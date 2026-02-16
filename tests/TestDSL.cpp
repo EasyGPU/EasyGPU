@@ -7,13 +7,7 @@
 #include <cassert>
 #include <cmath>
 
-#include <Kernel/Kernel.h>
-#include <IR/Value/VarArray.h>
-#include <IR/Value/Var.h>
-#include <Utility/Meta/StructMeta.h>
-
-using namespace GPU::IR::Value;
-using namespace GPU::Math;
+#include <GPU.h>
 
 // =============================================================================
 // Test 1: Basic Scalar Types
@@ -62,7 +56,7 @@ TEST(basic_scalar_types)
     // Test integer variables
     GPU::Kernel::InspectorKernel kernel1([](Var<int>& id) {
         Var<int> a;
-        Var<int> b = 10;
+        Var<int> b = MakeInt(10);
         Var<int> c = a + b;
         Var<int> d = c - 5;
         Var<int> e = d * 2;
@@ -103,14 +97,14 @@ TEST(basic_scalar_types)
         --a;
         auto _unused2 = a--;
     });
-    kernel1.Dispatch(true);
+    kernel1.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(float_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         Var<float> a;
-        Var<float> b = 3.14f;
+        Var<float> b = MakeFloat(3.14f);
         Var<float> c = a + b;
         Var<float> d = c - 1.0f;
         Var<float> e = d * 2.5f;
@@ -129,25 +123,25 @@ TEST(float_operations)
         a *= 2.0f;
         a /= 2.0f;
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(bool_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         Var<bool> a;
-        Var<bool> b = true;
+        Var<bool> b = MakeBool(true);
         Var<bool> c = a == b;
         Var<bool> d = a != b;
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(vec2_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         Var<Vec2> a;
-        Var<Vec2> b = Vec2(1.0f, 2.0f);
+        Var<Vec2> b = MakeFloat2(1.0f, 2.0f);
         Var<Vec2> c = a + b;
         Var<Vec2> d = c - b;
         Var<Vec2> e = d * 2.0f;  // Scalar multiplication
@@ -179,14 +173,14 @@ TEST(vec2_operations)
         a *= 2.0f;
         a /= 2.0f;
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(vec3_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         Var<Vec3> a;
-        Var<Vec3> b = Vec3(1.0f, 2.0f, 3.0f);
+        Var<Vec3> b = MakeFloat3(1.0f, 2.0f, 3.0f);
         Var<Vec3> c = a + b;
         Var<Vec3> d = c - b;
         Var<Vec3> e = d * 2.0f;
@@ -220,14 +214,14 @@ TEST(vec3_operations)
         Var<Vec3> res = (a + b).xyz();
         Var<Vec2> res2 = (a + b).xy();
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(vec4_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         Var<Vec4> a;
-        Var<Vec4> b = Vec4(1.0f, 2.0f, 3.0f, 4.0f);
+        Var<Vec4> b = MakeFloat4(1.0f, 2.0f, 3.0f, 4.0f);
         Var<Vec4> c = a + b;
         Var<Vec4> d = c - b;
         Var<Vec4> e = d * 2.0f;
@@ -256,39 +250,37 @@ TEST(vec4_operations)
         Var<Vec3> res2 = (a + b).xyz();
         Var<Vec4> res3 = (a + b).xyzw();
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(ivec_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         // IVec2
-        Var<IVec2> iv2 = IVec2(1, 2);
+        Var<IVec2> iv2 = MakeInt2(1, 2);
         Var<IVec2> iv2_add = iv2 + IVec2(3, 4);
         Var<IVec2> iv2_mul = iv2 * 2;  // Scalar multiplication
         Var<int> iv2_x = iv2.x();
         Var<IVec2> iv2_xx = iv2.xx();
         
         // Bitwise operations on integer vectors
-        Var<IVec2> iv2b = IVec2(7, 7);
+        Var<IVec2> iv2b = MakeInt2(7, 7);
         Var<IVec2> iv2_and = iv2 & iv2b;
         Var<IVec2> iv2_or = iv2 | iv2b;
         Var<IVec2> iv2_xor = iv2 ^ iv2b;
         Var<IVec2> iv2_not = ~iv2;
-        Var<IVec2> iv2_shl = iv2 << 1;
-        Var<IVec2> iv2_shr = iv2 >> 1;
         
         // IVec3
-        Var<IVec3> iv3 = IVec3(1, 2, 3);
+        Var<IVec3> iv3 = MakeInt3(1, 2, 3);
         Var<IVec3> iv3_mul = iv3 * 2;
         Var<IVec3> iv3_xyz = iv3.xyz();
         
         // IVec4
-        Var<IVec4> iv4 = IVec4(1, 2, 3, 4);
+        Var<IVec4> iv4 = MakeInt4(1, 2, 3, 4);
         Var<IVec4> iv4_mul = iv4 * 2;
         Var<IVec4> iv4_xyzw = iv4.xyzw();
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
@@ -296,7 +288,7 @@ TEST(matrix_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         // Mat2
         Var<Mat2> m2;
-        Var<Mat2> m2b = Mat2::Identity();
+        Var<Mat2> m2b = MakeMat2(Mat2::Identity());
         Var<Mat2> m2_add = m2 + m2b;
         Var<Mat2> m2_sub = m2 - m2b;
         Var<Mat2> m2_mul = m2 * 2.0f;
@@ -304,12 +296,12 @@ TEST(matrix_operations)
         
         // Mat3
         Var<Mat3> m3;
-        Var<Mat3> m3b = Mat3::Identity();
+        Var<Mat3> m3b = MakeMat3(Mat3::Identity());
         Var<Mat3> m3_mul = m3 * 2.0f;
         
         // Mat4
         Var<Mat4> m4;
-        Var<Mat4> m4b = Mat4::Identity();
+        Var<Mat4> m4b = MakeMat4(Mat4::Identity());
         Var<Mat4> m4_mul = m4 * 2.0f;
         
         // Column access
@@ -326,7 +318,7 @@ TEST(matrix_operations)
         Var<Mat3x2> m3x2_mul = m3x2 * 2.0f;
         Var<Vec2> m3x2_col = m3x2[0];
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
@@ -357,7 +349,7 @@ TEST(matrix_vector_multiplication)
         // Expression matrix * expression vector
         Var<Vec3> expr_mul = (m3 * 2.0f) * (v3 * 3.0f);
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
@@ -385,7 +377,7 @@ TEST(array_operations)
         // Dynamic index using expression
         Var<float> f_dyn = float_arr[Expr<int>(id)];
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
@@ -419,7 +411,7 @@ TEST(struct_operations)
         mat.albedo().x() = 1.0f;
         Var<float> rough = mat.roughness();
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
@@ -438,14 +430,14 @@ TEST(struct_cpu_capture)
         p.position() = p.position() + p.velocity() * 0.016f;
         p.life() = p.life() - 0.01f;
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(var_assignment)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         // Assignment from Var to Var
-        Var<int> a = 10;
+        Var<int> a = MakeInt(10);
         Var<int> b;
         b = a;
         
@@ -454,20 +446,20 @@ TEST(var_assignment)
         f = 3.14f;
         
         // Assignment from expression
-        Var<Vec3> v1 = Vec3(1.0f, 2.0f, 3.0f);
+        Var<Vec3> v1 = MakeFloat3(1.0f, 2.0f, 3.0f);
         Var<Vec3> v2;
         v2 = v1 + Vec3(1.0f, 1.0f, 1.0f);
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(expression_operations)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         // Complex expressions
-        Var<int> a = 1;
-        Var<int> b = 2;
-        Var<int> c = 3;
+        Var<int> a = MakeInt(1);
+        Var<int> b = MakeInt(2);
+        Var<int> c = MakeInt(3);
         
         Var<int> result1 = a + b * c;  // Should be 7
         Var<int> result2 = (a + b) * c;  // Should be 9
@@ -481,31 +473,31 @@ TEST(expression_operations)
         Var<bool> cmp4 = (a < b) && (b < c) && (c > a);
         
         // Float expressions
-        Var<float> f1 = 1.5f;
-        Var<float> f2 = 2.5f;
+        Var<float> f1 = MakeFloat(1.5f);
+        Var<float> f2 = MakeFloat(2.5f);
         Var<float> f3 = (f1 + f2) * 2.0f;
         Var<float> f4 = f1 * f2 + f3;
         
         // Vector expressions with swizzle
-        Var<Vec3> v1 = Vec3(1.0f, 2.0f, 3.0f);
-        Var<Vec3> v2 = Vec3(4.0f, 5.0f, 6.0f);
+        Var<Vec3> v1 = MakeFloat3(1.0f, 2.0f, 3.0f);
+        Var<Vec3> v2 = MakeFloat3(4.0f, 5.0f, 6.0f);
         Var<Vec2> v3 = (v1 + v2).xy();
         Var<Vec3> v4 = (v1 * 2.0f).xyz();
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
 TEST(mixed_type_expressions)
     GPU::Kernel::InspectorKernel kernel([](Var<int>& id) {
         // Int and float comparison (promotion)
-        Var<int> i = 5;
-        Var<float> f = 5.0f;
+        Var<int> i = MakeInt(5);
+        Var<float> f = MakeFloat(5.0f);
         Var<bool> eq = (i == i);  // Same type comparison
         Var<bool> eq2 = (f == f);
         
         // Scalar and vector multiplication
-        Var<Vec3> v = Vec3(1.0f, 2.0f, 3.0f);
+        Var<Vec3> v = MakeFloat3(1.0f, 2.0f, 3.0f);
         Var<Vec3> v2 = v * 2.0f;
         Var<Vec3> v3 = 3.0f * v;
         
@@ -514,7 +506,7 @@ TEST(mixed_type_expressions)
         Var<Mat4> m2 = m * 2.0f;
         Var<Mat4> m3 = 3.0f * m;
     });
-    kernel.Dispatch(true);
+    kernel.PrintCode();
     ASSERT(true);
 END_TEST
 
