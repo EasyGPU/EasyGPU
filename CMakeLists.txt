@@ -135,6 +135,7 @@ add_library(EasyGPU STATIC
     # Runtime
     include/Runtime/Buffer.h
     include/Runtime/Texture.h
+    include/Runtime/Uniform.h
     include/Runtime/Context.h
     source/Runtime/Context.cpp
     include/Runtime/PixelFormat.h
@@ -198,6 +199,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestProfiler.cpp
         tests/TestDispatch.cpp
         tests/TestArray.cpp
+        tests/TestUniform.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})

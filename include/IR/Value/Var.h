@@ -139,6 +139,17 @@ namespace GPU::IR::Value {
         }
 
         /**
+         * Creating a reference to an external variable (e.g., uniform) through the VarBase API.
+         * This API won't trigger the IR node tree construction and won't declare the variable in main().
+         * @param Name The name of the external variable
+         * @param IsExternal Flag to indicate this is an external variable (uniform, etc.)
+         */
+        VarBase(std::string Name, bool IsExternal) {
+            _node    = std::make_unique<Node::LocalVariableNode>(Name, TypeShaderName<Type>(), IsExternal);
+            _varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+        }
+
+        /**
          * Copy constructor - creates a new variable with value copied from source
          * @param Other The other VarBase to copy from
          */

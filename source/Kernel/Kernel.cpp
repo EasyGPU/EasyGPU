@@ -111,6 +111,9 @@ namespace GPU::Kernel {
         // Use the program
         glUseProgram(program);
 
+        // Upload uniform values
+        context.UploadUniformValues(program);
+
         // Bind all buffers to their specified binding points
         const auto& bufferBindings = context.GetRuntimeBufferBindings();
         for (const auto& [binding, handle] : bufferBindings) {

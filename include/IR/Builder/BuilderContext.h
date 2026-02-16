@@ -164,6 +164,27 @@ namespace GPU::IR::Builder {
 
     public:
         // ===================================================================
+        // Uniform Support
+        // ===================================================================
+        
+        /**
+         * Register a uniform variable for the kernel
+         * @param typeName The GLSL type name
+         * @param uniformPtr Pointer to the Uniform object (as void* for type erasure)
+         * @param uploadFunc Function to upload the uniform value to GPU
+         * @return The assigned uniform variable name in GLSL
+         */
+        virtual std::string RegisterUniform(const std::string& typeName, void* uniformPtr, 
+                                            std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) = 0;
+
+        /**
+         * Get the uniform declarations for GLSL
+         * @return The uniform declaration string
+         */
+        virtual std::string GetUniformDeclarations() const = 0;
+
+    public:
+        // ===================================================================
         // Callable Function Support
         // ===================================================================
         

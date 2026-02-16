@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <stack>
+#include <functional>
 
 namespace GPU::Kernel {
     /**
@@ -180,6 +181,34 @@ namespace GPU::Kernel {
 
     public:
         // ===================================================================
+        // Uniform Support
+        // ===================================================================
+        
+        /**
+         * Register a uniform variable for the kernel
+         * @param typeName The GLSL type name
+         * @param uniformPtr Pointer to the Uniform object (as void* for type erasure)
+         * @param uploadFunc Function to upload the uniform value to GPU
+         * @return The assigned uniform variable name in GLSL
+         */
+        std::string RegisterUniform(const std::string& typeName, void* uniformPtr,
+                                    std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) override;
+
+        /**
+         * Get the uniform declarations for GLSL
+         * @return The uniform declaration string
+         */
+        std::string GetUniformDeclarations() const override;
+
+        /**
+         * Set uniform values using glUniform functions
+         * This is called during dispatch to upload uniform values to GPU
+         * @param program The OpenGL shader program handle
+         */
+        void UploadUniformValues(uint32_t program) const;
+
+    public:
+        // ===================================================================
         // Callable Function Support
         // ===================================================================
         
@@ -262,6 +291,19 @@ namespace GPU::Kernel {
         std::vector<TextureInfo> _textures;
         std::vector<uint32_t> _textureBindings;
         std::unordered_map<uint32_t, uint32_t> _runtimeTextures;  // binding -> GL texture handle
+        
+        /**
+         * Uniform registration info
+         */
+        struct UniformEntry {
+            std::string name;
+            std::string typeName;
+            void* uniformPtr;
+            std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc;
+        };
+        
+        std::vector<UniformEntry> _uniforms;
+        int _nextUniformIndex = 0;
         
         /**
          * The index for the variable name generation

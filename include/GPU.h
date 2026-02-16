@@ -73,6 +73,7 @@
 // =============================================================================
 #include <Runtime/Buffer.h>
 #include <Runtime/Texture.h>
+#include <Runtime/Uniform.h>
 #include <Runtime/Context.h>
 #include <Runtime/PixelFormat.h>
 #include <Runtime/ShaderException.h>

@@ -9,7 +9,12 @@
 #include <utility>
 
 namespace GPU::IR::Node {
-    LocalVariableNode::LocalVariableNode(std::string Name, std::string Type) : _name(std::move(Name)), _type(std::move(Type)) {
+    LocalVariableNode::LocalVariableNode(std::string Name, std::string Type) 
+        : _name(std::move(Name)), _type(std::move(Type)), _isExternal(false) {
+    }
+    
+    LocalVariableNode::LocalVariableNode(std::string Name, std::string Type, bool IsExternal) 
+        : _name(std::move(Name)), _type(std::move(Type)), _isExternal(IsExternal) {
     }
 
     std::string LocalVariableNode::VarName() const {
@@ -19,12 +24,17 @@ namespace GPU::IR::Node {
     std::string LocalVariableNode::VarType() const {
         return _type;
     }
+    
+    bool LocalVariableNode::IsExternal() const {
+        return _isExternal;
+    }
 
     NodeType LocalVariableNode::Type() const {
         return NodeType::LocalVariable;
     }
 
     std::unique_ptr<Node> LocalVariableNode::Clone() const {
-        return std::make_unique<LocalVariableNode>(_name, _type);
+        auto clone = std::make_unique<LocalVariableNode>(_name, _type, _isExternal);
+        return clone;
     }
 }

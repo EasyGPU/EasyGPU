@@ -146,6 +146,22 @@ namespace GPU::Flow {
         _collectedCode.clear();
     }
 
+    // Uniform Support - delegate to parent
+    std::string CodeCollectContext::RegisterUniform(const std::string& typeName, void* uniformPtr,
+                                                    std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) {
+        if (_parentContext) {
+            return _parentContext->RegisterUniform(typeName, uniformPtr, uploadFunc);
+        }
+        return "";
+    }
+
+    std::string CodeCollectContext::GetUniformDeclarations() const {
+        if (_parentContext) {
+            return _parentContext->GetUniformDeclarations();
+        }
+        return "";
+    }
+
     // Callable Function Support - delegate to parent
     void CodeCollectContext::AddCallableDeclaration(const std::string &declaration) {
         if (_parentContext) {

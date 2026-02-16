@@ -51,6 +51,11 @@ namespace GPU::Flow {
         const std::unordered_map<uint32_t, uint32_t>& GetRuntimeTextureBindings() const override;
 
         // Callable Function Support
+        // Uniform Support
+        std::string RegisterUniform(const std::string& typeName, void* uniformPtr,
+                                    std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) override;
+        std::string GetUniformDeclarations() const override;
+
         void AddCallableDeclaration(const std::string &declaration) override;
         void AddCallableBodyGenerator(std::function<void()> generator) override;
         void PushCallableBody() override;

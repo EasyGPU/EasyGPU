@@ -188,6 +188,11 @@ namespace GPU::IR::Builder {
     }
 
     std::string Builder::BuildLocalVariable(const Node::LocalVariableNode &Node) {
+        // External variables (e.g., uniforms) are declared outside main(),
+        // so we don't need to declare them in the main function body
+        if (Node.IsExternal()) {
+            return "";
+        }
         return std::format("{} {}", Node.VarType(), Node.VarName());
     }
 

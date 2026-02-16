@@ -140,6 +140,12 @@ namespace GPU::Kernel {
             oss << bufferDecls << "\n";
         }
 
+        // Output uniform declarations (after buffer declarations, before callable declarations)
+        std::string uniformDecls = GetUniformDeclarations();
+        if (!uniformDecls.empty()) {
+            oss << uniformDecls << "\n";
+        }
+
         // Output callable function forward declarations (before main)
         for (const auto &decl : _callableDeclarations) {
             oss << decl << ";\n";
@@ -371,5 +377,43 @@ namespace GPU::Kernel {
         }
         
         return oss.str();
+    }
+
+    // ===================================================================
+    // Uniform Support
+    // ===================================================================
+
+    std::string KernelBuildContext::RegisterUniform(const std::string& typeName, void* uniformPtr,
+                                                    std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) {
+        // Check if this uniform is already registered
+        for (const auto& entry : _uniforms) {
+            if (entry.uniformPtr == uniformPtr) {
+                return entry.name;
+            }
+        }
+        
+        // Allocate new uniform name
+        std::string uniformName = std::format("u{}", _nextUniformIndex++);
+        
+        // Store uniform entry
+        _uniforms.push_back({uniformName, typeName, uniformPtr, uploadFunc});
+        
+        return uniformName;
+    }
+
+    std::string KernelBuildContext::GetUniformDeclarations() const {
+        std::ostringstream oss;
+        for (const auto& entry : _uniforms) {
+            oss << std::format("uniform {} {};\n", entry.typeName, entry.name);
+        }
+        return oss.str();
+    }
+
+    void KernelBuildContext::UploadUniformValues(uint32_t program) const {
+        for (const auto& entry : _uniforms) {
+            if (entry.uploadFunc) {
+                entry.uploadFunc(program, entry.name, entry.uniformPtr);
+            }
+        }
     }
 }
