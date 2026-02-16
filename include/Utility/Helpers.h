@@ -1,0 +1,566 @@
+/**
+ * Helpers.h:
+ *      @Descripiton    :   Helper functions and type aliases for EasyGPU
+ *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
+ *      @Date           :   2/14/2026
+ */
+#ifndef EASYGPU_HELPERS_H
+#define EASYGPU_HELPERS_H
+
+#include <IR/Value/Var.h>
+#include <IR/Value/Expr.h>
+#include <IR/Value/ExprVector.h>
+#include <IR/Value/ExprIVector.h>
+#include <IR/Value/ExprMatrix.h>
+#include <IR/Node/LoadUniform.h>
+#include <IR/Node/CallInst.h>
+#include <Utility/Math.h>
+
+namespace GPU {
+    // ============================================================================
+    // Type Aliases for Var types
+    // ============================================================================
+    namespace Alias {
+        // Scalar types
+        using Int   = IR::Value::Var<int>;
+        using Float = IR::Value::Var<float>;
+        using Bool  = IR::Value::Var<bool>;
+
+        // Float vector types
+        using Float2 = IR::Value::Var<Math::Vec2>;
+        using Float3 = IR::Value::Var<Math::Vec3>;
+        using Float4 = IR::Value::Var<Math::Vec4>;
+
+        // Int vector types
+        using Int2 = IR::Value::Var<Math::IVec2>;
+        using Int3 = IR::Value::Var<Math::IVec3>;
+        using Int4 = IR::Value::Var<Math::IVec4>;
+
+        // Matrix types
+        using Matrix2 = IR::Value::Var<Math::Mat2>;
+        using Matrix3 = IR::Value::Var<Math::Mat3>;
+        using Matrix4 = IR::Value::Var<Math::Mat4>;
+        using Matrix2x3 = IR::Value::Var<Math::Mat2x3>;
+        using Matrix3x2 = IR::Value::Var<Math::Mat3x2>;
+        using Matrix2x4 = IR::Value::Var<Math::Mat2x4>;
+        using Matrix4x2 = IR::Value::Var<Math::Mat4x2>;
+        using Matrix3x4 = IR::Value::Var<Math::Mat3x4>;
+        using Matrix4x3 = IR::Value::Var<Math::Mat4x3>;
+
+        // Expr type aliases
+        using IntExpr   = IR::Value::Expr<int>;
+        using FloatExpr = IR::Value::Expr<float>;
+        using BoolExpr  = IR::Value::Expr<bool>;
+        using Float2Expr = IR::Value::Expr<Math::Vec2>;
+        using Float3Expr = IR::Value::Expr<Math::Vec3>;
+        using Float4Expr = IR::Value::Expr<Math::Vec4>;
+        using Int2Expr = IR::Value::Expr<Math::IVec2>;
+        using Int3Expr = IR::Value::Expr<Math::IVec3>;
+        using Int4Expr = IR::Value::Expr<Math::IVec4>;
+
+        // Matrix Expr type aliases
+        using Mat2Expr = IR::Value::Expr<Math::Mat2>;
+        using Mat3Expr = IR::Value::Expr<Math::Mat3>;
+        using Mat4Expr = IR::Value::Expr<Math::Mat4>;
+        using Mat2x3Expr = IR::Value::Expr<Math::Mat2x3>;
+        using Mat3x2Expr = IR::Value::Expr<Math::Mat3x2>;
+        using Mat2x4Expr = IR::Value::Expr<Math::Mat2x4>;
+        using Mat4x2Expr = IR::Value::Expr<Math::Mat4x2>;
+        using Mat3x4Expr = IR::Value::Expr<Math::Mat3x4>;
+        using Mat4x3Expr = IR::Value::Expr<Math::Mat4x3>;
+    }
+
+    // ============================================================================
+    // Helper functions to construct vectors from components
+    // Uses perfect forwarding to accept Var, Expr, or literal values
+    // ============================================================================
+    namespace Construct {
+        // Helper to build parameter list for vector constructors
+        namespace Detail {
+            inline std::vector<std::unique_ptr<IR::Node::Node*>> BuildVectorParams(
+                const std::vector<IR::Value::ExprBase*>& exprs) {
+                std::vector<std::unique_ptr<IR::Node::Node*>> params;
+                params.reserve(exprs.size());
+                for (auto* expr : exprs) {
+                    params.push_back(std::make_unique<IR::Node::Node*>(
+                        const_cast<IR::Value::ExprBase*>(expr)->Node()->Clone().release()));
+                }
+                return params;
+            }
+
+            // Internal implementations that take Expr
+            [[nodiscard]] inline IR::Value::Expr<Math::Vec2> MakeFloat2Impl(
+                const IR::Value::Expr<float>& x,
+                const IR::Value::Expr<float>& y) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<float>*>(&x),
+                    const_cast<IR::Value::Expr<float>*>(&y)
+                };
+                return Math::MakeCall<Math::Vec2>("vec2", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Vec3> MakeFloat3Impl(
+                const IR::Value::Expr<float>& x,
+                const IR::Value::Expr<float>& y,
+                const IR::Value::Expr<float>& z) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<float>*>(&x),
+                    const_cast<IR::Value::Expr<float>*>(&y),
+                    const_cast<IR::Value::Expr<float>*>(&z)
+                };
+                return Math::MakeCall<Math::Vec3>("vec3", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Vec4> MakeFloat4Impl(
+                const IR::Value::Expr<float>& x,
+                const IR::Value::Expr<float>& y,
+                const IR::Value::Expr<float>& z,
+                const IR::Value::Expr<float>& w) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<float>*>(&x),
+                    const_cast<IR::Value::Expr<float>*>(&y),
+                    const_cast<IR::Value::Expr<float>*>(&z),
+                    const_cast<IR::Value::Expr<float>*>(&w)
+                };
+                return Math::MakeCall<Math::Vec4>("vec4", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::IVec2> MakeInt2Impl(
+                const IR::Value::Expr<int>& x,
+                const IR::Value::Expr<int>& y) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<int>*>(&x),
+                    const_cast<IR::Value::Expr<int>*>(&y)
+                };
+                return Math::MakeCall<Math::IVec2>("ivec2", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::IVec3> MakeInt3Impl(
+                const IR::Value::Expr<int>& x,
+                const IR::Value::Expr<int>& y,
+                const IR::Value::Expr<int>& z) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<int>*>(&x),
+                    const_cast<IR::Value::Expr<int>*>(&y),
+                    const_cast<IR::Value::Expr<int>*>(&z)
+                };
+                return Math::MakeCall<Math::IVec3>("ivec3", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::IVec4> MakeInt4Impl(
+                const IR::Value::Expr<int>& x,
+                const IR::Value::Expr<int>& y,
+                const IR::Value::Expr<int>& z,
+                const IR::Value::Expr<int>& w) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<int>*>(&x),
+                    const_cast<IR::Value::Expr<int>*>(&y),
+                    const_cast<IR::Value::Expr<int>*>(&z),
+                    const_cast<IR::Value::Expr<int>*>(&w)
+                };
+                return Math::MakeCall<Math::IVec4>("ivec4", BuildVectorParams(exprs));
+            }
+        }
+
+        // Public template versions with perfect forwarding
+        // Multi-component versions
+        template<typename X, typename Y>
+        [[nodiscard]] inline auto MakeFloat2(X&& x, Y&& y) {
+            return Detail::MakeFloat2Impl(
+                IR::Value::Expr<float>(std::forward<X>(x)),
+                IR::Value::Expr<float>(std::forward<Y>(y)));
+        }
+
+        template<typename X, typename Y, typename Z>
+        [[nodiscard]] inline auto MakeFloat3(X&& x, Y&& y, Z&& z) {
+            return Detail::MakeFloat3Impl(
+                IR::Value::Expr<float>(std::forward<X>(x)),
+                IR::Value::Expr<float>(std::forward<Y>(y)),
+                IR::Value::Expr<float>(std::forward<Z>(z)));
+        }
+
+        template<typename X, typename Y, typename Z, typename W>
+        [[nodiscard]] inline auto MakeFloat4(X&& x, Y&& y, Z&& z, W&& w) {
+            return Detail::MakeFloat4Impl(
+                IR::Value::Expr<float>(std::forward<X>(x)),
+                IR::Value::Expr<float>(std::forward<Y>(y)),
+                IR::Value::Expr<float>(std::forward<Z>(z)),
+                IR::Value::Expr<float>(std::forward<W>(w)));
+        }
+
+        template<typename X, typename Y>
+        [[nodiscard]] inline auto MakeInt2(X&& x, Y&& y) {
+            return Detail::MakeInt2Impl(
+                IR::Value::Expr<int>(std::forward<X>(x)),
+                IR::Value::Expr<int>(std::forward<Y>(y)));
+        }
+
+        template<typename X, typename Y, typename Z>
+        [[nodiscard]] inline auto MakeInt3(X&& x, Y&& y, Z&& z) {
+            return Detail::MakeInt3Impl(
+                IR::Value::Expr<int>(std::forward<X>(x)),
+                IR::Value::Expr<int>(std::forward<Y>(y)),
+                IR::Value::Expr<int>(std::forward<Z>(z)));
+        }
+
+        template<typename X, typename Y, typename Z, typename W>
+        [[nodiscard]] inline auto MakeInt4(X&& x, Y&& y, Z&& z, W&& w) {
+            return Detail::MakeInt4Impl(
+                IR::Value::Expr<int>(std::forward<X>(x)),
+                IR::Value::Expr<int>(std::forward<Y>(y)),
+                IR::Value::Expr<int>(std::forward<Z>(z)),
+                IR::Value::Expr<int>(std::forward<W>(w)));
+        }
+
+        // Type trait to detect Vec types (for disabling lazy fill when Vec is passed)
+        template<typename T>
+        struct IsVecType : std::false_type {};
+        template<> struct IsVecType<Math::Vec2> : std::true_type {};
+        template<> struct IsVecType<Math::Vec3> : std::true_type {};
+        template<> struct IsVecType<Math::Vec4> : std::true_type {};
+        template<> struct IsVecType<Math::IVec2> : std::true_type {};
+        template<> struct IsVecType<Math::IVec3> : std::true_type {};
+        template<> struct IsVecType<Math::IVec4> : std::true_type {};
+
+        // Single-component lazy fill versions (e.g., MakeFloat3(1.0) creates vec3(1.0, 1.0, 1.0))
+        // Disabled when X is a Vec type to avoid ambiguity with the overloads below
+        template<typename X>
+            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+        [[nodiscard]] inline auto MakeFloat2(X&& x) {
+            IR::Value::Expr<float> val(std::forward<X>(x));
+            return Detail::MakeFloat2Impl(val, val);
+        }
+
+        template<typename X>
+            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+        [[nodiscard]] inline auto MakeFloat3(X&& x) {
+            IR::Value::Expr<float> val(std::forward<X>(x));
+            return Detail::MakeFloat3Impl(val, val, val);
+        }
+
+        template<typename X>
+            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+        [[nodiscard]] inline auto MakeFloat4(X&& x) {
+            IR::Value::Expr<float> val(std::forward<X>(x));
+            return Detail::MakeFloat4Impl(val, val, val, val);
+        }
+
+        template<typename X>
+            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+        [[nodiscard]] inline auto MakeInt2(X&& x) {
+            IR::Value::Expr<int> val(std::forward<X>(x));
+            return Detail::MakeInt2Impl(val, val);
+        }
+
+        template<typename X>
+            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+        [[nodiscard]] inline auto MakeInt3(X&& x) {
+            IR::Value::Expr<int> val(std::forward<X>(x));
+            return Detail::MakeInt3Impl(val, val, val);
+        }
+
+        template<typename X>
+            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+        [[nodiscard]] inline auto MakeInt4(X&& x) {
+            IR::Value::Expr<int> val(std::forward<X>(x));
+            return Detail::MakeInt4Impl(val, val, val, val);
+        }
+
+        // CPU-side vector to GPU Expr vector conversions
+        [[nodiscard]] inline IR::Value::Expr<Math::Vec2> MakeFloat2(const Math::Vec2& v) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(v));
+            return IR::Value::Expr<Math::Vec2>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Vec3> MakeFloat3(const Math::Vec3& v) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(v));
+            return IR::Value::Expr<Math::Vec3>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Vec4> MakeFloat4(const Math::Vec4& v) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(v));
+            return IR::Value::Expr<Math::Vec4>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::IVec2> MakeInt2(const Math::IVec2& v) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(v));
+            return IR::Value::Expr<Math::IVec2>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::IVec3> MakeInt3(const Math::IVec3& v) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(v));
+            return IR::Value::Expr<Math::IVec3>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::IVec4> MakeInt4(const Math::IVec4& v) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(v));
+            return IR::Value::Expr<Math::IVec4>(std::move(uniform));
+        }
+
+        // ============================================================================
+        // Matrix construction helpers
+        // ============================================================================
+
+        // Internal implementations for matrix construction
+        namespace Detail {
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat2> MakeMat2Impl(
+                const IR::Value::Expr<Math::Vec2>& c0,
+                const IR::Value::Expr<Math::Vec2>& c1) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c1)
+                };
+                return Math::MakeCall<Math::Mat2>("mat2", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat3> MakeMat3Impl(
+                const IR::Value::Expr<Math::Vec3>& c0,
+                const IR::Value::Expr<Math::Vec3>& c1,
+                const IR::Value::Expr<Math::Vec3>& c2) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c1),
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c2)
+                };
+                return Math::MakeCall<Math::Mat3>("mat3", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat4> MakeMat4Impl(
+                const IR::Value::Expr<Math::Vec4>& c0,
+                const IR::Value::Expr<Math::Vec4>& c1,
+                const IR::Value::Expr<Math::Vec4>& c2,
+                const IR::Value::Expr<Math::Vec4>& c3) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c1),
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c2),
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c3)
+                };
+                return Math::MakeCall<Math::Mat4>("mat4", BuildVectorParams(exprs));
+            }
+
+            // Rectangular matrices
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat2x3> MakeMat2x3Impl(
+                const IR::Value::Expr<Math::Vec3>& c0,
+                const IR::Value::Expr<Math::Vec3>& c1) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c1)
+                };
+                return Math::MakeCall<Math::Mat2x3>("mat2x3", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat3x2> MakeMat3x2Impl(
+                const IR::Value::Expr<Math::Vec2>& c0,
+                const IR::Value::Expr<Math::Vec2>& c1,
+                const IR::Value::Expr<Math::Vec2>& c2) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c1),
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c2)
+                };
+                return Math::MakeCall<Math::Mat3x2>("mat3x2", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat2x4> MakeMat2x4Impl(
+                const IR::Value::Expr<Math::Vec4>& c0,
+                const IR::Value::Expr<Math::Vec4>& c1) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c1)
+                };
+                return Math::MakeCall<Math::Mat2x4>("mat2x4", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat4x2> MakeMat4x2Impl(
+                const IR::Value::Expr<Math::Vec2>& c0,
+                const IR::Value::Expr<Math::Vec2>& c1,
+                const IR::Value::Expr<Math::Vec2>& c2,
+                const IR::Value::Expr<Math::Vec2>& c3) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c1),
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c2),
+                    const_cast<IR::Value::Expr<Math::Vec2>*>(&c3)
+                };
+                return Math::MakeCall<Math::Mat4x2>("mat4x2", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat3x4> MakeMat3x4Impl(
+                const IR::Value::Expr<Math::Vec4>& c0,
+                const IR::Value::Expr<Math::Vec4>& c1,
+                const IR::Value::Expr<Math::Vec4>& c2) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c1),
+                    const_cast<IR::Value::Expr<Math::Vec4>*>(&c2)
+                };
+                return Math::MakeCall<Math::Mat3x4>("mat3x4", BuildVectorParams(exprs));
+            }
+
+            [[nodiscard]] inline IR::Value::Expr<Math::Mat4x3> MakeMat4x3Impl(
+                const IR::Value::Expr<Math::Vec3>& c0,
+                const IR::Value::Expr<Math::Vec3>& c1,
+                const IR::Value::Expr<Math::Vec3>& c2,
+                const IR::Value::Expr<Math::Vec3>& c3) {
+                std::vector<IR::Value::ExprBase*> exprs = {
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c0),
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c1),
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c2),
+                    const_cast<IR::Value::Expr<Math::Vec3>*>(&c3)
+                };
+                return Math::MakeCall<Math::Mat4x3>("mat4x3", BuildVectorParams(exprs));
+            }
+        }
+
+        // Public template versions for matrix construction from columns
+        template<typename C0, typename C1>
+        [[nodiscard]] inline auto MakeMat2(C0&& c0, C1&& c1) {
+            return Detail::MakeMat2Impl(
+                IR::Value::Expr<Math::Vec2>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec2>(std::forward<C1>(c1)));
+        }
+
+        template<typename C0, typename C1, typename C2>
+        [[nodiscard]] inline auto MakeMat3(C0&& c0, C1&& c1, C2&& c2) {
+            return Detail::MakeMat3Impl(
+                IR::Value::Expr<Math::Vec3>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec3>(std::forward<C1>(c1)),
+                IR::Value::Expr<Math::Vec3>(std::forward<C2>(c2)));
+        }
+
+        template<typename C0, typename C1, typename C2, typename C3>
+        [[nodiscard]] inline auto MakeMat4(C0&& c0, C1&& c1, C2&& c2, C3&& c3) {
+            return Detail::MakeMat4Impl(
+                IR::Value::Expr<Math::Vec4>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec4>(std::forward<C1>(c1)),
+                IR::Value::Expr<Math::Vec4>(std::forward<C2>(c2)),
+                IR::Value::Expr<Math::Vec4>(std::forward<C3>(c3)));
+        }
+
+        // Rectangular matrices
+        template<typename C0, typename C1>
+        [[nodiscard]] inline auto MakeMat2x3(C0&& c0, C1&& c1) {
+            return Detail::MakeMat2x3Impl(
+                IR::Value::Expr<Math::Vec3>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec3>(std::forward<C1>(c1)));
+        }
+
+        template<typename C0, typename C1, typename C2>
+        [[nodiscard]] inline auto MakeMat3x2(C0&& c0, C1&& c1, C2&& c2) {
+            return Detail::MakeMat3x2Impl(
+                IR::Value::Expr<Math::Vec2>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec2>(std::forward<C1>(c1)),
+                IR::Value::Expr<Math::Vec2>(std::forward<C2>(c2)));
+        }
+
+        template<typename C0, typename C1>
+        [[nodiscard]] inline auto MakeMat2x4(C0&& c0, C1&& c1) {
+            return Detail::MakeMat2x4Impl(
+                IR::Value::Expr<Math::Vec4>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec4>(std::forward<C1>(c1)));
+        }
+
+        template<typename C0, typename C1, typename C2, typename C3>
+        [[nodiscard]] inline auto MakeMat4x2(C0&& c0, C1&& c1, C2&& c2, C3&& c3) {
+            return Detail::MakeMat4x2Impl(
+                IR::Value::Expr<Math::Vec2>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec2>(std::forward<C1>(c1)),
+                IR::Value::Expr<Math::Vec2>(std::forward<C2>(c2)),
+                IR::Value::Expr<Math::Vec2>(std::forward<C3>(c3)));
+        }
+
+        template<typename C0, typename C1, typename C2>
+        [[nodiscard]] inline auto MakeMat3x4(C0&& c0, C1&& c1, C2&& c2) {
+            return Detail::MakeMat3x4Impl(
+                IR::Value::Expr<Math::Vec4>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec4>(std::forward<C1>(c1)),
+                IR::Value::Expr<Math::Vec4>(std::forward<C2>(c2)));
+        }
+
+        template<typename C0, typename C1, typename C2, typename C3>
+        [[nodiscard]] inline auto MakeMat4x3(C0&& c0, C1&& c1, C2&& c2, C3&& c3) {
+            return Detail::MakeMat4x3Impl(
+                IR::Value::Expr<Math::Vec3>(std::forward<C0>(c0)),
+                IR::Value::Expr<Math::Vec3>(std::forward<C1>(c1)),
+                IR::Value::Expr<Math::Vec3>(std::forward<C2>(c2)),
+                IR::Value::Expr<Math::Vec3>(std::forward<C3>(c3)));
+        }
+
+        // CPU-side matrix to GPU Expr matrix conversions
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat2> MakeMat2(const Math::Mat2& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat2>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat3> MakeMat3(const Math::Mat3& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat3>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat4> MakeMat4(const Math::Mat4& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat4>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat2x3> MakeMat2x3(const Math::Mat2x3& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat2x3>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat3x2> MakeMat3x2(const Math::Mat3x2& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat3x2>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat2x4> MakeMat2x4(const Math::Mat2x4& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat2x4>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat4x2> MakeMat4x2(const Math::Mat4x2& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat4x2>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat3x4> MakeMat3x4(const Math::Mat3x4& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat3x4>(std::move(uniform));
+        }
+
+        [[nodiscard]] inline IR::Value::Expr<Math::Mat4x3> MakeMat4x3(const Math::Mat4x3& m) {
+            auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m));
+            return IR::Value::Expr<Math::Mat4x3>(std::move(uniform));
+        }
+    }
+
+    // ============================================================================
+    // Scalar construction helpers
+    // ============================================================================
+    
+    // MakeFloat - Construct Expr<float> from scalar values
+    template<typename T>
+    [[nodiscard]] inline auto MakeFloat(T&& x) {
+        return IR::Value::Expr<float>(std::forward<T>(x));
+    }
+
+    // MakeInt - Construct Expr<int> from scalar values  
+    template<typename T>
+    [[nodiscard]] inline auto MakeInt(T&& x) {
+        return IR::Value::Expr<int>(std::forward<T>(x));
+    }
+
+    // MakeBool - Construct Expr<bool> from scalar values
+    template<typename T>
+    [[nodiscard]] inline auto MakeBool(T&& x) {
+        return IR::Value::Expr<bool>(std::forward<T>(x));
+    }
+
+    // ============================================================================
+    // Convenience: bring Alias and Construct into GPU namespace
+    // ============================================================================
+    using namespace Alias;
+    using namespace Construct;
+}
+
+#endif //EASYGPU_HELPERS_H
