@@ -1,0 +1,31 @@
+name: Question
+description: Ask a question about usage or documentation
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to accomplish?
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your system information
+      value: |
+        - OS: 
+        - Compiler: 
+        - EasyGPU Version: 
+  - type: textarea
+    id: code
+    attributes:
+      label: Code
+      description: Relevant code if applicable
+      render: cpp
