@@ -74,7 +74,6 @@ add_library(EasyGPU STATIC
     source/IR/Node/Increment.cpp
     include/IR/Node/MemberAccess.h
     source/IR/Node/MemberAccess.cpp
-    include/IR/Node/If.h
     source/IR/Node/If.cpp
     include/IR/Node/For.h
     source/IR/Node/For.cpp
@@ -119,14 +118,14 @@ add_library(EasyGPU STATIC
     source/Kernel/KernelProfiler.cpp
     
     # Flow Control
-    include/Flow/If.h
-    source/Flow/If.cpp
-    include/Flow/For.h
-    include/Flow/While.h
-    include/Flow/DoWhile.h
-    include/Flow/Break.h
-    include/Flow/Continue.h
-    include/Flow/Return.h
+    include/Flow/IfFlow.h
+    source/Flow/IfFlow.cpp
+    include/Flow/ForFlow.h
+    include/Flow/WhileFlow.h
+    include/Flow/DoWhileFlow.h
+    include/Flow/BreakFlow.h
+    include/Flow/ContinueFlow.h
+    include/Flow/ReturnFlow.h
     include/Flow/CodeCollectContext.h
     source/Flow/CodeCollectContext.cpp
     

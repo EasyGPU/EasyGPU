@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * StructMeta.h:
  *      @Descripiton    :   Structure reflection meta system for EASYGPU_STRUCT

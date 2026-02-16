@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * BuilderContext.h:
  *      @Descripiton    :   The context for the builder to bind
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

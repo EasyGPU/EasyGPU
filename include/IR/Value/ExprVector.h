@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * ExprVector.h:
  *      @Descripiton    :   The specified expression API for vector with swizzle access

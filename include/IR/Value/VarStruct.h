@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * VarStruct.h:
  *      @Descripiton    :   Var<StructType> specialization support

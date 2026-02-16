@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * KernelProfiler.h:
  *      @Descripiton    :   Kernel profiling tool for measuring GPU execution time
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

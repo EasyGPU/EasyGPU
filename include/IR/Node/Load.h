@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Load.h:
  *      @Descripiton    :   The node for any address loading
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

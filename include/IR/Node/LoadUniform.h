@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * LoadUniform.h:
  *      @Descripiton    :   The uniform load node
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

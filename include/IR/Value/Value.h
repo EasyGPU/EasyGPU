@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Value.h:
  *      @Descripiton    :   The value class
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

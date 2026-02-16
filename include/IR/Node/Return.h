@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Return.h:
  *      @Descripiton    :   The node for return statement in functions

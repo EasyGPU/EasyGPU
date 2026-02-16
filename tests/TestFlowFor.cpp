@@ -10,8 +10,8 @@
 
 #include <Kernel/Kernel.h>
 #include <IR/Value/Var.h>
-#include <Flow/For.h>
-#include <Flow/Continue.h>
+#include <Flow/ForFlow.h>
+#include <Flow/ContinueFlow.h>
 #include <Runtime/Buffer.h>
 
 using namespace GPU::IR::Value;

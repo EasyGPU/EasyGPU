@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Texture.h:
  *      @Descripiton    :   2D Texture for GPU compute shader

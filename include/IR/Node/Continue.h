@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * ContinueNode.h:
  *      @Descripiton    :   The node for continue statement in loops

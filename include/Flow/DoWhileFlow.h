@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * DoWhile.h:
  *      @Descripiton    :   The do-while loop control flow API for users
@@ -8,7 +10,7 @@
 #define EASYGPU_FLOW_DOWHILE_H
 
 #include <Flow/CodeCollectContext.h>
-#include <Flow/If.h>
+#include <Flow/IfFlow.h>
 
 #include <IR/Node/DoWhile.h>
 #include <IR/Node/RawCode.h>

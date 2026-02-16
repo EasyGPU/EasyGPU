@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * For.h:
  *      @Descripiton    :   The node for for loop control flow

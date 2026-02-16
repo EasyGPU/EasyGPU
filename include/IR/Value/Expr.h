@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Expr.h:
  *      @Descripiton    :   The expression API for users
  *      @Author         :   Margoo(qiuzhengyu@sigraph.org)

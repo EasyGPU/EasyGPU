@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * If.h:
  *      @Descripiton    :   The node for if-elif-else control flow

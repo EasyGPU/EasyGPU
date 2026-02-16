@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Break.h:
  *      @Descripiton    :   The node for break statement in loops

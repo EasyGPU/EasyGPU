@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Buffer.h:
  *      @Descripiton    :   The GPU buffer for compute shader

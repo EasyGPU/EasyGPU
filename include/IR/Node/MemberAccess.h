@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * MemberAccess.h:
  *      @Descripiton    :   The node for member access
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

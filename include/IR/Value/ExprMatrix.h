@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * ExprMatrix.h:
  *      @Descripiton    :   The specified expression API for matrix with column access

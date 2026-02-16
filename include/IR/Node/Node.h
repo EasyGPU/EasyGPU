@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Node.h:
  *      @Descripiton    :   The base class for all the node type
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * VarIVector.h:
  *      @Descripiton    :   The specified variable API for int vector

@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * CodeCollectContext.h:
  *      @Descripiton    :   The context for collecting code during control flow lambda execution

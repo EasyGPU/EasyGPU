@@ -10,10 +10,10 @@
 #include <IR/Value/Var.h>
 #include <IR/Value/BufferRef.h>
 #include <Runtime/Buffer.h>
-#include <Flow/For.h>
-#include <Flow/If.h>
-#include <Flow/Break.h>
-#include <Flow/Return.h>
+#include <Flow/ForFlow.h>
+#include <Flow/IfFlow.h>
+#include <Flow/BreakFlow.h>
+#include <Flow/ReturnFlow.h>
 #include <Utility/Vec.h>
 #include <Utility/Math.h>
 #include <Utility/Helpers.h>

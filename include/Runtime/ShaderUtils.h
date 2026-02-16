@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * ShaderUtils.h:
  *      @Descripiton    :   Shader compilation utilities and beautiful error formatting
  *      @Author         :   Margoo(qiuzhengyu@sigraph.org)

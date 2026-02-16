@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Call.h:
  *      @Descripiton    :   The node for calling user-defined callable functions

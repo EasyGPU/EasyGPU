@@ -7,7 +7,7 @@
 #include <Kernel/Kernel.h>
 #include <IR/Value/Var.h>
 #include <Runtime/Buffer.h>
-#include <Flow/For.h>
+#include <Flow/ForFlow.h>
 
 #include <iostream>
 #include <cassert>

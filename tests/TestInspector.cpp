@@ -9,8 +9,8 @@
 #include <IR/Value/BufferRef.h>
 #include <Runtime/Buffer.h>
 #include <Utility/Helpers.h>
-#include <Flow/For.h>
-#include <Flow/If.h>
+#include <Flow/ForFlow.h>
+#include <Flow/IfFlow.h>
 #include <Utility/Vec.h>
 
 #include <iostream>

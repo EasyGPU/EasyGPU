@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * ShaderException.h:
  *      @Descripiton    :   Beautiful exception types for shader compilation errors

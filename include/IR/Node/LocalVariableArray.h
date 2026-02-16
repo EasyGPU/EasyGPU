@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * LocalVariableArray.h:
  *      @Descripiton    :   The node for the local variable array definition
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Operation.h:
  *      @Descripiton    :   The operation node for the binary operation
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

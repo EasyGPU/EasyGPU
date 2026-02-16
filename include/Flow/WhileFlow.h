@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * While.h:
  *      @Descripiton    :   The while loop control flow API for users

@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * While.h:
  *      @Descripiton    :   The node for while loop control flow

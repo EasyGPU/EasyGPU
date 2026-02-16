@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Matrix.h
  *      Matrix types for GPU Math (non-templated explicit sizes)
  *      @author Margoo

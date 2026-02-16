@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * If.h:
  *      @Descripiton    :   The if-elif-else control flow API for users

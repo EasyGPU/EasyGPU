@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * KernelBuildContext.h:
  *      @Descripiton    :   Ther build context for the kernel function class
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

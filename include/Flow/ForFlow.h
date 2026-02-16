@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * For.h:
  *      @Descripiton    :   The for loop control flow API for users
@@ -8,7 +10,7 @@
 #define EASYGPU_FLOW_FOR_H
 
 #include <Flow/CodeCollectContext.h>
-#include <Flow/If.h>
+#include <Flow/IfFlow.h>
 
 #include <IR/Node/For.h>
 #include <IR/Node/RawCode.h>

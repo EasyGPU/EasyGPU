@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * LoadLocalArray.h:
  *      @Descripiton    :   The load node for local array
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

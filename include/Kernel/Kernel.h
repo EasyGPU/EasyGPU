@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Kernel.h:
  *      @Descripiton    :   The kernel function definition

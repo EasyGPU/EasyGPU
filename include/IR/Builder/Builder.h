@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Builder.h:
  *      @Descripiton    :   The builder for the DSL
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

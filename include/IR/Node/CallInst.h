@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * CallInst.h:
  *      @Descripiton    :   The intrinsic call node
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

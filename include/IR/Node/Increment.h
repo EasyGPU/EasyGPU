@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Increment.h:
  *      @Descripiton    :   The node for increment/decrement
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

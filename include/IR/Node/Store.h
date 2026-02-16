@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Store.h:
  *      @Descripiton    :   The store node
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

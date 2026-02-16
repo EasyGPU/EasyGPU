@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * LocalVariable.h:
  *      @Descripiton    :   The node for the local variable definition
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

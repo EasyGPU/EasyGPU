@@ -20,9 +20,9 @@
 
 #include <Callable/Callable.h>
 
-#include <Flow/Return.h>
-#include <Flow/For.h>
-#include <Flow/If.h>
+#include <Flow/ReturnFlow.h>
+#include <Flow/ForFlow.h>
+#include <Flow/IfFlow.h>
 
 #include <Utility/Math.h>
 

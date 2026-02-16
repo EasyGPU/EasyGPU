@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * DoWhile.h:
  *      @Descripiton    :   The node for do-while loop control flow

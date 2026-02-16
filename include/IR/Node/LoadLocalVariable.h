@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * LoadLocalVariable.h:
  *      @Descripiton    :   The load node for local variable
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

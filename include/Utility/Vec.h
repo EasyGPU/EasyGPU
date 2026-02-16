@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Vec.h:
  *      @Descripiton    :   The vector library for GPU programing
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

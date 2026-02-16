@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Break.h:
  *      @Descripiton    :   The break control flow API for users

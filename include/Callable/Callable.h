@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Callable.h:
  *      @Descripiton    :   The callable function API for user-defined functions

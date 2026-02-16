@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * BufferRef.h:
  *      @Descripiton    :   The buffer reference for DSL access - Full IR integration

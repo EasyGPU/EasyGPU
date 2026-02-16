@@ -10,12 +10,12 @@
 
 #include <Kernel/Kernel.h>
 #include <IR/Value/Var.h>
-#include <Flow/For.h>
-#include <Flow/While.h>
-#include <Flow/DoWhile.h>
-#include <Flow/If.h>
-#include <Flow/Break.h>
-#include <Flow/Continue.h>
+#include <Flow/ForFlow.h>
+#include <Flow/WhileFlow.h>
+#include <Flow/DoWhileFlow.h>
+#include <Flow/IfFlow.h>
+#include <Flow/BreakFlow.h>
+#include <Flow/ContinueFlow.h>
 #include <Runtime/Buffer.h>
 
 using namespace GPU::IR::Value;

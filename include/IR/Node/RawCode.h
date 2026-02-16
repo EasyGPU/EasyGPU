@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * RawCode.h:
  *      @Descripiton    :   The node for raw GLSL code (used in control flow)

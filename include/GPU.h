@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file GPU.h
  * @brief EasyGPU lazy header - includes everything with all namespaces
@@ -57,13 +59,13 @@
 // =============================================================================
 // Control Flow
 // =============================================================================
-#include <Flow/If.h>
-#include <Flow/For.h>
-#include <Flow/While.h>
-#include <Flow/DoWhile.h>
-#include <Flow/Break.h>
-#include <Flow/Continue.h>
-#include <Flow/Return.h>
+#include <Flow/IfFlow.h>
+#include <Flow/ForFlow.h>
+#include <Flow/WhileFlow.h>
+#include <Flow/DoWhileFlow.h>
+#include <Flow/BreakFlow.h>
+#include <Flow/ContinueFlow.h>
+#include <Flow/ReturnFlow.h>
 #include <Flow/CodeCollectContext.h>
 
 // =============================================================================

@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * PixelFormat.h:
  *      @Descripiton    :   Pixel format definitions for Texture

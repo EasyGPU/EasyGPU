@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * VarMatrix.h:
  *      @Descripiton    :   The specified variable API for matrix

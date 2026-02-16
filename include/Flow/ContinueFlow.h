@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Continue.h:
  *      @Descripiton    :   The continue control flow API for users

@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * VarArray.h:
  *      @Descripiton    :   The array for variables

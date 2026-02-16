@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Return.h:
  *      @Descripiton    :   The return statement API for user-defined callable functions

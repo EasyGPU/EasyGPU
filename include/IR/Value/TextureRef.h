@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * TextureRef.h:
  *      @Descripiton    :   Texture reference for DSL access in Kernel

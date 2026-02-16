@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * VarBase.h:
  *      @Descripiton    :   The variable API for users
  *      @Author         :   Margoo(qiuzhengyu@sigraph.org)

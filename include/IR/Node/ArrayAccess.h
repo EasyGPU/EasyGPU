@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * ArrayAccess.h:
  *      @Descripiton    :   The node for array access
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

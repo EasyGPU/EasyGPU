@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * CompoundAssignment.h:
  *      @Descripiton    :   The node for compound assignment
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)

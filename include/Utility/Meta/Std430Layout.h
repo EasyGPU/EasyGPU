@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Std430Layout.h:
  *      @Descripiton    :   Automatic std430 layout conversion for GPU buffers

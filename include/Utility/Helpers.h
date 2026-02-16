@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * Helpers.h:
  *      @Descripiton    :   Helper functions and type aliases for EasyGPU

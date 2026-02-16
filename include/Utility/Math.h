@@ -1,4 +1,6 @@
-﻿/**
+﻿#pragma once
+
+/**
  * Math.h:
  *      @Descripiton    :   The math library for GPU programing
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
