@@ -18,10 +18,10 @@
 
 // Forward declarations for math types
 namespace GPU::Math {
-    struct Vec2; struct Vec3; struct Vec4;
-    struct IVec2; struct IVec3; struct IVec4;
-    struct Mat2; struct Mat3; struct Mat4;
-    struct Mat2x3; struct Mat2x4; struct Mat3x2; struct Mat3x4; struct Mat4x2; struct Mat4x3;
+    class Vec2; class Vec3; class Vec4;
+    class IVec2; class IVec3; class IVec4;
+    class Mat2; class Mat3; class Mat4;
+    class Mat2x3; class Mat2x4; class Mat3x2; class Mat3x4; class Mat4x2; class Mat4x3;
 }
 
 namespace GPU::Meta {

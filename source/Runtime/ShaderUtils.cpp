@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ShaderUtils.cpp:
  *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/13/2026
