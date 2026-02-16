@@ -349,7 +349,10 @@ namespace GPU::IR::Builder {
     }
 
     std::string Builder::BuildReturn(const Node::ReturnNode &Node) {
-        return std::format("return {}", BuildNode(*Node.Value()));
+        if (Node.HasValue()) {
+            return std::format("return {}", BuildNode(*Node.Value()));
+        }
+        return "return";
     }
 
     std::string Builder::BuildCall(const Node::CallNode &Node) {

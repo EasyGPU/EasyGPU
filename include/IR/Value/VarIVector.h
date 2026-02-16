@@ -448,7 +448,77 @@ namespace GPU::IR::Value {
     [[nodiscard]] inline Expr<Math::IVec4> operator^(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
         return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
     }
-    
+
+    // ============================================================================
+    // IVector Compound Assignment with Scalar Expr
+    // ============================================================================
+
+    // IVec2 compound assignment with Expr<int> (scalar)
+    [[nodiscard]] inline Var<Math::IVec2> &operator*=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::IVec2> &operator/=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // IVec3 compound assignment with Expr<int> (scalar)
+    [[nodiscard]] inline Var<Math::IVec3> &operator*=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::IVec3> &operator/=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // IVec4 compound assignment with Expr<int> (scalar)
+    [[nodiscard]] inline Var<Math::IVec4> &operator*=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::IVec4> &operator/=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
 }
 
 #endif //EASYGPU_VARIVECTOR_H

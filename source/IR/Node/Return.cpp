@@ -1,12 +1,14 @@
 /**
  * Return.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
+ *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/14/2026
  */
 
 #include <IR/Node/Return.h>
 
 namespace GPU::IR::Node {
+    ReturnNode::ReturnNode() = default;
+
     ReturnNode::ReturnNode(std::unique_ptr<Node> Value) : _value(std::move(Value)) {
     }
 
@@ -18,7 +20,14 @@ namespace GPU::IR::Node {
         return _value.get();
     }
 
+    bool ReturnNode::HasValue() const {
+        return _value != nullptr;
+    }
+
     std::unique_ptr<Node> ReturnNode::Clone() const {
-        return std::make_unique<ReturnNode>(_value->Clone());
+        if (_value) {
+            return std::make_unique<ReturnNode>(_value->Clone());
+        }
+        return std::make_unique<ReturnNode>();
     }
 }

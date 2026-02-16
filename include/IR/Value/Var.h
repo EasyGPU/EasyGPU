@@ -541,6 +541,59 @@ namespace GPU::IR::Value {
             return *this;
         }
 
+        // Compound assignment with Expr<Type>
+        VarBase &operator+=(const Expr<Type> &other) {
+            auto lhsLoad = this->Load();
+            auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+                Node::CompoundAssignmentCode::AddAssign,
+                std::move(lhsLoad),
+                CloneNode(other)
+            );
+
+            Builder::Builder::Get().Build(*comAssign, true);
+
+            return *this;
+        }
+
+        VarBase &operator-=(const Expr<Type> &other) {
+            auto lhsLoad = this->Load();
+            auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+                Node::CompoundAssignmentCode::SubAssign,
+                std::move(lhsLoad),
+                CloneNode(other)
+            );
+
+            Builder::Builder::Get().Build(*comAssign, true);
+
+            return *this;
+        }
+
+        VarBase &operator*=(const Expr<Type> &other) {
+            auto lhsLoad = this->Load();
+            auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+                Node::CompoundAssignmentCode::MulAssign,
+                std::move(lhsLoad),
+                CloneNode(other)
+            );
+
+            Builder::Builder::Get().Build(*comAssign, true);
+
+            return *this;
+        }
+
+        VarBase &operator/=(const Expr<Type> &other) {
+            auto lhsLoad = this->Load();
+            auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+                Node::CompoundAssignmentCode::DivAssign,
+                std::move(lhsLoad),
+                CloneNode(other)
+            );
+
+            Builder::Builder::Get().Build(*comAssign, true);
+
+            return *this;
+        }
+
         VarBase &operator%=(const VarBase &other) {
             auto lhsLoad = this->Load();
             auto rhsLoad = other.Load();

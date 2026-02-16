@@ -21,6 +21,11 @@ namespace GPU::IR::Node {
     class ReturnNode : public Node {
     public:
         /**
+         * Construct a void return node (for void functions)
+         */
+        ReturnNode();
+
+        /**
          * Construct a return node with a value expression
          * @param Value The expression to return
          */
@@ -34,9 +39,15 @@ namespace GPU::IR::Node {
     public:
         /**
          * Get the value expression being returned
-         * @return The value expression node
+         * @return The value expression node, or nullptr for void return
          */
         [[nodiscard]] const Node *Value() const;
+
+        /**
+         * Check if this return node has a value
+         * @return true if this is a value return, false for void return
+         */
+        [[nodiscard]] bool HasValue() const;
 
         /**
          * Clone this node and its value

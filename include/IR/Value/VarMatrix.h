@@ -644,6 +644,203 @@ namespace GPU::IR::Value {
         auto rhsLoad = rhs.Load();
         return Expr<Math::Mat4x3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
     }
+
+    // ============================================================================
+    // Matrix Compound Assignment with Scalar Expr
+    // ============================================================================
+
+    // Mat2 compound assignment with Expr<float> (scalar)
+    [[nodiscard]] inline Var<Math::Mat2> &operator*=(Var<Math::Mat2> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat2> &operator/=(Var<Math::Mat2> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Mat3 compound assignment with Expr<float> (scalar)
+    [[nodiscard]] inline Var<Math::Mat3> &operator*=(Var<Math::Mat3> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat3> &operator/=(Var<Math::Mat3> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Mat4 compound assignment with Expr<float> (scalar)
+    [[nodiscard]] inline Var<Math::Mat4> &operator*=(Var<Math::Mat4> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat4> &operator/=(Var<Math::Mat4> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Rectangular matrices compound assignment with Expr<float> (scalar)
+    [[nodiscard]] inline Var<Math::Mat2x3> &operator*=(Var<Math::Mat2x3> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat2x3> &operator/=(Var<Math::Mat2x3> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    [[nodiscard]] inline Var<Math::Mat2x4> &operator*=(Var<Math::Mat2x4> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat2x4> &operator/=(Var<Math::Mat2x4> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    [[nodiscard]] inline Var<Math::Mat3x2> &operator*=(Var<Math::Mat3x2> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat3x2> &operator/=(Var<Math::Mat3x2> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    [[nodiscard]] inline Var<Math::Mat3x4> &operator*=(Var<Math::Mat3x4> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat3x4> &operator/=(Var<Math::Mat3x4> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    [[nodiscard]] inline Var<Math::Mat4x2> &operator*=(Var<Math::Mat4x2> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat4x2> &operator/=(Var<Math::Mat4x2> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    [[nodiscard]] inline Var<Math::Mat4x3> &operator*=(Var<Math::Mat4x3> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+    [[nodiscard]] inline Var<Math::Mat4x3> &operator/=(Var<Math::Mat4x3> &lhs, const Expr<float> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
 }
 
 #endif //EASYGPU_VARMATRIX_H
