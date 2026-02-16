@@ -15,6 +15,21 @@
 
 namespace GPU::Flow {
     /**
+     * Return from a void callable function
+     * This generates a GLSL return statement without a value
+     * 
+     * Example usage:
+     *   Callable<void(float)> MyVoidFunc = [](Var<float> x) {
+     *       // do something
+     *       Return();
+     *   };
+     */
+    inline void Return() {
+        auto returnNode = std::make_unique<IR::Node::ReturnNode>();
+        IR::Builder::Builder::Get().Build(*returnNode, true);
+    }
+    
+    /**
      * Return a value from a callable function
      * This generates a GLSL return statement with the given expression
      * 
