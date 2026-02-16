@@ -4,6 +4,9 @@
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
  *      @Date           :   2/15/2026
  */
+// Makes MSVC Happy :)
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <Kernel/KernelProfiler.h>
 #include <Runtime/Context.h>
 
