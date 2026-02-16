@@ -213,7 +213,7 @@ KernelProfiler::PrintReport(kernel);
 include(FetchContent)
 FetchContent_Declare(
     easygpu
-    GIT_REPOSITORY https://github.com/fsmargoo/EasyGPU.git
+    GIT_REPOSITORY https://github.com/easygpu/EasyGPU.git
     GIT_TAG v0.1.0
 )
 FetchContent_MakeAvailable(easygpu)
@@ -377,7 +377,7 @@ val = 5;  // May unexpectedly modify buf[i] in the generated shader
 ### Build Commands
 
 ```bash
-git clone --recursive https://github.com/fsmargoo/EasyGPU.git
+git clone --recursive https://github.com/easygpu/EasyGPU.git
 cd EasyGPU
 
 cmake -B build -DCMAKE_BUILD_TYPE=Release

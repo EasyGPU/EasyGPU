@@ -41,7 +41,7 @@ Add to your `CMakeLists.txt`:
 include(FetchContent)
 FetchContent_Declare(
     easygpu
-    GIT_REPOSITORY https://github.com/fsmargoo/EasyGPU.git
+    GIT_REPOSITORY https://github.com/easygpu/EasyGPU.git
     GIT_TAG v0.1.0
 )
 FetchContent_MakeAvailable(easygpu)
