@@ -18,6 +18,7 @@ Solutions to frequently encountered tasks in EasyGPU.
 
 - [Local Array Patterns](#local-array-patterns)
 - [Parallel Reduction (Sum/Max)](#parallel-reduction-summax)
+- [Uniforms for Dynamic Parameters](#uniforms-for-dynamic-parameters)
 - [Image Processing](#image-processing)
 - [Particle Systems](#particle-systems)
 - [Matrix Operations](#matrix-operations)
@@ -245,6 +246,93 @@ Kernel1D find_max([](Int i) {
     });
     
     out[i] = max_val;
+});
+```
+
+---
+
+## Uniforms for Dynamic Parameters
+
+Use `Uniform<T>` when you need to change values between kernel dispatches without recompiling.
+
+### Simulation Parameters
+
+```cpp
+Uniform<float> timeStep;
+Uniform<int> maxIterations;
+Uniform<float> damping;
+
+timeStep = 0.016f;
+maxIterations = 100;
+damping = 0.99f;
+
+Kernel1D physics_step([&](Int i) {
+    auto p = particles.Bind();
+    auto dt = timeStep.Load();
+    auto maxIter = maxIterations.Load();
+    auto damp = damping.Load();
+    
+    // Physics update using uniforms
+    Float3 vel = p[i].velocity();
+    vel = vel * damp;
+    p[i].velocity() = vel;
+});
+
+// Run simulation with different parameters
+for (int frame = 0; frame < 1000; frame++) {
+    timeStep = 0.016f + 0.001f * sin(frame * 0.01f);  // Varying timestep
+    physics_step.Dispatch(groups, true);
+}
+```
+
+### Feature Toggles
+
+```cpp
+Uniform<bool> enableGravity;
+Uniform<bool> enableCollision;
+
+enableGravity = true;
+enableCollision = false;
+
+Kernel1D update([&](Int i) {
+    auto p = particles.Bind();
+    auto gravEnabled = enableGravity.Load();
+    auto collEnabled = enableCollision.Load();
+    
+    If(gravEnabled, [&]() {
+        // Apply gravity
+    });
+    
+    If(collEnabled, [&]() {
+        // Apply collision
+    });
+});
+
+// Toggle features at runtime
+enableCollision = true;
+update.Dispatch(groups, true);
+```
+
+### Transform Matrices
+
+```cpp
+Uniform<Mat4> viewMatrix;
+Uniform<Mat4> projectionMatrix;
+
+// Update camera position each frame
+void UpdateCamera(float time) {
+    Mat4 view = Mat4::Rotate(time, Vec3(0, 1, 0)) * Mat4::Translate(Vec3(0, 0, -5));
+    viewMatrix = view;
+}
+
+Kernel1D transform([&](Int i) {
+    auto verts = vertices.Bind();
+    auto view = viewMatrix.Load();
+    auto proj = projectionMatrix.Load();
+    
+    Float4 pos = MakeFloat4(verts[i].x(), verts[i].y(), verts[i].z(), 1.0f);
+    pos = proj * view * pos;
+    verts[i] = pos.xyz();
 });
 ```
 

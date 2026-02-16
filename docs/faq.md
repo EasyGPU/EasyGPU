@@ -115,7 +115,7 @@ kernel.Dispatch(groups, true);  // true = wait for completion
 
 ### How do I pass constants to kernels?
 
-**Method 1: Capture by value (recommended)**
+**Method 1: Capture by value (recommended for static constants)**
 ```cpp
 float constant_value = 3.14f;
 
@@ -131,6 +131,25 @@ Kernel1D kernel([](Int i) {
     data[i] = data[i] * pi;
 });
 ```
+
+**Method 3: Uniforms (for dynamic values that change between dispatches)**
+```cpp
+Uniform<float> scale;
+scale = 2.0f;
+
+Kernel1D kernel([&](Int i) {
+    auto s = scale.Load();  // Load uniform value
+    data[i] = data[i] * s;
+});
+
+kernel.Dispatch(groups, true);  // Uses scale = 2.0
+scale = 3.0f;                    // Change value
+kernel.Dispatch(groups, true);  // Uses scale = 3.0, no recompilation
+```
+
+**Which to use:**
+- **Capture by value**: Value is constant for the kernel's lifetime
+- **Uniforms**: Value changes between dispatches, avoids recompilation
 
 ### Can I use std::vector inside kernels?
 

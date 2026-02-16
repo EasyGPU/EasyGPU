@@ -230,6 +230,50 @@ stage1.Dispatch(groups, true);
 stage2.Dispatch(groups, true);
 ```
 
+### Uniforms (Dynamic Constants)
+
+When you need to pass values that change between kernel dispatches, use `Uniform<T>` instead of capturing constants. Uniforms are uploaded to the GPU at dispatch time, allowing you to modify values without recompiling the kernel.
+
+```cpp
+// Create uniforms
+Uniform<float> time;
+Uniform<int> iteration;
+
+Buffer<float> data(1024);
+
+Kernel1D kernel([&](Int i) {
+    auto buf = data.Bind();
+    auto t = time.Load();        // Load uniform value in kernel
+    auto iter = iteration.Load();
+    
+    // Use uniforms in computation
+    buf[i] = buf[i] * Sin(t + ToFloat(iter));
+});
+
+// Simulation loop
+for (int i = 0; i < 100; i++) {
+    time = static_cast<float>(i) * 0.016f;  // Update time
+    iteration = i;                           // Update iteration
+    kernel.Dispatch(groups, true);           // Uses new uniform values
+}
+```
+
+**When to use Uniforms vs Capture:**
+
+| Approach | Use When | Example |
+|:---------|:---------|:--------|
+| Capture by value | Value is constant for kernel lifetime | Fixed array size, configuration flags |
+| `Uniform<T>` | Value changes between dispatches | Time step, iteration count, dynamic parameters |
+
+**Uniform Types:**
+```cpp
+Uniform<float>  f;     // float uniform
+Uniform<int>    i;     // int uniform
+Uniform<bool>   b;     // bool uniform
+Uniform<Vec3>   v;     // vec3 uniform
+Uniform<Mat4>   m;     // mat4 uniform
+```
+
 ---
 
 ## Parallel Thinking

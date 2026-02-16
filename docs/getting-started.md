@@ -432,4 +432,11 @@ Float f = MakeFloat(3.14f);                        // From literal
 Int i = MakeInt(42);
 Float f2 = ToFloat(i);                             // Convert
 Int i2 = ToInt(f);                                 // Convert (truncates)
+
+// Uniforms (dynamic constants)
+Uniform<float> param;                              // Create uniform
+param = 2.5f;                                      // Set value
+kernel.Dispatch(groups, true);                     // Dispatch with current value
+param = 5.0f;                                      // Change value
+kernel.Dispatch(groups, true);                     // Dispatch with new value
 ```

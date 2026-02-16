@@ -7,6 +7,7 @@ Complete reference for all EasyGPU classes and functions.
 - [Core Types](#core-types)
 - [Kernels](#kernels)
 - [Buffers](#buffers)
+- [Uniforms](#uniforms)
 - [Variables and Expressions](#variables-and-expressions)
 - [Control Flow](#control-flow)
 - [Math Functions](#math-functions)
@@ -190,6 +191,135 @@ Kernel1D kernel([](Int i) {
 
 // After kernel
 buf1.Download(data);
+```
+
+---
+
+## Uniforms
+
+### Uniform<T>
+
+Uniform variables for passing constants from CPU to GPU. Unlike captured values which are embedded directly into the generated GLSL code, uniforms are dynamically uploaded to the GPU at dispatch time, allowing you to change values between kernel executions without recompiling.
+
+```cpp
+template<typename T>
+class Uniform;
+```
+
+**Supported Types:**
+
+| C++ Type | GLSL Type | Description |
+|:---------|:----------|:------------|
+| `float` | `float` | 32-bit floating point |
+| `int` | `int` | 32-bit signed integer |
+| `bool` | `bool` | Boolean value |
+| `Math::Vec2` | `vec2` | 2-component float vector |
+| `Math::Vec3` | `vec3` | 3-component float vector |
+| `Math::Vec4` | `vec4` | 4-component float vector |
+| `Math::IVec2` | `ivec2` | 2-component int vector |
+| `Math::IVec3` | `ivec3` | 3-component int vector |
+| `Math::IVec4` | `ivec4` | 4-component int vector |
+| `Math::Mat2` | `mat2` | 2x2 float matrix |
+| `Math::Mat3` | `mat3` | 3x3 float matrix |
+| `Math::Mat4` | `mat4` | 4x4 float matrix |
+| `Math::Mat2x3` | `mat2x3` | 2 columns, 3 rows |
+| `Math::Mat2x4` | `mat2x4` | 2 columns, 4 rows |
+| `Math::Mat3x2` | `mat3x2` | 3 columns, 2 rows |
+| `Math::Mat3x4` | `mat3x4` | 3 columns, 4 rows |
+| `Math::Mat4x2` | `mat4x2` | 4 columns, 2 rows |
+| `Math::Mat4x3` | `mat4x3` | 4 columns, 3 rows |
+
+**Constructors:**
+
+| Constructor | Description |
+|:------------|:------------|
+| `Uniform()` | Default constructor - creates uninitialized uniform |
+| `Uniform(T value)` | Constructor with initial value |
+| `Uniform(const Uniform& other)` | Copy constructor |
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Load()` | Load the uniform in kernel context, returns `Var<T>` |
+| `GetValue() const` | Get the current CPU-side value |
+| `SetValue(T value)` | Set the CPU-side value |
+| `operator=(T value)` | Assign value from literal |
+| `operator=(const Uniform& other)` | Assign from another uniform |
+| `operator T() const` | Implicit conversion to value type |
+
+**Example:**
+
+```cpp
+// Create uniforms
+Uniform<int> offset;
+Uniform<float> scale(2.5f);
+
+// Set values on CPU
+offset = 100;
+scale.SetValue(3.0f);
+
+// Use in kernel
+Buffer<float> data(1024);
+Kernel1D kernel([&](Int i) {
+    auto buf = data.Bind();
+    auto off = offset.Load();    // Load uniform as Var<int>
+    auto s = scale.Load();       // Load uniform as Var<float>
+    buf[i] = (buf[i] + ToFloat(off)) * s;
+});
+
+// Dispatch with current uniform values
+kernel.Dispatch(4, true);
+
+// Change uniform values and dispatch again
+offset = 200;
+scale = 1.5f;
+kernel.Dispatch(4, true);  // Uses new values without recompilation
+```
+
+**Multiple Uniforms:**
+
+```cpp
+Uniform<int> threshold;
+Uniform<float> factor1;
+Uniform<float> factor2;
+
+threshold = 50;
+factor1 = 0.5f;
+factor2 = 2.0f;
+
+Kernel1D kernel([&](Int i) {
+    auto buf = buffer.Bind();
+    auto t = threshold.Load();
+    auto f1 = factor1.Load();
+    auto f2 = factor2.Load();
+    
+    If(buf[i] > ToFloat(t), [&]() {
+        buf[i] = buf[i] * f1;
+    }).Else([&]() {
+        buf[i] = buf[i] * f2;
+    });
+});
+```
+
+**Uniform<bool> for Conditional Logic:**
+
+```cpp
+Uniform<bool> enableFeature;
+enableFeature = true;
+
+Kernel1D kernel([&](Int i) {
+    auto buf = buffer.Bind();
+    auto enabled = enableFeature.Load();
+    
+    If(enabled, [&]() {
+        buf[i] = Process(buf[i]);
+    });
+});
+
+// Toggle feature off
+enableFeature = false;
+kernel.Dispatch(4, true);
 ```
 
 ---
