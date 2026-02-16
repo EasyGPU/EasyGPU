@@ -1,6 +1,6 @@
-﻿/**
+/**
  * CallInst.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
+ *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/11/2026
  */
 
@@ -9,7 +9,7 @@
 #include <utility>
 
 namespace GPU::IR::Node {
-    IntrinsicCallNode::IntrinsicCallNode(std::string Name, std::vector<std::unique_ptr<Node *>> Parameter) : _name(std::move(Name)),
+    IntrinsicCallNode::IntrinsicCallNode(std::string Name, std::vector<std::unique_ptr<Node>> Parameter) : _name(std::move(Name)),
         _parameter(std::move(Parameter)) {
     }
 
@@ -21,16 +21,16 @@ namespace GPU::IR::Node {
         return _name;
     }
 
-    const std::vector<std::unique_ptr<Node *> > &IntrinsicCallNode::Parameter() const {
+    const std::vector<std::unique_ptr<Node>> &IntrinsicCallNode::Parameter() const {
         return _parameter;
     }
 
     std::unique_ptr<Node> IntrinsicCallNode::Clone() const {
-        std::vector<std::unique_ptr<Node *>> clonedParams;
+        std::vector<std::unique_ptr<Node>> clonedParams;
         clonedParams.reserve(_parameter.size());
         for (const auto &param : _parameter) {
-            if (param && *param) {
-                clonedParams.push_back(std::make_unique<Node *>((*param)->Clone().release()));
+            if (param) {
+                clonedParams.push_back(param->Clone());
             } else {
                 clonedParams.push_back(nullptr);
             }

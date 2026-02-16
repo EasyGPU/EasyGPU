@@ -34,7 +34,7 @@ namespace GPU::Math {
      * @return The expression which contains a function calling
      */
     template<typename T>
-    IR::Value::Expr<T> MakeCall(const std::string& Name, std::vector<std::unique_ptr<IR::Node::Node*>> Parameters) {
+    IR::Value::Expr<T> MakeCall(const std::string& Name, std::vector<std::unique_ptr<IR::Node::Node>> Parameters) {
         auto callNode = std::make_unique<IR::Node::IntrinsicCallNode>(Name, std::move(Parameters));
         return IR::Value::Expr<T>(std::move(callNode));
     }
@@ -43,15 +43,15 @@ namespace GPU::Math {
      * Helper to wrap a single Expr parameter
      */
     template<typename T>
-    std::unique_ptr<IR::Node::Node*> WrapNode(const IR::Value::Expr<T>& expr) {
-        return std::make_unique<IR::Node::Node*>(expr.Node()->Clone().release());
+    std::unique_ptr<IR::Node::Node> WrapNode(const IR::Value::Expr<T>& expr) {
+        return expr.Node()->Clone();
     }
 
     /**
      * Helper to wrap an ExprBase parameter (for bool expressions)
      */
-    inline std::unique_ptr<IR::Node::Node*> WrapNode(const IR::Value::ExprBase& expr) {
-        return std::make_unique<IR::Node::Node*>(expr.Node()->Clone().release());
+    inline std::unique_ptr<IR::Node::Node> WrapNode(const IR::Value::ExprBase& expr) {
+        return expr.Node()->Clone();
     }
 
     // ============================================================================
@@ -123,35 +123,35 @@ namespace GPU::Math {
         
         // AddParam for Expr types - wrap the node
         template<typename T>
-        void AddParam(std::vector<std::unique_ptr<IR::Node::Node*>>& params, const IR::Value::Expr<T>& arg) {
+        void AddParam(std::vector<std::unique_ptr<IR::Node::Node>>& params, const IR::Value::Expr<T>& arg) {
             params.push_back(WrapNode(arg));
         }
         
         // AddParam for ExprBase - direct wrap (used by ToExpr)
-        inline void AddParam(std::vector<std::unique_ptr<IR::Node::Node*>>& params, const IR::Value::ExprBase& arg) {
-            params.push_back(std::make_unique<IR::Node::Node*>(const_cast<IR::Value::ExprBase&>(arg).Node()->Clone().release()));
+        inline void AddParam(std::vector<std::unique_ptr<IR::Node::Node>>& params, const IR::Value::ExprBase& arg) {
+            params.push_back(const_cast<IR::Value::ExprBase&>(arg).Node()->Clone());
         }
         
         // AddParam for scalar types - convert to uniform load
         template<typename T>
             requires IsScalar<T>::value
-        void AddParam(std::vector<std::unique_ptr<IR::Node::Node*>>& params, T arg) {
+        void AddParam(std::vector<std::unique_ptr<IR::Node::Node>>& params, T arg) {
             auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString<T>(arg));
-            params.push_back(std::make_unique<IR::Node::Node*>(uniform.release()));
+            params.push_back(std::move(uniform));
         }
         
         // Base case: single parameter
         template<typename T1>
-        std::vector<std::unique_ptr<IR::Node::Node*>> BuildParams(T1&& arg1) {
-            std::vector<std::unique_ptr<IR::Node::Node*>> params;
+        std::vector<std::unique_ptr<IR::Node::Node>> BuildParams(T1&& arg1) {
+            std::vector<std::unique_ptr<IR::Node::Node>> params;
             AddParam(params, std::forward<T1>(arg1));
             return params;
         }
         
         // Two parameters
         template<typename T1, typename T2>
-        std::vector<std::unique_ptr<IR::Node::Node*>> BuildParams(T1&& arg1, T2&& arg2) {
-            std::vector<std::unique_ptr<IR::Node::Node*>> params;
+        std::vector<std::unique_ptr<IR::Node::Node>> BuildParams(T1&& arg1, T2&& arg2) {
+            std::vector<std::unique_ptr<IR::Node::Node>> params;
             AddParam(params, std::forward<T1>(arg1));
             AddParam(params, std::forward<T2>(arg2));
             return params;
@@ -159,8 +159,8 @@ namespace GPU::Math {
         
         // Three parameters
         template<typename T1, typename T2, typename T3>
-        std::vector<std::unique_ptr<IR::Node::Node*>> BuildParams(T1&& arg1, T2&& arg2, T3&& arg3) {
-            std::vector<std::unique_ptr<IR::Node::Node*>> params;
+        std::vector<std::unique_ptr<IR::Node::Node>> BuildParams(T1&& arg1, T2&& arg2, T3&& arg3) {
+            std::vector<std::unique_ptr<IR::Node::Node>> params;
             AddParam(params, std::forward<T1>(arg1));
             AddParam(params, std::forward<T2>(arg2));
             AddParam(params, std::forward<T3>(arg3));

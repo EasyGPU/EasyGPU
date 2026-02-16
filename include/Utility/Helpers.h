@@ -79,13 +79,12 @@ namespace GPU {
     namespace Construct {
         // Helper to build parameter list for vector constructors
         namespace Detail {
-            inline std::vector<std::unique_ptr<IR::Node::Node*>> BuildVectorParams(
+            inline std::vector<std::unique_ptr<IR::Node::Node>> BuildVectorParams(
                 const std::vector<IR::Value::ExprBase*>& exprs) {
-                std::vector<std::unique_ptr<IR::Node::Node*>> params;
+                std::vector<std::unique_ptr<IR::Node::Node>> params;
                 params.reserve(exprs.size());
                 for (auto* expr : exprs) {
-                    params.push_back(std::make_unique<IR::Node::Node*>(
-                        const_cast<IR::Value::ExprBase*>(expr)->Node()->Clone().release()));
+                    params.push_back(const_cast<IR::Value::ExprBase*>(expr)->Node()->Clone());
                 }
                 return params;
             }

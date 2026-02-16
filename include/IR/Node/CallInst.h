@@ -21,7 +21,7 @@ namespace GPU::IR::Node {
      */
     class IntrinsicCallNode : public Node {
     public:
-        IntrinsicCallNode(std::string Name, std::vector<std::unique_ptr<Node *> > Parameter);
+        IntrinsicCallNode(std::string Name, std::vector<std::unique_ptr<Node>> Parameter);
 
         ~IntrinsicCallNode() override = default;
 
@@ -39,7 +39,7 @@ namespace GPU::IR::Node {
          * Get the parameters of the calling
          * @return The parameters of the calling
          */
-        [[nodiscard]] const std::vector<std::unique_ptr<Node *> > &Parameter() const;
+        [[nodiscard]] const std::vector<std::unique_ptr<Node>> &Parameter() const;
 
         /**
          * Clone this node and its arguments
@@ -48,8 +48,8 @@ namespace GPU::IR::Node {
         [[nodiscard]] std::unique_ptr<Node> Clone() const override;
 
     private:
-        std::string                           _name;
-        std::vector<std::unique_ptr<Node *> > _parameter;
+        std::string                        _name;
+        std::vector<std::unique_ptr<Node>> _parameter;
     };
 }
 

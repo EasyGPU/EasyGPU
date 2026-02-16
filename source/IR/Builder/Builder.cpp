@@ -107,9 +107,9 @@ namespace GPU::IR::Builder {
         std::ostringstream stream;
 
         stream << Node.Name() << "(";
-        stream << BuildNode(**Node.Parameter()[0]);
+        stream << BuildNode(*Node.Parameter()[0]);
         for (size_t index = 1; index < Node.Parameter().size(); ++index) {
-            stream << "," << BuildNode(**Node.Parameter()[index]);
+            stream << "," << BuildNode(*Node.Parameter()[index]);
         }
         stream << ")";
 
