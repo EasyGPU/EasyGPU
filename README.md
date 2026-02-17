@@ -24,6 +24,7 @@ Lightweight C++20 Embedded DSL for GPU Compute
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Examples](#examples)
+- [Best Practices](#best-practices)
 - [Documentation](#documentation)
 - [Building](#building)
 - [License](#license)
@@ -199,6 +200,19 @@ std::cout << kernel.GetGeneratedGLSL() << std::endl;
 
 // Profile execution
 KernelProfiler::PrintReport(kernel);
+```
+
+### Async Data Transfer
+
+Pixel Buffer Objects (PBO) for non-blocking CPU/GPU transfers:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> video(1920, 1080);
+video.InitUploadPBOPool(2);  // Double buffering
+
+// Upload without blocking - essential for real-time video
+video.UploadAsync(frameData.data());
+kernel.Dispatch(120, 68, true);  // GPU processes while CPU continues
 ```
 
 ---

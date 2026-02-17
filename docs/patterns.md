@@ -26,6 +26,7 @@ Solutions to frequently encountered tasks in EasyGPU.
 - [Working with Indices](#working-with-indices)
 - [Multi-Pass Rendering](#multi-pass-rendering)
 - [Debugging Output](#debugging-output)
+- [Async Data Transfer](#async-data-transfer)
 
 ---
 
@@ -701,3 +702,168 @@ Kernel1D debug_kernel([](Int i) {
     });
 });
 ```
+
+---
+
+## Async Data Transfer
+
+Use Pixel Buffer Objects (PBOs) for non-blocking CPU/GPU data transfers. Essential for real-time applications.
+
+### Pattern 1: Double-Buffered Streaming
+
+CPU prepares next frame while GPU uploads previous frame:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> videoFrame(1920, 1080);
+videoFrame.InitUploadPBOPool(2);  // Double buffering
+
+Kernel2D processFrame([&](Int x, Int y) {
+    auto frame = videoFrame.Bind();
+    Float4 color = frame.Read(x, y);
+    // Apply filter...
+    frame.Write(x, y, filtered);
+}, 16, 16);
+
+// Generate frames
+std::vector<std::vector<uint8_t>> frames = GenerateFrames(100);
+
+for (size_t i = 0; i < frames.size(); ++i) {
+    // Try async upload - returns false if both PBOs busy
+    while (!videoFrame.UploadAsync(frames[i].data())) {
+        // Both buffers in use, wait a bit
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+    
+    // Process frame (runs in parallel with next upload)
+    processFrame.Dispatch(120, 68, true);
+}
+
+videoFrame.Sync();  // Wait for final upload
+```
+
+### Pattern 2: Triple Buffering (Maximum Throughput)
+
+Tolerates more timing variance between CPU and GPU:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> renderTarget(2048, 2048);
+renderTarget.InitUploadPBOPool(3);  // Triple buffering
+
+// Producer thread generates frames faster than GPU consumes
+for (const auto& frameData : frameQueue) {
+    // UploadStream blocks if all 3 PBOs busy, ensuring smooth flow
+    renderTarget.UploadAsyncStream(frameData.data(), 1000);
+    
+    kernel.Dispatch(128, 128, false);  // Don't wait, keep pipeline full
+}
+
+renderTarget.Sync();
+```
+
+### Pattern 3: Async Readback
+
+Download results without stalling the GPU pipeline:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> output(1024, 1024);
+output.InitDownloadPBOPool(2);
+
+// Rendering passes
+renderKernel.Dispatch(64, 64, true);
+
+// Start async download (returns immediately)
+output.DownloadAsync();
+
+// Do more computation while GPU prepares download...
+postProcess.Dispatch(32, 32, true);
+
+// Check if download ready
+std::vector<uint8_t> pixels(1024 * 1024 * 4);
+if (output.GetDownloadData(pixels.data())) {
+    SaveImage(pixels);
+} else {
+    // Not ready yet, either wait or process next frame
+    output.Sync();
+    output.GetDownloadData(pixels.data());
+}
+```
+
+### Pattern 4: Ping-Pong with Async Transfer
+
+Combine ping-pong rendering with async uploads:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> texA(1024, 1024);
+Texture2D<PixelFormat::RGBA8> texB(1024, 1024);
+
+texA.InitUploadPBOPool(2);
+texB.InitUploadPBOPool(2);
+
+bool useA = true;
+for (const auto& frameData : frames) {
+    auto& currentTex = useA ? texA : texB;
+    auto& otherTex = useA ? texB : texA;
+    
+    // Upload new frame while processing previous
+    currentTex.UploadAsyncStream(frameData.data(), 1000);
+    
+    // Process (reads from otherTex, writes to currentTex)
+    Kernel2D process([&](Int x, Int y) {
+        auto in = otherTex.Bind();
+        auto out = currentTex.Bind();
+        // Read from in, write to out...
+    }, 16, 16);
+    
+    process.Dispatch(64, 64, true);
+    useA = !useA;
+}
+```
+
+### Pattern 5: Producer-Consumer with PBO
+
+CPU produces data while GPU consumes:
+
+```cpp
+Texture2D<PixelFormat::RGBA32F> simulationData(512, 512);
+simulationData.InitUploadPBOPool(2);
+
+// CPU thread: continuously generate simulation data
+void ProducerThread() {
+    for (int step = 0; step < 1000; ++step) {
+        std::vector<float> data = ComputeSimulationStep(step);
+        
+        // Block if GPU hasn't finished with previous frame
+        simulationData.UploadAsyncStream(data.data(), 5000);
+    }
+}
+
+// GPU thread: process as fast as possible
+void ConsumerThread() {
+    Kernel2D simulate([&](Int x, Int y) {
+        auto data = simulationData.Bind();
+        // Process simulation data...
+    }, 16, 16);
+    
+    for (int i = 0; i < 1000; ++i) {
+        simulate.Dispatch(32, 32, true);
+    }
+}
+```
+
+### When to Use PBO vs Synchronous Transfer
+
+| Scenario | Use | Reason |
+|:---------|:----|:-------|
+| Real-time video | PBO | Maximize CPU/GPU parallelism |
+| Single image processing | Sync | Simple, no pipeline needed |
+| Large dataset streaming | PBO | Overlap transfer and compute |
+| Interactive applications | PBO | Maintain responsive framerate |
+| Small textures (<1MB) | Either | Overhead negligible |
+
+### Buffer Count Selection
+
+| Count | Latency | Throughput | Use Case |
+|:------|:--------|:-----------|:---------|
+| 1 | Low | Low | Simple async |
+| 2 | Medium | High | Standard streaming |
+| 3+ | Higher | Max | High-latency tolerance |

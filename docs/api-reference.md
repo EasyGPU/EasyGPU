@@ -16,6 +16,7 @@ Complete reference for all EasyGPU classes and functions.
 - [Callable](#callable)
 - [Structs](#structs)
 - [Textures](#textures)
+- [PBO Async Transfer](#pbo-async-transfer)
 
 ---
 
@@ -939,15 +940,28 @@ Texture2D<PixelFormat::RGBA8> tex(width, height, data);        // With initial d
 
 | Method | Description |
 |:-------|:------------|
-| `Upload(const void* data)` | Upload pixel data to GPU |
+| `Upload(const void* data)` | Upload pixel data to GPU (synchronous) |
 | `UploadSubRegion(x, y, w, h, data)` | Upload partial data |
-| `Download(void* outData)` | Download pixel data from GPU |
+| `Download(void* outData)` | Download pixel data from GPU (synchronous) |
 | `Download(std::vector<T>& outData)` | Download to vector |
 | `Bind()` | Bind to current kernel (returns TextureRef) |
 | `GetWidth()` | Get texture width |
 | `GetHeight()` | Get texture height |
 | `GetHandle()` | Get OpenGL texture ID |
 | `GetSizeInBytes()` | Get total size in bytes |
+
+**PBO Async Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `InitUploadPBOPool(bufferCount)` | Initialize PBO pool for async upload (typically 2-3) |
+| `InitDownloadPBOPool(bufferCount)` | Initialize PBO pool for async download |
+| `UploadAsync(data)` | Asynchronous upload using PBO (non-blocking) |
+| `UploadAsyncStream(data, timeoutMs)` | Async upload with blocking wait for idle PBO |
+| `DownloadAsync()` | Start asynchronous download |
+| `GetDownloadData(outData)` | Get data from completed async download |
+| `Sync()` | Wait for all async operations to complete |
+| `IsIdle()` | Check if all async operations are complete |
 
 **Usage in Kernel:**
 
@@ -999,9 +1013,22 @@ Texture3D<PixelFormat::RGBA8> vol(width, height, depth, data);        // With in
 
 | Method | Description |
 |:-------|:------------|
-| `Upload(const void* data)` | Upload voxel data to GPU |
+| `Upload(const void* data)` | Upload voxel data to GPU (synchronous) |
 | `UploadSubRegion(x, y, z, w, h, d, data)` | Upload partial data |
-| `Download(void* outData)` | Download voxel data from GPU |
+| `Download(void* outData)` | Download voxel data from GPU (synchronous) |
+
+**PBO Async Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `InitUploadPBOPool(bufferCount)` | Initialize PBO pool for async upload |
+| `InitDownloadPBOPool(bufferCount)` | Initialize PBO pool for async download |
+| `UploadAsync(data)` | Asynchronous upload using PBO |
+| `UploadAsyncStream(data, timeoutMs)` | Async upload with blocking wait |
+| `DownloadAsync()` | Start asynchronous download |
+| `GetDownloadData(outData)` | Get data from completed download |
+| `Sync()` | Wait for all async operations to complete |
+| `IsIdle()` | Check if all async operations are complete |
 | `Download(std::vector<T>& outData)` | Download to vector |
 | `Bind()` | Bind to current kernel (returns Texture3DRef) |
 | `GetWidth()` | Get volume width |
@@ -1079,6 +1106,149 @@ Float4 value = vol.Read(x, y, z);
 // All combinations of Var<int>, Expr<int>, literal int for coordinates
 // and Var<Vec4>, Expr<Vec4> for value
 vol.Write(x, y, z, value);
+```
+
+---
+
+## PBO Async Transfer
+
+Pixel Buffer Objects (PBOs) enable asynchronous CPU/GPU data transfers, allowing CPU and GPU to work in parallel. This is essential for real-time applications like video streaming and interactive simulations.
+
+### Overview
+
+```
+CPU Memory              GPU Memory
+     │                       │
+     │  Synchronous Upload   │
+     │ ─────────────────────>│  CPU waits for GPU
+     │                       │
+     │  Async with PBO       │
+     │ ─────────────────────>│  CPU continues immediately
+     │ (non-blocking)        │  GPU copies in background
+```
+
+### Basic Async Upload
+
+```cpp
+Texture2D<PixelFormat::RGBA8> texture(1920, 1080);
+
+// Initialize PBO pool with 2 buffers (double buffering)
+texture.InitUploadPBOPool(2);
+
+// Upload without blocking
+std::vector<uint8_t> frame(1920 * 1080 * 4);
+// ... fill frame data ...
+
+texture.UploadAsync(frame.data());  // Returns immediately
+// CPU can continue processing while GPU uploads
+
+kernel.Dispatch(120, 68, true);
+```
+
+### Streaming Pattern
+
+For continuous streaming (e.g., video playback), use `UploadAsyncStream` which blocks if no PBO is available:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> videoFrame(1920, 1080);
+videoFrame.InitUploadPBOPool(3);  // Triple buffering
+
+Kernel2D processFrame([&](Int x, Int y) {
+    auto frame = videoFrame.Bind();
+    Float4 color = frame.Read(x, y);
+    // Apply filter...
+    frame.Write(x, y, filtered);
+}, 16, 16);
+
+// Stream loop
+for (const auto& frameData : videoFrames) {
+    // Upload blocks if all PBOs busy (waits up to 1000ms)
+    videoFrame.UploadAsyncStream(frameData.data(), 1000);
+    
+    // Process while next frame uploads
+    processFrame.Dispatch(120, 68, true);
+}
+
+// Wait for final upload
+videoFrame.Sync();
+```
+
+### Async Download
+
+Download GPU-computed results without blocking:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> result(1024, 1024);
+result.InitDownloadPBOPool(2);
+
+// Render to texture
+renderKernel.Dispatch(64, 64, true);
+
+// Start async download (returns immediately)
+result.DownloadAsync();
+
+// Do other work while GPU prepares data...
+otherKernel.Dispatch(32, 32, true);
+
+// Try to get data
+std::vector<uint8_t> pixels(1024 * 1024 * 4);
+if (result.GetDownloadData(pixels.data())) {
+    // Data ready
+    SaveToFile(pixels);
+} else {
+    // Still pending, sync and retry
+    result.Sync();
+    result.GetDownloadData(pixels.data());
+}
+```
+
+### Synchronization
+
+| Method | Use When |
+|:-------|:---------|
+| `Sync()` | Need all operations complete before next step |
+| `IsIdle()` | Polling to check if operations finished |
+| Non-blocking | `UploadAsync` returns `false` if no PBO available |
+
+```cpp
+// Poll for completion
+while (!texture.IsIdle()) {
+    // Do other CPU work
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+}
+
+// Or block until complete
+texture.Sync();
+```
+
+### Buffer Count Guidelines
+
+| Count | Pattern | Use Case |
+|:------|:--------|:---------|
+| 1 | Single buffering | Simple async, may stall |
+| 2 | Double buffering | Most common, good balance |
+| 3+ | Triple buffering | High-latency tolerance, max throughput |
+
+```cpp
+// Double buffering: CPU fills one PBO while GPU uploads from another
+texture.InitUploadPBOPool(2);
+
+// Triple buffering: More tolerance for timing variations
+texture.InitUploadPBOPool(3);
+```
+
+### Error Handling
+
+```cpp
+// UploadAsync returns false if no PBO available
+if (!texture.UploadAsync(data)) {
+    // Option 1: Sync and retry
+    texture.Sync();
+    texture.UploadAsync(data);  // Now succeeds
+    
+    // Option 2: Use streaming version (blocks until ready)
+    // texture.UploadAsyncStream(data, timeoutMs);
+}
 ```
 
 ---

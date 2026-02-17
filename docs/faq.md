@@ -329,6 +329,32 @@ Kernel1D kernel([](Int i) {
 });
 ```
 
+### How do I use PBO for async transfer?
+
+PBO (Pixel Buffer Object) enables asynchronous CPU/GPU data transfer:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> texture(1920, 1080);
+texture.InitUploadPBOPool(2);  // Double buffering
+
+// Non-blocking upload
+texture.UploadAsync(frameData.data());
+// CPU continues immediately while GPU copies data
+
+// Check if complete
+if (texture.IsIdle()) { /* ready for next upload */ }
+
+// Or wait explicitly
+texture.Sync();
+```
+
+**When to use:**
+- Video streaming (continuous frame upload)
+- Real-time applications (maintain 60 FPS)
+- Large texture processing (overlap transfer and compute)
+
+See [Patterns](patterns.md#async-data-transfer) for more examples.
+
 ### How do I handle large datasets?
 
 For datasets larger than GPU memory, process in chunks:
