@@ -127,7 +127,7 @@ using Kernel2D = Kernel::Kernel2D;
 using Kernel1D = Kernel::Kernel1D;
 
 /// Alias for InspectorKernel3D
-using InspectorKernel3D = Kernel::InspectorKernel1D;
+using InspectorKernel1D = Kernel::InspectorKernel1D;
 
 /// Alias for InspectorKernel2D
 using InspectorKernel2D = Kernel::InspectorKernel2D;
