@@ -135,6 +135,8 @@ add_library(EasyGPU STATIC
     # Runtime
     include/Runtime/Buffer.h
     include/Runtime/Texture.h
+    include/Runtime/TexturePBOManager.h
+    source/Runtime/TexturePBOManager.cpp
     include/Runtime/Uniform.h
     include/Runtime/Context.h
     source/Runtime/Context.cpp
