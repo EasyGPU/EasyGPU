@@ -2,7 +2,7 @@
 
 /**
  * Texture.h:
- *      @Descripiton    :   2D/3D Texture for GPU compute shader with PBO-accelerated download
+ *      @Descripiton    :   2D Texture for GPU compute shader
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
  *      @Date           :   2/13/2026
  * 
@@ -10,8 +10,7 @@
  *   - Creating empty texture of specified size
  *   - Creating from raw pixel buffer
  *   - Uploading raw pixel data
- *   - Downloading to raw pixel buffer (PBO-accelerated)
- *   - Asynchronous download for GPU/CPU overlap
+ *   - Downloading to raw pixel buffer
  *   - Read/Write access in compute shaders
  */
 #ifndef EASYGPU_TEXTURE_H
@@ -19,7 +18,6 @@
 
 #include <Runtime/PixelFormat.h>
 #include <Runtime/Context.h>
-#include <Runtime/TexturePBOManager.h>
 
 #include <IR/Value/TextureRef.h>
 #include <IR/Builder/Builder.h>
@@ -47,14 +45,9 @@ namespace GPU::Runtime {
      *   // Upload new data
      *   tex.Upload(newPixels.data());
      *
-     *   // Download to buffer (PBO-accelerated)
+     *   // Download to buffer
      *   std::vector<uint8_t> result(1024 * 1024 * 4);
      *   tex.Download(result.data());
-     *
-     *   // Asynchronous download for better performance
-     *   auto token = tex.BeginDownloadAsync();
-     *   // ... do other work while GPU transfers data ...
-     *   tex.CompleteDownloadAsync(token, result.data());
      *
      *   // Use in kernel
      *   Kernel1D kernel([&](Var<int>& id) {
@@ -92,7 +85,7 @@ namespace GPU::Runtime {
          */
         Texture2D(Texture2D &&other) noexcept
                 : _textureId(other._textureId), _width(other._width), _height(other._height), _format(other._format),
-                  _boundBinding(other._boundBinding), _pboManager(std::move(other._pboManager)) {
+                  _boundBinding(other._boundBinding) {
             other._textureId = 0;
             other._width = 0;
             other._height = 0;
@@ -110,7 +103,6 @@ namespace GPU::Runtime {
                 _height = other._height;
                 _format = other._format;
                 _boundBinding = other._boundBinding;
-                _pboManager = std::move(other._pboManager);
                 other._textureId = 0;
                 other._width = 0;
                 other._height = 0;
@@ -177,7 +169,7 @@ namespace GPU::Runtime {
         }
 
         /**
-         * Download texture data to CPU buffer (PBO-accelerated)
+         * Download texture data to CPU buffer
          * @param outData Output buffer pointer (must be large enough)
          */
         void Download(void *outData) const {
@@ -188,15 +180,10 @@ namespace GPU::Runtime {
             Runtime::Context::GetInstance().MakeCurrent();
 
             auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
-            size_t dataSize = GetSizeInBytes();
 
-            // Use PBO manager for efficient download
-            if (!_pboManager) {
-                _pboManager = std::make_unique<TexturePBOManager>();
-                _pboManager->Initialize(dataSize);
-            }
-
-            _pboManager->DownloadSync(_textureId, GL_TEXTURE_2D, format, type, outData);
+            glBindTexture(GL_TEXTURE_2D, _textureId);
+            glGetTexImage(GL_TEXTURE_2D, 0, format, type, outData);
+            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         /**
@@ -209,84 +196,6 @@ namespace GPU::Runtime {
                 outData.resize(requiredSize);
             }
             Download(outData.data());
-        }
-
-        /**
-         * Begin asynchronous download from GPU to CPU
-         * Returns immediately, allowing GPU transfer to happen in background
-         * @return Download token to track this operation
-         */
-        [[nodiscard]] AsyncDownloadToken BeginDownloadAsync() const {
-            AsyncDownloadToken token;
-            
-            if (_textureId == 0) {
-                return token;
-            }
-
-            Runtime::Context::GetInstance().MakeCurrent();
-
-            auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
-            size_t dataSize = GetSizeInBytes();
-
-            // Initialize PBO manager if needed
-            if (!_pboManager) {
-                _pboManager = std::make_unique<TexturePBOManager>();
-                _pboManager->Initialize(dataSize);
-            }
-
-            _pboManager->BeginDownloadAsync(_textureId, GL_TEXTURE_2D, format, type, token);
-            return token;
-        }
-
-        /**
-         * Check if an asynchronous download has completed
-         * @param token The download token returned by BeginDownloadAsync
-         * @return true if download is complete and data is ready
-         */
-        [[nodiscard]] bool IsDownloadComplete(const AsyncDownloadToken& token) const {
-            if (!_pboManager) {
-                return false;
-            }
-            return _pboManager->IsDownloadComplete(token);
-        }
-
-        /**
-         * Wait for asynchronous download to complete
-         * @param token The download token
-         * @param timeoutMs Timeout in milliseconds (0 = wait forever)
-         * @return true if download completed, false if timeout
-         */
-        bool WaitForDownload(const AsyncDownloadToken& token, uint32_t timeoutMs = 0) const {
-            if (!_pboManager) {
-                return false;
-            }
-            return _pboManager->WaitForDownload(token, timeoutMs);
-        }
-
-        /**
-         * Complete asynchronous download and copy data to CPU buffer
-         * Must be called after IsDownloadComplete returns true or WaitForDownload returns true
-         * @param token The download token (will be invalidated after this call)
-         * @param outData Output buffer pointer (must be large enough)
-         */
-        void CompleteDownloadAsync(AsyncDownloadToken& token, void* outData) const {
-            if (!_pboManager || outData == nullptr) {
-                return;
-            }
-            _pboManager->CompleteDownload(token, outData);
-        }
-
-        /**
-         * Set the download strategy for this texture
-         * @param strategy Download strategy (Auto, Direct, or PBO)
-         */
-        void SetDownloadStrategy(TextureDownloadStrategy strategy) const {
-            if (!_pboManager) {
-                size_t dataSize = GetSizeInBytes();
-                _pboManager = std::make_unique<TexturePBOManager>();
-                _pboManager->Initialize(dataSize);
-            }
-            _pboManager->SetStrategy(strategy);
         }
 
     public:
@@ -408,7 +317,6 @@ namespace GPU::Runtime {
                 glDeleteTextures(1, &_textureId);
                 _textureId = 0;
             }
-            // PBO manager will be cleaned up by unique_ptr destructor
         }
 
     private:
@@ -417,12 +325,11 @@ namespace GPU::Runtime {
         uint32_t _height = 0;
         PixelFormat _format = Format;
         int _boundBinding = -1;  // -1 means not bound
-        mutable std::unique_ptr<TexturePBOManager> _pboManager = nullptr;  // Lazy-initialized
     };
 
-    /**
-     * Type aliases for common 2D texture formats
-     */
+/**
+ * Type aliases for common 2D texture formats
+ */
     using TextureRGBA8 = Texture2D<PixelFormat::RGBA8>;
     using TextureRGBA32F = Texture2D<PixelFormat::RGBA32F>;
     using TextureR32F = Texture2D<PixelFormat::R32F>;
@@ -444,14 +351,9 @@ namespace GPU::Runtime {
      *   // Upload new data
      *   vol.Upload(newVoxels.data());
      *
-     *   // Download to buffer (PBO-accelerated)
+     *   // Download to buffer
      *   std::vector<uint8_t> result(256 * 256 * 256 * 4);
      *   vol.Download(result.data());
-     *
-     *   // Asynchronous download
-     *   auto token = vol.BeginDownloadAsync();
-     *   // ... do other work ...
-     *   vol.CompleteDownloadAsync(token, result.data());
      *
      *   // Use in kernel
      *   Kernel3D kernel([&](Var<int>& x, Var<int>& y, Var<int>& z) {
@@ -491,8 +393,7 @@ namespace GPU::Runtime {
          */
         Texture3D(Texture3D &&other) noexcept
                 : _textureId(other._textureId), _width(other._width), _height(other._height), 
-                  _depth(other._depth), _format(other._format), _boundBinding(other._boundBinding),
-                  _pboManager(std::move(other._pboManager)) {
+                  _depth(other._depth), _format(other._format), _boundBinding(other._boundBinding) {
             other._textureId = 0;
             other._width = 0;
             other._height = 0;
@@ -512,7 +413,6 @@ namespace GPU::Runtime {
                 _depth = other._depth;
                 _format = other._format;
                 _boundBinding = other._boundBinding;
-                _pboManager = std::move(other._pboManager);
                 other._textureId = 0;
                 other._width = 0;
                 other._height = 0;
@@ -583,7 +483,7 @@ namespace GPU::Runtime {
         }
 
         /**
-         * Download texture data to CPU buffer (PBO-accelerated)
+         * Download texture data to CPU buffer
          * @param outData Output buffer pointer (must be large enough)
          */
         void Download(void *outData) const {
@@ -594,15 +494,10 @@ namespace GPU::Runtime {
             Runtime::Context::GetInstance().MakeCurrent();
 
             auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
-            size_t dataSize = GetSizeInBytes();
 
-            // Use PBO manager for efficient download
-            if (!_pboManager) {
-                _pboManager = std::make_unique<TexturePBOManager>();
-                _pboManager->Initialize(dataSize);
-            }
-
-            _pboManager->DownloadSync(_textureId, GL_TEXTURE_3D, format, type, outData);
+            glBindTexture(GL_TEXTURE_3D, _textureId);
+            glGetTexImage(GL_TEXTURE_3D, 0, format, type, outData);
+            glBindTexture(GL_TEXTURE_3D, 0);
         }
 
         /**
@@ -615,84 +510,6 @@ namespace GPU::Runtime {
                 outData.resize(requiredSize);
             }
             Download(outData.data());
-        }
-
-        /**
-         * Begin asynchronous download from GPU to CPU
-         * Returns immediately, allowing GPU transfer to happen in background
-         * @return Download token to track this operation
-         */
-        [[nodiscard]] AsyncDownloadToken BeginDownloadAsync() const {
-            AsyncDownloadToken token;
-            
-            if (_textureId == 0) {
-                return token;
-            }
-
-            Runtime::Context::GetInstance().MakeCurrent();
-
-            auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
-            size_t dataSize = GetSizeInBytes();
-
-            // Initialize PBO manager if needed
-            if (!_pboManager) {
-                _pboManager = std::make_unique<TexturePBOManager>();
-                _pboManager->Initialize(dataSize);
-            }
-
-            _pboManager->BeginDownloadAsync(_textureId, GL_TEXTURE_3D, format, type, token);
-            return token;
-        }
-
-        /**
-         * Check if an asynchronous download has completed
-         * @param token The download token returned by BeginDownloadAsync
-         * @return true if download is complete and data is ready
-         */
-        [[nodiscard]] bool IsDownloadComplete(const AsyncDownloadToken& token) const {
-            if (!_pboManager) {
-                return false;
-            }
-            return _pboManager->IsDownloadComplete(token);
-        }
-
-        /**
-         * Wait for asynchronous download to complete
-         * @param token The download token
-         * @param timeoutMs Timeout in milliseconds (0 = wait forever)
-         * @return true if download completed, false if timeout
-         */
-        bool WaitForDownload(const AsyncDownloadToken& token, uint32_t timeoutMs = 0) const {
-            if (!_pboManager) {
-                return false;
-            }
-            return _pboManager->WaitForDownload(token, timeoutMs);
-        }
-
-        /**
-         * Complete asynchronous download and copy data to CPU buffer
-         * Must be called after IsDownloadComplete returns true or WaitForDownload returns true
-         * @param token The download token (will be invalidated after this call)
-         * @param outData Output buffer pointer (must be large enough)
-         */
-        void CompleteDownloadAsync(AsyncDownloadToken& token, void* outData) const {
-            if (!_pboManager || outData == nullptr) {
-                return;
-            }
-            _pboManager->CompleteDownload(token, outData);
-        }
-
-        /**
-         * Set the download strategy for this texture
-         * @param strategy Download strategy (Auto, Direct, or PBO)
-         */
-        void SetDownloadStrategy(TextureDownloadStrategy strategy) const {
-            if (!_pboManager) {
-                size_t dataSize = GetSizeInBytes();
-                _pboManager = std::make_unique<TexturePBOManager>();
-                _pboManager->Initialize(dataSize);
-            }
-            _pboManager->SetStrategy(strategy);
         }
 
     public:
@@ -822,7 +639,6 @@ namespace GPU::Runtime {
                 glDeleteTextures(1, &_textureId);
                 _textureId = 0;
             }
-            // PBO manager will be cleaned up by unique_ptr destructor
         }
 
     private:
@@ -832,7 +648,6 @@ namespace GPU::Runtime {
         uint32_t _depth = 0;
         PixelFormat _format = Format;
         int _boundBinding = -1;  // -1 means not bound
-        mutable std::unique_ptr<TexturePBOManager> _pboManager = nullptr;  // Lazy-initialized
     };
 
     /**
