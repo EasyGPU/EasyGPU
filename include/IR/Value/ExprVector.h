@@ -55,8 +55,8 @@ namespace GPU::IR::Value {
 
         Expr() = default;
         Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        Expr(ExprBase&& base) : ExprBase(base.Release()) {}
+        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
+        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
         
         // Construct from same-type Var
         Expr(const Var<Math::Vec2>& var);
@@ -185,8 +185,8 @@ namespace GPU::IR::Value {
 
         Expr() = default;
         Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        Expr(ExprBase&& base) : ExprBase(base.Release()) {}
+        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
+        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
         
         // Construct from same-type Var
         Expr(const Var<Math::Vec3>& var);
@@ -332,8 +332,8 @@ namespace GPU::IR::Value {
 
         Expr() = default;
         Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        Expr(ExprBase&& base) : ExprBase(base.Release()) {}
+        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
+        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
         
         // Construct from same-type Var
         Expr(const Var<Math::Vec4>& var);
