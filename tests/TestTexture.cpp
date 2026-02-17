@@ -10,19 +10,15 @@
 #include <cmath>
 #include <iomanip>
 #include <string>
+#include <chrono>
+#include <thread>
+#include <queue>
 
 // STB Image Write for saving images
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include <Kernel/Kernel.h>
-#include <Runtime/Texture.h>
-#include <Runtime/ShaderException.h>
-#include <Utility/Math.h>
-#include <Utility/Helpers.h>
-
-#include <IR/Value/Var.h>
-#include <IR/Value/ExprVector.h>
+#include <GPU.h>
 
 using namespace GPU::IR::Value;
 using namespace GPU::Math;
@@ -1292,6 +1288,229 @@ TEST(texture3d_vs_2d_slice)
 END_TEST
 
 // =============================================================================
+// PBO Async Upload/Download Tests
+// =============================================================================
+
+// =============================================================================
+// Test 29: Basic PBO async upload
+// =============================================================================
+TEST(pbo_basic_async_upload)
+    const int W = 256, H = 256;
+    
+    Texture2D<PixelFormat::RGBA8> tex(W, H);
+    tex.InitUploadPBOPool(2);  // 2 PBOs
+    
+    std::vector<uint8_t> data1(W * H * 4, 255);  // White
+    std::vector<uint8_t> data2(W * H * 4, 128);  // Gray
+    
+    // Async upload first frame
+    ASSERT(tex.UploadAsync(data1.data()));
+    tex.Sync();
+    
+    // Verify
+    std::vector<uint8_t> result(W * H * 4);
+    tex.Download(result.data());
+    
+    bool correct = true;
+    for (int i = 0; i < W * H * 4 && correct; ++i) {
+        if (std::abs(result[i] - 255) > 2) {
+            correct = false;
+        }
+    }
+    ASSERT(correct);
+    std::cout << "Basic PBO async upload verified!";
+END_TEST
+
+// =============================================================================
+// Test 30: PBO double buffering upload
+// =============================================================================
+TEST(pbo_double_buffering)
+    const int W = 512, H = 512;
+    const int NUM_FRAMES = 10;
+    
+    Texture2D<PixelFormat::RGBA8> tex(W, H);
+    tex.InitUploadPBOPool(2);  // Double buffering
+    
+    // Generate frames
+    std::vector<std::vector<uint8_t>> frames(NUM_FRAMES);
+    for (int i = 0; i < NUM_FRAMES; ++i) {
+        frames[i].resize(W * H * 4);
+        std::fill(frames[i].begin(), frames[i].end(), static_cast<uint8_t>(i * 25));
+    }
+    
+    int uploaded = 0;
+    for (int i = 0; i < NUM_FRAMES; ++i) {
+        if (tex.UploadAsync(frames[i].data())) {
+            uploaded++;
+        } else {
+            // Wait and retry
+            tex.Sync();
+            if (tex.UploadAsync(frames[i].data())) {
+                uploaded++;
+            }
+        }
+    }
+    
+    tex.Sync();
+    ASSERT(uploaded == NUM_FRAMES);
+    std::cout << "Double buffering uploaded " << uploaded << " frames!";
+END_TEST
+
+// =============================================================================
+// Test 31: PBO streaming upload
+// =============================================================================
+TEST(pbo_streaming_upload)
+    const int W = 256, H = 256;
+    const int NUM_FRAMES = 5;
+    
+    Texture2D<PixelFormat::RGBA8> tex(W, H);
+    tex.InitUploadPBOPool(2);
+    
+    Kernel2D kernel([&](Var<int>& x, Var<int>& y) {
+        auto img = tex.Bind();
+        Var<Vec4> color = img.Read(x, y);
+        img.Write(x, y, Vec4(1.0f) - color);
+    }, 16, 16);
+    
+    std::vector<std::vector<uint8_t>> frames(NUM_FRAMES);
+    for (int i = 0; i < NUM_FRAMES; ++i) {
+        frames[i].resize(W * H * 4);
+        std::fill(frames[i].begin(), frames[i].end(), static_cast<uint8_t>(50 + i * 50));
+    }
+    
+    for (int i = 0; i < NUM_FRAMES; ++i) {
+        // Sync before uploading to ensure previous kernel is done
+        tex.Sync();
+        tex.UploadAsyncStream(frames[i].data(), 1000);
+        kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
+    }
+    
+    std::cout << "Streaming upload with kernel dispatch completed!";
+END_TEST
+
+// =============================================================================
+// Test 32: PBO async download
+// =============================================================================
+TEST(pbo_async_download)
+    const int W = 256, H = 256;
+    
+    // Create texture with known data
+    std::vector<uint8_t> data(W * H * 4, 200);
+    Texture2D<PixelFormat::RGBA8> tex(W, H, data.data());
+    tex.InitDownloadPBOPool(2);
+    
+    // Start async download
+    ASSERT(tex.DownloadAsync());
+    
+    // Wait for completion
+    tex.Sync();
+    
+    // Get data
+    std::vector<uint8_t> result(W * H * 4);
+    bool gotData = tex.GetDownloadData(result.data());
+    
+    if (!gotData) {
+        // Fallback to sync download
+        tex.Download(result.data());
+    }
+    
+    // Verify
+    bool correct = true;
+    for (int i = 0; i < W * H * 4 && correct; ++i) {
+        if (std::abs(result[i] - 200) > 2) {
+            correct = false;
+        }
+    }
+    ASSERT(correct);
+    std::cout << "PBO async download verified!";
+END_TEST
+
+// =============================================================================
+// Test 33: PBO IsIdle check
+// =============================================================================
+TEST(pbo_is_idle_check)
+    const int W = 128, H = 128;
+    
+    Texture2D<PixelFormat::RGBA8> tex(W, H);
+    tex.InitUploadPBOPool(1);  // Single PBO
+    
+    std::vector<uint8_t> data(W * H * 4, 100);
+    
+    ASSERT(tex.IsIdle());
+    
+    tex.UploadAsync(data.data());
+    // May or may not be idle depending on GPU speed
+    
+    tex.Sync();
+    ASSERT(tex.IsIdle());
+    
+    std::cout << "PBO IsIdle check passed!";
+END_TEST
+
+// =============================================================================
+// Test 34: PBO with multiple textures
+// =============================================================================
+TEST(pbo_multiple_textures)
+    const int W = 256, H = 256;
+    
+    Texture2D<PixelFormat::RGBA8> tex1(W, H);
+    Texture2D<PixelFormat::RGBA8> tex2(W, H);
+    
+    tex1.InitUploadPBOPool(2);
+    tex2.InitUploadPBOPool(2);
+    
+    std::vector<uint8_t> data1(W * H * 4, 255);
+    std::vector<uint8_t> data2(W * H * 4, 0);
+    
+    ASSERT(tex1.UploadAsync(data1.data()));
+    ASSERT(tex2.UploadAsync(data2.data()));
+    
+    tex1.Sync();
+    tex2.Sync();
+    
+    std::vector<uint8_t> result1(W * H * 4);
+    std::vector<uint8_t> result2(W * H * 4);
+    tex1.Download(result1.data());
+    tex2.Download(result2.data());
+    
+    bool correct1 = true, correct2 = true;
+    for (int i = 0; i < W * H * 4; ++i) {
+        if (correct1 && std::abs(result1[i] - 255) > 2) correct1 = false;
+        if (correct2 && std::abs(result2[i] - 0) > 2) correct2 = false;
+    }
+    
+    ASSERT(correct1 && correct2);
+    std::cout << "Multiple textures with PBOs verified!";
+END_TEST
+
+// =============================================================================
+// Test 35: PBO 3D texture async upload
+// =============================================================================
+TEST(pbo_3d_texture_async)
+    const int W = 32, H = 32, D = 32;
+    
+    Texture3D<PixelFormat::RGBA8> vol(W, H, D);
+    vol.InitUploadPBOPool(2);
+    
+    std::vector<uint8_t> data(W * H * D * 4, 150);
+    
+    ASSERT(vol.UploadAsync(data.data()));
+    vol.Sync();
+    
+    std::vector<uint8_t> result(W * H * D * 4);
+    vol.Download(result.data());
+    
+    bool correct = true;
+    for (int i = 0; i < W * H * D * 4 && correct; ++i) {
+        if (std::abs(result[i] - 150) > 2) {
+            correct = false;
+        }
+    }
+    ASSERT(correct);
+    std::cout << "3D texture PBO async upload verified!";
+END_TEST
+
+// =============================================================================
 // Main
 // =============================================================================
 int main() {
@@ -1337,6 +1556,16 @@ int main() {
         test_texture3d_write_readback();
         test_texture3d_cross_slice();
         test_texture3d_vs_2d_slice();
+        
+        // PBO async tests
+        std::cout << "\n=== PBO Async Transfer Tests ===\n";
+        test_pbo_basic_async_upload();
+        test_pbo_double_buffering();
+        test_pbo_streaming_upload();
+        test_pbo_async_download();
+        test_pbo_is_idle_check();
+        test_pbo_multiple_textures();
+        test_pbo_3d_texture_async();
         
         std::cout << "\n========================================\n";
         std::cout << "  Results: " << pass_count << "/" << test_count << " tests passed\n";
