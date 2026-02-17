@@ -77,8 +77,11 @@ namespace GPU {
     // Uses perfect forwarding to accept Var, Expr, or literal values
     // ============================================================================
     namespace Construct {
-        // Helper to build parameter list for vector constructors
+        // ============================================================================
+        // Type traits and concepts for Make function constraints
+        // ============================================================================
         namespace Detail {
+            // Helper to build parameter list for vector constructors
             inline std::vector<std::unique_ptr<IR::Node::Node>> BuildVectorParams(
                 const std::vector<IR::Value::ExprBase*>& exprs) {
                 std::vector<std::unique_ptr<IR::Node::Node>> params;
@@ -88,6 +91,53 @@ namespace GPU {
                 }
                 return params;
             }
+
+            // Trait to detect if T is Var<U>
+            template<typename T, typename U>
+            struct IsVarOf : std::false_type {};
+            template<typename U>
+            struct IsVarOf<IR::Value::Var<U>, U> : std::true_type {};
+
+            // Trait to detect if T is Expr<U>
+            template<typename T, typename U>
+            struct IsExprOf : std::false_type {};
+            template<typename U>
+            struct IsExprOf<IR::Value::Expr<U>, U> : std::true_type {};
+
+            // Concept for valid float component type (Var<float>, Expr<float>, or float literal)
+            template<typename T>
+            concept FloatComponent = 
+                std::same_as<std::remove_cvref_t<T>, float> ||
+                IsVarOf<std::remove_cvref_t<T>, float>::value ||
+                IsExprOf<std::remove_cvref_t<T>, float>::value;
+
+            // Concept for valid int component type (Var<int>, Expr<int>, or int literal)
+            template<typename T>
+            concept IntComponent = 
+                std::same_as<std::remove_cvref_t<T>, int> ||
+                IsVarOf<std::remove_cvref_t<T>, int>::value ||
+                IsExprOf<std::remove_cvref_t<T>, int>::value;
+
+            // Concept for valid Vec2 column type (Var<Vec2>, Expr<Vec2>, or Math::Vec2)
+            template<typename T>
+            concept Vec2Component = 
+                std::same_as<std::remove_cvref_t<T>, Math::Vec2> ||
+                IsVarOf<std::remove_cvref_t<T>, Math::Vec2>::value ||
+                IsExprOf<std::remove_cvref_t<T>, Math::Vec2>::value;
+
+            // Concept for valid Vec3 column type (Var<Vec3>, Expr<Vec3>, or Math::Vec3)
+            template<typename T>
+            concept Vec3Component = 
+                std::same_as<std::remove_cvref_t<T>, Math::Vec3> ||
+                IsVarOf<std::remove_cvref_t<T>, Math::Vec3>::value ||
+                IsExprOf<std::remove_cvref_t<T>, Math::Vec3>::value;
+
+            // Concept for valid Vec4 column type (Var<Vec4>, Expr<Vec4>, or Math::Vec4)
+            template<typename T>
+            concept Vec4Component = 
+                std::same_as<std::remove_cvref_t<T>, Math::Vec4> ||
+                IsVarOf<std::remove_cvref_t<T>, Math::Vec4>::value ||
+                IsExprOf<std::remove_cvref_t<T>, Math::Vec4>::value;
 
             // Internal implementations that take Expr
             [[nodiscard]] inline IR::Value::Expr<Math::Vec2> MakeFloat2Impl(
@@ -163,9 +213,10 @@ namespace GPU {
             }
         }
 
-        // Public template versions with perfect forwarding
+        // Public template versions with perfect forwarding and type constraints
         // Multi-component versions
         template<typename X, typename Y>
+            requires Detail::FloatComponent<X> && Detail::FloatComponent<Y>
         [[nodiscard]] inline auto MakeFloat2(X&& x, Y&& y) {
             return Detail::MakeFloat2Impl(
                 IR::Value::Expr<float>(std::forward<X>(x)),
@@ -173,6 +224,7 @@ namespace GPU {
         }
 
         template<typename X, typename Y, typename Z>
+            requires Detail::FloatComponent<X> && Detail::FloatComponent<Y> && Detail::FloatComponent<Z>
         [[nodiscard]] inline auto MakeFloat3(X&& x, Y&& y, Z&& z) {
             return Detail::MakeFloat3Impl(
                 IR::Value::Expr<float>(std::forward<X>(x)),
@@ -181,6 +233,8 @@ namespace GPU {
         }
 
         template<typename X, typename Y, typename Z, typename W>
+            requires Detail::FloatComponent<X> && Detail::FloatComponent<Y> && 
+                     Detail::FloatComponent<Z> && Detail::FloatComponent<W>
         [[nodiscard]] inline auto MakeFloat4(X&& x, Y&& y, Z&& z, W&& w) {
             return Detail::MakeFloat4Impl(
                 IR::Value::Expr<float>(std::forward<X>(x)),
@@ -190,6 +244,7 @@ namespace GPU {
         }
 
         template<typename X, typename Y>
+            requires Detail::IntComponent<X> && Detail::IntComponent<Y>
         [[nodiscard]] inline auto MakeInt2(X&& x, Y&& y) {
             return Detail::MakeInt2Impl(
                 IR::Value::Expr<int>(std::forward<X>(x)),
@@ -197,6 +252,7 @@ namespace GPU {
         }
 
         template<typename X, typename Y, typename Z>
+            requires Detail::IntComponent<X> && Detail::IntComponent<Y> && Detail::IntComponent<Z>
         [[nodiscard]] inline auto MakeInt3(X&& x, Y&& y, Z&& z) {
             return Detail::MakeInt3Impl(
                 IR::Value::Expr<int>(std::forward<X>(x)),
@@ -205,6 +261,8 @@ namespace GPU {
         }
 
         template<typename X, typename Y, typename Z, typename W>
+            requires Detail::IntComponent<X> && Detail::IntComponent<Y> && 
+                     Detail::IntComponent<Z> && Detail::IntComponent<W>
         [[nodiscard]] inline auto MakeInt4(X&& x, Y&& y, Z&& z, W&& w) {
             return Detail::MakeInt4Impl(
                 IR::Value::Expr<int>(std::forward<X>(x)),
@@ -226,42 +284,42 @@ namespace GPU {
         // Single-component lazy fill versions (e.g., MakeFloat3(1.0) creates vec3(1.0, 1.0, 1.0))
         // Disabled when X is a Vec type to avoid ambiguity with the overloads below
         template<typename X>
-            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+            requires Detail::FloatComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeFloat2(X&& x) {
             IR::Value::Expr<float> val(std::forward<X>(x));
             return Detail::MakeFloat2Impl(val, val);
         }
 
         template<typename X>
-            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+            requires Detail::FloatComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeFloat3(X&& x) {
             IR::Value::Expr<float> val(std::forward<X>(x));
             return Detail::MakeFloat3Impl(val, val, val);
         }
 
         template<typename X>
-            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+            requires Detail::FloatComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeFloat4(X&& x) {
             IR::Value::Expr<float> val(std::forward<X>(x));
             return Detail::MakeFloat4Impl(val, val, val, val);
         }
 
         template<typename X>
-            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+            requires Detail::IntComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeInt2(X&& x) {
             IR::Value::Expr<int> val(std::forward<X>(x));
             return Detail::MakeInt2Impl(val, val);
         }
 
         template<typename X>
-            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+            requires Detail::IntComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeInt3(X&& x) {
             IR::Value::Expr<int> val(std::forward<X>(x));
             return Detail::MakeInt3Impl(val, val, val);
         }
 
         template<typename X>
-            requires (!IsVecType<std::remove_cvref_t<X>>::value)
+            requires Detail::IntComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeInt4(X&& x) {
             IR::Value::Expr<int> val(std::forward<X>(x));
             return Detail::MakeInt4Impl(val, val, val, val);
@@ -414,8 +472,9 @@ namespace GPU {
             }
         }
 
-        // Public template versions for matrix construction from columns
+        // Public template versions for matrix construction from columns with type constraints
         template<typename C0, typename C1>
+            requires Detail::Vec2Component<C0> && Detail::Vec2Component<C1>
         [[nodiscard]] inline auto MakeMat2(C0&& c0, C1&& c1) {
             return Detail::MakeMat2Impl(
                 IR::Value::Expr<Math::Vec2>(std::forward<C0>(c0)),
@@ -423,6 +482,7 @@ namespace GPU {
         }
 
         template<typename C0, typename C1, typename C2>
+            requires Detail::Vec3Component<C0> && Detail::Vec3Component<C1> && Detail::Vec3Component<C2>
         [[nodiscard]] inline auto MakeMat3(C0&& c0, C1&& c1, C2&& c2) {
             return Detail::MakeMat3Impl(
                 IR::Value::Expr<Math::Vec3>(std::forward<C0>(c0)),
@@ -431,6 +491,8 @@ namespace GPU {
         }
 
         template<typename C0, typename C1, typename C2, typename C3>
+            requires Detail::Vec4Component<C0> && Detail::Vec4Component<C1> && 
+                     Detail::Vec4Component<C2> && Detail::Vec4Component<C3>
         [[nodiscard]] inline auto MakeMat4(C0&& c0, C1&& c1, C2&& c2, C3&& c3) {
             return Detail::MakeMat4Impl(
                 IR::Value::Expr<Math::Vec4>(std::forward<C0>(c0)),
@@ -441,6 +503,7 @@ namespace GPU {
 
         // Rectangular matrices
         template<typename C0, typename C1>
+            requires Detail::Vec3Component<C0> && Detail::Vec3Component<C1>
         [[nodiscard]] inline auto MakeMat2x3(C0&& c0, C1&& c1) {
             return Detail::MakeMat2x3Impl(
                 IR::Value::Expr<Math::Vec3>(std::forward<C0>(c0)),
@@ -448,6 +511,7 @@ namespace GPU {
         }
 
         template<typename C0, typename C1, typename C2>
+            requires Detail::Vec2Component<C0> && Detail::Vec2Component<C1> && Detail::Vec2Component<C2>
         [[nodiscard]] inline auto MakeMat3x2(C0&& c0, C1&& c1, C2&& c2) {
             return Detail::MakeMat3x2Impl(
                 IR::Value::Expr<Math::Vec2>(std::forward<C0>(c0)),
@@ -456,6 +520,7 @@ namespace GPU {
         }
 
         template<typename C0, typename C1>
+            requires Detail::Vec4Component<C0> && Detail::Vec4Component<C1>
         [[nodiscard]] inline auto MakeMat2x4(C0&& c0, C1&& c1) {
             return Detail::MakeMat2x4Impl(
                 IR::Value::Expr<Math::Vec4>(std::forward<C0>(c0)),
@@ -463,6 +528,8 @@ namespace GPU {
         }
 
         template<typename C0, typename C1, typename C2, typename C3>
+            requires Detail::Vec2Component<C0> && Detail::Vec2Component<C1> && 
+                     Detail::Vec2Component<C2> && Detail::Vec2Component<C3>
         [[nodiscard]] inline auto MakeMat4x2(C0&& c0, C1&& c1, C2&& c2, C3&& c3) {
             return Detail::MakeMat4x2Impl(
                 IR::Value::Expr<Math::Vec2>(std::forward<C0>(c0)),
@@ -472,6 +539,7 @@ namespace GPU {
         }
 
         template<typename C0, typename C1, typename C2>
+            requires Detail::Vec4Component<C0> && Detail::Vec4Component<C1> && Detail::Vec4Component<C2>
         [[nodiscard]] inline auto MakeMat3x4(C0&& c0, C1&& c1, C2&& c2) {
             return Detail::MakeMat3x4Impl(
                 IR::Value::Expr<Math::Vec4>(std::forward<C0>(c0)),
@@ -480,6 +548,8 @@ namespace GPU {
         }
 
         template<typename C0, typename C1, typename C2, typename C3>
+            requires Detail::Vec3Component<C0> && Detail::Vec3Component<C1> && 
+                     Detail::Vec3Component<C2> && Detail::Vec3Component<C3>
         [[nodiscard]] inline auto MakeMat4x3(C0&& c0, C1&& c1, C2&& c2, C3&& c3) {
             return Detail::MakeMat4x3Impl(
                 IR::Value::Expr<Math::Vec3>(std::forward<C0>(c0)),
@@ -539,20 +609,56 @@ namespace GPU {
     // Scalar construction helpers
     // ============================================================================
     
+    // Trait to detect if T is Var<U> for some U
+    template<typename T>
+    struct IsVar : std::false_type {};
+    template<typename U>
+    struct IsVar<IR::Value::Var<U>> : std::true_type {};
+
+    // Trait to detect if T is Expr<U> for some U
+    template<typename T>
+    struct IsExpr : std::false_type {};
+    template<typename U>
+    struct IsExpr<IR::Value::Expr<U>> : std::true_type {};
+
+    // Concept for valid float type (Var<float>, Expr<float>, or float literal)
+    template<typename T>
+    concept FloatConstructible = 
+        std::same_as<std::remove_cvref_t<T>, float> ||
+        IsVar<std::remove_cvref_t<T>>::value ||
+        IsExpr<std::remove_cvref_t<T>>::value;
+
+    // Concept for valid int type (Var<int>, Expr<int>, or int literal)
+    template<typename T>
+    concept IntConstructible = 
+        std::same_as<std::remove_cvref_t<T>, int> ||
+        IsVar<std::remove_cvref_t<T>>::value ||
+        IsExpr<std::remove_cvref_t<T>>::value;
+
+    // Concept for valid bool type (Var<bool>, Expr<bool>, or bool literal)
+    template<typename T>
+    concept BoolConstructible = 
+        std::same_as<std::remove_cvref_t<T>, bool> ||
+        IsVar<std::remove_cvref_t<T>>::value ||
+        IsExpr<std::remove_cvref_t<T>>::value;
+
     // MakeFloat - Construct Expr<float> from scalar values
     template<typename T>
+        requires FloatConstructible<T>
     [[nodiscard]] inline auto MakeFloat(T&& x) {
         return IR::Value::Expr<float>(std::forward<T>(x));
     }
 
     // MakeInt - Construct Expr<int> from scalar values  
     template<typename T>
+        requires IntConstructible<T>
     [[nodiscard]] inline auto MakeInt(T&& x) {
         return IR::Value::Expr<int>(std::forward<T>(x));
     }
 
     // MakeBool - Construct Expr<bool> from scalar values
     template<typename T>
+        requires BoolConstructible<T>
     [[nodiscard]] inline auto MakeBool(T&& x) {
         return IR::Value::Expr<bool>(std::forward<T>(x));
     }
