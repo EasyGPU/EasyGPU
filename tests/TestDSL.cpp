@@ -186,7 +186,7 @@ TEST(vec3_operations)
         Var<Vec3> e = d * 2.0f;
         Var<Vec3> f = 3.0f * e;
         Var<Vec3> g = f / 2.0f;
-        
+
         // Swizzle access - single component
         Var<float> x = b.x();
         Var<float> y = b.y();

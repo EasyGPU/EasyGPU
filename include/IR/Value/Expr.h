@@ -278,8 +278,7 @@ namespace GPU::IR::Value {
          */
         template<typename U = T>
         Expr(T value)
-            requires std::same_as<U, float> || std::same_as<U, int> || std::same_as<U, bool>
-        {
+            requires std::same_as<U, float> || std::same_as<U, int> || std::same_as<U, bool>{
             _node = std::make_unique<Node::LoadUniformNode>(ValueToString(value));
         }
 

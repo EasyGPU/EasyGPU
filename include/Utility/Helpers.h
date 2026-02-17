@@ -104,17 +104,17 @@ namespace GPU {
             template<typename U>
             struct IsExprOf<IR::Value::Expr<U>, U> : std::true_type {};
 
-            // Concept for valid float component type (Var<float>, Expr<float>, or float literal)
+            // Concept for valid float component type (Var<float>, Expr<float>, or convertible-to-float literal)
             template<typename T>
             concept FloatComponent = 
-                std::same_as<std::remove_cvref_t<T>, float> ||
+                std::convertible_to<std::remove_cvref_t<T>, float> ||
                 IsVarOf<std::remove_cvref_t<T>, float>::value ||
                 IsExprOf<std::remove_cvref_t<T>, float>::value;
 
-            // Concept for valid int component type (Var<int>, Expr<int>, or int literal)
+            // Concept for valid int component type (Var<int>, Expr<int>, or convertible-to-int literal)
             template<typename T>
             concept IntComponent = 
-                std::same_as<std::remove_cvref_t<T>, int> ||
+                std::convertible_to<std::remove_cvref_t<T>, int> ||
                 IsVarOf<std::remove_cvref_t<T>, int>::value ||
                 IsExprOf<std::remove_cvref_t<T>, int>::value;
 
@@ -621,26 +621,42 @@ namespace GPU {
     template<typename U>
     struct IsExpr<IR::Value::Expr<U>> : std::true_type {};
 
-    // Concept for valid float type (Var<float>, Expr<float>, or float literal)
+    // Trait to get value type from Var<T> or Expr<T>
+    template<typename T>
+    struct ValueTypeOf {
+        using type = void;
+    };
+    template<typename U>
+    struct ValueTypeOf<IR::Value::Var<U>> {
+        using type = U;
+    };
+    template<typename U>
+    struct ValueTypeOf<IR::Value::Expr<U>> {
+        using type = U;
+    };
+    template<typename T>
+    using ValueTypeOf_t = typename ValueTypeOf<std::remove_cvref_t<T>>::type;
+
+    // Concept for valid float type (Var<float>, Expr<float>, or convertible-to-float literal)
     template<typename T>
     concept FloatConstructible = 
-        std::same_as<std::remove_cvref_t<T>, float> ||
-        IsVar<std::remove_cvref_t<T>>::value ||
-        IsExpr<std::remove_cvref_t<T>>::value;
+        std::convertible_to<std::remove_cvref_t<T>, float> ||
+        (IsVar<std::remove_cvref_t<T>>::value && std::same_as<ValueTypeOf_t<T>, float>) ||
+        (IsExpr<std::remove_cvref_t<T>>::value && std::same_as<ValueTypeOf_t<T>, float>);
 
-    // Concept for valid int type (Var<int>, Expr<int>, or int literal)
+    // Concept for valid int type (Var<int>, Expr<int>, or convertible-to-int literal)
     template<typename T>
     concept IntConstructible = 
-        std::same_as<std::remove_cvref_t<T>, int> ||
-        IsVar<std::remove_cvref_t<T>>::value ||
-        IsExpr<std::remove_cvref_t<T>>::value;
+        std::convertible_to<std::remove_cvref_t<T>, int> ||
+        (IsVar<std::remove_cvref_t<T>>::value && std::same_as<ValueTypeOf_t<T>, int>) ||
+        (IsExpr<std::remove_cvref_t<T>>::value && std::same_as<ValueTypeOf_t<T>, int>);
 
-    // Concept for valid bool type (Var<bool>, Expr<bool>, or bool literal)
+    // Concept for valid bool type (Var<bool>, Expr<bool>, or convertible-to-bool literal)
     template<typename T>
     concept BoolConstructible = 
-        std::same_as<std::remove_cvref_t<T>, bool> ||
-        IsVar<std::remove_cvref_t<T>>::value ||
-        IsExpr<std::remove_cvref_t<T>>::value;
+        std::convertible_to<std::remove_cvref_t<T>, bool> ||
+        (IsVar<std::remove_cvref_t<T>>::value && std::same_as<ValueTypeOf_t<T>, bool>) ||
+        (IsExpr<std::remove_cvref_t<T>>::value && std::same_as<ValueTypeOf_t<T>, bool>);
 
     // MakeFloat - Construct Expr<float> from scalar values
     template<typename T>
