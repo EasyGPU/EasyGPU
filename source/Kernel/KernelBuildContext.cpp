@@ -134,6 +134,12 @@ namespace GPU::Kernel {
             oss << textureDecls << "\n";
         }
 
+        // Output 3D texture declarations (after 2D texture declarations, before buffers)
+        std::string texture3DDecls = GetTexture3DDeclarations();
+        if (!texture3DDecls.empty()) {
+            oss << texture3DDecls << "\n";
+        }
+
         // Output buffer declarations (after texture declarations)
         std::string bufferDecls = GetBufferDeclarations();
         if (!bufferDecls.empty()) {
@@ -304,6 +310,44 @@ namespace GPU::Kernel {
         for (const auto &tex: _textures) {
             std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
             oss << std::format("layout({}, binding={}) uniform image2D {};\n",
+                               formatQualifier, tex.binding, tex.textureName);
+        }
+        return oss.str();
+    }
+
+    /**
+     * Allocate a binding slot for 3D texture/image
+     * @return The allocated binding slot index
+     */
+    uint32_t KernelBuildContext::AllocateTexture3DBinding() {
+        return _nextTexture3DBinding++;
+    }
+
+    /**
+     * Register a 3D texture for the kernel
+     * @param binding The binding slot
+     * @param format The pixel format
+     * @param textureName The texture variable name in GLSL
+     * @param width Texture width
+     * @param height Texture height
+     * @param depth Texture depth
+     */
+    void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
+                                               const std::string &textureName,
+                                               uint32_t width, uint32_t height, uint32_t depth) {
+        _textures3D.push_back({binding, format, textureName, width, height, depth});
+        _texture3DBindings.push_back(binding);
+    }
+
+    /**
+     * Get the 3D texture declarations for GLSL
+     * @return The texture declaration string
+     */
+    std::string KernelBuildContext::GetTexture3DDeclarations() const {
+        std::ostringstream oss;
+        for (const auto &tex: _textures3D) {
+            std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
+            oss << std::format("layout({}, binding={}) uniform image3D {};\n",
                                formatQualifier, tex.binding, tex.textureName);
         }
         return oss.str();

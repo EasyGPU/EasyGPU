@@ -50,6 +50,16 @@ namespace GPU::Flow {
         void BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) override;
         const std::unordered_map<uint32_t, uint32_t>& GetRuntimeTextureBindings() const override;
 
+        // 3D Texture Support
+        uint32_t AllocateTexture3DBinding() override;
+        void RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
+                              const std::string& textureName,
+                              uint32_t width, uint32_t height, uint32_t depth) override;
+        std::string GetTexture3DDeclarations() const override;
+        const std::vector<uint32_t>& GetTexture3DBindings() const override;
+        void BindRuntimeTexture3D(uint32_t binding, uint32_t textureHandle) override;
+        const std::unordered_map<uint32_t, uint32_t>& GetRuntimeTexture3DBindings() const override;
+
         // Callable Function Support
         // Uniform Support
         std::string RegisterUniform(const std::string& typeName, void* uniformPtr,

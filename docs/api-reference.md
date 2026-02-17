@@ -900,12 +900,12 @@ EASYGPU_STRUCT(Triangle,
 
 ## Textures
 
-### Texture
+### Texture2D
 
 2D texture for image data.
 
 ```cpp
-Texture texture(width, height, PixelFormat::RGBA8);
+Texture2D<PixelFormat::RGBA8> texture(width, height);
 ```
 
 **PixelFormat:**
@@ -914,27 +914,171 @@ Texture texture(width, height, PixelFormat::RGBA8);
 |:-------|:------------|
 | `PixelFormat::R8` | Single channel, 8-bit |
 | `PixelFormat::RG8` | Two channels, 8-bit each |
-| `PixelFormat::RGB8` | Three channels, 8-bit each |
 | `PixelFormat::RGBA8` | Four channels, 8-bit each |
 | `PixelFormat::R32F` | Single channel, 32-bit float |
 | `PixelFormat::RG32F` | Two channels, 32-bit float |
-| `PixelFormat::RGB32F` | Three channels, 32-bit float |
 | `PixelFormat::RGBA32F` | Four channels, 32-bit float |
+| `PixelFormat::R16F` | Single channel, 16-bit float |
+| `PixelFormat::RG16F` | Two channels, 16-bit float |
+| `PixelFormat::RGBA16F` | Four channels, 16-bit float |
+| `PixelFormat::R32I` | Single channel, 32-bit signed int |
+| `PixelFormat::RG32I` | Two channels, 32-bit signed int |
+| `PixelFormat::RGBA32I` | Four channels, 32-bit signed int |
+| `PixelFormat::R32UI` | Single channel, 32-bit unsigned int |
+| `PixelFormat::RG32UI` | Two channels, 32-bit unsigned int |
+| `PixelFormat::RGBA32UI` | Four channels, 32-bit unsigned int |
+
+**Constructors:**
+
+```cpp
+Texture2D<PixelFormat::RGBA8> tex(width, height);              // Empty texture
+Texture2D<PixelFormat::RGBA8> tex(width, height, data);        // With initial data
+```
 
 **Methods:**
 
+| Method | Description |
+|:-------|:------------|
+| `Upload(const void* data)` | Upload pixel data to GPU |
+| `UploadSubRegion(x, y, w, h, data)` | Upload partial data |
+| `Download(void* outData)` | Download pixel data from GPU |
+| `Download(std::vector<T>& outData)` | Download to vector |
+| `Bind()` | Bind to current kernel (returns TextureRef) |
+| `GetWidth()` | Get texture width |
+| `GetHeight()` | Get texture height |
+| `GetHandle()` | Get OpenGL texture ID |
+| `GetSizeInBytes()` | Get total size in bytes |
+
+**Usage in Kernel:**
+
 ```cpp
-// Upload image data
-texture.Upload(data, width, height);
+Texture2D<PixelFormat::RGBA8> texture(1024, 1024);
 
-// Download image data
-texture.Download(buffer);
+Kernel2D kernel([&](Int x, Int y) {
+    auto img = texture.Bind();
+    
+    // Read pixel
+    Float4 color = img.Read(x, y);
+    
+    // Write pixel
+    img.Write(x, y, color * 0.5f);
+});
 
-// Bind for kernel access
-texture.Bind();
+kernel.Dispatch(64, 64, true);
+```
 
-// Sample at coordinates
-Float4 color = texture.Sample(u, v);  // u, v in [0, 1]
+**Type Aliases:**
+
+```cpp
+using TextureRGBA8   = Texture2D<PixelFormat::RGBA8>;
+using TextureRGBA32F = Texture2D<PixelFormat::RGBA32F>;
+using TextureR32F    = Texture2D<PixelFormat::R32F>;
+using TextureRG32F   = Texture2D<PixelFormat::RG32F>;
+using TextureR8      = Texture2D<PixelFormat::R8>;
+using image2d<Format> = IR::Value::TextureRef<Format>;  // Inside kernel
+```
+
+---
+
+### Texture3D
+
+3D texture for volume data.
+
+```cpp
+Texture3D<PixelFormat::RGBA8> volume(width, height, depth);
+```
+
+**Constructors:**
+
+```cpp
+Texture3D<PixelFormat::RGBA8> vol(width, height, depth);              // Empty volume
+Texture3D<PixelFormat::RGBA8> vol(width, height, depth, data);        // With initial data
+```
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Upload(const void* data)` | Upload voxel data to GPU |
+| `UploadSubRegion(x, y, z, w, h, d, data)` | Upload partial data |
+| `Download(void* outData)` | Download voxel data from GPU |
+| `Download(std::vector<T>& outData)` | Download to vector |
+| `Bind()` | Bind to current kernel (returns Texture3DRef) |
+| `GetWidth()` | Get volume width |
+| `GetHeight()` | Get volume height |
+| `GetDepth()` | Get volume depth |
+| `GetHandle()` | Get OpenGL texture ID |
+| `GetSizeInBytes()` | Get total size in bytes |
+
+**Usage in Kernel:**
+
+```cpp
+Texture3D<PixelFormat::R32F> volume(256, 256, 256);
+
+Kernel3D kernel([&](Int x, Int y, Int z) {
+    auto vol = volume.Bind();
+    
+    // Read voxel
+    Float4 value = vol.Read(x, y, z);
+    
+    // Write voxel
+    vol.Write(x, y, z, value * 2.0f);
+});
+
+kernel.Dispatch(32, 32, 32, true);
+```
+
+**Type Aliases:**
+
+```cpp
+using Texture3DRGBA8   = Texture3D<PixelFormat::RGBA8>;
+using Texture3DRGBA32F = Texture3D<PixelFormat::RGBA32F>;
+using Texture3DR32F    = Texture3D<PixelFormat::R32F>;
+using Texture3DRG32F   = Texture3D<PixelFormat::RG32F>;
+using Texture3DR8      = Texture3D<PixelFormat::R8>;
+using image3d<Format> = IR::Value::Texture3DRef<Format>;  // Inside kernel
+```
+
+---
+
+### TextureRef (2D)
+
+Reference to a 2D texture inside a kernel, returned by `Texture2D::Bind()`.
+
+**Read Methods:**
+
+```cpp
+// All combinations of Var<int>, Expr<int>, and literal int
+Float4 color = img.Read(x, y);
+```
+
+**Write Methods:**
+
+```cpp
+// All combinations of Var<int>, Expr<int>, literal int for coordinates
+// and Var<Vec4>, Expr<Vec4> for color
+img.Write(x, y, color);
+```
+
+---
+
+### Texture3DRef (3D)
+
+Reference to a 3D texture inside a kernel, returned by `Texture3D::Bind()`.
+
+**Read Methods:**
+
+```cpp
+// All combinations of Var<int>, Expr<int>, and literal int
+Float4 value = vol.Read(x, y, z);
+```
+
+**Write Methods:**
+
+```cpp
+// All combinations of Var<int>, Expr<int>, literal int for coordinates
+// and Var<Vec4>, Expr<Vec4> for value
+vol.Write(x, y, z, value);
 ```
 
 ---

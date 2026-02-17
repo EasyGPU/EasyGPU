@@ -130,6 +130,50 @@ namespace GPU::Flow {
         return empty;
     }
 
+    uint32_t CodeCollectContext::AllocateTexture3DBinding() {
+        if (_parentContext) {
+            return _parentContext->AllocateTexture3DBinding();
+        }
+        return 0;
+    }
+
+    void CodeCollectContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
+                                              const std::string& textureName,
+                                              uint32_t width, uint32_t height, uint32_t depth) {
+        if (_parentContext) {
+            _parentContext->RegisterTexture3D(binding, format, textureName, width, height, depth);
+        }
+    }
+
+    std::string CodeCollectContext::GetTexture3DDeclarations() const {
+        if (_parentContext) {
+            return _parentContext->GetTexture3DDeclarations();
+        }
+        return "";
+    }
+
+    const std::vector<uint32_t>& CodeCollectContext::GetTexture3DBindings() const {
+        if (_parentContext) {
+            return _parentContext->GetTexture3DBindings();
+        }
+        static std::vector<uint32_t> empty;
+        return empty;
+    }
+
+    void CodeCollectContext::BindRuntimeTexture3D(uint32_t binding, uint32_t textureHandle) {
+        if (_parentContext) {
+            _parentContext->BindRuntimeTexture3D(binding, textureHandle);
+        }
+    }
+
+    const std::unordered_map<uint32_t, uint32_t>& CodeCollectContext::GetRuntimeTexture3DBindings() const {
+        if (_parentContext) {
+            return _parentContext->GetRuntimeTexture3DBindings();
+        }
+        static std::unordered_map<uint32_t, uint32_t> empty;
+        return empty;
+    }
+
     void CodeCollectContext::SetParentContext(IR::Builder::BuilderContext* parent) {
         _parentContext = parent;
     }

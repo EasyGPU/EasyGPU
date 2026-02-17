@@ -286,6 +286,554 @@ namespace GPU::IR::Value {
     template<Runtime::PixelFormat Format>
     using image2d = TextureRef<Format>;
 
+    /**
+     * 3D Texture reference class for DSL access
+     * @tparam Format The pixel format of the texture
+     *
+     * Usage:
+     *   auto vol = texture3d.Bind();
+     *   Var<Vec4> value = vol.Read(x, y, z);        // Read
+     *   vol.Write(x, y, z, Vec4(1.0f, 0.0f, 0.0f, 1.0f));  // Write
+     */
+    template<Runtime::PixelFormat Format>
+    class Texture3DRef {
+    public:
+        Texture3DRef(std::string textureName, uint32_t binding, uint32_t width, uint32_t height, uint32_t depth)
+                : _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height), _depth(depth) {
+        }
+
+        [[nodiscard]] uint32_t GetBinding() const { return _binding; }
+
+        [[nodiscard]] const std::string &GetTextureName() const { return _textureName; }
+
+        [[nodiscard]] uint32_t GetWidth() const { return _width; }
+
+        [[nodiscard]] uint32_t GetHeight() const { return _height; }
+
+        [[nodiscard]] uint32_t GetDepth() const { return _depth; }
+
+        static constexpr Runtime::PixelFormat GetFormat() { return Format; }
+
+    public:
+        // =======================================================================
+        // Read operations - imageLoad(texture, ivec3(x, y, z))
+        // =======================================================================
+
+        /**
+         * Read voxel at integer coordinates
+         * @param x X coordinate (0 to width-1)
+         * @param y Y coordinate (0 to height-1)
+         * @param z Z coordinate (0 to depth-1)
+         * @return Vec4 color value (automatically converted from format)
+         */
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Var<int> &y, const Var<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Expr<int> &x, const Var<int> &y, const Var<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Expr<int> &y, const Var<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Var<int> &y, const Expr<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Expr<int> &x, const Expr<int> &y, const Var<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Expr<int> &x, const Var<int> &y, const Expr<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Expr<int> &y, const Expr<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Expr<int> &x, const Expr<int> &y, const Expr<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        // Literal integer versions
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, const Var<int> &y, const Var<int> &z) const {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, int y, const Var<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, y, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Var<int> &y, int z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, int y, const Var<int> &z) const {
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, y, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, const Var<int> &y, int z) const {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, yStr, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, int y, int z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, y, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, int y, int z) const {
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, y, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        // Mixed literal and Expr versions
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, const Expr<int> &y, const Var<int> &z) const {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, const Var<int> &y, const Expr<int> &z) const {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, yStr, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Expr<int> &x, int y, const Var<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, y, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, int y, const Expr<int> &z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, y, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Expr<int> &x, const Var<int> &y, int z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Expr<int> &y, int z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, int y, const Expr<int> &z) const {
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, y, zStr);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(int x, const Expr<int> &y, int z) const {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, yStr, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+        [[nodiscard]] Var<GPU::Math::Vec4> Read(const Expr<int> &x, int y, int z) const {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, y, z);
+            return Var<GPU::Math::Vec4>(code);
+        }
+
+    public:
+        // =======================================================================
+        // Write operations - imageStore(texture, ivec3(x, y, z), value)
+        // =======================================================================
+
+        /**
+         * Write voxel at integer coordinates
+         * @param x X coordinate
+         * @param y Y coordinate
+         * @param z Z coordinate
+         * @param color Color value (Vec4 or expression)
+         */
+        void Write(const Var<int> &x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Expr<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Var<int> &y, const Expr<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Expr<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Var<int> &y, const Expr<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Expr<int> &y, const Expr<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Expr<int> &y, const Expr<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        // With Expr<Math::Vec4> color
+        void Write(const Var<int> &x, const Var<int> &y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Var<int> &y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Expr<int> &y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Var<int> &y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Expr<int> &y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Var<int> &y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Expr<int> &y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, const Expr<int> &y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        // Literal integer coordinates
+        void Write(int x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, int y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Var<int> &y, int z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, int y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, const Var<int> &y, int z, const Var<GPU::Math::Vec4> &color) {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, yStr, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, int y, int z, const Var<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, int y, int z, const Var<GPU::Math::Vec4> &color) {
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, const Var<int> &y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, int y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, const Var<int> &y, int z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, int y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, const Var<int> &y, int z, const Expr<GPU::Math::Vec4> &color) {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, yStr, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, int y, int z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, int y, int z, const Expr<GPU::Math::Vec4> &color) {
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, const Expr<int> &y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, int y, const Var<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Var<int> &x, int y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, int y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, const Expr<int> &y, int z, const Expr<GPU::Math::Vec4> &color) {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, yStr, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, int y, int z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, z, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(int x, const Var<int> &y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, yStr, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+        void Write(const Expr<int> &x, int y, const Expr<int> &z, const Expr<GPU::Math::Vec4> &color) {
+            std::string xStr = Builder::Builder::Get().BuildNode(*x.Node());
+            std::string zStr = Builder::Builder::Get().BuildNode(*z.Node());
+            std::string colorStr = Builder::Builder::Get().BuildNode(*color.Node());
+            std::string code = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, y, zStr, colorStr);
+            Builder::Builder::Get().Context()->PushTranslatedCode(code);
+        }
+
+    private:
+        std::string _textureName;
+        uint32_t _binding;
+        uint32_t _width;
+        uint32_t _height;
+        uint32_t _depth;
+    };
+
+    /**
+     * Type alias for convenience
+     */
+    template<Runtime::PixelFormat Format>
+    using image2d = TextureRef<Format>;
+
+    template<Runtime::PixelFormat Format>
+    using image3d = Texture3DRef<Format>;
+
 } // namespace GPU::IR::Value
 
 #endif // EASYGPU_TEXTUREREF_H

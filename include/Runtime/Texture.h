@@ -328,13 +328,336 @@ namespace GPU::Runtime {
     };
 
 /**
- * Type aliases for common texture formats
+ * Type aliases for common 2D texture formats
  */
     using TextureRGBA8 = Texture2D<PixelFormat::RGBA8>;
     using TextureRGBA32F = Texture2D<PixelFormat::RGBA32F>;
     using TextureR32F = Texture2D<PixelFormat::R32F>;
     using TextureRG32F = Texture2D<PixelFormat::RG32F>;
     using TextureR8 = Texture2D<PixelFormat::R8>;
+
+    /**
+     * 3D Texture class for GPU compute operations (volume textures)
+     * @tparam Format The pixel format of the texture
+     *
+     * Usage:
+     *   // Create empty volume texture
+     *   Texture3D<PixelFormat::RGBA8> vol1(256, 256, 256);
+     *
+     *   // Create from raw buffer
+     *   std::vector<uint8_t> voxels(256 * 256 * 256 * 4, 255);
+     *   Texture3D<PixelFormat::RGBA8> vol2(256, 256, 256, voxels.data());
+     *
+     *   // Upload new data
+     *   vol.Upload(newVoxels.data());
+     *
+     *   // Download to buffer
+     *   std::vector<uint8_t> result(256 * 256 * 256 * 4);
+     *   vol.Download(result.data());
+     *
+     *   // Use in kernel
+     *   Kernel3D kernel([&](Var<int>& x, Var<int>& y, Var<int>& z) {
+     *       auto volume = vol.Bind();
+     *       Var<Vec4> value = volume.Read(x, y, z);
+     *       volume.Write(x, y, z, value * 0.5f);
+     *   });
+     */
+    template<PixelFormat Format>
+    class Texture3D {
+    public:
+        /**
+         * Create an empty 3D texture with specified dimensions
+         * @param width Texture width in voxels
+         * @param height Texture height in voxels
+         * @param depth Texture depth in voxels
+         */
+        Texture3D(uint32_t width, uint32_t height, uint32_t depth)
+                : _width(width), _height(height), _depth(depth), _format(Format) {
+            CreateTexture(nullptr);
+        }
+
+        /**
+         * Create a 3D texture and upload voxel data
+         * @param width Texture width in voxels
+         * @param height Texture height in voxels
+         * @param depth Texture depth in voxels
+         * @param data Raw voxel data pointer (must be width * height * depth * bytesPerPixel)
+         */
+        Texture3D(uint32_t width, uint32_t height, uint32_t depth, const void *data)
+                : _width(width), _height(height), _depth(depth), _format(Format) {
+            CreateTexture(data);
+        }
+
+        /**
+         * Move constructor
+         */
+        Texture3D(Texture3D &&other) noexcept
+                : _textureId(other._textureId), _width(other._width), _height(other._height), 
+                  _depth(other._depth), _format(other._format), _boundBinding(other._boundBinding) {
+            other._textureId = 0;
+            other._width = 0;
+            other._height = 0;
+            other._depth = 0;
+            other._boundBinding = -1;
+        }
+
+        /**
+         * Move assignment
+         */
+        Texture3D &operator=(Texture3D &&other) noexcept {
+            if (this != &other) {
+                DestroyTexture();
+                _textureId = other._textureId;
+                _width = other._width;
+                _height = other._height;
+                _depth = other._depth;
+                _format = other._format;
+                _boundBinding = other._boundBinding;
+                other._textureId = 0;
+                other._width = 0;
+                other._height = 0;
+                other._depth = 0;
+                other._boundBinding = -1;
+            }
+            return *this;
+        }
+
+        /**
+         * Destructor
+         */
+        ~Texture3D() {
+            DestroyTexture();
+        }
+
+        // Disable copy
+        Texture3D(const Texture3D &) = delete;
+
+        Texture3D &operator=(const Texture3D &) = delete;
+
+    public:
+        /**
+         * Upload raw voxel data to GPU 3D texture
+         * @param data Raw voxel data pointer
+         */
+        void Upload(const void *data) {
+            if (_textureId == 0 || data == nullptr) {
+                return;
+            }
+
+            // Ensure context is current
+            Runtime::Context::GetInstance().MakeCurrent();
+
+            auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
+
+            glBindTexture(GL_TEXTURE_3D, _textureId);
+            glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, _width, _height, _depth, format, type, data);
+            glBindTexture(GL_TEXTURE_3D, 0);
+        }
+
+        /**
+         * Upload a portion of the 3D texture
+         * @param x Offset X
+         * @param y Offset Y
+         * @param z Offset Z
+         * @param w Width to upload
+         * @param h Height to upload
+         * @param d Depth to upload
+         * @param data Raw voxel data
+         */
+        void UploadSubRegion(uint32_t x, uint32_t y, uint32_t z, 
+                            uint32_t w, uint32_t h, uint32_t d, const void *data) {
+            if (_textureId == 0 || data == nullptr) {
+                return;
+            }
+            if (x + w > _width || y + h > _height || z + d > _depth) {
+                throw std::out_of_range("Upload region exceeds texture bounds");
+            }
+
+            Runtime::Context::GetInstance().MakeCurrent();
+
+            auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
+
+            glBindTexture(GL_TEXTURE_3D, _textureId);
+            glTexSubImage3D(GL_TEXTURE_3D, 0, x, y, z, w, h, d, format, type, data);
+            glBindTexture(GL_TEXTURE_3D, 0);
+        }
+
+        /**
+         * Download texture data to CPU buffer
+         * @param outData Output buffer pointer (must be large enough)
+         */
+        void Download(void *outData) const {
+            if (_textureId == 0 || outData == nullptr) {
+                return;
+            }
+
+            Runtime::Context::GetInstance().MakeCurrent();
+
+            auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
+
+            glBindTexture(GL_TEXTURE_3D, _textureId);
+            glGetTexImage(GL_TEXTURE_3D, 0, format, type, outData);
+            glBindTexture(GL_TEXTURE_3D, 0);
+        }
+
+        /**
+         * Download to a vector (resizes automatically)
+         */
+        template<typename T>
+        void Download(std::vector<T> &outData) const {
+            size_t requiredSize = (_width * _height * _depth * GetBytesPerPixel(_format) + sizeof(T) - 1) / sizeof(T);
+            if (outData.size() < requiredSize) {
+                outData.resize(requiredSize);
+            }
+            Download(outData.data());
+        }
+
+    public:
+        /**
+         * Bind this 3D texture to the current kernel being defined
+         * Automatically allocates a binding slot and registers the texture
+         * @return Texture3DRef for DSL access
+         */
+        [[nodiscard]] IR::Value::Texture3DRef<Format> Bind() {
+            // Get current builder context
+            auto *context = IR::Builder::Builder::Get().Context();
+            if (!context) {
+                throw std::runtime_error("Texture3D::Bind() called outside of Kernel definition");
+            }
+
+            // Allocate binding slot
+            uint32_t binding = context->AllocateTextureBinding();
+
+            // Generate texture variable name
+            std::string textureName = std::format("tex3d{}", binding);
+
+            // Register texture in context
+            context->RegisterTexture3D(binding, _format, textureName, _width, _height, _depth);
+
+            // Register runtime texture handle
+            context->BindRuntimeTexture(binding, _textureId);
+
+            // Store binding info
+            _boundBinding = static_cast<int>(binding);
+
+            // Return Texture3DRef for DSL access
+            return IR::Value::Texture3DRef<Format>(textureName, binding, _width, _height, _depth);
+        }
+
+    public:
+        /**
+         * Get OpenGL texture handle
+         */
+        [[nodiscard]] uint32_t GetHandle() const {
+            return _textureId;
+        }
+
+        /**
+         * Get texture width
+         */
+        [[nodiscard]] uint32_t GetWidth() const {
+            return _width;
+        }
+
+        /**
+         * Get texture height
+         */
+        [[nodiscard]] uint32_t GetHeight() const {
+            return _height;
+        }
+
+        /**
+         * Get texture depth
+         */
+        [[nodiscard]] uint32_t GetDepth() const {
+            return _depth;
+        }
+
+        /**
+         * Get pixel format
+         */
+        static constexpr PixelFormat GetFormat() {
+            return Format;
+        }
+
+        /**
+         * Get bytes per pixel
+         */
+        [[nodiscard]] size_t GetBytesPerPixel() const {
+            return Runtime::GetBytesPerPixel(_format);
+        }
+
+        /**
+         * Get total size in bytes
+         */
+        [[nodiscard]] size_t GetSizeInBytes() const {
+            return _width * _height * _depth * GetBytesPerPixel();
+        }
+
+        /**
+         * Get binding slot if bound to a kernel
+         * @return The binding slot, or -1 if not bound
+         */
+        [[nodiscard]] int GetBinding() const {
+            return _boundBinding;
+        }
+
+    private:
+        void CreateTexture(const void *initialData) {
+            // Auto-initialize OpenGL context
+            Runtime::AutoInitContext();
+            Runtime::Context::GetInstance().MakeCurrent();
+
+            if (_width == 0 || _height == 0 || _depth == 0) {
+                throw std::invalid_argument("Texture dimensions must be non-zero");
+            }
+
+            auto [internalFormat, format, type] = GetGLPixelFormatInfo(_format);
+
+            glGenTextures(1, &_textureId);
+            if (_textureId == 0) {
+                throw std::runtime_error("Failed to create OpenGL 3D texture");
+            }
+
+            glBindTexture(GL_TEXTURE_3D, _textureId);
+
+            // Set texture parameters (required for proper operation)
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+            // Allocate texture storage
+            glTexImage3D(GL_TEXTURE_3D, 0, internalFormat, _width, _height, _depth, 0, format, type, initialData);
+
+            glBindTexture(GL_TEXTURE_3D, 0);
+        }
+
+        void DestroyTexture() {
+            if (_textureId != 0) {
+                glDeleteTextures(1, &_textureId);
+                _textureId = 0;
+            }
+        }
+
+    private:
+        uint32_t _textureId = 0;
+        uint32_t _width = 0;
+        uint32_t _height = 0;
+        uint32_t _depth = 0;
+        PixelFormat _format = Format;
+        int _boundBinding = -1;  // -1 means not bound
+    };
+
+    /**
+     * Type aliases for common 3D texture formats
+     */
+    using Texture3DRGBA8 = Texture3D<PixelFormat::RGBA8>;
+    using Texture3DRGBA32F = Texture3D<PixelFormat::RGBA32F>;
+    using Texture3DR32F = Texture3D<PixelFormat::R32F>;
+    using Texture3DRG32F = Texture3D<PixelFormat::RG32F>;
+    using Texture3DR8 = Texture3D<PixelFormat::R8>;
 
 } // namespace GPU::Runtime
 
