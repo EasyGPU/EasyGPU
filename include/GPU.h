@@ -117,11 +117,23 @@ using namespace GPU::Flow;
 
 namespace GPU {
 
+/// Alias for Kernel3D
+using Kernel3D = Kernel::Kernel3D;
+
 /// Alias for Kernel2D
 using Kernel2D = Kernel::Kernel2D;
 
 /// Alias for Kernel1D
 using Kernel1D = Kernel::Kernel1D;
+
+/// Alias for InspectorKernel3D
+using InspectorKernel3D = Kernel::InspectorKernel1D;
+
+/// Alias for InspectorKernel2D
+using InspectorKernel2D = Kernel::InspectorKernel2D;
+
+/// Alias for InspectorKernel3D
+using InspectorKernel3D = Kernel::InspectorKernel3D;
 
 } // namespace GPU
 
