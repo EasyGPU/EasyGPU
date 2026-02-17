@@ -31,6 +31,8 @@
 #include <format>
 #include <memory>
 #include <queue>
+#include <thread>
+#include <chrono>
 
 namespace GPU::Runtime {
 
