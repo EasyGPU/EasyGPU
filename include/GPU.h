@@ -134,24 +134,4 @@ using InspectorKernel2D = Kernel::InspectorKernel2D;
 
 /// Alias for InspectorKernel3D
 using InspectorKernel3D = Kernel::InspectorKernel3D;
-
-// =============================================================================
-// Texture Type Aliases
-// =============================================================================
-
-/// Alias for 2D textures with RGBA8 format
-using Texture2D = Runtime::Texture2D<Runtime::PixelFormat::RGBA8>;
-
-/// Alias for 3D textures with RGBA8 format
-using Texture3D = Runtime::Texture3D<Runtime::PixelFormat::RGBA8>;
-
 } // namespace GPU
-
-// Bring convenience aliases into global scope too
-using GPU::Kernel2D;
-using GPU::Kernel1D;
-using GPU::Kernel3D;
-
-// Texture type aliases in global scope
-using GPU::Texture2D;
-using GPU::Texture3D;
