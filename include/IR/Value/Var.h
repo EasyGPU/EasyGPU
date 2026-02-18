@@ -89,7 +89,7 @@ namespace GPU::IR::Value {
          * Assignment from a expression
          * @param Value The expression to assign
          */
-        VarBase(Expr<Type> &&Value) noexcept {
+        explicit VarBase(Expr<Type> &&Value) noexcept {
             std::string name = Builder::Builder::Get().Context()->AssignVarName();
 
             _node    = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
@@ -111,7 +111,7 @@ namespace GPU::IR::Value {
         * Assignment from a expression
         * @param Value The expression to assign
         */
-        VarBase(Expr<Type> &Value) noexcept {
+        explicit VarBase(Expr<Type> &Value) noexcept {
             std::string name = Builder::Builder::Get().Context()->AssignVarName();
 
             _node    = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
