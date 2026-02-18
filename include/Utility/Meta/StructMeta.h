@@ -821,6 +821,14 @@ namespace GPU::Meta {
                     varName, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName)); \
                 _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); \
             }                           \
+            \
+            /* From existing variable name with IsExternal flag (for uniforms) */ \
+            Var(const std::string& varName, bool IsExternal) { \
+                GPU::Meta::RegisterStructWithDependencies<StructType>(); \
+                _node = std::make_unique<Node::LocalVariableNode>( \
+                    varName, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName), IsExternal); \
+                _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); \
+            }                           \
             /* Copy constructor - like VarBase */ \
             Var(const Var &Other) : Var() { \
                 auto rhs = Other.Load(); \
