@@ -482,7 +482,7 @@ namespace GPU::IR::Value {
     };
 
     // ==================== Var Matrix-Vector Multiplication ====================
-    // Mat2 * Vec2
+    // Mat2 * Vec2 (Var * Var)
     [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Mat2> &lhs, const VarBase<Math::Vec2> &rhs) {
         auto lhsLoad = lhs.Load();
         auto rhsLoad = rhs.Load();
@@ -490,7 +490,13 @@ namespace GPU::IR::Value {
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
     }
 
-    // Mat3 * Vec3
+    // Mat2 * Vec2 (Var * Expr)
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Mat2> &lhs, const Expr<Math::Vec2> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+    }
+
+    // Mat3 * Vec3 (Var * Var)
     [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Mat3> &lhs, const VarBase<Math::Vec3> &rhs) {
         auto lhsLoad = lhs.Load();
         auto rhsLoad = rhs.Load();
@@ -498,7 +504,13 @@ namespace GPU::IR::Value {
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
     }
 
-    // Mat4 * Vec4
+    // Mat3 * Vec3 (Var * Expr)
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Mat3> &lhs, const Expr<Math::Vec3> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+    }
+
+    // Mat4 * Vec4 (Var * Var)
     [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Mat4> &lhs, const VarBase<Math::Vec4> &rhs) {
         auto lhsLoad = lhs.Load();
         auto rhsLoad = rhs.Load();
@@ -506,12 +518,23 @@ namespace GPU::IR::Value {
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
     }
 
-    // Rectangular matrix * vector
+    // Mat4 * Vec4 (Var * Expr)
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Mat4> &lhs, const Expr<Math::Vec4> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+    }
+
+    // Rectangular matrix * vector (Var * Var and Var * Expr)
     [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Mat2x3> &lhs, const VarBase<Math::Vec2> &rhs) {
         auto lhsLoad = lhs.Load();
         auto rhsLoad = rhs.Load();
         return Expr<Math::Vec3>(
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+    }
+
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Mat2x3> &lhs, const Expr<Math::Vec2> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
     }
 
     [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Mat3x2> &lhs, const VarBase<Math::Vec3> &rhs) {
@@ -521,11 +544,21 @@ namespace GPU::IR::Value {
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
     }
 
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Mat3x2> &lhs, const Expr<Math::Vec3> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+    }
+
     [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Mat2x4> &lhs, const VarBase<Math::Vec2> &rhs) {
         auto lhsLoad = lhs.Load();
         auto rhsLoad = rhs.Load();
         return Expr<Math::Vec4>(
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+    }
+
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Mat2x4> &lhs, const Expr<Math::Vec2> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
     }
 
     [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Mat4x2> &lhs, const VarBase<Math::Vec4> &rhs) {
@@ -535,6 +568,11 @@ namespace GPU::IR::Value {
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
     }
 
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Mat4x2> &lhs, const Expr<Math::Vec4> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+    }
+
     [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Mat3x4> &lhs, const VarBase<Math::Vec3> &rhs) {
         auto lhsLoad = lhs.Load();
         auto rhsLoad = rhs.Load();
@@ -542,11 +580,21 @@ namespace GPU::IR::Value {
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
     }
 
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Mat3x4> &lhs, const Expr<Math::Vec3> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+    }
+
     [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Mat4x3> &lhs, const VarBase<Math::Vec4> &rhs) {
         auto lhsLoad = lhs.Load();
         auto rhsLoad = rhs.Load();
         return Expr<Math::Vec3>(
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+    }
+
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Mat4x3> &lhs, const Expr<Math::Vec4> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
     }
 
     // ============================================================================
@@ -835,6 +883,226 @@ namespace GPU::IR::Value {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // ============================================================================
+    // Vector *= Matrix Compound Assignment Operations
+    // ============================================================================
+
+    // Vec2 *= Mat2
+    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const VarBase<Math::Mat2> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const Expr<Math::Mat2> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec3 *= Mat3
+    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const VarBase<Math::Mat3> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const Expr<Math::Mat3> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec4 *= Mat4
+    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const VarBase<Math::Mat4> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const Expr<Math::Mat4> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec2 *= Mat3x2 (3x2 matrix multiplies Vec2 -> Vec3)
+    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const VarBase<Math::Mat3x2> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const Expr<Math::Mat3x2> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec2 *= Mat4x2 (4x2 matrix multiplies Vec2 -> Vec4)
+    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const VarBase<Math::Mat4x2> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const Expr<Math::Mat4x2> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec3 *= Mat2x3 (2x3 matrix multiplies Vec3 -> Vec2)
+    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const VarBase<Math::Mat2x3> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const Expr<Math::Mat2x3> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec3 *= Mat4x3 (4x3 matrix multiplies Vec3 -> Vec4)
+    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const VarBase<Math::Mat4x3> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const Expr<Math::Mat4x3> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec4 *= Mat2x4 (2x4 matrix multiplies Vec4 -> Vec2)
+    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const VarBase<Math::Mat2x4> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const Expr<Math::Mat2x4> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            CloneNode(rhs)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    // Vec4 *= Mat3x4 (3x4 matrix multiplies Vec4 -> Vec3)
+    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const VarBase<Math::Mat3x4> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto rhsLoad = rhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
+            std::move(lhsLoad),
+            std::move(rhsLoad)
+        );
+        Builder::Builder::Get().Build(*comAssign, true);
+        return lhs;
+    }
+
+    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const Expr<Math::Mat3x4> &rhs) {
+        auto lhsLoad = lhs.Load();
+        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
+            Node::CompoundAssignmentCode::MulAssign,
             std::move(lhsLoad),
             CloneNode(rhs)
         );
