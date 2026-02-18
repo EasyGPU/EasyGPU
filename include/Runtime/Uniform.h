@@ -47,6 +47,10 @@ namespace GPU::Runtime {
         else if constexpr (std::same_as<T, Math::Mat3x4>) return "mat3x4";
         else if constexpr (std::same_as<T, Math::Mat4x2>) return "mat4x2";
         else if constexpr (std::same_as<T, Math::Mat4x3>) return "mat4x3";
+        else if constexpr (GPU::Meta::RegisteredStruct<T>) {
+            // For registered structs, use the struct type name
+            return GPU::Meta::StructMeta<T>::glslTypeName;
+        }
         else return "unknown";
     }
 
