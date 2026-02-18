@@ -388,7 +388,7 @@ namespace GPU {
                       Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value ||
                       Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value)
         [[nodiscard]] inline auto MakeFloat3(XY&& xy, Z&& z) {
-            IR::Value::Expr<float> zExpr = Detail::ToExpr(std::forward<Z>(z));
+            IR::Value::Expr<float> zExpr = Math::Detail::ToExpr(std::forward<Z>(z));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeFloat3BroadcastImpl(xy, std::move(zExpr));
             } else {
@@ -404,8 +404,8 @@ namespace GPU {
                      (std::convertible_to<std::remove_cvref_t<Z>, float> || Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value) &&
                      (std::convertible_to<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline auto MakeFloat4(XY&& xy, Z&& z, W&& w) {
-            IR::Value::Expr<float> zExpr = Detail::ToExpr(std::forward<Z>(z));
-            IR::Value::Expr<float> wExpr = Detail::ToExpr(std::forward<W>(w));
+            IR::Value::Expr<float> zExpr = Math::Detail::ToExpr(std::forward<Z>(z));
+            IR::Value::Expr<float> wExpr = Math::Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeFloat4BroadcastImpl(xy, std::move(zExpr), std::move(wExpr));
             } else {
@@ -420,7 +420,7 @@ namespace GPU {
             requires Detail::Vec3Component<XYZ> && 
                      (std::convertible_to<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline auto MakeFloat4(XYZ&& xyz, W&& w) {
-            IR::Value::Expr<float> wExpr = Detail::ToExpr(std::forward<W>(w));
+            IR::Value::Expr<float> wExpr = Math::Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XYZ>>) {
                 return Detail::MakeFloat4BroadcastImpl(xyz, std::move(wExpr));
             } else {
@@ -437,7 +437,7 @@ namespace GPU {
                       Detail::IsVarOf<std::remove_cvref_t<Z>, int>::value ||
                       Detail::IsExprOf<std::remove_cvref_t<Z>, int>::value)
         [[nodiscard]] inline auto MakeInt3(XY&& xy, Z&& z) {
-            IR::Value::Expr<int> zExpr = Detail::ToExpr(std::forward<Z>(z));
+            IR::Value::Expr<int> zExpr = Math::Detail::ToExpr(std::forward<Z>(z));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeInt3BroadcastImpl(xy, std::move(zExpr));
             } else {
@@ -453,8 +453,8 @@ namespace GPU {
                      (std::convertible_to<std::remove_cvref_t<Z>, int> || Detail::IsVarOf<std::remove_cvref_t<Z>, int>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, int>::value) &&
                      (std::convertible_to<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
         [[nodiscard]] inline auto MakeInt4(XY&& xy, Z&& z, W&& w) {
-            IR::Value::Expr<int> zExpr = Detail::ToExpr(std::forward<Z>(z));
-            IR::Value::Expr<int> wExpr = Detail::ToExpr(std::forward<W>(w));
+            IR::Value::Expr<int> zExpr = Math::Detail::ToExpr(std::forward<Z>(z));
+            IR::Value::Expr<int> wExpr = Math::Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeInt4BroadcastImpl(xy, std::move(zExpr), std::move(wExpr));
             } else {
@@ -469,7 +469,7 @@ namespace GPU {
             requires Detail::IVec3Component<XYZ> && 
                      (std::convertible_to<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
         [[nodiscard]] inline auto MakeInt4(XYZ&& xyz, W&& w) {
-            IR::Value::Expr<int> wExpr = Detail::ToExpr(std::forward<W>(w));
+            IR::Value::Expr<int> wExpr = Math::Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XYZ>>) {
                 return Detail::MakeInt4BroadcastImpl(xyz, std::move(wExpr));
             } else {
