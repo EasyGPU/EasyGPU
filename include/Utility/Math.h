@@ -115,6 +115,9 @@ namespace GPU::Math {
                 // CPU-side Vec - construct via ValueToString (creates uniform)
                 auto uniform = std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString<U>(val));
                 return IR::Value::ExprBase(std::move(uniform));
+            } else if constexpr (std::same_as<U, double>) {
+                // double - convert to float
+                return IR::Value::Expr<float>(static_cast<float>(val));
             } else {
                 // Scalar - construct Expr
                 return IR::Value::Expr<ValueType>(std::forward<T>(val));

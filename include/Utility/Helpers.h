@@ -107,10 +107,10 @@ namespace GPU {
             template<typename U>
             struct IsExprOf<IR::Value::Expr<U>, U> : std::true_type {};
 
-            // Concept for valid float component type (Var<float>, Expr<float>, or exact float literal)
+            // Concept for valid float component type (Var<float>, Expr<float>, or convertible-to-float literal)
             template<typename T>
             concept FloatComponent = 
-                std::same_as<std::remove_cvref_t<T>, float> ||
+                std::convertible_to<std::remove_cvref_t<T>, float> ||
                 IsVarOf<std::remove_cvref_t<T>, float>::value ||
                 IsExprOf<std::remove_cvref_t<T>, float>::value;
 
@@ -384,96 +384,98 @@ namespace GPU {
         // MakeFloat3 from Float2/Float2Expr + float
         template<typename XY, typename Z>
             requires Detail::Vec2Component<XY> && 
-                     (std::same_as<std::remove_cvref_t<Z>, float> || 
+                     (std::convertible_to<std::remove_cvref_t<Z>, float> || 
                       Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value ||
                       Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value)
         [[nodiscard]] inline auto MakeFloat3(XY&& xy, Z&& z) {
+            IR::Value::Expr<float> zExpr = Detail::ToExpr(std::forward<Z>(z));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
-                return Detail::MakeFloat3BroadcastImpl(xy, IR::Value::Expr<float>(std::forward<Z>(z)));
+                return Detail::MakeFloat3BroadcastImpl(xy, std::move(zExpr));
             } else {
                 return Detail::MakeFloat3BroadcastImpl(
                     IR::Value::Expr<Math::Vec2>(std::forward<XY>(xy)),
-                    IR::Value::Expr<float>(std::forward<Z>(z)));
+                    std::move(zExpr));
             }
         }
 
         // MakeFloat4 from Float2/Float2Expr + float + float
         template<typename XY, typename Z, typename W>
             requires Detail::Vec2Component<XY> && 
-                     (std::same_as<std::remove_cvref_t<Z>, float> || Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value) &&
-                     (std::same_as<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
+                     (std::convertible_to<std::remove_cvref_t<Z>, float> || Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value) &&
+                     (std::convertible_to<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline auto MakeFloat4(XY&& xy, Z&& z, W&& w) {
+            IR::Value::Expr<float> zExpr = Detail::ToExpr(std::forward<Z>(z));
+            IR::Value::Expr<float> wExpr = Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
-                return Detail::MakeFloat4BroadcastImpl(xy, 
-                    IR::Value::Expr<float>(std::forward<Z>(z)),
-                    IR::Value::Expr<float>(std::forward<W>(w)));
+                return Detail::MakeFloat4BroadcastImpl(xy, std::move(zExpr), std::move(wExpr));
             } else {
                 return Detail::MakeFloat4BroadcastImpl(
                     IR::Value::Expr<Math::Vec2>(std::forward<XY>(xy)),
-                    IR::Value::Expr<float>(std::forward<Z>(z)),
-                    IR::Value::Expr<float>(std::forward<W>(w)));
+                    std::move(zExpr), std::move(wExpr));
             }
         }
 
         // MakeFloat4 from Float3/Float3Expr + float
         template<typename XYZ, typename W>
             requires Detail::Vec3Component<XYZ> && 
-                     (std::same_as<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
+                     (std::convertible_to<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline auto MakeFloat4(XYZ&& xyz, W&& w) {
+            IR::Value::Expr<float> wExpr = Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XYZ>>) {
-                return Detail::MakeFloat4BroadcastImpl(xyz, IR::Value::Expr<float>(std::forward<W>(w)));
+                return Detail::MakeFloat4BroadcastImpl(xyz, std::move(wExpr));
             } else {
                 return Detail::MakeFloat4BroadcastImpl(
                     IR::Value::Expr<Math::Vec3>(std::forward<XYZ>(xyz)),
-                    IR::Value::Expr<float>(std::forward<W>(w)));
+                    std::move(wExpr));
             }
         }
 
         // MakeInt3 from Int2/Int2Expr + int
         template<typename XY, typename Z>
             requires Detail::IVec2Component<XY> && 
-                     (std::same_as<std::remove_cvref_t<Z>, int> || 
+                     (std::convertible_to<std::remove_cvref_t<Z>, int> || 
                       Detail::IsVarOf<std::remove_cvref_t<Z>, int>::value ||
                       Detail::IsExprOf<std::remove_cvref_t<Z>, int>::value)
         [[nodiscard]] inline auto MakeInt3(XY&& xy, Z&& z) {
+            IR::Value::Expr<int> zExpr = Detail::ToExpr(std::forward<Z>(z));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
-                return Detail::MakeInt3BroadcastImpl(xy, IR::Value::Expr<int>(std::forward<Z>(z)));
+                return Detail::MakeInt3BroadcastImpl(xy, std::move(zExpr));
             } else {
                 return Detail::MakeInt3BroadcastImpl(
                     IR::Value::Expr<Math::IVec2>(std::forward<XY>(xy)),
-                    IR::Value::Expr<int>(std::forward<Z>(z)));
+                    std::move(zExpr));
             }
         }
 
         // MakeInt4 from Int2/Int2Expr + int + int
         template<typename XY, typename Z, typename W>
             requires Detail::IVec2Component<XY> && 
-                     (std::same_as<std::remove_cvref_t<Z>, int> || Detail::IsVarOf<std::remove_cvref_t<Z>, int>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, int>::value) &&
-                     (std::same_as<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
+                     (std::convertible_to<std::remove_cvref_t<Z>, int> || Detail::IsVarOf<std::remove_cvref_t<Z>, int>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, int>::value) &&
+                     (std::convertible_to<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
         [[nodiscard]] inline auto MakeInt4(XY&& xy, Z&& z, W&& w) {
+            IR::Value::Expr<int> zExpr = Detail::ToExpr(std::forward<Z>(z));
+            IR::Value::Expr<int> wExpr = Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
-                return Detail::MakeInt4BroadcastImpl(xy,
-                    IR::Value::Expr<int>(std::forward<Z>(z)),
-                    IR::Value::Expr<int>(std::forward<W>(w)));
+                return Detail::MakeInt4BroadcastImpl(xy, std::move(zExpr), std::move(wExpr));
             } else {
                 return Detail::MakeInt4BroadcastImpl(
                     IR::Value::Expr<Math::IVec2>(std::forward<XY>(xy)),
-                    IR::Value::Expr<int>(std::forward<Z>(z)),
-                    IR::Value::Expr<int>(std::forward<W>(w)));
+                    std::move(zExpr), std::move(wExpr));
             }
         }
 
         // MakeInt4 from Int3/Int3Expr + int
         template<typename XYZ, typename W>
             requires Detail::IVec3Component<XYZ> && 
-                     (std::same_as<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
+                     (std::convertible_to<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
         [[nodiscard]] inline auto MakeInt4(XYZ&& xyz, W&& w) {
+            IR::Value::Expr<int> wExpr = Detail::ToExpr(std::forward<W>(w));
             if constexpr (IsExpr_v<std::remove_cvref_t<XYZ>>) {
-                return Detail::MakeInt4BroadcastImpl(xyz, IR::Value::Expr<int>(std::forward<W>(w)));
+                return Detail::MakeInt4BroadcastImpl(xyz, std::move(wExpr));
             } else {
                 return Detail::MakeInt4BroadcastImpl(
                     IR::Value::Expr<Math::IVec3>(std::forward<XYZ>(xyz)),
-                    IR::Value::Expr<int>(std::forward<W>(w)));
+                    std::move(wExpr));
             }
         }
 
