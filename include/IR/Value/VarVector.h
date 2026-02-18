@@ -439,6 +439,19 @@ namespace GPU::IR::Value {
     [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<float> &lhs, const VarBase<Math::Vec2> &rhs) {
         return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
     }
+    // Expr<float> * Expr<Vec2> (to resolve ambiguity)
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
+    }
     
     // Vec2 * Scalar (Expr versions - to resolve ambiguity)
     [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
@@ -516,6 +529,10 @@ namespace GPU::IR::Value {
     [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<float> &lhs, const VarBase<Math::Vec3> &rhs) {
         return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
     }
+    // Expr<float> * Expr<Vec3> (to resolve ambiguity)
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
     
     // Vec3 * Scalar (Expr versions - to resolve ambiguity)
     [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
@@ -548,6 +565,17 @@ namespace GPU::IR::Value {
     // VarBase<float> * Expr<Vec3> (to resolve ambiguity)
     [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<float> &lhs, const Expr<Math::Vec3> &rhs) {
         return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+    }
+    
+    // Expr<float> * Expr<Vec3> 其他运算符
+    [[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
     }
     
     // Vec4 * Scalar
@@ -753,6 +781,19 @@ namespace GPU::IR::Value {
     }
     [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<float> &lhs, const VarBase<Math::Vec4> &rhs) {
         return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+    // Expr<float> * Expr<Vec4> (to resolve ambiguity)
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+    }
+    [[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
     }
 }
 
