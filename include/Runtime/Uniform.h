@@ -165,6 +165,10 @@ namespace GPU::Runtime {
                     glProgramUniformMatrix4x2fv(program, location, 1, GL_FALSE, &value.m00);
                 } else if constexpr (std::same_as<T, Math::Mat4x3>) {
                     glProgramUniformMatrix4x3fv(program, location, 1, GL_FALSE, &value.m00);
+                } else if constexpr (GPU::Meta::RegisteredStruct<T>) {
+                    // For struct types, upload each member individually
+                    // The location returned is for the struct, members are accessed with "structName.memberName"
+                    GPU::Meta::StructMeta<T>::UploadUniform(program, name, value);
                 }
             };
 

@@ -20,6 +20,9 @@
 #include <Utility/Vec.h>
 #include <Utility/Matrix.h>
 
+// Include GLAD for OpenGL function declarations used in uniform upload
+#include <glad/glad.h>
+
 // ============================================================================
 // Part 1: GPU::Meta namespace - defined FIRST
 // ============================================================================
@@ -684,6 +687,52 @@ namespace GPU::Meta {
     size_t gpuOffset = 0; \
     EASYGPU_CAT(EASYGPU_SEQ_CONVERT_FROM_GPU_, N)(__VA_ARGS__)
 
+// Uniform upload helpers for struct types
+#define EASYGPU_UPLOAD_UNIFORM_FLOAT(program, locationPrefix, value, name) \
+    { \
+        GLint loc = glGetUniformLocation(program, (std::string(locationPrefix) + "." + #name).c_str()); \
+        if (loc != -1) glProgramUniform1f(program, loc, value.name); \
+    }
+#define EASYGPU_UPLOAD_UNIFORM_INT(program, locationPrefix, value, name) \
+    { \
+        GLint loc = glGetUniformLocation(program, (std::string(locationPrefix) + "." + #name).c_str()); \
+        if (loc != -1) glProgramUniform1i(program, loc, value.name); \
+    }
+#define EASYGPU_UPLOAD_UNIFORM_BOOL(program, locationPrefix, value, name) \
+    { \
+        GLint loc = glGetUniformLocation(program, (std::string(locationPrefix) + "." + #name).c_str()); \
+        if (loc != -1) glProgramUniform1i(program, loc, value.name ? 1 : 0); \
+    }
+#define EASYGPU_UPLOAD_UNIFORM_VEC2(program, locationPrefix, value, name) \
+    { \
+        GLint loc = glGetUniformLocation(program, (std::string(locationPrefix) + "." + #name).c_str()); \
+        if (loc != -1) glProgramUniform2fv(program, loc, 1, &value.name.x); \
+    }
+#define EASYGPU_UPLOAD_UNIFORM_VEC3(program, locationPrefix, value, name) \
+    { \
+        GLint loc = glGetUniformLocation(program, (std::string(locationPrefix) + "." + #name).c_str()); \
+        if (loc != -1) glProgramUniform3fv(program, loc, 1, &value.name.x); \
+    }
+#define EASYGPU_UPLOAD_UNIFORM_VEC4(program, locationPrefix, value, name) \
+    { \
+        GLint loc = glGetUniformLocation(program, (std::string(locationPrefix) + "." + #name).c_str()); \
+        if (loc != -1) glProgramUniform4fv(program, loc, 1, &value.name.x); \
+    }
+
+#define EASYGPU_UPLOAD_FIELD(type, name) \
+    EASYGPU_UPLOAD_UNIFORM_##type(program, uniformName.c_str(), value, name)
+
+#define EASYGPU_SEQ_UPLOAD_1(P1) EASYGPU_UPLOAD_FIELD P1
+#define EASYGPU_SEQ_UPLOAD_2(P1, P2) EASYGPU_SEQ_UPLOAD_1(P1) EASYGPU_UPLOAD_FIELD P2
+#define EASYGPU_SEQ_UPLOAD_3(P1, P2, P3) EASYGPU_SEQ_UPLOAD_2(P1, P2) EASYGPU_UPLOAD_FIELD P3
+#define EASYGPU_SEQ_UPLOAD_4(P1, P2, P3, P4) EASYGPU_SEQ_UPLOAD_3(P1, P2, P3) EASYGPU_UPLOAD_FIELD P4
+#define EASYGPU_SEQ_UPLOAD_5(P1, P2, P3, P4, P5) EASYGPU_SEQ_UPLOAD_4(P1, P2, P3, P4) EASYGPU_UPLOAD_FIELD P5
+#define EASYGPU_SEQ_UPLOAD_6(P1, P2, P3, P4, P5, P6) EASYGPU_SEQ_UPLOAD_5(P1, P2, P3, P4, P5) EASYGPU_UPLOAD_FIELD P6
+#define EASYGPU_SEQ_UPLOAD_7(P1, P2, P3, P4, P5, P6, P7) EASYGPU_SEQ_UPLOAD_6(P1, P2, P3, P4, P5, P6) EASYGPU_UPLOAD_FIELD P7
+#define EASYGPU_SEQ_UPLOAD_8(P1, P2, P3, P4, P5, P6, P7, P8) EASYGPU_SEQ_UPLOAD_7(P1, P2, P3, P4, P5, P6, P7) EASYGPU_UPLOAD_FIELD P8
+
+#define EASYGPU_DO_UPLOAD(N, ...) EASYGPU_CAT(EASYGPU_SEQ_UPLOAD_, N)(__VA_ARGS__)
+
 /************************************************
  * Main EASYGPU_STRUCT macro - All-in-one with CPU capture support!
  * Usage: EASYGPU_STRUCT(StructName, (type1, member1), (type2, member2), ...)
@@ -738,6 +787,11 @@ namespace GPU::Meta {
              * while field offsets differ). Always use generated field-wise converters. \
              */ \
             static bool NeedsLayoutConversion() { return true; } \
+            \
+            /* Upload struct members as individual uniforms (for Uniform<T> with struct types) */ \
+            static void UploadUniform(uint32_t program, const std::string& uniformName, const StructType& value) { \
+                EASYGPU_DO_UPLOAD(EASYGPU_ARG_COUNT(__VA_ARGS__), __VA_ARGS__) \
+            } \
             \
             /* Generated converters - performs field-by-field copy with padding */ \
             static void ConvertToGPUImpl(const char* src, char* dst, size_t srcStride, size_t dstStride, size_t count) { \
