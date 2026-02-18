@@ -182,6 +182,7 @@ if(EASYGPU_BUILD_TESTS)
     enable_testing()
     
     set(EASYGPU_TEST_SOURCES
+        tests/TestBroadcastConstruct.cpp
         tests/TestVec.cpp
         tests/TestStruct.cpp
         tests/TestDSL.cpp

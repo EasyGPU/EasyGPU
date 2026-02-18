@@ -9,22 +9,7 @@
 #include <cassert>
 #include <cmath>
 
-#include <Kernel/Kernel.h>
-#include <Runtime/Buffer.h>
-#include <Runtime/ShaderException.h>
-
-#include <Utility/Helpers.h>
-#include <IR/Value/Var.h>
-#include <IR/Value/VarVector.h>
-#include <IR/Value/Expr.h>
-
-#include <Callable/Callable.h>
-
-#include <Flow/ReturnFlow.h>
-#include <Flow/ForFlow.h>
-#include <Flow/IfFlow.h>
-
-#include <Utility/Math.h>
+#include <GPU.h>
 
 using namespace GPU::IR::Value;
 using namespace GPU::Math;
@@ -417,7 +402,7 @@ END_TEST
 // =============================================================================
 TEST(callable_int_return)
         Callable<int(int)> NextPowerOfTwo = [](Var<int> x) {
-            Var<int> result = 1;
+            Var<int> result = MakeInt(1);
             For(0, 31, [&](Var<int> &i) {
                 If(result >= x, [&]() {
                     Return(result);
