@@ -559,4 +559,138 @@ namespace GPU::Math {
     Mat3x4 Mat4x3::Transposed() const {
         return {Vec4(c0.x, c1.x, c2.x, c3.x), Vec4(c0.y, c1.y, c2.y, c3.y), Vec4(c0.z, c1.z, c2.z, c3.z)};
     }
+
+    // ---------------- Hadamard Product (Element-wise multiplication) ----------------
+    
+    // Mat2 Hadamard product
+    Mat2 Mat2::operator%(const Mat2 &Rhs) const {
+        return {m00 * Rhs.m00, m10 * Rhs.m10, m01 * Rhs.m01, m11 * Rhs.m11};
+    }
+    Mat2 &Mat2::operator%=(const Mat2 &Rhs) {
+        m00 *= Rhs.m00; m10 *= Rhs.m10;
+        m01 *= Rhs.m01; m11 *= Rhs.m11;
+        return *this;
+    }
+    
+    // Mat3 Hadamard product
+    Mat3 Mat3::operator%(const Mat3 &Rhs) const {
+        return {
+            m00 * Rhs.m00, m10 * Rhs.m10, m20 * Rhs.m20,
+            m01 * Rhs.m01, m11 * Rhs.m11, m21 * Rhs.m21,
+            m02 * Rhs.m02, m12 * Rhs.m12, m22 * Rhs.m22
+        };
+    }
+    Mat3 &Mat3::operator%=(const Mat3 &Rhs) {
+        m00 *= Rhs.m00; m10 *= Rhs.m10; m20 *= Rhs.m20;
+        m01 *= Rhs.m01; m11 *= Rhs.m11; m21 *= Rhs.m21;
+        m02 *= Rhs.m02; m12 *= Rhs.m12; m22 *= Rhs.m22;
+        return *this;
+    }
+    
+    // Mat4 Hadamard product
+    Mat4 Mat4::operator%(const Mat4 &Rhs) const {
+        return {
+            m00 * Rhs.m00, m10 * Rhs.m10, m20 * Rhs.m20, m30 * Rhs.m30,
+            m01 * Rhs.m01, m11 * Rhs.m11, m21 * Rhs.m21, m31 * Rhs.m31,
+            m02 * Rhs.m02, m12 * Rhs.m12, m22 * Rhs.m22, m32 * Rhs.m32,
+            m03 * Rhs.m03, m13 * Rhs.m13, m23 * Rhs.m23, m33 * Rhs.m33
+        };
+    }
+    Mat4 &Mat4::operator%=(const Mat4 &Rhs) {
+        m00 *= Rhs.m00; m10 *= Rhs.m10; m20 *= Rhs.m20; m30 *= Rhs.m30;
+        m01 *= Rhs.m01; m11 *= Rhs.m11; m21 *= Rhs.m21; m31 *= Rhs.m31;
+        m02 *= Rhs.m02; m12 *= Rhs.m12; m22 *= Rhs.m22; m32 *= Rhs.m32;
+        m03 *= Rhs.m03; m13 *= Rhs.m13; m23 *= Rhs.m23; m33 *= Rhs.m33;
+        return *this;
+    }
+    
+    // Mat2x3 Hadamard product
+    Mat2x3 Mat2x3::operator%(const Mat2x3 &Rhs) const {
+        return {
+            Vec3(c0.x * Rhs.c0.x, c0.y * Rhs.c0.y, c0.z * Rhs.c0.z),
+            Vec3(c1.x * Rhs.c1.x, c1.y * Rhs.c1.y, c1.z * Rhs.c1.z)
+        };
+    }
+    Mat2x3 &Mat2x3::operator%=(const Mat2x3 &Rhs) {
+        c0.x *= Rhs.c0.x; c0.y *= Rhs.c0.y; c0.z *= Rhs.c0.z;
+        c1.x *= Rhs.c1.x; c1.y *= Rhs.c1.y; c1.z *= Rhs.c1.z;
+        return *this;
+    }
+    
+    // Mat3x2 Hadamard product
+    Mat3x2 Mat3x2::operator%(const Mat3x2 &Rhs) const {
+        return {
+            Vec2(c0.x * Rhs.c0.x, c0.y * Rhs.c0.y),
+            Vec2(c1.x * Rhs.c1.x, c1.y * Rhs.c1.y),
+            Vec2(c2.x * Rhs.c2.x, c2.y * Rhs.c2.y)
+        };
+    }
+    Mat3x2 &Mat3x2::operator%=(const Mat3x2 &Rhs) {
+        c0.x *= Rhs.c0.x; c0.y *= Rhs.c0.y;
+        c1.x *= Rhs.c1.x; c1.y *= Rhs.c1.y;
+        c2.x *= Rhs.c2.x; c2.y *= Rhs.c2.y;
+        return *this;
+    }
+    
+    // Mat2x4 Hadamard product
+    Mat2x4 Mat2x4::operator%(const Mat2x4 &Rhs) const {
+        return {
+            Vec4(c0.x * Rhs.c0.x, c0.y * Rhs.c0.y, c0.z * Rhs.c0.z, c0.w * Rhs.c0.w),
+            Vec4(c1.x * Rhs.c1.x, c1.y * Rhs.c1.y, c1.z * Rhs.c1.z, c1.w * Rhs.c1.w)
+        };
+    }
+    Mat2x4 &Mat2x4::operator%=(const Mat2x4 &Rhs) {
+        c0.x *= Rhs.c0.x; c0.y *= Rhs.c0.y; c0.z *= Rhs.c0.z; c0.w *= Rhs.c0.w;
+        c1.x *= Rhs.c1.x; c1.y *= Rhs.c1.y; c1.z *= Rhs.c1.z; c1.w *= Rhs.c1.w;
+        return *this;
+    }
+    
+    // Mat4x2 Hadamard product
+    Mat4x2 Mat4x2::operator%(const Mat4x2 &Rhs) const {
+        return {
+            Vec2(c0.x * Rhs.c0.x, c0.y * Rhs.c0.y),
+            Vec2(c1.x * Rhs.c1.x, c1.y * Rhs.c1.y),
+            Vec2(c2.x * Rhs.c2.x, c2.y * Rhs.c2.y),
+            Vec2(c3.x * Rhs.c3.x, c3.y * Rhs.c3.y)
+        };
+    }
+    Mat4x2 &Mat4x2::operator%=(const Mat4x2 &Rhs) {
+        c0.x *= Rhs.c0.x; c0.y *= Rhs.c0.y;
+        c1.x *= Rhs.c1.x; c1.y *= Rhs.c1.y;
+        c2.x *= Rhs.c2.x; c2.y *= Rhs.c2.y;
+        c3.x *= Rhs.c3.x; c3.y *= Rhs.c3.y;
+        return *this;
+    }
+    
+    // Mat3x4 Hadamard product
+    Mat3x4 Mat3x4::operator%(const Mat3x4 &Rhs) const {
+        return {
+            Vec4(c0.x * Rhs.c0.x, c0.y * Rhs.c0.y, c0.z * Rhs.c0.z, c0.w * Rhs.c0.w),
+            Vec4(c1.x * Rhs.c1.x, c1.y * Rhs.c1.y, c1.z * Rhs.c1.z, c1.w * Rhs.c1.w),
+            Vec4(c2.x * Rhs.c2.x, c2.y * Rhs.c2.y, c2.z * Rhs.c2.z, c2.w * Rhs.c2.w)
+        };
+    }
+    Mat3x4 &Mat3x4::operator%=(const Mat3x4 &Rhs) {
+        c0.x *= Rhs.c0.x; c0.y *= Rhs.c0.y; c0.z *= Rhs.c0.z; c0.w *= Rhs.c0.w;
+        c1.x *= Rhs.c1.x; c1.y *= Rhs.c1.y; c1.z *= Rhs.c1.z; c1.w *= Rhs.c1.w;
+        c2.x *= Rhs.c2.x; c2.y *= Rhs.c2.y; c2.z *= Rhs.c2.z; c2.w *= Rhs.c2.w;
+        return *this;
+    }
+    
+    // Mat4x3 Hadamard product
+    Mat4x3 Mat4x3::operator%(const Mat4x3 &Rhs) const {
+        return {
+            Vec3(c0.x * Rhs.c0.x, c0.y * Rhs.c0.y, c0.z * Rhs.c0.z),
+            Vec3(c1.x * Rhs.c1.x, c1.y * Rhs.c1.y, c1.z * Rhs.c1.z),
+            Vec3(c2.x * Rhs.c2.x, c2.y * Rhs.c2.y, c2.z * Rhs.c2.z),
+            Vec3(c3.x * Rhs.c3.x, c3.y * Rhs.c3.y, c3.z * Rhs.c3.z)
+        };
+    }
+    Mat4x3 &Mat4x3::operator%=(const Mat4x3 &Rhs) {
+        c0.x *= Rhs.c0.x; c0.y *= Rhs.c0.y; c0.z *= Rhs.c0.z;
+        c1.x *= Rhs.c1.x; c1.y *= Rhs.c1.y; c1.z *= Rhs.c1.z;
+        c2.x *= Rhs.c2.x; c2.y *= Rhs.c2.y; c2.z *= Rhs.c2.z;
+        c3.x *= Rhs.c3.x; c3.y *= Rhs.c3.y; c3.z *= Rhs.c3.z;
+        return *this;
+    }
 } // namespace GPU::Math

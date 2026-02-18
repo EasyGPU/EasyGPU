@@ -90,6 +90,11 @@ namespace GPU::Math {
 
         Mat2 &operator/=(float S);
 
+        /** Hadamard product (element-wise multiplication) */
+        Mat2 operator%(const Mat2 &Rhs) const;
+
+        Mat2 &operator%=(const Mat2 &Rhs);
+
     public:
         // Column-major: col0 = (m00,m10), col1 = (m01,m11)
         float m00 = 1.0f;
@@ -140,6 +145,11 @@ namespace GPU::Math {
 
         Mat3 &operator/=(float S);
 
+        /** Hadamard product (element-wise multiplication) */
+        Mat3 operator%(const Mat3 &Rhs) const;
+
+        Mat3 &operator%=(const Mat3 &Rhs);
+
     public:
         // column-major: c0=(m00,m10,m20), c1=(m01,m11,m21), c2=(m02,m12,m22)
         float m00 = 1.0f, m10 = 0.0f, m20 = 0.0f;
@@ -189,6 +199,11 @@ namespace GPU::Math {
 
         Mat4 &operator/=(float S);
 
+        /** Hadamard product (element-wise multiplication) */
+        Mat4 operator%(const Mat4 &Rhs) const;
+
+        Mat4 &operator%=(const Mat4 &Rhs);
+
     public:
         // column-major layout: elements mrc where r=row c=col
         float m00 = 1.0f, m10 = 0.0f, m20 = 0.0f, m30 = 0.0f;
@@ -225,6 +240,11 @@ namespace GPU::Math {
 
         Mat2x3 &operator-=(const Mat2x3 &Rhs);
 
+        /** Hadamard product (element-wise multiplication) */
+        Mat2x3 operator%(const Mat2x3 &Rhs) const;
+
+        Mat2x3 &operator%=(const Mat2x3 &Rhs);
+
     public:
         Vec3 c0;
         Vec3 c1;
@@ -258,6 +278,11 @@ namespace GPU::Math {
 
         Mat3x2 &operator-=(const Mat3x2 &Rhs);
 
+        /** Hadamard product (element-wise multiplication) */
+        Mat3x2 operator%(const Mat3x2 &Rhs) const;
+
+        Mat3x2 &operator%=(const Mat3x2 &Rhs);
+
     public:
         Vec2 c0;
         Vec2 c1;
@@ -277,6 +302,11 @@ namespace GPU::Math {
 
         [[nodiscard]] Mat4x2 Transposed() const;
 
+        /** Hadamard product (element-wise multiplication) */
+        Mat2x4 operator%(const Mat2x4 &Rhs) const;
+
+        Mat2x4 &operator%=(const Mat2x4 &Rhs);
+
     public:
         Vec4 c0;
         Vec4 c1;
@@ -294,6 +324,11 @@ namespace GPU::Math {
         Vec2 operator*(const Vec4 &V) const;
 
         [[nodiscard]] Mat2x4 Transposed() const;
+
+        /** Hadamard product (element-wise multiplication) */
+        Mat4x2 operator%(const Mat4x2 &Rhs) const;
+
+        Mat4x2 &operator%=(const Mat4x2 &Rhs);
 
     public:
         Vec2 c0;
@@ -315,6 +350,11 @@ namespace GPU::Math {
 
         [[nodiscard]] Mat4x3 Transposed() const;
 
+        /** Hadamard product (element-wise multiplication) */
+        Mat3x4 operator%(const Mat3x4 &Rhs) const;
+
+        Mat3x4 &operator%=(const Mat3x4 &Rhs);
+
     public:
         Vec4 c0;
         Vec4 c1;
@@ -333,6 +373,11 @@ namespace GPU::Math {
         Vec3 operator*(const Vec4 &V) const;
 
         [[nodiscard]] Mat3x4 Transposed() const;
+
+        /** Hadamard product (element-wise multiplication) */
+        Mat4x3 operator%(const Mat4x3 &Rhs) const;
+
+        Mat4x3 &operator%=(const Mat4x3 &Rhs);
 
     public:
         Vec3 c0;
