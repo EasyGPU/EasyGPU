@@ -86,7 +86,7 @@ namespace GPU::Runtime {
     template<typename T>
     std::string GetGLSLTypeNameForBuffer(T*) {
         // Explicitly use data and size to avoid string_view to string conversion issues
-        auto sv = GPU::Meta::StructMeta<T>::glslTypeName;
+        auto sv = std::string(GPU::Meta::StructMeta<T>::glslTypeName);
         return std::string(sv.data(), sv.size());
     }
 
