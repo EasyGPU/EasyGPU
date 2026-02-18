@@ -584,6 +584,118 @@ namespace GPU::IR::Value {
             std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
     }
 
+    // ==================== Expr Vector * Expr Matrix Multiplication ====================
+    // Expr<Vec2> * Expr<Mat2>
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const Expr<Math::Mat2> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Expr<Vec3> * Expr<Mat3>
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const Expr<Math::Mat3> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Expr<Vec4> * Expr<Mat4>
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const Expr<Math::Mat4> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Rectangular Expr<Vector> * Expr<Matrix>
+    // Expr<Vec2> * Expr<Mat3x2> -> Expr<Vec3>
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec2> &lhs, const Expr<Math::Mat3x2> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Expr<Vec3> * Expr<Mat2x3> -> Expr<Vec2>
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec3> &lhs, const Expr<Math::Mat2x3> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Expr<Vec2> * Expr<Mat4x2> -> Expr<Vec4>
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec2> &lhs, const Expr<Math::Mat4x2> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Expr<Vec4> * Expr<Mat2x4> -> Expr<Vec2>
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec4> &lhs, const Expr<Math::Mat2x4> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Expr<Vec3> * Expr<Mat4x3> -> Expr<Vec4>
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec3> &lhs, const Expr<Math::Mat4x3> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // Expr<Vec4> * Expr<Mat3x4> -> Expr<Vec3>
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec4> &lhs, const Expr<Math::Mat3x4> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+    }
+
+    // ==================== Expr Vector * Var Matrix Multiplication ====================
+    // Expr<Vec2> * Var<Mat2>
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const VarBase<Math::Mat2> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Expr<Vec3> * Var<Mat3>
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const VarBase<Math::Mat3> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Expr<Vec4> * Var<Mat4>
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const VarBase<Math::Mat4> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Rectangular Expr<Vector> * Var<Matrix>
+    // Expr<Vec2> * Var<Mat3x2> -> Expr<Vec3>
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec2> &lhs, const VarBase<Math::Mat3x2> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Expr<Vec3> * Var<Mat2x3> -> Expr<Vec2>
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec3> &lhs, const VarBase<Math::Mat2x3> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Expr<Vec2> * Var<Mat4x2> -> Expr<Vec4>
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec2> &lhs, const VarBase<Math::Mat4x2> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Expr<Vec4> * Var<Mat2x4> -> Expr<Vec2>
+    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec4> &lhs, const VarBase<Math::Mat2x4> &rhs) {
+        return Expr<Math::Vec2>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Expr<Vec3> * Var<Mat4x3> -> Expr<Vec4>
+    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec3> &lhs, const VarBase<Math::Mat4x3> &rhs) {
+        return Expr<Math::Vec4>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
+    // Expr<Vec4> * Var<Mat3x4> -> Expr<Vec3>
+    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec4> &lhs, const VarBase<Math::Mat3x4> &rhs) {
+        return Expr<Math::Vec3>(
+            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+    }
+
     // ==================== Var Matrix Scalar Operations ====================
     // Mat2 * float
     [[nodiscard]] inline Expr<Math::Mat2> operator*(const VarBase<Math::Mat2> &lhs, float rhs) {
