@@ -102,11 +102,18 @@ namespace GPU::Kernel {
         // Create context guard
         Runtime::ContextGuard guard(Runtime::Context::GetInstance());
 
-        // Get the complete shader code
-        std::string shaderSource = context.GetCompleteCode();
-
-        // Compile the shader
-        uint32_t program = Runtime::ShaderCompiler::CompileComputeShader(shaderSource);
+        // Get or create the cached program
+        uint32_t program = context.GetCachedProgram();
+        if (program == 0) {
+            // Get the complete shader code
+            std::string shaderSource = context.GetCompleteCode();
+            
+            // Compile the shader
+            program = Runtime::ShaderCompiler::CompileComputeShader(shaderSource);
+            
+            // Cache the program for future dispatches
+            context.SetCachedProgram(program);
+        }
 
         // Use the program
         glUseProgram(program);
@@ -145,11 +152,8 @@ namespace GPU::Kernel {
             glBindImageTexture(binding, 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
         }
 
-        // Unbind the program
+        // Unbind the program (but don't delete - it's cached)
         glUseProgram(0);
-
-        // Delete the program
-        glDeleteProgram(program);
     }
 
     // ===================================================================================

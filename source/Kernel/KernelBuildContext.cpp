@@ -12,8 +12,18 @@
 #include <sstream>
 #include <iostream>
 
+#include <glad/glad.h>
+
 namespace GPU::Kernel {
     KernelDimensionOutOfRange::KernelDimensionOutOfRange() : std::out_of_range("Kernel dimension out of range!") {
+    }
+
+    KernelBuildContext::~KernelBuildContext() {
+        // Delete cached OpenGL program if any
+        if (_cachedProgram != 0) {
+            glDeleteProgram(_cachedProgram);
+            _cachedProgram = 0;
+        }
     }
 
     KernelBuildContext::KernelBuildContext(int Dimension) : _variableIndex(0), _nextBinding(0), _dimension(Dimension) {

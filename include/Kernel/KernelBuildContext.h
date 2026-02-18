@@ -41,6 +41,11 @@ namespace GPU::Kernel {
          * @param Dimension The dimension of the kernel
          */
         KernelBuildContext(int Dimension);
+        
+        /**
+         * Destructor - cleans up cached OpenGL program if any
+         */
+        ~KernelBuildContext();
 
     public:
         void PushTranslatedCode(std::string Code) override;
@@ -378,6 +383,38 @@ namespace GPU::Kernel {
         std::vector<UniformEntry> _uniforms;
         int _nextUniformIndex = 0;
         
+    public:
+        // ===================================================================
+        // Shader Program Cache
+        // ===================================================================
+        
+        /**
+         * Get the cached OpenGL program handle
+         * @return The cached program handle, or 0 if not cached
+         */
+        uint32_t GetCachedProgram() const { return _cachedProgram; }
+        
+        /**
+         * Set the cached OpenGL program handle
+         * @param program The program handle to cache
+         */
+        void SetCachedProgram(uint32_t program) { _cachedProgram = program; }
+        
+        /**
+         * Check if a program is cached
+         * @return True if a program is cached
+         */
+        bool HasCachedProgram() const { return _cachedProgram != 0; }
+        
+        /**
+         * Invalidate the cached program (force recompilation)
+         */
+        void InvalidateCachedProgram() { _cachedProgram = 0; }
+        
+    private:
+        uint32_t _cachedProgram = 0;
+        
+    private:
         /**
          * The index for the variable name generation
          */
