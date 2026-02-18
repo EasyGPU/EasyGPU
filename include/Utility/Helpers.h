@@ -107,10 +107,10 @@ namespace GPU {
             template<typename U>
             struct IsExprOf<IR::Value::Expr<U>, U> : std::true_type {};
 
-            // Concept for valid float component type (Var<float>, Expr<float>, or convertible-to-float literal)
+            // Concept for valid float component type (Var<float>, Expr<float>, or exact float literal)
             template<typename T>
             concept FloatComponent = 
-                std::convertible_to<std::remove_cvref_t<T>, float> ||
+                std::same_as<std::remove_cvref_t<T>, float> ||
                 IsVarOf<std::remove_cvref_t<T>, float>::value ||
                 IsExprOf<std::remove_cvref_t<T>, float>::value;
 
