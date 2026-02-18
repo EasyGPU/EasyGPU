@@ -700,7 +700,7 @@ namespace GPU::Meta {
         template<> \
         struct StructMeta<StructType> { \
             static constexpr bool isRegistered = true; \
-            static constexpr std::string_view glslTypeName = #StructType; \
+            static constexpr const char* glslTypeName = #StructType; \
             using _EasyGPU_CurrentStruct = StructType; \
             \
             static std::string ExpandedDefinition() { \

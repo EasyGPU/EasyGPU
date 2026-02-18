@@ -66,7 +66,7 @@ namespace GPU::IR::Value {
         else if constexpr (std::same_as<Type, Math::Mat4x3>) return "mat4x3";
         else if constexpr (GPU::Meta::RegisteredStruct<Type>) {
             // For registered structs, return the GLSL type name from StructMeta
-            return GPU::Meta::StructMeta<Type>::glslTypeName.data();
+            return GPU::Meta::StructMeta<Type>::glslTypeName;
         }
         else return "unknown";
     }
@@ -834,13 +834,20 @@ namespace GPU::IR::Value {
         friend class Var;
     };
 
-    // Primary template for scalar types
+    // Primary template for scalar types (includes registered structs)
     template<ScalarType Type>
     class Var : public VarBase<Type> {
     public:
         using VarBase<Type>::VarBase;
         using VarBase<Type>::Load;
         using VarBase<Type>::operator=;
+        
+        // Explicitly inherit constructors for registered structs
+        Var() : VarBase<Type>() {}
+        Var(std::string Name) : VarBase<Type>(Name) {}
+        Var(std::string Name, bool IsExternal) : VarBase<Type>(Name, IsExternal) {}
+        Var(Expr<Type> &&Value) : VarBase<Type>(std::move(Value)) {}
+        Var(Expr<Type> &Value) : VarBase<Type>(Value) {}
     };
 
     // ==================== VarBase op VarBase ====================
