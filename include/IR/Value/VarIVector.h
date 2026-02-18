@@ -454,7 +454,7 @@ namespace GPU::IR::Value {
     // ============================================================================
 
     // IVec2 compound assignment with Expr<int> (scalar)
-    [[nodiscard]] inline Var<Math::IVec2> &operator*=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
+    inline Var<Math::IVec2> &operator*=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -464,7 +464,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::IVec2> &operator/=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
+    inline Var<Math::IVec2> &operator/=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -476,7 +476,7 @@ namespace GPU::IR::Value {
     }
 
     // IVec3 compound assignment with Expr<int> (scalar)
-    [[nodiscard]] inline Var<Math::IVec3> &operator*=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
+    inline Var<Math::IVec3> &operator*=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -486,7 +486,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::IVec3> &operator/=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
+    inline Var<Math::IVec3> &operator/=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -498,7 +498,7 @@ namespace GPU::IR::Value {
     }
 
     // IVec4 compound assignment with Expr<int> (scalar)
-    [[nodiscard]] inline Var<Math::IVec4> &operator*=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
+    inline Var<Math::IVec4> &operator*=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -508,7 +508,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::IVec4> &operator/=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
+    inline Var<Math::IVec4> &operator/=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,

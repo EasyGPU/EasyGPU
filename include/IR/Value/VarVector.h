@@ -631,7 +631,7 @@ namespace GPU::IR::Value {
     // ============================================================================
 
     // Vec2 compound assignment with Expr<float> (scalar)
-    [[nodiscard]] inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -641,7 +641,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Vec2> &operator/=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Vec2> &operator/=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -653,7 +653,7 @@ namespace GPU::IR::Value {
     }
 
     // Vec3 compound assignment with Expr<float> (scalar)
-    [[nodiscard]] inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -663,7 +663,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Vec3> &operator/=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Vec3> &operator/=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -675,7 +675,7 @@ namespace GPU::IR::Value {
     }
 
     // Vec4 compound assignment with Expr<float> (scalar)
-    [[nodiscard]] inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -685,7 +685,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Vec4> &operator/=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Vec4> &operator/=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,

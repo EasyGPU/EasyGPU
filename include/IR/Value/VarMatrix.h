@@ -650,7 +650,7 @@ namespace GPU::IR::Value {
     // ============================================================================
 
     // Mat2 compound assignment with Expr<float> (scalar)
-    [[nodiscard]] inline Var<Math::Mat2> &operator*=(Var<Math::Mat2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat2> &operator*=(Var<Math::Mat2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -660,7 +660,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat2> &operator/=(Var<Math::Mat2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat2> &operator/=(Var<Math::Mat2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -672,7 +672,7 @@ namespace GPU::IR::Value {
     }
 
     // Mat3 compound assignment with Expr<float> (scalar)
-    [[nodiscard]] inline Var<Math::Mat3> &operator*=(Var<Math::Mat3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat3> &operator*=(Var<Math::Mat3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -682,7 +682,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat3> &operator/=(Var<Math::Mat3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat3> &operator/=(Var<Math::Mat3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -694,7 +694,7 @@ namespace GPU::IR::Value {
     }
 
     // Mat4 compound assignment with Expr<float> (scalar)
-    [[nodiscard]] inline Var<Math::Mat4> &operator*=(Var<Math::Mat4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat4> &operator*=(Var<Math::Mat4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -704,7 +704,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat4> &operator/=(Var<Math::Mat4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat4> &operator/=(Var<Math::Mat4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -716,7 +716,7 @@ namespace GPU::IR::Value {
     }
 
     // Rectangular matrices compound assignment with Expr<float> (scalar)
-    [[nodiscard]] inline Var<Math::Mat2x3> &operator*=(Var<Math::Mat2x3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat2x3> &operator*=(Var<Math::Mat2x3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -726,7 +726,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat2x3> &operator/=(Var<Math::Mat2x3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat2x3> &operator/=(Var<Math::Mat2x3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -737,7 +737,7 @@ namespace GPU::IR::Value {
         return lhs;
     }
 
-    [[nodiscard]] inline Var<Math::Mat2x4> &operator*=(Var<Math::Mat2x4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat2x4> &operator*=(Var<Math::Mat2x4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -747,7 +747,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat2x4> &operator/=(Var<Math::Mat2x4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat2x4> &operator/=(Var<Math::Mat2x4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -758,7 +758,7 @@ namespace GPU::IR::Value {
         return lhs;
     }
 
-    [[nodiscard]] inline Var<Math::Mat3x2> &operator*=(Var<Math::Mat3x2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat3x2> &operator*=(Var<Math::Mat3x2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -768,7 +768,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat3x2> &operator/=(Var<Math::Mat3x2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat3x2> &operator/=(Var<Math::Mat3x2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -779,7 +779,7 @@ namespace GPU::IR::Value {
         return lhs;
     }
 
-    [[nodiscard]] inline Var<Math::Mat3x4> &operator*=(Var<Math::Mat3x4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat3x4> &operator*=(Var<Math::Mat3x4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -789,7 +789,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat3x4> &operator/=(Var<Math::Mat3x4> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat3x4> &operator/=(Var<Math::Mat3x4> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -800,7 +800,7 @@ namespace GPU::IR::Value {
         return lhs;
     }
 
-    [[nodiscard]] inline Var<Math::Mat4x2> &operator*=(Var<Math::Mat4x2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat4x2> &operator*=(Var<Math::Mat4x2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -810,7 +810,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat4x2> &operator/=(Var<Math::Mat4x2> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat4x2> &operator/=(Var<Math::Mat4x2> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
@@ -821,7 +821,7 @@ namespace GPU::IR::Value {
         return lhs;
     }
 
-    [[nodiscard]] inline Var<Math::Mat4x3> &operator*=(Var<Math::Mat4x3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat4x3> &operator*=(Var<Math::Mat4x3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::MulAssign,
@@ -831,7 +831,7 @@ namespace GPU::IR::Value {
         Builder::Builder::Get().Build(*comAssign, true);
         return lhs;
     }
-    [[nodiscard]] inline Var<Math::Mat4x3> &operator/=(Var<Math::Mat4x3> &lhs, const Expr<float> &rhs) {
+    inline Var<Math::Mat4x3> &operator/=(Var<Math::Mat4x3> &lhs, const Expr<float> &rhs) {
         auto lhsLoad = lhs.Load();
         auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
             Node::CompoundAssignmentCode::DivAssign,
