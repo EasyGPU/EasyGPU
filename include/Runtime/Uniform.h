@@ -122,13 +122,21 @@ namespace GPU::Runtime {
             // Create upload function for this type
             auto uploadFunc = [](uint32_t program, const std::string& name, void* ptr) {
                 Uniform<T>* uniform = static_cast<Uniform<T>*>(ptr);
+                T value = uniform->GetValue();
+                
+                // For struct types, upload each member individually (struct itself has no location)
+                if constexpr (GPU::Meta::RegisteredStruct<T>) {
+                    GPU::Meta::StructMeta<T>::UploadUniform(program, name, value);
+                    return;
+                }
+                
+                // For basic types, get the uniform location and upload
                 GLint location = glGetUniformLocation(program, name.c_str());
                 if (location == -1) {
                     // Uniform not found in shader (might be optimized out)
                     return;
                 }
                 
-                T value = uniform->GetValue();
                 if constexpr (std::same_as<T, float>) {
                     glProgramUniform1f(program, location, value);
                 } else if constexpr (std::same_as<T, int>) {
@@ -165,10 +173,6 @@ namespace GPU::Runtime {
                     glProgramUniformMatrix4x2fv(program, location, 1, GL_FALSE, &value.m00);
                 } else if constexpr (std::same_as<T, Math::Mat4x3>) {
                     glProgramUniformMatrix4x3fv(program, location, 1, GL_FALSE, &value.m00);
-                } else if constexpr (GPU::Meta::RegisteredStruct<T>) {
-                    // For struct types, upload each member individually
-                    // The location returned is for the struct, members are accessed with "structName.memberName"
-                    GPU::Meta::StructMeta<T>::UploadUniform(program, name, value);
                 }
             };
 
