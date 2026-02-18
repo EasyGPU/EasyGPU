@@ -4,6 +4,9 @@
  *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
  *      @Date           :   2/12/2026
  */
+// glad.h must be included first to avoid APIENTRY redefinition with Windows SDK
+#include <glad/glad.h>
+
 #include <Kernel/Kernel.h>
 #include <Kernel/KernelBuildContext.h>
 #include <Kernel/KernelProfiler.h>
@@ -15,8 +18,6 @@
 
 #include <stdexcept>
 #include <iostream>
-
-#include <glad/glad.h>
 
 namespace GPU::Kernel {
     /**

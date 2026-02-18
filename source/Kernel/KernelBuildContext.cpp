@@ -3,6 +3,8 @@
  *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/12/2026
  */
+// glad.h must be included first to avoid APIENTRY redefinition with Windows SDK
+#include <glad/glad.h>
 
 #include <Kernel/KernelBuildContext.h>
 
@@ -11,8 +13,6 @@
 #include <format>
 #include <sstream>
 #include <iostream>
-
-#include <glad/glad.h>
 
 namespace GPU::Kernel {
     KernelDimensionOutOfRange::KernelDimensionOutOfRange() : std::out_of_range("Kernel dimension out of range!") {

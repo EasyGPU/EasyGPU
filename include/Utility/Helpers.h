@@ -107,10 +107,11 @@ namespace GPU {
             template<typename U>
             struct IsExprOf<IR::Value::Expr<U>, U> : std::true_type {};
 
-            // Concept for valid float component type (Var<float>, Expr<float>, or convertible-to-float literal)
+            // Concept for valid float component type (Var<float>, Expr<float>, float literal, or double literal)
             template<typename T>
             concept FloatComponent = 
-                std::convertible_to<std::remove_cvref_t<T>, float> ||
+                std::same_as<std::remove_cvref_t<T>, float> ||
+                std::same_as<std::remove_cvref_t<T>, double> ||
                 IsVarOf<std::remove_cvref_t<T>, float>::value ||
                 IsExprOf<std::remove_cvref_t<T>, float>::value;
 
@@ -311,23 +312,33 @@ namespace GPU {
             }
         }
 
+        // Helper to safely convert scalar to float (silences C4244 for double->float)
+        template<typename T>
+        [[nodiscard]] inline float ToFloat(T&& val) {
+            if constexpr (std::same_as<std::remove_cvref_t<T>, double>) {
+                return static_cast<float>(val);
+            } else {
+                return static_cast<float>(val);
+            }
+        }
+
         // Public template versions with perfect forwarding and type constraints
         // Multi-component versions
         template<typename X, typename Y>
             requires Detail::FloatComponent<X> && Detail::FloatComponent<Y>
         [[nodiscard]] inline auto MakeFloat2(X&& x, Y&& y) {
             return Detail::MakeFloat2Impl(
-                IR::Value::Expr<float>(std::forward<X>(x)),
-                IR::Value::Expr<float>(std::forward<Y>(y)));
+                IR::Value::Expr<float>(ToFloat(std::forward<X>(x))),
+                IR::Value::Expr<float>(ToFloat(std::forward<Y>(y))));
         }
 
         template<typename X, typename Y, typename Z>
             requires Detail::FloatComponent<X> && Detail::FloatComponent<Y> && Detail::FloatComponent<Z>
         [[nodiscard]] inline auto MakeFloat3(X&& x, Y&& y, Z&& z) {
             return Detail::MakeFloat3Impl(
-                IR::Value::Expr<float>(std::forward<X>(x)),
-                IR::Value::Expr<float>(std::forward<Y>(y)),
-                IR::Value::Expr<float>(std::forward<Z>(z)));
+                IR::Value::Expr<float>(ToFloat(std::forward<X>(x))),
+                IR::Value::Expr<float>(ToFloat(std::forward<Y>(y))),
+                IR::Value::Expr<float>(ToFloat(std::forward<Z>(z))));
         }
 
         template<typename X, typename Y, typename Z, typename W>
@@ -335,10 +346,10 @@ namespace GPU {
                      Detail::FloatComponent<Z> && Detail::FloatComponent<W>
         [[nodiscard]] inline auto MakeFloat4(X&& x, Y&& y, Z&& z, W&& w) {
             return Detail::MakeFloat4Impl(
-                IR::Value::Expr<float>(std::forward<X>(x)),
-                IR::Value::Expr<float>(std::forward<Y>(y)),
-                IR::Value::Expr<float>(std::forward<Z>(z)),
-                IR::Value::Expr<float>(std::forward<W>(w)));
+                IR::Value::Expr<float>(ToFloat(std::forward<X>(x))),
+                IR::Value::Expr<float>(ToFloat(std::forward<Y>(y))),
+                IR::Value::Expr<float>(ToFloat(std::forward<Z>(z))),
+                IR::Value::Expr<float>(ToFloat(std::forward<W>(w))));
         }
 
         template<typename X, typename Y>
@@ -384,11 +395,12 @@ namespace GPU {
         // MakeFloat3 from Float2/Float2Expr + float
         template<typename XY, typename Z>
             requires Detail::Vec2Component<XY> && 
-                     (std::convertible_to<std::remove_cvref_t<Z>, float> || 
+                     (std::same_as<std::remove_cvref_t<Z>, float> || 
+                      std::same_as<std::remove_cvref_t<Z>, double> ||
                       Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value ||
                       Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value)
         [[nodiscard]] inline IR::Value::Expr<Math::Vec3> MakeFloat3(XY&& xy, Z&& z) {
-            IR::Value::Expr<float> zExpr = IR::Value::Expr<float>(static_cast<float>(std::forward<Z>(z)));
+            IR::Value::Expr<float> zExpr = IR::Value::Expr<float>(ToFloat(std::forward<Z>(z)));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeFloat3BroadcastImpl(xy, std::move(zExpr));
             } else {
@@ -401,11 +413,11 @@ namespace GPU {
         // MakeFloat4 from Float2/Float2Expr + float + float
         template<typename XY, typename Z, typename W>
             requires Detail::Vec2Component<XY> && 
-                     (std::convertible_to<std::remove_cvref_t<Z>, float> || Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value) &&
-                     (std::convertible_to<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
+                     (std::same_as<std::remove_cvref_t<Z>, float> || std::same_as<std::remove_cvref_t<Z>, double> || Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value) &&
+                     (std::same_as<std::remove_cvref_t<W>, float> || std::same_as<std::remove_cvref_t<W>, double> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline IR::Value::Expr<Math::Vec4> MakeFloat4(XY&& xy, Z&& z, W&& w) {
-            IR::Value::Expr<float> zExpr = IR::Value::Expr<float>(static_cast<float>(std::forward<Z>(z)));
-            IR::Value::Expr<float> wExpr = IR::Value::Expr<float>(static_cast<float>(std::forward<W>(w)));
+            IR::Value::Expr<float> zExpr = IR::Value::Expr<float>(ToFloat(std::forward<Z>(z)));
+            IR::Value::Expr<float> wExpr = IR::Value::Expr<float>(ToFloat(std::forward<W>(w)));
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeFloat4BroadcastImpl(xy, std::move(zExpr), std::move(wExpr));
             } else {
@@ -418,9 +430,9 @@ namespace GPU {
         // MakeFloat4 from Float3/Float3Expr + float
         template<typename XYZ, typename W>
             requires Detail::Vec3Component<XYZ> && 
-                     (std::convertible_to<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
+                     (std::same_as<std::remove_cvref_t<W>, float> || std::same_as<std::remove_cvref_t<W>, double> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline IR::Value::Expr<Math::Vec4> MakeFloat4(XYZ&& xyz, W&& w) {
-            IR::Value::Expr<float> wExpr = IR::Value::Expr<float>(static_cast<float>(std::forward<W>(w)));
+            IR::Value::Expr<float> wExpr = IR::Value::Expr<float>(ToFloat(std::forward<W>(w)));
             if constexpr (IsExpr_v<std::remove_cvref_t<XYZ>>) {
                 return Detail::MakeFloat4BroadcastImpl(xyz, std::move(wExpr));
             } else {
@@ -494,21 +506,21 @@ namespace GPU {
         template<typename X>
             requires Detail::FloatComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeFloat2(X&& x) {
-            IR::Value::Expr<float> val(std::forward<X>(x));
+            IR::Value::Expr<float> val(ToFloat(std::forward<X>(x)));
             return Detail::MakeFloat2Impl(val, val);
         }
 
         template<typename X>
             requires Detail::FloatComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeFloat3(X&& x) {
-            IR::Value::Expr<float> val(std::forward<X>(x));
+            IR::Value::Expr<float> val(ToFloat(std::forward<X>(x)));
             return Detail::MakeFloat3Impl(val, val, val);
         }
 
         template<typename X>
             requires Detail::FloatComponent<X> && (!IsVecType<std::remove_cvref_t<X>>::value)
         [[nodiscard]] inline auto MakeFloat4(X&& x) {
-            IR::Value::Expr<float> val(std::forward<X>(x));
+            IR::Value::Expr<float> val(ToFloat(std::forward<X>(x)));
             return Detail::MakeFloat4Impl(val, val, val, val);
         }
 

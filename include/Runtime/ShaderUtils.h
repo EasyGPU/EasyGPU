@@ -56,12 +56,12 @@ namespace GPU::Runtime {
         constexpr const char *LeftT = "╠";
         constexpr const char *RightT = "╣";
         constexpr const char *Cross = "╬";
-        constexpr const char *Bullet = "•";
-        constexpr const char *Arrow = "→";
-        constexpr const char *Check = "✓";
-        constexpr const char *CrossX = "✗";
-        constexpr const char *Warning = "⚠";
-        constexpr const char *Info = "ℹ";
+        constexpr const char *Bullet = "*";
+        constexpr const char *Arrow = "->";
+        constexpr const char *Check = "[OK]";
+        constexpr const char *CrossX = "[X]";
+        constexpr const char *Warning = "[!]";
+        constexpr const char *Info = "[i]";
     }
 
     /**
