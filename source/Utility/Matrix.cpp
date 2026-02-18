@@ -2,8 +2,8 @@
  * Matrix.cpp
  * Implementation for Matrix.h
  */
-#include "../../include/Utility/Matrix.h"
-#include "../../include/Utility/Vec.h"
+#include <Utility/Matrix.h>
+#include <Utility/Vec.h>
 
 #include <stdexcept>
 #include <cmath>
@@ -95,6 +95,16 @@ namespace GPU::Math {
         m01 /= S;
         m11 /= S;
         return *this;
+    }
+
+    // Mat2 matrix multiplication
+    Mat2 Mat2::operator*(const Mat2 &Rhs) const {
+        return {
+            m00 * Rhs.m00 + m01 * Rhs.m10,
+            m10 * Rhs.m00 + m11 * Rhs.m10,
+            m00 * Rhs.m01 + m01 * Rhs.m11,
+            m10 * Rhs.m01 + m11 * Rhs.m11
+        };
     }
 
     // ---------------- Mat3 ----------------
@@ -216,6 +226,21 @@ namespace GPU::Math {
     }
 
     Mat3 &Mat3::operator/=(float S) { return (*this) *= (1.0f / S); }
+
+    // Mat3 matrix multiplication
+    Mat3 Mat3::operator*(const Mat3 &Rhs) const {
+        return {
+            m00 * Rhs.m00 + m01 * Rhs.m10 + m02 * Rhs.m20,
+            m10 * Rhs.m00 + m11 * Rhs.m10 + m12 * Rhs.m20,
+            m20 * Rhs.m00 + m21 * Rhs.m10 + m22 * Rhs.m20,
+            m00 * Rhs.m01 + m01 * Rhs.m11 + m02 * Rhs.m21,
+            m10 * Rhs.m01 + m11 * Rhs.m11 + m12 * Rhs.m21,
+            m20 * Rhs.m01 + m21 * Rhs.m11 + m22 * Rhs.m21,
+            m00 * Rhs.m02 + m01 * Rhs.m12 + m02 * Rhs.m22,
+            m10 * Rhs.m02 + m11 * Rhs.m12 + m12 * Rhs.m22,
+            m20 * Rhs.m02 + m21 * Rhs.m12 + m22 * Rhs.m22
+        };
+    }
 
     // ---------------- Mat4 ----------------
     Mat4::Mat4() = default;
@@ -401,6 +426,28 @@ namespace GPU::Math {
 
     Mat4 &Mat4::operator/=(float S) { return (*this) *= (1.0f / S); }
 
+    // Mat4 matrix multiplication
+    Mat4 Mat4::operator*(const Mat4 &Rhs) const {
+        return {
+            m00 * Rhs.m00 + m01 * Rhs.m10 + m02 * Rhs.m20 + m03 * Rhs.m30,
+            m10 * Rhs.m00 + m11 * Rhs.m10 + m12 * Rhs.m20 + m13 * Rhs.m30,
+            m20 * Rhs.m00 + m21 * Rhs.m10 + m22 * Rhs.m20 + m23 * Rhs.m30,
+            m30 * Rhs.m00 + m31 * Rhs.m10 + m32 * Rhs.m20 + m33 * Rhs.m30,
+            m00 * Rhs.m01 + m01 * Rhs.m11 + m02 * Rhs.m21 + m03 * Rhs.m31,
+            m10 * Rhs.m01 + m11 * Rhs.m11 + m12 * Rhs.m21 + m13 * Rhs.m31,
+            m20 * Rhs.m01 + m21 * Rhs.m11 + m22 * Rhs.m21 + m23 * Rhs.m31,
+            m30 * Rhs.m01 + m31 * Rhs.m11 + m32 * Rhs.m21 + m33 * Rhs.m31,
+            m00 * Rhs.m02 + m01 * Rhs.m12 + m02 * Rhs.m22 + m03 * Rhs.m32,
+            m10 * Rhs.m02 + m11 * Rhs.m12 + m12 * Rhs.m22 + m13 * Rhs.m32,
+            m20 * Rhs.m02 + m21 * Rhs.m12 + m22 * Rhs.m22 + m23 * Rhs.m32,
+            m30 * Rhs.m02 + m31 * Rhs.m12 + m32 * Rhs.m22 + m33 * Rhs.m32,
+            m00 * Rhs.m03 + m01 * Rhs.m13 + m02 * Rhs.m23 + m03 * Rhs.m33,
+            m10 * Rhs.m03 + m11 * Rhs.m13 + m12 * Rhs.m23 + m13 * Rhs.m33,
+            m20 * Rhs.m03 + m21 * Rhs.m13 + m22 * Rhs.m23 + m23 * Rhs.m33,
+            m30 * Rhs.m03 + m31 * Rhs.m13 + m32 * Rhs.m23 + m33 * Rhs.m33
+        };
+    }
+
     // ---------------- Rectangular implementations ----------------
     Mat2x3::Mat2x3() : c0(Vec3::Zero()), c1(Vec3::Zero()) {
     }
@@ -488,6 +535,38 @@ namespace GPU::Math {
         return *this;
     }
 
+    // Mat2x3 * Mat3x2 = Mat3
+    // Mat2x3 has 2 Vec3 columns (c0, c1), Mat3x2 has 3 Vec2 columns (c0, c1, c2)
+    // Result is 3x3
+    Mat3 Mat2x3::operator*(const Mat3x2 &Rhs) const {
+        return {
+            // Column 0
+            c0.x * Rhs.c0.x + c1.x * Rhs.c0.y,
+            c0.y * Rhs.c0.x + c1.y * Rhs.c0.y,
+            c0.z * Rhs.c0.x + c1.z * Rhs.c0.y,
+            // Column 1
+            c0.x * Rhs.c1.x + c1.x * Rhs.c1.y,
+            c0.y * Rhs.c1.x + c1.y * Rhs.c1.y,
+            c0.z * Rhs.c1.x + c1.z * Rhs.c1.y,
+            // Column 2
+            c0.x * Rhs.c2.x + c1.x * Rhs.c2.y,
+            c0.y * Rhs.c2.x + c1.y * Rhs.c2.y,
+            c0.z * Rhs.c2.x + c1.z * Rhs.c2.y
+        };
+    }
+
+    // Mat3x2 * Mat2x3 = Mat2
+    // Mat3x2 has 3 Vec2 columns (c0, c1, c2), Mat2x3 has 2 Vec3 columns (c0, c1)
+    // Result is 2x2
+    Mat2 Mat3x2::operator*(const Mat2x3 &Rhs) const {
+        return {
+            c0.x * Rhs.c0.x + c1.x * Rhs.c0.y + c2.x * Rhs.c0.z,
+            c0.y * Rhs.c0.x + c1.y * Rhs.c0.y + c2.y * Rhs.c0.z,
+            c0.x * Rhs.c1.x + c1.x * Rhs.c1.y + c2.x * Rhs.c1.z,
+            c0.y * Rhs.c1.x + c1.y * Rhs.c1.y + c2.y * Rhs.c1.z
+        };
+    }
+
     Mat2x4::Mat2x4() : c0(Vec4::Zero()), c1(Vec4::Zero()) {
     }
 
@@ -524,6 +603,44 @@ namespace GPU::Math {
         return {Vec4(c0.x, c1.x, c2.x, c3.x), Vec4(c0.y, c1.y, c2.y, c3.y)};
     }
 
+    // Mat2x4 * Mat4x2 = Mat4
+    // Mat2x4 has 2 Vec4 columns (c0, c1), Mat4x2 has 4 Vec2 columns (c0, c1, c2, c3)
+    // Result is 4x4
+    Mat4 Mat2x4::operator*(const Mat4x2 &Rhs) const {
+        return {
+            // Column 0
+            c0.x * Rhs.c0.x + c1.x * Rhs.c0.y,
+            c0.y * Rhs.c0.x + c1.y * Rhs.c0.y,
+            c0.z * Rhs.c0.x + c1.z * Rhs.c0.y,
+            c0.w * Rhs.c0.x + c1.w * Rhs.c0.y,
+            // Column 1
+            c0.x * Rhs.c1.x + c1.x * Rhs.c1.y,
+            c0.y * Rhs.c1.x + c1.y * Rhs.c1.y,
+            c0.z * Rhs.c1.x + c1.z * Rhs.c1.y,
+            c0.w * Rhs.c1.x + c1.w * Rhs.c1.y,
+            // Column 2
+            c0.x * Rhs.c2.x + c1.x * Rhs.c2.y,
+            c0.y * Rhs.c2.x + c1.y * Rhs.c2.y,
+            c0.z * Rhs.c2.x + c1.z * Rhs.c2.y,
+            c0.w * Rhs.c2.x + c1.w * Rhs.c2.y,
+            // Column 3
+            c0.x * Rhs.c3.x + c1.x * Rhs.c3.y,
+            c0.y * Rhs.c3.x + c1.y * Rhs.c3.y,
+            c0.z * Rhs.c3.x + c1.z * Rhs.c3.y,
+            c0.w * Rhs.c3.x + c1.w * Rhs.c3.y
+        };
+    }
+
+    // Mat4x2 * Mat2x4 = Mat2
+    Mat2 Mat4x2::operator*(const Mat2x4 &Rhs) const {
+        return {
+            c0.x * Rhs.c0.x + c1.x * Rhs.c0.y + c2.x * Rhs.c0.z + c3.x * Rhs.c0.w,
+            c0.y * Rhs.c0.x + c1.y * Rhs.c0.y + c2.y * Rhs.c0.z + c3.y * Rhs.c0.w,
+            c0.x * Rhs.c1.x + c1.x * Rhs.c1.y + c2.x * Rhs.c1.z + c3.x * Rhs.c1.w,
+            c0.y * Rhs.c1.x + c1.y * Rhs.c1.y + c2.y * Rhs.c1.z + c3.y * Rhs.c1.w
+        };
+    }
+
     Mat3x4::Mat3x4() : c0(Vec4::Zero()), c1(Vec4::Zero()), c2(Vec4::Zero()) {
     }
 
@@ -558,6 +675,49 @@ namespace GPU::Math {
 
     Mat3x4 Mat4x3::Transposed() const {
         return {Vec4(c0.x, c1.x, c2.x, c3.x), Vec4(c0.y, c1.y, c2.y, c3.y), Vec4(c0.z, c1.z, c2.z, c3.z)};
+    }
+
+    // Mat3x4 * Mat4x3 = Mat4
+    // Mat3x4 has 3 Vec4 columns (c0, c1, c2), Mat4x3 has 4 Vec3 columns (c0, c1, c2, c3)
+    // Result is 4x4
+    Mat4 Mat3x4::operator*(const Mat4x3 &Rhs) const {
+        return {
+            // Column 0
+            c0.x * Rhs.c0.x + c1.x * Rhs.c0.y + c2.x * Rhs.c0.z,
+            c0.y * Rhs.c0.x + c1.y * Rhs.c0.y + c2.y * Rhs.c0.z,
+            c0.z * Rhs.c0.x + c1.z * Rhs.c0.y + c2.z * Rhs.c0.z,
+            c0.w * Rhs.c0.x + c1.w * Rhs.c0.y + c2.w * Rhs.c0.z,
+            // Column 1
+            c0.x * Rhs.c1.x + c1.x * Rhs.c1.y + c2.x * Rhs.c1.z,
+            c0.y * Rhs.c1.x + c1.y * Rhs.c1.y + c2.y * Rhs.c1.z,
+            c0.z * Rhs.c1.x + c1.z * Rhs.c1.y + c2.z * Rhs.c1.z,
+            c0.w * Rhs.c1.x + c1.w * Rhs.c1.y + c2.w * Rhs.c1.z,
+            // Column 2
+            c0.x * Rhs.c2.x + c1.x * Rhs.c2.y + c2.x * Rhs.c2.z,
+            c0.y * Rhs.c2.x + c1.y * Rhs.c2.y + c2.y * Rhs.c2.z,
+            c0.z * Rhs.c2.x + c1.z * Rhs.c2.y + c2.z * Rhs.c2.z,
+            c0.w * Rhs.c2.x + c1.w * Rhs.c2.y + c2.w * Rhs.c2.z,
+            // Column 3
+            c0.x * Rhs.c3.x + c1.x * Rhs.c3.y + c2.x * Rhs.c3.z,
+            c0.y * Rhs.c3.x + c1.y * Rhs.c3.y + c2.y * Rhs.c3.z,
+            c0.z * Rhs.c3.x + c1.z * Rhs.c3.y + c2.z * Rhs.c3.z,
+            c0.w * Rhs.c3.x + c1.w * Rhs.c3.y + c2.w * Rhs.c3.z
+        };
+    }
+
+    // Mat4x3 * Mat3x4 = Mat3
+    Mat3 Mat4x3::operator*(const Mat3x4 &Rhs) const {
+        return {
+            c0.x * Rhs.c0.x + c1.x * Rhs.c0.y + c2.x * Rhs.c0.z + c3.x * Rhs.c0.w,
+            c0.y * Rhs.c0.x + c1.y * Rhs.c0.y + c2.y * Rhs.c0.z + c3.y * Rhs.c0.w,
+            c0.z * Rhs.c0.x + c1.z * Rhs.c0.y + c2.z * Rhs.c0.z + c3.z * Rhs.c0.w,
+            c0.x * Rhs.c1.x + c1.x * Rhs.c1.y + c2.x * Rhs.c1.z + c3.x * Rhs.c1.w,
+            c0.y * Rhs.c1.x + c1.y * Rhs.c1.y + c2.y * Rhs.c1.z + c3.y * Rhs.c1.w,
+            c0.z * Rhs.c1.x + c1.z * Rhs.c1.y + c2.z * Rhs.c1.z + c3.z * Rhs.c1.w,
+            c0.x * Rhs.c2.x + c1.x * Rhs.c2.y + c2.x * Rhs.c2.z + c3.x * Rhs.c2.w,
+            c0.y * Rhs.c2.x + c1.y * Rhs.c2.y + c2.y * Rhs.c2.z + c3.y * Rhs.c2.w,
+            c0.z * Rhs.c2.x + c1.z * Rhs.c2.y + c2.z * Rhs.c2.z + c3.z * Rhs.c2.w
+        };
     }
 
     // ---------------- Hadamard Product (Element-wise multiplication) ----------------

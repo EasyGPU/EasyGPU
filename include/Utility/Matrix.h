@@ -73,6 +73,9 @@ namespace GPU::Math {
         /** Multiply by `Vec2`. Complexity: O(1). */
         Vec2 operator*(const Vec2 &V) const;
 
+        /** Multiply by `Mat2` (matrix multiplication). Complexity: O(1). */
+        Mat2 operator*(const Mat2 &Rhs) const;
+
     public: // Operators
         Mat2 operator+(const Mat2 &Rhs) const;
 
@@ -128,6 +131,9 @@ namespace GPU::Math {
         [[nodiscard]] Mat3 Inverse() const; // may throw
         [[nodiscard]] Vec3 operator*(const Vec3 &V) const;
 
+        /** Multiply by `Mat3` (matrix multiplication). Complexity: O(1). */
+        Mat3 operator*(const Mat3 &Rhs) const;
+
     public:
         Mat3 operator+(const Mat3 &Rhs) const;
 
@@ -182,6 +188,9 @@ namespace GPU::Math {
 
         Vec4 operator*(const Vec4 &V) const;
 
+        /** Multiply by `Mat4` (matrix multiplication). Complexity: O(1). */
+        Mat4 operator*(const Mat4 &Rhs) const;
+
     public:
         Mat4 operator+(const Mat4 &Rhs) const;
 
@@ -229,6 +238,9 @@ namespace GPU::Math {
 
         Vec3 operator*(const Vec2 &V) const;
 
+        /** Multiply by `Mat3x2` (2x3 * 3x2 = 3x3). Complexity: O(1). */
+        Mat3 operator*(const Mat3x2 &Rhs) const;
+
     public:
         Mat2x3 operator+(const Mat2x3 &Rhs) const;
 
@@ -267,6 +279,9 @@ namespace GPU::Math {
 
         Vec2 operator*(const Vec3 &V) const;
 
+        /** Multiply by `Mat2x3` (3x2 * 2x3 = 2x2). Complexity: O(1). */
+        Mat2 operator*(const Mat2x3 &Rhs) const;
+
     public:
         Mat3x2 operator+(const Mat3x2 &Rhs) const;
 
@@ -300,6 +315,9 @@ namespace GPU::Math {
 
         Vec4 operator*(const Vec2 &V) const;
 
+        /** Multiply by `Mat4x2` (2x4 * 4x2 = 4x4). Complexity: O(1). */
+        Mat4 operator*(const Mat4x2 &Rhs) const;
+
         [[nodiscard]] Mat4x2 Transposed() const;
 
         /** Hadamard product (element-wise multiplication) */
@@ -322,6 +340,9 @@ namespace GPU::Math {
         static Mat4x2 Zero();
 
         Vec2 operator*(const Vec4 &V) const;
+
+        /** Multiply by `Mat2x4` (4x2 * 2x4 = 2x2). Complexity: O(1). */
+        Mat2 operator*(const Mat2x4 &Rhs) const;
 
         [[nodiscard]] Mat2x4 Transposed() const;
 
@@ -348,6 +369,9 @@ namespace GPU::Math {
 
         Vec4 operator*(const Vec3 &V) const;
 
+        /** Multiply by `Mat4x3` (3x4 * 4x3 = 4x4). Complexity: O(1). */
+        Mat4 operator*(const Mat4x3 &Rhs) const;
+
         [[nodiscard]] Mat4x3 Transposed() const;
 
         /** Hadamard product (element-wise multiplication) */
@@ -371,6 +395,9 @@ namespace GPU::Math {
         static Mat4x3 Zero();
 
         Vec3 operator*(const Vec4 &V) const;
+
+        /** Multiply by `Mat3x4` (4x3 * 3x4 = 3x3). Complexity: O(1). */
+        Mat3 operator*(const Mat3x4 &Rhs) const;
 
         [[nodiscard]] Mat3x4 Transposed() const;
 
