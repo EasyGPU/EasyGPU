@@ -567,7 +567,7 @@ namespace GPU::IR::Value {
         return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
     }
     
-    // Expr<float> * Expr<Vec3> 其他运算符
+    // Expr<float> * Expr<Vec3> operators
     [[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
         return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
     }

@@ -18,6 +18,8 @@
 #include <IR/Node/LoadLocalVariable.h>
 #include <IR/Node/LoadUniform.h>
 
+#include <Utility/Meta/StructMeta.h>
+
 #include <string>
 #include <type_traits>
 #include <concepts>
@@ -62,6 +64,10 @@ namespace GPU::IR::Value {
         else if constexpr (std::same_as<Type, Math::Mat3x4>) return "mat3x4";
         else if constexpr (std::same_as<Type, Math::Mat4x2>) return "mat4x2";
         else if constexpr (std::same_as<Type, Math::Mat4x3>) return "mat4x3";
+        else if constexpr (GPU::Meta::RegisteredStruct<Type>) {
+            // For registered structs, return the GLSL type name from StructMeta
+            return GPU::Meta::StructMeta<Type>::glslTypeName.data();
+        }
         else return "unknown";
     }
 
