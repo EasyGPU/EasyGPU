@@ -385,8 +385,8 @@ namespace GPU {
         template<typename XY, typename Z>
             requires Detail::Vec2Component<XY> && 
                      (std::same_as<std::remove_cvref_t<Z>, float> || 
-                      IsVarOf<std::remove_cvref_t<Z>, float>::value ||
-                      IsExprOf<std::remove_cvref_t<Z>, float>::value)
+                      Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value ||
+                      Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value)
         [[nodiscard]] inline auto MakeFloat3(XY&& xy, Z&& z) {
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeFloat3BroadcastImpl(xy, IR::Value::Expr<float>(std::forward<Z>(z)));
@@ -400,8 +400,8 @@ namespace GPU {
         // MakeFloat4 from Float2/Float2Expr + float + float
         template<typename XY, typename Z, typename W>
             requires Detail::Vec2Component<XY> && 
-                     (std::same_as<std::remove_cvref_t<Z>, float> || IsVarOf<std::remove_cvref_t<Z>, float>::value || IsExprOf<std::remove_cvref_t<Z>, float>::value) &&
-                     (std::same_as<std::remove_cvref_t<W>, float> || IsVarOf<std::remove_cvref_t<W>, float>::value || IsExprOf<std::remove_cvref_t<W>, float>::value)
+                     (std::same_as<std::remove_cvref_t<Z>, float> || Detail::IsVarOf<std::remove_cvref_t<Z>, float>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, float>::value) &&
+                     (std::same_as<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline auto MakeFloat4(XY&& xy, Z&& z, W&& w) {
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeFloat4BroadcastImpl(xy, 
@@ -418,7 +418,7 @@ namespace GPU {
         // MakeFloat4 from Float3/Float3Expr + float
         template<typename XYZ, typename W>
             requires Detail::Vec3Component<XYZ> && 
-                     (std::same_as<std::remove_cvref_t<W>, float> || IsVarOf<std::remove_cvref_t<W>, float>::value || IsExprOf<std::remove_cvref_t<W>, float>::value)
+                     (std::same_as<std::remove_cvref_t<W>, float> || Detail::IsVarOf<std::remove_cvref_t<W>, float>::value || Detail::IsExprOf<std::remove_cvref_t<W>, float>::value)
         [[nodiscard]] inline auto MakeFloat4(XYZ&& xyz, W&& w) {
             if constexpr (IsExpr_v<std::remove_cvref_t<XYZ>>) {
                 return Detail::MakeFloat4BroadcastImpl(xyz, IR::Value::Expr<float>(std::forward<W>(w)));
@@ -433,8 +433,8 @@ namespace GPU {
         template<typename XY, typename Z>
             requires Detail::IVec2Component<XY> && 
                      (std::same_as<std::remove_cvref_t<Z>, int> || 
-                      IsVarOf<std::remove_cvref_t<Z>, int>::value ||
-                      IsExprOf<std::remove_cvref_t<Z>, int>::value)
+                      Detail::IsVarOf<std::remove_cvref_t<Z>, int>::value ||
+                      Detail::IsExprOf<std::remove_cvref_t<Z>, int>::value)
         [[nodiscard]] inline auto MakeInt3(XY&& xy, Z&& z) {
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeInt3BroadcastImpl(xy, IR::Value::Expr<int>(std::forward<Z>(z)));
@@ -448,8 +448,8 @@ namespace GPU {
         // MakeInt4 from Int2/Int2Expr + int + int
         template<typename XY, typename Z, typename W>
             requires Detail::IVec2Component<XY> && 
-                     (std::same_as<std::remove_cvref_t<Z>, int> || IsVarOf<std::remove_cvref_t<Z>, int>::value || IsExprOf<std::remove_cvref_t<Z>, int>::value) &&
-                     (std::same_as<std::remove_cvref_t<W>, int> || IsVarOf<std::remove_cvref_t<W>, int>::value || IsExprOf<std::remove_cvref_t<W>, int>::value)
+                     (std::same_as<std::remove_cvref_t<Z>, int> || Detail::IsVarOf<std::remove_cvref_t<Z>, int>::value || Detail::IsExprOf<std::remove_cvref_t<Z>, int>::value) &&
+                     (std::same_as<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
         [[nodiscard]] inline auto MakeInt4(XY&& xy, Z&& z, W&& w) {
             if constexpr (IsExpr_v<std::remove_cvref_t<XY>>) {
                 return Detail::MakeInt4BroadcastImpl(xy,
@@ -466,7 +466,7 @@ namespace GPU {
         // MakeInt4 from Int3/Int3Expr + int
         template<typename XYZ, typename W>
             requires Detail::IVec3Component<XYZ> && 
-                     (std::same_as<std::remove_cvref_t<W>, int> || IsVarOf<std::remove_cvref_t<W>, int>::value || IsExprOf<std::remove_cvref_t<W>, int>::value)
+                     (std::same_as<std::remove_cvref_t<W>, int> || Detail::IsVarOf<std::remove_cvref_t<W>, int>::value || Detail::IsExprOf<std::remove_cvref_t<W>, int>::value)
         [[nodiscard]] inline auto MakeInt4(XYZ&& xyz, W&& w) {
             if constexpr (IsExpr_v<std::remove_cvref_t<XYZ>>) {
                 return Detail::MakeInt4BroadcastImpl(xyz, IR::Value::Expr<int>(std::forward<W>(w)));
