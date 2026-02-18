@@ -838,9 +838,19 @@ namespace GPU::IR::Value {
     template<ScalarType Type>
     class Var : public VarBase<Type> {
     public:
-        using VarBase<Type>::VarBase;
         using VarBase<Type>::Load;
         using VarBase<Type>::operator=;
+        
+        // Explicitly inherit constructors to ensure they are accessible
+        Var() = default;
+        Var(const Var&) = default;
+        Var(Var&&) = default;
+        
+        // Forward to base class constructors
+        Var(std::string Name) : VarBase<Type>(Name) {}
+        Var(std::string Name, bool IsExternal) : VarBase<Type>(Name, IsExternal) {}
+        Var(Expr<Type>&& Value) : VarBase<Type>(std::move(Value)) {}
+        Var(Expr<Type>& Value) : VarBase<Type>(Value) {}
     };
 
     // ==================== VarBase op VarBase ====================
