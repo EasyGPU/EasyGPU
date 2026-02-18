@@ -102,7 +102,7 @@ Callable<int(float, float)> Mandelbrot = [](Float& cx, Float& cy) {
         
         // Check if escaped: |z|^2 > 4.0 (i.e., |z| > 2.0)
         If(zx2 + zy2 > 4.0f, [&]() {
-            iter = i;
+            iter = Expr<int>(i);
             Break();
         });
         
@@ -110,7 +110,7 @@ Callable<int(float, float)> Mandelbrot = [](Float& cx, Float& cy) {
         // z^2 = (zx + i*zy)^2 = zx^2 - zy^2 + 2*i*zx*zy
         zy = 2.0f * zx * zy + cy;
         zx = zx2 - zy2 + cx;
-        iter = i;
+        iter = Expr<int>(i);
     });
     
     Return(iter);

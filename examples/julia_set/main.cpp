@@ -99,16 +99,16 @@ Callable<int(float, float)> Julia = [](Float& zx, Float& zy) {
         
         // Check if escaped: |z|^2 > 4.0 (i.e., |z| > 2.0)
         If(zx2 + zy2 > 4.0f, [&]() {
-            iter = i;
+            iter = Expr<int>(i);
             Break();
         });
         
         // z = z^2 + c
         Float new_zy = 2.0f * zx * zy + JULIA_CY;
         zx = zx2 - zy2 + JULIA_CX;
-        zy = new_zy;
+        zy = Expr<float>(new_zy);
         
-        iter = i;
+        iter = Expr<int>(i);
     });
     
     Return(iter);

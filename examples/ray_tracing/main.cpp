@@ -112,14 +112,14 @@ Callable<bool(Vec3, Vec3, Ray&, float, float&, HitRec&, Material&)> HitBox = [](
         If(t > tmin && t < tc, [&]() {
             Float3 p = RayAt(r, t);
             If(p.y() > bmin.y() && p.y() < bmax.y() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-                tc = t; n = Vec3(-1.0f, 0.0f, 0.0f); hit = true;
+                tc = Expr<float>(t); n = Vec3(-1.0f, 0.0f, 0.0f); hit = true;
                 });
             });
         t = (bmax.x() - r.origin().x()) / r.dir().x();
         If(t > tmin && t < tc, [&]() {
             Float3 p = RayAt(r, t);
             If(p.y() > bmin.y() && p.y() < bmax.y() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-                tc = t; n = Vec3(1.0f, 0.0f, 0.0f); hit = true;
+                tc = Expr<float>(t); n = Vec3(1.0f, 0.0f, 0.0f); hit = true;
                 });
             });
 
@@ -128,14 +128,14 @@ Callable<bool(Vec3, Vec3, Ray&, float, float&, HitRec&, Material&)> HitBox = [](
         If(t > tmin && t < tc, [&]() {
             Float3 p = RayAt(r, t);
             If(p.x() > bmin.x() && p.x() < bmax.x() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-                tc = t; n = Vec3(0.0f, -1.0f, 0.0f); hit = true;
+                tc = Expr<float>(t); n = Vec3(0.0f, -1.0f, 0.0f); hit = true;
                 });
             });
         t = (bmax.y() - r.origin().y()) / r.dir().y();
         If(t > tmin && t < tc, [&]() {
             Float3 p = RayAt(r, t);
             If(p.x() > bmin.x() && p.x() < bmax.x() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-                tc = t; n = Vec3(0.0f, 1.0f, 0.0f); hit = true;
+                tc = Expr<float>(t); n = Vec3(0.0f, 1.0f, 0.0f); hit = true;
                 });
             });
 
@@ -144,23 +144,23 @@ Callable<bool(Vec3, Vec3, Ray&, float, float&, HitRec&, Material&)> HitBox = [](
         If(t > tmin && t < tc, [&]() {
             Float3 p = RayAt(r, t);
             If(p.x() > bmin.x() && p.x() < bmax.x() && p.y() > bmin.y() && p.y() < bmax.y(), [&]() {
-                tc = t; n = Vec3(0.0f, 0.0f, -1.0f); hit = true;
+                tc = Expr<float>(t); n = Vec3(0.0f, 0.0f, -1.0f); hit = true;
                 });
             });
         t = (bmax.z() - r.origin().z()) / r.dir().z();
         If(t > tmin && t < tc, [&]() {
             Float3 p = RayAt(r, t);
             If(p.x() > bmin.x() && p.x() < bmax.x() && p.y() > bmin.y() && p.y() < bmax.y(), [&]() {
-                tc = t; n = Vec3(0.0f, 0.0f, 1.0f); hit = true;
+                tc = Expr<float>(t); n = Vec3(0.0f, 0.0f, 1.0f); hit = true;
                 });
             });
 
         If(hit, [&]() {
-            rec.t() = tc;
+            rec.t() = Expr<float>(tc);
             rec.p() = RayAt(r, tc);
             rec.normal() = n;
             rec.mat() = mat;
-            closest = tc;
+            closest = Expr<float>(tc);
             });
 
         Return(hit);
@@ -336,7 +336,7 @@ int main() {
             Sqrt(Clamp(col.z() * scale, 0.0f, 1.0f)),
             1.f
         );
-        state[idx] = rngState;
+        state[idx] = Expr<int>(rngState);
         });
 
     kernel.Dispatch((IMAGE_WIDTH + 15) / 16, (IMAGE_HEIGHT + 15) / 16, true);

@@ -70,7 +70,7 @@ Callable<float(Vec3, Vec3)> intersect_light = [](Float3 pos, Float3 d) {
 
     Float result;
     If(valid, [&]() {
-        result = D;
+        result = Expr<float>(D);
         }).Else([&]() {
             result = INF;
             });
@@ -139,10 +139,10 @@ Callable<float(float)> make_nested = [](Float f) {
         If(f_int % 2 == 0, [&]() {
             result = 1.0f - fract_val;
             }).Else([&]() {
-                result = fract_val;
+                result = Expr<float>(fract_val);
                 });
         }).Else([&]() {
-            result = f;
+            result = Expr<float>(f);
             });
 
         Return((result - 0.2f) * (1.0f / freq));
@@ -212,7 +212,7 @@ Callable<void(float&, Vec3&, Vec3&, Vec3, Vec3)> next_hit = [](
 
         Float ray_march_dist = ray_march(pos, d);
         If(ray_march_dist < Min(DIST_LIMIT, closest), [&]() {
-            closest = ray_march_dist;
+            closest = Expr<float>(ray_march_dist);
             Float3 hit_pos = pos + d * closest;
             normal = sdf_normal(hit_pos);
             Int t = FloatToInt((hit_pos.x() + 10.0f) * 1.1f + 0.5f) % 3;
@@ -325,7 +325,7 @@ int main() {
             });
 
         accums[idx] = accum;
-        seeds[idx] = seed;
+        seeds[idx] = Expr<int>(seed);
         });
 
     render_kernel.Dispatch((IMAGE_WIDTH + 15) / 16, (IMAGE_HEIGHT + 15) / 16, true);

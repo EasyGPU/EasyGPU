@@ -730,8 +730,69 @@ namespace GPU::Meta {
 #define EASYGPU_UPLOAD_UNIFORM_vec4 EASYGPU_UPLOAD_UNIFORM_VEC4
 #define EASYGPU_UPLOAD_UNIFORM_Vec4 EASYGPU_UPLOAD_UNIFORM_VEC4
 
+// Uniform upload dispatcher for nested struct support
+namespace GPU::Meta {
+    // Forward declare the dispatcher
+    template<typename T>
+    inline void DispatchUploadUniform(uint32_t program, const std::string& uniformName, const T& value, const char* name);
+    
+    // Overload for registered structs - dispatches to nested UploadUniform
+    template<typename T>
+    inline void UploadUniformDispatch(uint32_t program, const std::string& uniformName, const T& value, const char* name) {
+        if constexpr (StructMeta<T>::isRegistered) {
+            std::string nestedPrefix = uniformName + "." + name;
+            StructMeta<T>::UploadUniform(program, nestedPrefix, value);
+        }
+    }
+    
+    // Specializations for primitive types - they call the corresponding glUniform* functions
+    template<>
+    inline void UploadUniformDispatch<float>(uint32_t program, const std::string& uniformName, const float& value, const char* name) {
+        GLint loc = glGetUniformLocation(program, (uniformName + "." + name).c_str());
+        if (loc != -1) glProgramUniform1f(program, loc, value);
+    }
+    
+    template<>
+    inline void UploadUniformDispatch<int>(uint32_t program, const std::string& uniformName, const int& value, const char* name) {
+        GLint loc = glGetUniformLocation(program, (uniformName + "." + name).c_str());
+        if (loc != -1) glProgramUniform1i(program, loc, value);
+    }
+    
+    template<>
+    inline void UploadUniformDispatch<bool>(uint32_t program, const std::string& uniformName, const bool& value, const char* name) {
+        GLint loc = glGetUniformLocation(program, (uniformName + "." + name).c_str());
+        if (loc != -1) glProgramUniform1i(program, loc, value ? 1 : 0);
+    }
+    
+    template<>
+    inline void UploadUniformDispatch<Math::Vec2>(uint32_t program, const std::string& uniformName, const Math::Vec2& value, const char* name) {
+        GLint loc = glGetUniformLocation(program, (uniformName + "." + name).c_str());
+        if (loc != -1) glProgramUniform2fv(program, loc, 1, &value.x);
+    }
+    
+    template<>
+    inline void UploadUniformDispatch<Math::Vec3>(uint32_t program, const std::string& uniformName, const Math::Vec3& value, const char* name) {
+        GLint loc = glGetUniformLocation(program, (uniformName + "." + name).c_str());
+        if (loc != -1) glProgramUniform3fv(program, loc, 1, &value.x);
+    }
+    
+    template<>
+    inline void UploadUniformDispatch<Math::Vec4>(uint32_t program, const std::string& uniformName, const Math::Vec4& value, const char* name) {
+        GLint loc = glGetUniformLocation(program, (uniformName + "." + name).c_str());
+        if (loc != -1) glProgramUniform4fv(program, loc, 1, &value.x);
+    }
+    
+    // Wrapper that extracts the field from the parent struct
+    template<typename StructT, typename FieldT>
+    inline void DispatchUploadUniformField(uint32_t program, const std::string& uniformName, const StructT& value, FieldT StructT::*member, const char* name) {
+        UploadUniformDispatch<FieldT>(program, uniformName, value.*member, name);
+    }
+}
+
+// The macro now uses template-based dispatch
+// Note: _EasyGPU_CurrentStruct is defined as 'using _EasyGPU_CurrentStruct = StructType' inside StructMeta
 #define EASYGPU_UPLOAD_FIELD(type, name) \
-    EASYGPU_UPLOAD_UNIFORM_##type(program, uniformName.c_str(), value, name)
+    GPU::Meta::UploadUniformDispatch<type>(program, uniformName, value.name, #name);
 
 #define EASYGPU_SEQ_UPLOAD_1(P1) EASYGPU_UPLOAD_FIELD P1
 #define EASYGPU_SEQ_UPLOAD_2(P1, P2) EASYGPU_SEQ_UPLOAD_1(P1) EASYGPU_UPLOAD_FIELD P2
