@@ -9,6 +9,9 @@
 
 #include <Kernel/WindowAttachment.h>
 
+#include <Runtime/Context.h>
+#include <Runtime/GLStateCache.h>
+
 #include <glad/glad.h>
 
 #include <stdexcept>
@@ -77,6 +80,20 @@ namespace GPU::Kernel {
             return false;
         }
 
+        // Make the OpenGL context current on this window's DC
+        // This is done once during attach; Flush() assumes context stays current
+        HGLRC hglrc = Runtime::Context::GetInstance().GetGLContext();
+        if (hglrc && !MakeCurrent(hglrc)) {
+            // Failed to make current, clean up
+            SetWindowLongPtrW(_hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(_originalWndProc));
+            _originalWndProc = nullptr;
+            RemovePropW(_hwnd, s_propName);
+            ReleaseDC(_hwnd, _hdc);
+            _hdc = nullptr;
+            _hwnd = nullptr;
+            return false;
+        }
+
         _attached = true;
         return true;
     }
@@ -136,7 +153,12 @@ namespace GPU::Kernel {
         if (!_hdc || !hglrc) {
             return false;
         }
-        return wglMakeCurrent(_hdc, hglrc) == TRUE;
+        BOOL result = wglMakeCurrent(_hdc, hglrc);
+        if (result) {
+            // Invalidate state cache since context may have changed
+            Runtime::GetStateCache().Invalidate();
+        }
+        return result == TRUE;
     }
 
     bool WindowAttachment::IsPixelFormatSet() const {

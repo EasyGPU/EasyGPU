@@ -152,6 +152,8 @@ add_library(EasyGPU STATIC
     include/Runtime/ShaderException.h
     include/Runtime/ShaderUtils.h
     source/Runtime/ShaderUtils.cpp
+    include/Runtime/GLStateCache.h
+    source/Runtime/GLStateCache.cpp
     
     # Utilities
     include/Utility/Vec.h

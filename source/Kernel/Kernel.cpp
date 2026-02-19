@@ -14,6 +14,7 @@
 #include <IR/Value/Var.h>
 #include <IR/Value/VarArray.h>
 #include <Runtime/Context.h>
+#include <Runtime/GLStateCache.h>
 #include <Runtime/ShaderUtils.h>
 
 #include <stdexcept>
@@ -88,7 +89,11 @@ namespace GPU::Kernel {
     // ===================================================================================
 
     /**
-     * Execute the OpenGL compute shader dispatch
+     * Execute the OpenGL compute shader dispatch with state caching
+     * 
+     * This function uses GLStateCache to minimize redundant OpenGL state changes.
+     * It assumes EasyGPU has exclusive control over the OpenGL context (exclusive mode).
+     * 
      * @param context The kernel build context
      * @param groupX The x group count
      * @param groupY The y group count
@@ -100,8 +105,11 @@ namespace GPU::Kernel {
         // Initialize context
         Runtime::AutoInitContext();
 
-        // Create context guard
-        Runtime::ContextGuard guard(Runtime::Context::GetInstance());
+        // Make context current (no guard needed - we stay current for efficiency)
+        Runtime::Context::GetInstance().MakeCurrent();
+
+        // Get the state cache
+        auto& cache = Runtime::GetStateCache();
 
         // Get or create the cached program
         uint32_t program = context.GetCachedProgram();
@@ -116,23 +124,23 @@ namespace GPU::Kernel {
             context.SetCachedProgram(program);
         }
 
-        // Use the program
-        glUseProgram(program);
+        // Bind the program (cached - only changes if different from last dispatch)
+        cache.BindProgram(program);
 
         // Upload uniform values
         context.UploadUniformValues(program);
 
-        // Bind all buffers to their specified binding points
+        // Bind all buffers to their specified binding points (cached)
         const auto& bufferBindings = context.GetRuntimeBufferBindings();
         for (const auto& [binding, handle] : bufferBindings) {
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, handle);
+            cache.BindSSBO(binding, handle);
         }
 
-        // Bind all textures to their specified binding points
+        // Bind all textures to their specified binding points (cached)
         const auto& textureBindings = context.GetRuntimeTextureBindings();
         for (const auto& [binding, handle] : textureBindings) {
             // TODO: Format and access mode should be configurable per texture
-            glBindImageTexture(binding, handle, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
+            cache.BindImageTexture(binding, handle, GL_RGBA8, GL_READ_WRITE);
         }
 
         // Dispatch the compute shader
@@ -143,18 +151,10 @@ namespace GPU::Kernel {
             KernelBase::RuntimeBarrier();
         }
 
-        // Unbind buffers
-        for (const auto& [binding, handle] : bufferBindings) {
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, 0);
-        }
-
-        // Unbind textures
-        for (const auto& [binding, handle] : textureBindings) {
-            glBindImageTexture(binding, 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
-        }
-
-        // Unbind the program (but don't delete - it's cached)
-        glUseProgram(0);
+        // Note: We intentionally do NOT unbind resources here for performance:
+        // 1. In exclusive mode, the next dispatch will bind its own resources anyway
+        // 2. Unbinding would defeat the purpose of the cache
+        // 3. The driver handles resource lifetime, zero-binding is not required
     }
 
     // ===================================================================================

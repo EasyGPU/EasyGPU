@@ -139,6 +139,22 @@ Kernel1D sum([](Int i) {
 });
 ```
 
+### Interoperability — Works with Your Favorite Framework
+
+EasyGPU integrates seamlessly with any OpenGL-based windowing framework. You control the window lifecycle; EasyGPU handles the GPU compute.
+
+| Framework | Use Case | Demo |
+|-----------|----------|------|
+| **EasyX** | Teaching / Rapid prototyping | <img src="docs/image/easyx.png" width="320"> |
+| **GLFW** | Cross-platform applications | <img src="docs/image/glfw.png" width="320"> |
+
+*Original shader: [Seascape](https://www.shadertoy.com/view/Ms2SD1) on Shadertoy*
+
+Key benefits:
+- **Zero windowing interference** — Bring your own window, EasyGPU only touches the GPU
+- **Native OpenGL interop** — Render compute results directly to window textures
+- **Non-intrusive design** — Adopt incrementally in existing projects
+
 ### Control Flow
 
 Structured control flow with C++-like semantics:
@@ -213,6 +229,32 @@ video.InitUploadPBOPool(2);  // Double buffering
 // Upload without blocking - essential for real-time video
 video.UploadAsync(frameData.data());
 kernel.Dispatch(120, 68, true);  // GPU processes while CPU continues
+```
+
+### Performance Notes — Exclusive OpenGL Context Mode
+
+EasyGPU operates in **exclusive mode** by default, assuming it has sole ownership of the OpenGL context within the current thread. This design choice maximizes performance by:
+
+- **State caching**: Programs, buffers, and textures are only rebound when actually changed
+- **Eliminating redundant `glMakeCurrent`**: Context is made current once during `Attach()` and stays current
+- **No defensive `glGet` calls**: Trusting cached state avoids expensive driver synchronization
+
+**Implications:**
+- Do not interleave raw OpenGL calls with EasyGPU operations in the same context
+- If you must use raw OpenGL, either:
+  - Use a separate OpenGL context, or
+  - Call `GPU::Runtime::GetStateCache().Invalidate()` before returning to EasyGPU
+
+**FragmentKernel Lifecycle:**
+```cpp
+FragmentKernel2D kernel(...);
+kernel.Attach(hwnd);  // Context becomes current here
+
+while (running) {
+    // No need to MakeCurrent - context stays current
+    kernel.Flush();     // Minimal state changes thanks to caching
+}
+// Context cleanup happens automatically
 ```
 
 ---

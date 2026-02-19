@@ -4,6 +4,7 @@
  */
 
 #include <Runtime/Context.h>
+#include <Runtime/GLStateCache.h>
 
 #include <iostream>
 #include <sstream>
@@ -63,6 +64,9 @@ namespace GPU::Runtime {
             throw std::runtime_error("Failed to make OpenGL context current");
         }
 #endif
+        // Invalidate state cache when context becomes current
+        // This ensures we re-bind state after any context switch
+        GetStateCache().Invalidate();
     }
 
     void Context::MakeNoneCurrent() {

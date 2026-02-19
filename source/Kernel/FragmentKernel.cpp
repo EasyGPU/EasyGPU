@@ -16,6 +16,7 @@
 #include <Kernel/KernelProfiler.h>
 
 #include <Runtime/Context.h>
+#include <Runtime/GLStateCache.h>
 #include <Runtime/ShaderUtils.h>
 
 #include <glad/glad.h>
@@ -184,15 +185,11 @@ namespace GPU::Kernel {
             throw std::runtime_error("FragmentKernel2D::Flush() called before Attach()");
         }
 
-        // Get EasyGPU's OpenGL context
+        // Ensure context is current on this window
+        // This is lightweight if already current - just updates the state cache
         HGLRC hglrc = Runtime::Context::GetInstance().GetGLContext();
-        if (!hglrc) {
-            throw std::runtime_error("FragmentKernel2D: No OpenGL context available");
-        }
-
-        // Switch to window's DC for rendering
-        if (!_windowAttachment->MakeCurrent(hglrc)) {
-            std::cerr << "Failed to make window DC current" << std::endl;
+        if (hglrc) {
+            _windowAttachment->MakeCurrent(hglrc);
         }
 
         // Execute render
@@ -200,22 +197,26 @@ namespace GPU::Kernel {
 
         // Swap buffers on window
         _windowAttachment->SwapBuffers();
-
-        // Restore EasyGPU's original DC (optional, but good practice)
-        Runtime::Context::GetInstance().MakeCurrent();
     }
 
     void FragmentKernel2D::ExecuteRender() {
         // Ensure shader is compiled
         EnsureShaderCompiled();
 
-        // Check for OpenGL errors
+        // Get the state cache for optimized state management
+        auto& cache = Runtime::GetStateCache();
+
+        // Check for OpenGL errors (debug builds only)
+        #ifdef EASYGPU_DEBUG
         auto checkGLError = [](const char* where) {
             GLenum err = glGetError();
             if (err != GL_NO_ERROR) {
                 std::cerr << "OpenGL error at " << where << ": " << err << std::endl;
             }
         };
+        #else
+        auto checkGLError = [](const char*) {};
+        #endif
 
         // Begin profiling if enabled (check both per-kernel and global settings)
         unsigned int queryId = 0;
@@ -232,16 +233,14 @@ namespace GPU::Kernel {
         glClear(GL_COLOR_BUFFER_BIT);
         checkGLError("glClear");
         
-        // Bind shader program
-        glUseProgram(_shaderProgram);
+        // Bind shader program (cached)
+        cache.BindProgram(_shaderProgram);
         checkGLError("glUseProgram");
 
         // Upload uniforms (resolution)
         GLint resLoc = glGetUniformLocation(_shaderProgram, "u_resolution");
         if (resLoc >= 0) {
             glUniform2f(resLoc, static_cast<float>(_width), static_cast<float>(_height));
-        } else {
-            std::cerr << "Warning: u_resolution uniform not found" << std::endl;
         }
         checkGLError("glUniform2f");
 
@@ -251,33 +250,23 @@ namespace GPU::Kernel {
         }
         checkGLError("UploadUniformValues");
 
-        // Bind textures
+        // Bind textures (cached)
         const auto& textureBindings = _context->GetRuntimeTextureBindings();
         for (const auto& [binding, textureHandle] : textureBindings) {
-            glActiveTexture(GL_TEXTURE0 + binding);
-            glBindTexture(GL_TEXTURE_2D, textureHandle);
+            cache.BindTexture(binding, GL_TEXTURE_2D, textureHandle);
         }
 
-        // Bind VAO
-        glBindVertexArray(_vao);
+        // Bind VAO (cached)
+        cache.BindVAO(_vao);
         checkGLError("glBindVertexArray");
 
         // Draw full-screen triangle (3 vertices, no buffers)
         glDrawArrays(GL_TRIANGLES, 0, 3);
         checkGLError("glDrawArrays");
 
-        // Unbind
-        glBindVertexArray(0);
-        
-        // Unbind textures
-        for (const auto& [binding, textureHandle] : textureBindings) {
-            glActiveTexture(GL_TEXTURE0 + binding);
-            glBindTexture(GL_TEXTURE_2D, 0);
-        }
-        glActiveTexture(GL_TEXTURE0);
-        
-        glUseProgram(0);
-        checkGLError("glUseProgram(0)");
+        // Note: We intentionally do NOT unbind resources here for performance.
+        // In exclusive mode, the next Flush() will bind its own resources.
+        // The state cache ensures we only change what's necessary.
 
         // End profiling - fragment kernels use single "work group" (1,1,1)
         // since they're rasterization-based, not compute-based
