@@ -368,6 +368,35 @@ val = 5;  // May unexpectedly modify buf[i] in the generated shader
 
 **Why this matters:** Due to move constructor optimizations, `Int val = buf[i]` transfers ownership of the underlying variable name, causing `val` to reference `buffer[i]` directly. Use `Make*()` to ensure value semantics and create truly independent variables.
 
+### Var-Var Assignment
+
+**Always explicitly convert the right-hand side to `Expr<T>`** when assigning one `Var` to another:
+
+```cpp
+Int A;
+Int B = MakeInt(10);
+
+// ❌ WRONG: Direct Var-Var assignment may not generate correct IR
+A = B;
+
+// ✅ CORRECT: Explicitly convert right-hand side to Expr
+A = Expr<int>(B);
+```
+
+### Handling Side-Effects
+
+**Use `ExprBase::NotUse()`** for expressions with side-effects that aren't captured by operators:
+
+```cpp
+Callable<void(int&)> A = [](Int &a) { a = 20; };
+
+// ❌ WRONG: Side-effect won't be translated into IR
+A(b);
+
+// ✅ CORRECT: Explicitly mark the expression as "not used" to preserve side-effect
+ExprBase::NotUse(A(b));
+```
+
 ## Documentation
 
 - [Getting Started](docs/getting-started.md)

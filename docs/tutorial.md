@@ -517,6 +517,23 @@ Float pi = MakeFloat(3.14f);
 Int approx = ToInt(pi);          // Convert Var<float> to Var<int> (truncates)
 ```
 
+> ⚠️ **CRITICAL WARNING: Var-Var Assignment Requires Explicit Expr Conversion**
+> 
+> When assigning one `Var` to another, the right-hand side must be explicitly converted to `Expr<T>`. Direct Var-Var assignment may not work correctly because the DSL needs to distinguish between variable references and values:
+> 
+> ```cpp
+> Int A;
+> Int B = MakeInt(10);
+> 
+> // ❌ WRONG: Direct Var-Var assignment
+> A = B;  // Won't pass compile
+> 
+> // ✅ CORRECT: Explicitly convert right-hand side to Expr
+> A = Expr<int>(B);  // Explicitly convert B to Expr<int>
+> ```
+> 
+> **Why this matters:** The DSL uses expression templates to build the IR. When both sides are `Var` types, the assignment operator may not properly trigger the expression-to-variable conversion needed for correct code generation. Always wrap the right-hand `Var` in `Expr<T>()` when assigning to another `Var`.
+
 ---
 
 ## Working with 2D Data

@@ -355,6 +355,44 @@ texture.Sync();
 
 See [Patterns](patterns.md#async-data-transfer) for more examples.
 
+### How do I handle expressions with side-effects?
+
+The EasyGPU DSL cannot automatically handle side-effects from expressions. If a function or callable produces a side-effect (like modifying a reference parameter) and its return value is not used by any operator, the expression may be incorrectly optimized away and not translated into IR.
+
+**Problem:**
+```cpp
+Callable<void(int&)> A = [](Int &a) {
+    a = 20;  // Side-effect: modifies the input parameter
+};
+
+Kernel1D kernel([](Int i) {
+    Int b = MakeInt(0);
+    A(b);  // ❌ WRONG: Side-effect won't work!
+           // This call may be optimized away and not generate IR
+    // b is still 0 here, not 20
+});
+```
+
+**Solution:**
+Use `ExprBase::NotUse()` to explicitly mark expressions with side-effects that must be preserved:
+
+```cpp
+Kernel1D kernel([](Int i) {
+    Int b = MakeInt(0);
+    ExprBase::NotUse(A(b));  // ✅ CORRECT: Side-effect is preserved
+    // b is now 20 as expected
+});
+```
+
+**When to use `ExprBase::NotUse`:**
+- When calling a `Callable` that modifies its parameters (reference parameters)
+- When the return value of an expression is not used by any other operation
+- When you need to ensure an expression is evaluated for its side-effects only
+
+**Note:** `ExprBase::NotUse` takes an `ExprBase` (the base class of all expressions). Most function calls in the DSL return typed expressions (`Expr<T>`), which can be implicitly converted to `ExprBase`.
+
+---
+
 ### How do I handle large datasets?
 
 For datasets larger than GPU memory, process in chunks:
