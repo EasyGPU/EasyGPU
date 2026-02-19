@@ -13,6 +13,7 @@
 #include <windows.h>
 
 #include <Kernel/FragmentKernel.h>
+#include <Kernel/KernelProfiler.h>
 
 #include <Runtime/Context.h>
 #include <Runtime/ShaderUtils.h>
@@ -216,6 +217,12 @@ namespace GPU::Kernel {
             }
         };
 
+        // Begin profiling if enabled (use current context method for FragmentKernel)
+        unsigned int queryId = 0;
+        if (_profilingEnabled) {
+            queryId = KernelProfiler::GetInstance().BeginQueryOnCurrentContext();
+        }
+
         // Set up rendering state
         glViewport(0, 0, _width, _height);
         checkGLError("glViewport");
@@ -271,6 +278,12 @@ namespace GPU::Kernel {
         
         glUseProgram(0);
         checkGLError("glUseProgram(0)");
+
+        // End profiling - fragment kernels use single "work group" (1,1,1)
+        // since they're rasterization-based, not compute-based
+        if (_profilingEnabled && queryId != 0) {
+            KernelProfiler::GetInstance().EndQueryOnCurrentContext(queryId, _name, 1, 1, 1);
+        }
     }
 
     // ===================================================================================
@@ -406,6 +419,21 @@ namespace GPU::Kernel {
 
     void FragmentKernel2D::OnResize(uint32_t width, uint32_t height) {
         SetResolution(width, height);
+    }
+
+    // ===================================================================================
+    // Profiling
+    // ===================================================================================
+
+    void FragmentKernel2D::SetProfilingEnabled(bool enabled) {
+        _profilingEnabled = enabled;
+        if (enabled) {
+            KernelProfiler::GetInstance().SetEnabled(true);
+        }
+    }
+
+    bool FragmentKernel2D::IsProfilingEnabled() const {
+        return _profilingEnabled;
     }
 
 } // namespace GPU::Kernel

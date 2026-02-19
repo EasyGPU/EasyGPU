@@ -171,6 +171,59 @@ namespace GPU::Kernel {
         ReleaseQuery(queryId);
     }
 
+    unsigned int KernelProfiler::BeginQueryOnCurrentContext() {
+        if (!_enabled) return 0;
+        
+        // No context switch - use current context
+        unsigned int query = AcquireQuery();
+        if (query != 0) {
+            glBeginQuery(GL_TIME_ELAPSED, query);
+        }
+        return query;
+    }
+
+    void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::string& kernelName,
+                                                   int groupX, int groupY, int groupZ) {
+        if (!_enabled || queryId == 0) return;
+
+        // No context switch - use current context
+        glEndQuery(GL_TIME_ELAPSED);
+
+        // Get the query result
+        GLuint64 elapsedNanos = 0;
+        glGetQueryObjectui64v(queryId, GL_QUERY_RESULT, &elapsedNanos);
+        
+        double elapsedMs = static_cast<double>(elapsedNanos) / 1'000'000.0;
+
+        // Record the execution
+        KernelProfileRecord record;
+        record.kernelName = kernelName;
+        record.elapsedTimeMs = elapsedMs;
+        record.groupX = groupX;
+        record.groupY = groupY;
+        record.groupZ = groupZ;
+        record.timestamp = std::chrono::system_clock::now();
+        _records.push_back(record);
+
+        // Update statistics
+        auto& stat = _stats[kernelName];
+        stat.kernelName = kernelName;
+        stat.counter++;
+        stat.totalTimeMs += elapsedMs;
+        
+        if (stat.counter == 1) {
+            stat.minTimeMs = elapsedMs;
+            stat.maxTimeMs = elapsedMs;
+            stat.avgTimeMs = elapsedMs;
+        } else {
+            stat.minTimeMs = std::min(stat.minTimeMs, elapsedMs);
+            stat.maxTimeMs = std::max(stat.maxTimeMs, elapsedMs);
+            stat.avgTimeMs = stat.totalTimeMs / stat.counter;
+        }
+
+        ReleaseQuery(queryId);
+    }
+
     // ===================================================================================
     // Query Results
     // ===================================================================================

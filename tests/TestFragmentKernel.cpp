@@ -7,6 +7,7 @@
  * - Buffer/SSBO access
  * - Callable functions
  * - Complex shader effects
+ * - GPU Profiling
  */
 
 #include <windows.h>
@@ -14,6 +15,8 @@
 #include <cmath>
 #include <vector>
 #include <chrono>
+#include <iostream>
+#include <Windows.h>
 
 #pragma comment(lib, "opengl32.lib")
 
@@ -53,12 +56,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 PostQuitMessage(0);
                 return 0;
             }
+            // Press 'P' to print profiling info
+            if (wParam == 'P') {
+                GPU::Kernel::PrintKernelProfilerInfo("count");
+            }
             break;
     }
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow) {
     // Register window class
     const TCHAR CLASS_NAME[] = TEXT("FragmentKernelTest");
     
@@ -77,7 +84,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
-        TEXT("EasyGPU FragmentKernel"),
+        TEXT("EasyGPU FragmentKernel - Comprehensive Test (Press 'P' for profiling)"),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         WIDTH, HEIGHT,
@@ -88,7 +95,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     );
     
     if (!hwnd) {
-        MessageBox(nullptr, TEXT("Failed to create window"), TEXT("Error"), MB_OK);
+        MessageBoxW(nullptr, L"Failed to create window", L"Error", MB_OK);
         return 1;
     }
     
@@ -128,21 +135,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         }
         
         Texture2D<PixelFormat::RGBA8> patternTex(TEX_SIZE, TEX_SIZE, textureData.data());
-        
-        // 3. Buffer - particle positions for some effect
-        struct Particle {
-            float x, y, vx, vy;
-        };
-        
-        std::vector<Particle> particles(100);
-        for (int i = 0; i < 100; i++) {
-            particles[i].x = (float)(rand() % 1280) / 1280.0f;
-            particles[i].y = (float)(rand() % 720) / 720.0f;
-            particles[i].vx = ((float)(rand() % 100) - 50) / 1000.0f;
-            particles[i].vy = ((float)(rand() % 100) - 50) / 1000.0f;
-        }
-        
-        Buffer<Particle> particleBuffer(particles);
         
         // ============================================================
         // Create Fragment Kernel with ALL features
@@ -235,9 +227,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         
         // Attach to window
         if (!kernel.Attach(hwnd)) {
-            MessageBox(hwnd, TEXT("Failed to attach kernel to window"), TEXT("Error"), MB_OK);
+            MessageBoxW(hwnd, L"Failed to attach kernel to window", L"Error", MB_OK);
             return 1;
         }
+        
+        // Enable profiling
+        kernel.SetProfilingEnabled(true);
         
         // ============================================================
         // Main Loop
@@ -293,8 +288,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
             }
         }
         
+        // Print final profiling info
+        std::cout << "\n=== Final Profiling Results ===" << std::endl;
+        GPU::Kernel::PrintKernelProfilerInfo("count");
+        
     } catch (const std::exception& e) {
         MessageBoxA(hwnd, e.what(), "Exception", MB_OK);
+        std::cerr << "Exception: " << e.what() << std::endl;
         return 1;
     }
     

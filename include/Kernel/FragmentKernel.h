@@ -135,6 +135,19 @@ namespace GPU::Kernel {
          */
         void SetResolution(uint32_t width, uint32_t height);
 
+    public:
+        /**
+         * Enable or disable profiling for this kernel
+         * When enabled, each Flush() will record GPU execution time
+         * Use KernelProfiler::PrintInfo() to view results
+         */
+        void SetProfilingEnabled(bool enabled);
+
+        /**
+         * Check if profiling is enabled
+         */
+        bool IsProfilingEnabled() const;
+
     private:
         /**
          * Initialize OpenGL resources (VAO, shader)
@@ -174,6 +187,7 @@ namespace GPU::Kernel {
         bool _resourcesInitialized = false;
         uint32_t _width;
         uint32_t _height;
+        bool _profilingEnabled = false;
     };
 
 } // namespace GPU::Kernel

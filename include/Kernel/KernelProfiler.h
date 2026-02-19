@@ -109,6 +109,25 @@ namespace GPU::Kernel {
         void EndQuery(unsigned int queryId, const std::string& kernelName, 
                       int groupX, int groupY, int groupZ);
 
+        /**
+         * Begin profiling on the current OpenGL context (without context switch)
+         * Use this for FragmentKernel profiling where the context is already set
+         * @return Query ID for ending the timer, 0 if profiling is disabled
+         */
+        unsigned int BeginQueryOnCurrentContext();
+
+        /**
+         * End profiling on the current OpenGL context (without context switch)
+         * Use this for FragmentKernel profiling where the context is already set
+         * @param queryId The query ID from BeginQueryOnCurrentContext
+         * @param kernelName Name of the kernel
+         * @param groupX X dimension dispatch size
+         * @param groupY Y dimension dispatch size
+         * @param groupZ Z dimension dispatch size
+         */
+        void EndQueryOnCurrentContext(unsigned int queryId, const std::string& kernelName,
+                                      int groupX, int groupY, int groupZ);
+
     public:
         /**
          * Query profiling statistics for a specific kernel by name
