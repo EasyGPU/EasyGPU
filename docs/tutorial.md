@@ -14,6 +14,7 @@ A comprehensive guide to GPU programming with EasyGPU. By the end, you'll unders
 8. [Reusable Functions](#reusable-functions)
 9. [Debugging and Profiling](#debugging-and-profiling)
 10. [Complete Example: Particle System](#complete-example-particle-system)
+11. [Real-Time Rendering with Fragment Kernels](#real-time-rendering-with-fragment-kernels)
 
 ---
 
@@ -1092,6 +1093,324 @@ You now understand:
 7. **Complex Data** - Structs in GPU code
 8. **Reusable Functions** - Callable for code reuse
 9. **Debugging** - Viewing GLSL and profiling
+
+---
+
+## Real-Time Rendering with Fragment Kernels
+
+So far we've used **compute kernels** for data processing. For real-time graphics rendering, **fragment kernels** provide a more direct path to the screen.
+
+### The Problem with Compute Rendering
+
+When rendering to a window with compute kernels:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> framebuffer(1920, 1080);
+
+// 1. Compute kernel writes to texture
+Kernel2D render([&](Int x, Int y) {
+    auto fb = framebuffer.Bind();
+    fb.Write(x, y, color);
+});
+render.Dispatch(120, 68, true);
+
+// 2. Download to CPU (SLOW!)
+std::vector<uint8_t> pixels(1920 * 1080 * 4);
+framebuffer.Download(pixels);  // GPU->CPU copy
+
+// 3. Upload to window (SLOW!)
+// ... blit to screen ...
+```
+
+**Problems:**
+- Download/upload overhead kills performance
+- CPU-GPU synchronization stalls
+- Complex window integration
+
+### Fragment Kernels: Zero-Copy Rendering
+
+Fragment kernels use the GPU's rendering pipeline directly:
+
+```cpp
+FragmentKernel2D kernel("Renderer",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        // Direct pixel output - no Download() needed!
+        Float2 uv = fragCoord / resolution;
+        fragColor = CalculateColor(uv);
+    },
+    1920, 1080
+);
+
+kernel.Attach(hwnd);  // Bind to window
+
+while (running) {
+    kernel.Flush();  // Direct to screen!
+}
+```
+
+**Advantages:**
+- No CPU-GPU transfer
+- Hardware ROP optimization
+- Automatic pixel-level parallelism
+
+### Your First Fragment Kernel
+
+```cpp
+#include <GPU.h>
+#include <windows.h>
+
+int main() {
+    // Create a window
+    HWND hwnd = CreateWindowEx(
+        0, L"Static", L"Fragment Kernel Demo",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        1280, 720,
+        nullptr, nullptr, nullptr, nullptr
+    );
+    ShowWindow(hwnd, SW_SHOW);
+    
+    // Create fragment kernel
+    FragmentKernel2D kernel("Gradient",
+        [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+            // fragCoord: fragment coordinates in pixels
+            // resolution: viewport resolution in pixels
+            
+            Float2 uv = fragCoord / resolution;
+            
+            // Simple gradient
+            Float3 color = MakeFloat3(uv.x(), uv.y(), 0.5f);
+            fragColor = MakeFloat4(color, 1.0f);
+        },
+        1280, 720
+    );
+    
+    // Attach to window
+    if (!kernel.Attach(hwnd)) {
+        std::cerr << "Failed to attach\n";
+        return 1;
+    }
+    
+    // Render loop
+    MSG msg;
+    bool running = true;
+    while (running) {
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) running = false;
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        
+        kernel.Flush();  // Render frame
+    }
+    
+    return 0;
+}
+```
+
+### Key Differences from Compute Kernels
+
+| Aspect | Compute | Fragment |
+|:-------|:--------|:---------|
+| **Entry Point** | `Kernel2D` | `FragmentKernel2D` |
+| **Parameters** | `(Int x, Int y)` | `(Float2 coord, Float2 res, Var<Vec4>& color)` |
+| **Coordinates** | `gl_GlobalInvocationID` | `gl_FragCoord` |
+| **Output** | Buffer/Texture writes | `fragColor` assignment |
+| **Execution** | `Dispatch()` | `Flush()` after `Attach()` |
+| **Window** | Manual integration | Direct `Attach(hwnd)` |
+
+### Animated Effects with Uniforms
+
+```cpp
+Uniform<float> uTime;
+Uniform<Vec2> uResolution;
+
+FragmentKernel2D kernel("Plasma",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        Float time = uTime.Load();
+        Float2 uv = fragCoord / resolution;
+        
+        // Animated plasma effect
+        Float v = Sin(uv.x() * 10.0f + time) +
+                  Sin(uv.y() * 10.0f + time) +
+                  Sin((uv.x() + uv.y()) * 5.0f + time);
+        
+        Float3 color = MakeFloat3(
+            Sin(v) * 0.5f + 0.5f,
+            Sin(v + 2.0f) * 0.5f + 0.5f,
+            Sin(v + 4.0f) * 0.5f + 0.5f
+        );
+        
+        fragColor = MakeFloat4(color, 1.0f);
+    },
+    1280, 720
+);
+
+kernel.Attach(hwnd);
+
+auto start = std::chrono::steady_clock::now();
+while (running) {
+    auto now = std::chrono::steady_clock::now();
+    float time = std::chrono::duration<float>(now - start).count();
+    
+    uTime = time;
+    uResolution = Vec2(1280.0f, 720.0f);
+    
+    kernel.Flush();
+}
+```
+
+### Texture Sampling
+
+Fragment kernels support hardware-accelerated texture sampling:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> image(512, 512);
+// ... upload image data ...
+
+FragmentKernel2D kernel("Textured",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        auto tex = image.BindSampler();  // Use BindSampler()
+        
+        // Sample at normalized UV coordinates
+        Float2 uv = fragCoord / resolution;
+        
+        fragColor = tex.Sample(uv);
+    },
+    512, 512
+);
+```
+
+### Comparison: Rendering Approaches
+
+**Compute Approach (for data processing):**
+```cpp
+Texture2D<PixelFormat::RGBA8> texture(1920, 1080);
+
+Kernel2D render([&](Int x, Int y) {
+    auto img = texture.Bind();
+    img.Write(x, y, color);
+});
+
+render.Dispatch(120, 68, true);
+texture.Download(pixels);  // Slow CPU readback
+```
+
+**Fragment Approach (for real-time rendering):**
+```cpp
+FragmentKernel2D render([&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+    Float2 uv = fragCoord / resolution;
+    fragColor = CalculateColor(uv);  // Direct output
+}, 1920, 1080);
+
+render.Attach(hwnd);
+render.Flush();  // Direct to screen, zero copy!
+```
+
+### When to Use Fragment Kernels
+
+**Use Fragment Kernels for:**
+- Real-time graphics rendering
+- Post-processing effects
+- Procedural animations
+- Shader toy-style effects
+- Full-screen visualizations
+
+**Use Compute Kernels for:**
+- Data-parallel algorithms
+- Physics simulations
+- Image processing pipelines
+- Machine learning inference
+- Any CPU-accessible results
+
+### Complete Example: Shader Toy Style
+
+```cpp
+#include <GPU.h>
+#include <windows.h>
+#include <cmath>
+
+Uniform<float> uTime;
+Uniform<Vec2> uMouse;
+
+// Callable for rotation
+Callable<Vec2(Vec2, float)> Rotate = [](Float2& uv, Float& angle) {
+    Float cosA = Cos(angle);
+    Float sinA = Sin(angle);
+    Float2 center = MakeFloat2(0.5f, 0.5f);
+    Float2 delta = uv - center;
+    Float x = delta.x() * cosA - delta.y() * sinA;
+    Float y = delta.x() * sinA + delta.y() * cosA;
+    Return(MakeFloat2(x, y) + center);
+};
+
+int main() {
+    HWND hwnd = CreateWindowEx(0, L"Static", L"Demo",
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+        1280, 720, nullptr, nullptr, nullptr, nullptr);
+    ShowWindow(hwnd, SW_SHOW);
+    
+    FragmentKernel2D kernel("Art",
+        [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+            Float time = uTime.Load();
+            Float2 mouse = uMouse.Load();
+            Float2 uv = fragCoord / resolution;
+            
+            // Mouse influence
+            Float2 mouseInfluence = mouse / resolution;
+            Float distToMouse = Length(uv - mouseInfluence);
+            
+            // Animated rotation
+            Float2 rotated = Rotate(uv, time * 0.3f);
+            
+            // Pattern
+            Float pattern = Sin(rotated.x() * 20.0f) * 
+                           Sin(rotated.y() * 20.0f) *
+                           Sin(time);
+            
+            // Color
+            Float3 color = MakeFloat3(
+                pattern * 0.5f + distToMouse,
+                pattern * 0.3f + 0.2f,
+                pattern * 0.8f + 0.5f
+            );
+            
+            fragColor = MakeFloat4(color, 1.0f);
+        },
+        1280, 720
+    );
+    
+    kernel.Attach(hwnd);
+    
+    auto start = std::chrono::steady_clock::now();
+    
+    MSG msg;
+    while (true) {
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) return 0;
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        
+        auto now = std::chrono::steady_clock::now();
+        uTime = std::chrono::duration<float>(now - start).count();
+        
+        POINT pt;
+        GetCursorPos(&pt);
+        ScreenToClient(hwnd, &pt);
+        uMouse = Vec2((float)pt.x, (float)pt.y);
+        
+        kernel.Flush();
+    }
+}
+```
+
+### Performance Tips
+
+1. **Minimize State Changes**: Update uniforms only when needed
+2. **Use Texture Sampling**: Hardware filtering is faster than manual interpolation
+3. **Avoid Complex Branches**: GPUs are sensitive to divergence in fragment shaders
+4. **Profile Generated Code**: Use `GetShaderSource()` to inspect GLSL
 
 Next steps:
 - Review [API Reference](api-reference.md) for complete function list

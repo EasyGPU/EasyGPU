@@ -104,6 +104,15 @@ namespace GPU::Runtime {
 
         void LoadGLAD();
 
+    public:
+        /**
+         * Get the OpenGL context handle (HGLRC on Windows)
+         * @return The GL context handle
+         */
+        #ifdef _WIN32
+        [[nodiscard]] HGLRC GetGLContext() const { return _hglrc; }
+        #endif
+
     private:
         bool _initialized = false;
 

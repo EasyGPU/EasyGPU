@@ -14,6 +14,7 @@ project(EasyGPU
 # =============================================================================
 option(EASYGPU_BUILD_EXAMPLES "Build example programs" ON)
 option(EASYGPU_BUILD_TESTS "Build test suite" ON)
+option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -108,6 +109,7 @@ add_library(EasyGPU STATIC
     include/IR/Value/ExprMatrix.h
     include/IR/Value/BufferRef.h
     include/IR/Value/TextureRef.h
+    include/IR/Value/TextureSampler.h
     
     # Kernel
     include/Kernel/Kernel.h
@@ -116,6 +118,14 @@ add_library(EasyGPU STATIC
     source/Kernel/KernelBuildContext.cpp
     include/Kernel/KernelProfiler.h
     source/Kernel/KernelProfiler.cpp
+    
+    # Fragment Kernel (Windows only)
+    include/Kernel/FragmentKernel.h
+    source/Kernel/FragmentKernel.cpp
+    include/Kernel/FragmentBuildContext.h
+    source/Kernel/FragmentBuildContext.cpp
+    include/Kernel/WindowAttachment.h
+    source/Kernel/WindowAttachment.cpp
     
     # Flow Control
     include/Flow/IfFlow.h
@@ -250,6 +260,35 @@ if(EASYGPU_BUILD_EXAMPLES)
     endforeach()
 endif()
 
+set(EASYGPU_BUILD_FRAGMENT_TESTER TRUE)
+
+# =============================================================================
+# Fragment Kernel Tester (Windows + EasyX)
+# =============================================================================
+if(EASYGPU_BUILD_FRAGMENT_TESTER)
+    if(NOT WIN32)
+        message(WARNING "Fragment Kernel Tester is only supported on Windows")
+    else()
+        # EasyX is typically installed as a system library on Windows
+        # or can be provided via EASYGPU_EASYX_PATH
+        set(EASYGPU_EASYX_PATH "" CACHE PATH "Path to EasyX library")
+        
+        if(EASYGPU_EASYX_PATH)
+            include_directories(${EASYGPU_EASYX_PATH}/include)
+            link_directories(${EASYGPU_EASYX_PATH}/lib)
+        endif()
+        
+        add_executable(TestFragmentKernel WIN32 tests/TestFragmentKernel.cpp)
+        target_link_libraries(TestFragmentKernel PRIVATE EasyGPU)
+        
+        if(MSVC)
+            target_compile_options(TestFragmentKernel PRIVATE /Zc:preprocessor)
+        endif()
+        
+        message(STATUS "  Build Fragment Kernel Tester: ON")
+    endif()
+endif()
+
 # =============================================================================
 # Summary
 # =============================================================================
@@ -259,4 +298,5 @@ message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Build Examples: ${EASYGPU_BUILD_EXAMPLES}")
 message(STATUS "  Build Tests: ${EASYGPU_BUILD_TESTS}")
+message(STATUS "  Build Fragment Kernel Tester: ${EASYGPU_BUILD_FRAGMENT_TESTER}")
 message(STATUS "")

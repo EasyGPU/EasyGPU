@@ -21,6 +21,7 @@
 #include <Runtime/Context.h>
 
 #include <IR/Value/TextureRef.h>
+#include <IR/Value/TextureSampler.h>
 #include <IR/Builder/Builder.h>
 
 #include <cstdint>
@@ -742,6 +743,26 @@ namespace GPU::Runtime {
             _boundBinding = static_cast<int>(binding);
 
             return IR::Value::TextureRef<Format>(textureName, binding, _width, _height);
+        }
+
+        /**
+         * Bind this texture as a sampler for FragmentKernel
+         * Uses sampler2D for texture() sampling instead of imageLoad
+         * @return TextureSampler2D for DSL access
+         */
+        [[nodiscard]] IR::Value::TextureSampler2D<Format> BindSampler() {
+            auto *context = IR::Builder::Builder::Get().Context();
+            if (!context) {
+                throw std::runtime_error("Texture2D::BindSampler() called outside of Kernel definition");
+            }
+
+            uint32_t binding = context->AllocateTextureBinding();
+            std::string textureName = std::format("tex{}", binding);
+            context->RegisterTexture(binding, _format, textureName, _width, _height);
+            context->BindRuntimeTexture(binding, _textureId);
+            _boundBinding = static_cast<int>(binding);
+
+            return IR::Value::TextureSampler2D<Format>(textureName, binding, _width, _height);
         }
 
     public:

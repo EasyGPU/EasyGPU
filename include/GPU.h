@@ -24,6 +24,7 @@
 // Core Kernel
 // =============================================================================
 #include <Kernel/Kernel.h>
+#include <Kernel/FragmentKernel.h>
 #include <Kernel/KernelBuildContext.h>
 #include <Kernel/KernelProfiler.h>
 
@@ -134,4 +135,6 @@ using InspectorKernel2D = Kernel::InspectorKernel2D;
 
 /// Alias for InspectorKernel3D
 using InspectorKernel3D = Kernel::InspectorKernel3D;
+
+using FragmentKernel2D = Kernel::FragmentKernel2D;
 } // namespace GPU

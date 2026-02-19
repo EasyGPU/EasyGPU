@@ -56,7 +56,7 @@ namespace GPU::Kernel {
          * Get the complete kernel code including struct definitions
          * @return The complete GLSL code
          */
-        std::string GetCompleteCode();
+        virtual std::string GetCompleteCode();
 
     public:
         /**
@@ -312,7 +312,11 @@ namespace GPU::Kernel {
         int WorkSizeY;
         int WorkSizeZ;
 
-    private:
+    protected:
+        // ===================================================================
+        // Protected Members for Subclass Access
+        // ===================================================================
+        
         // Callable support
         std::vector<std::string> _callableDeclarations;
         std::vector<std::function<void()>> _callableBodyGenerators;
@@ -321,7 +325,6 @@ namespace GPU::Kernel {
         std::string _currentCallableBody;
         bool _inCallableBody = false;
 
-    private:
         /**
          * Buffer registration info
          */
@@ -411,10 +414,9 @@ namespace GPU::Kernel {
          */
         void InvalidateCachedProgram() { _cachedProgram = 0; }
         
-    private:
+    protected:
         uint32_t _cachedProgram = 0;
         
-    private:
         /**
          * The index for the variable name generation
          */
@@ -426,6 +428,7 @@ namespace GPU::Kernel {
         std::vector<std::string> _structDefinitions;
 
         friend class Kernel;
+        friend class FragmentKernel2D;
     };
 }
 

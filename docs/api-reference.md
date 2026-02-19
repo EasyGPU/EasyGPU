@@ -6,6 +6,7 @@ Complete reference for all EasyGPU classes and functions.
 
 - [Core Types](#core-types)
 - [Kernels](#kernels)
+- [Fragment Kernels](#fragment-kernels)
 - [Buffers](#buffers)
 - [Uniforms](#uniforms)
 - [Variables and Expressions](#variables-and-expressions)
@@ -16,6 +17,7 @@ Complete reference for all EasyGPU classes and functions.
 - [Callable](#callable)
 - [Structs](#structs)
 - [Textures](#textures)
+- [Texture Samplers](#texture-samplers)
 - [PBO Async Transfer](#pbo-async-transfer)
 
 ---
@@ -132,6 +134,153 @@ Synchronization within work groups:
 Kernel1D::WorkgroupBarrier();  // Synchronize threads in work group
 Kernel1D::MemoryBarrier();     // Ensure memory writes are visible
 Kernel1D::FullBarrier();       // Both barriers combined
+```
+
+---
+
+## Fragment Kernels
+
+Fragment kernels use the GPU's rendering pipeline for direct pixel output to windows. Unlike compute kernels that require `Download()` to retrieve results, fragment kernels render directly to the screen with zero CPU-GPU transfer overhead.
+
+### FragmentKernel2D
+
+2D fragment kernel for real-time pixel rendering.
+
+```cpp
+FragmentKernel2D kernel(
+    const std::string& name,
+    const std::function<void(Var<Vec4>&)>& func,  // Kernel function with fragColor output
+    uint32_t width,                               // Viewport width
+    uint32_t height                               // Viewport height
+);
+```
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Attach(HWND hwnd)` | Attach to a window for rendering |
+| `Detach()` | Detach from window |
+| `Flush()` | Render frame and swap buffers |
+| `SetResolution(uint32_t w, uint32_t h)` | Change viewport resolution |
+| `GetShaderSource()` | Get generated GLSL code |
+
+**Basic Example:**
+
+```cpp
+#include <GPU.h>
+#include <windows.h>
+
+// Create window
+HWND hwnd = CreateWindowEx(...);
+
+FragmentKernel2D kernel("Gradient",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        // fragCoord: fragment coordinates in pixels (0,0 at bottom-left)
+        // resolution: viewport resolution in pixels
+        
+        Float2 uv = fragCoord / resolution;
+        Float3 color = MakeFloat3(uv.x(), uv.y(), 0.5f);
+        fragColor = MakeFloat4(color, 1.0f);
+    },
+    1280, 720
+);
+
+kernel.Attach(hwnd);
+
+// Render loop
+while (running) {
+    kernel.Flush();  // Direct to screen, no Download() needed!
+}
+```
+
+**With Uniforms and Animation:**
+
+```cpp
+Uniform<float> uTime;
+Uniform<Vec2> uMouse;
+
+FragmentKernel2D kernel("Animated",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        Float time = uTime.Load();
+        Float2 mouse = uMouse.Load();
+        
+        Float2 uv = fragCoord / resolution;
+        
+        // Animated plasma effect
+        Float v = Sin(uv.x() * 10.0f + time) + 
+                  Sin(uv.y() * 10.0f + time);
+        Float3 color = MakeFloat3(v * 0.5f + 0.5f, 0.2f, 0.8f);
+        
+        fragColor = MakeFloat4(color, 1.0f);
+    },
+    1280, 720
+);
+
+kernel.Attach(hwnd);
+
+while (running) {
+    uTime = clock() / 1000.0f;
+    uMouse = Vec2(mouseX, mouseY);
+    kernel.Flush();
+}
+```
+
+**With Texture Sampling:**
+
+```cpp
+Texture2D<PixelFormat::RGBA8> image(512, 512);
+// ... upload image data ...
+
+FragmentKernel2D kernel("Textured",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        auto tex = image.BindSampler();  // Use BindSampler, not Bind
+        
+        // Sample at normalized coordinates
+        Float2 uv = fragCoord / resolution;
+        
+        fragColor = tex.Sample(uv);  // Sample texture
+    },
+    512, 512
+);
+```
+
+### Compute vs Fragment Kernels
+
+| Feature | Compute Kernel | Fragment Kernel |
+|:--------|:---------------|:----------------|
+| **Execution** | `Dispatch()` | `Flush()` after `Attach()` |
+| **Output** | Buffers/Textures | Direct to window |
+| **Coordinates** | `gl_GlobalInvocationID` | `gl_FragCoord` |
+| **Texture Read** | `tex.Read(x, y)` | `tex.Sample(uv)` |
+| **Texture Write** | `tex.Write(x, y, color)` | Not supported |
+| **CPU Readback** | `Download()` required | Not needed |
+| **Best For** | Data processing | Real-time rendering |
+
+### Lambda Parameters
+
+The fragment kernel lambda receives three parameters automatically:
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `fragCoord` | `Float2` | Fragment coordinates in pixels (0,0 at bottom-left) |
+| `resolution` | `Float2` | Viewport resolution in pixels (width, height) |
+| `fragColor` | `Var<Vec4>&` | Output color variable (write final color here) |
+
+```cpp
+FragmentKernel2D kernel("Effect",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        // fragCoord: (0,0) to (width-1, height-1)
+        // resolution: (width, height)
+        
+        Float2 uv = fragCoord / resolution;  // Normalized (0-1)
+        
+        // Your shader logic here
+        
+        fragColor = MakeFloat4(color, 1.0f);  // Write output
+    },
+    width, height
+);
 ```
 
 ---
@@ -1106,6 +1255,121 @@ Float4 value = vol.Read(x, y, z);
 // All combinations of Var<int>, Expr<int>, literal int for coordinates
 // and Var<Vec4>, Expr<Vec4> for value
 vol.Write(x, y, z, value);
+```
+
+---
+
+## Texture Samplers
+
+Texture samplers provide filtered texture sampling for fragment kernels. Unlike `TextureRef` which uses `imageLoad`/`imageStore` for compute kernels, samplers use `texture()` for hardware-accelerated filtered sampling in fragment shaders.
+
+### TextureSampler2D
+
+Returned by `Texture2D::BindSampler()` for use in fragment kernels.
+
+```cpp
+Texture2D<PixelFormat::RGBA8> texture(1024, 1024);
+
+FragmentKernel2D kernel([&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+    auto tex = texture.BindSampler();  // Returns TextureSampler2D
+    
+    Float2 uv = fragCoord / resolution;
+    
+    // Sample with hardware filtering
+    Float4 color = tex.Sample(uv);
+    fragColor = color;
+});
+```
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Sample(uv)` | Sample texture at normalized UV coordinates (0-1) |
+| `SampleLod(uv, lod)` | Sample with explicit mipmap level |
+| `GetSize()` | Get texture size as `Vec2` |
+| `GetTextureWidth()` | Get width in pixels |
+| `GetTextureHeight()` | Get height in pixels |
+
+**Sampling with Different Wrapping:**
+
+```cpp
+FragmentKernel2D kernel([&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+    auto tex = texture.BindSampler();
+    
+    Float2 uv = fragCoord / resolution;
+    
+    // Repeat/tile the texture
+    Float2 tiledUV = Fract(uv * MakeFloat2(3.0f, 3.0f));
+    Float4 color = tex.Sample(tiledUV);
+    
+    fragColor = color;
+});
+```
+
+### Compute vs Fragment Texture Access
+
+| Operation | Compute Kernel | Fragment Kernel |
+|:----------|:---------------|:----------------|
+| Binding | `tex.Bind()` | `tex.BindSampler()` |
+| Returns | `TextureRef` | `TextureSampler2D` |
+| Read | `tex.Read(x, y)` | `tex.Sample(uv)` |
+| Write | `tex.Write(x, y, color)` | Not supported |
+| Coordinates | Integer pixel | Normalized UV (0-1) |
+| Filtering | Nearest only | Bilinear/trilinear |
+| GLSL | `imageLoad/Store` | `texture()` |
+
+### Complete Fragment Kernel with Textures
+
+```cpp
+#include <GPU.h>
+#include <windows.h>
+
+int main() {
+    HWND hwnd = CreateWindowEx(...);  // Your window
+    
+    // Create and fill texture
+    Texture2D<PixelFormat::RGBA8> image(512, 512);
+    std::vector<uint8_t> pixels(512 * 512 * 4);
+    // ... fill pixels ...
+    image.Upload(pixels.data());
+    
+    Uniform<float> uTime;
+    
+    FragmentKernel2D kernel("TextureDemo",
+        [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+            auto tex = image.BindSampler();
+            
+            Float time = uTime.Load();
+            
+            // Animated UV coordinates
+            Float2 uv = fragCoord / resolution;
+            
+            // Rotate UVs
+            Float angle = time * 0.5f;
+            Float cosA = Cos(angle);
+            Float sinA = Sin(angle);
+            Float2 center = MakeFloat2(0.5f, 0.5f);
+            Float2 delta = uv - center;
+            Float x = delta.x() * cosA - delta.y() * sinA;
+            Float y = delta.x() * sinA + delta.y() * cosA;
+            Float2 rotatedUV = MakeFloat2(x, y) + center;
+            
+            // Sample rotated texture
+            fragColor = tex.Sample(rotatedUV);
+        },
+        512, 512
+    );
+    
+    kernel.Attach(hwnd);
+    
+    while (running) {
+        uTime = clock() / 1000.0f;
+        kernel.Flush();
+    }
+    
+    return 0;
+}
 ```
 
 ---
