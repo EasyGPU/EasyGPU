@@ -217,9 +217,9 @@ namespace GPU::Kernel {
             }
         };
 
-        // Begin profiling if enabled (use current context method for FragmentKernel)
+        // Begin profiling if enabled (check both per-kernel and global settings)
         unsigned int queryId = 0;
-        if (_profilingEnabled) {
+        if (_profilingEnabled || KernelProfiler::GetInstance().IsEnabled()) {
             queryId = KernelProfiler::GetInstance().BeginQueryOnCurrentContext();
         }
 
@@ -281,7 +281,7 @@ namespace GPU::Kernel {
 
         // End profiling - fragment kernels use single "work group" (1,1,1)
         // since they're rasterization-based, not compute-based
-        if (_profilingEnabled && queryId != 0) {
+        if (queryId != 0) {
             KernelProfiler::GetInstance().EndQueryOnCurrentContext(queryId, _name, 1, 1, 1);
         }
     }
