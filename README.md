@@ -146,7 +146,7 @@ EasyGPU integrates seamlessly with any OpenGL-based windowing framework. You con
 | Framework | Use Case | Demo |
 |-----------|----------|------|
 | **EasyX** | Teaching / Rapid prototyping | <img src="docs/image/easyx.png" width="320"> |
-| **GLFW** | Cross-platform applications | <img src="docs/image/glfw.png" width="320"> |
+| **GLFW** | Cross-platform applications | <img src="docs/image/GLFW-Show.png" width="320"> |
 
 *Original shader: [Seascape](https://www.shadertoy.com/view/Ms2SD1) on Shadertoy*
 
