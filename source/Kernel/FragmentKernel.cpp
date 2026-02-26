@@ -337,19 +337,6 @@ namespace GPU::Kernel {
         std::string vsSource = _context->GetVertexShaderSource();
         std::string fsSource = _context->GetFragmentShaderSource();
 
-        // Debug: save shaders to file
-        FILE* fp = nullptr;
-        fopen_s(&fp, "vertex_shader.glsl", "w");
-        if (fp) {
-            fprintf(fp, "%s", vsSource.c_str());
-            fclose(fp);
-        }
-        fopen_s(&fp, "fragment_shader.glsl", "w");
-        if (fp) {
-            fprintf(fp, "%s", fsSource.c_str());
-            fclose(fp);
-        }
-
         try {
             // Compile vertex shader
             uint32_t vs = Runtime::ShaderCompiler::CompileShader(GL_VERTEX_SHADER, vsSource);
