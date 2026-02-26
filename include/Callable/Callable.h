@@ -119,17 +119,17 @@ namespace GPU::Callables {
         private:
             template<size_t... Indices>
             void GenerateImpl(std::index_sequence<Indices...>) const {
-                // Create unique_ptr to Var objects - Var is non-copyable
-                // but unique_ptr is movable, and dereferencing gives us Var&
+                // Create Var objects that reference the GLSL parameter directly
+                // isExternal=true means no local variable declaration is generated
                 auto vars = std::make_tuple(
-                    std::make_unique<IR::Value::Var<ParamTypes>>(
-                        "p" + std::to_string(Indices)
+                    IR::Value::Var<ParamTypes>(
+                        "p" + std::to_string(Indices),
+                        true  // isExternal - use parameter name directly, no copy
                     )...
                 );
                 
-                // Call the function with dereferenced unique_ptrs (Var&)
-                // This works for both Var<T> (by value/move) and Var<T>& (by reference) params
-                _func(*std::get<Indices>(vars)...);
+                // Call the function with Var& that reference parameters directly
+                _func(std::get<Indices>(vars)...);
             }
 
             mutable Func _func;

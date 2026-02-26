@@ -159,13 +159,29 @@ namespace GPU::IR::Value {
          * Copy constructor - creates a new variable with value copied from source
          * @param Other The other VarBase to copy from
          */
-        VarBase(const VarBase &Other)
-            : VarBase() {
-            // Copy value via IR load/store
-            auto rhs = Other.Load();
-            auto lhs = Load();
-            auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
-            Builder::Builder::Get().Build(*store, true);
+        VarBase(const VarBase &Other) {
+            // If source is external (function parameter), don't generate copy
+            // Just mark this as external too, referencing the same name
+            if (Other._varNode && Other._varNode->IsExternal()) {
+                // Re-construct as external with the same name
+                _node = std::make_unique<Node::LocalVariableNode>(
+                    Other._varNode->VarName(), 
+                    TypeShaderName<Type>(), 
+                    true);  // isExternal
+                _varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+                // Note: Don't call Build() for external variables
+            } else {
+                // Normal copy: create new variable and copy value via IR load/store
+                auto name = Builder::Builder::Get().Context()->AssignVarName();
+                _node = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
+                _varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+                Builder::Builder::Get().Build(*_varNode, true);
+                
+                auto rhs = Other.Load();
+                auto lhs = Load();
+                auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
+                Builder::Builder::Get().Build(*store, true);
+            }
         }
 
         /**
