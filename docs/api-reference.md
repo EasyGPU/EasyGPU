@@ -963,6 +963,12 @@ class Callable;
 Callable<float(float, float)> Add = [](Float& a, Float& b) {
     Return(a + b);
 };
+
+// Also supports GPU types in signature
+Callable<Float(Float, Float)> Add2 = [](Float& a, Float& b) {
+    Return(a + b);
+};
+```
 ```
 
 **Features:**

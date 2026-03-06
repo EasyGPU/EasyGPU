@@ -38,11 +38,43 @@ template <typename T> using RemoveRef				   = std::remove_reference_t<T>;
  */
 template <typename T> inline constexpr bool		 IsRef = std::is_reference_v<T>;
 
+// Forward declarations for type extraction
+namespace TypeExtractor {
+    // Primary template: assume T is already a scalar type
+    template<typename T>
+    struct ExtractScalar {
+        using type = T;
+        static constexpr bool isGpuType = false;
+    };
+    
+    // Specialization for Var<T>
+    template<typename T>
+    struct ExtractScalar<IR::Value::Var<T>> {
+        using type = T;
+        static constexpr bool isGpuType = true;
+    };
+    
+    // Specialization for Expr<T>
+    template<typename T>
+    struct ExtractScalar<IR::Value::Expr<T>> {
+        using type = T;
+        static constexpr bool isGpuType = true;
+    };
+    
+    // Helper alias
+    template<typename T>
+    using ToScalar = typename ExtractScalar<RemoveRef<T>>::type;
+    
+    template<typename T>
+    inline constexpr bool IsGpuType = ExtractScalar<RemoveRef<T>>::isGpuType;
+}
+
 /**
  * Helper to get type name as string for GLSL
+ * Supports both C++ types (float, Math::Vec3) and GPU types (Float, Float3)
  */
 template <typename T> constexpr std::string_view GetGLSLTypeName() {
-	using CleanT = RemoveRef<T>;
+	using CleanT = TypeExtractor::ToScalar<T>;
 	if constexpr (std::same_as<CleanT, float>)
 		return "float";
 	else if constexpr (std::same_as<CleanT, int>)
@@ -164,6 +196,11 @@ private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
 	std::string										   _baseName;	 // Base name for the function
 	mutable std::string								   _mangledName; // Generated unique name
+	
+	// Extract scalar types for Args and R (supports both C++ types and GPU types like Float, Float3)
+	using ScalarR = Detail::TypeExtractor::ToScalar<R>;
+	template<typename Arg>
+	using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
 
 public:
 	/**
@@ -173,22 +210,23 @@ public:
 	 */
 	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)) {
 		// Type-erase the lambda using shared_ptr for easy copying
+		// Use scalar types for the body generator (Var<float> needs float)
 		_bodyGenerator =
-			std::make_shared<Detail::CallableBodyGenerator<Func, Detail::RemoveRef<Args>...>>(std::forward<Func>(def));
+			std::make_shared<Detail::CallableBodyGenerator<Func, ScalarArg<Args>...>>(std::forward<Func>(def));
 	}
 
 	/**
 	 * Call the callable function, generating a CallInst expression
 	 * This will trigger function declaration/definition generation if not already done
-	 * @param args The argument expressions
+	 * @param args The argument expressions (can be Expr<T> or Var<T>)
 	 * @return An expression representing the function call
 	 */
-	IR::Value::Expr<R> operator()(const IR::Value::Expr<Detail::RemoveRef<Args>> &...args) const {
+	IR::Value::Expr<ScalarR> operator()(const IR::Value::Expr<ScalarArg<Args>> &...args) const {
 		auto *context = IR::Builder::Builder::Get().Context();
 		if (!context) {
 			// No active build context, return empty expression
 			// This happens if called outside of Kernel construction
-			return IR::Value::Expr<R>();
+			return IR::Value::Expr<ScalarR>();
 		}
 
 		// Check if we've already generated this callable in this context
@@ -214,7 +252,7 @@ public:
 		(argNodes.push_back(IR::Value::CloneNode(args)), ...);
 
 		auto callNode = std::make_unique<IR::Node::CallNode>(_mangledName, std::move(argNodes));
-		return IR::Value::Expr<R>(std::move(callNode));
+		return IR::Value::Expr<ScalarR>(std::move(callNode));
 	}
 
 private:
@@ -225,8 +263,8 @@ private:
 		std::string result					 = std::string(Detail::GetGLSLTypeName<R>());
 		result								+= " " + _mangledName + "(";
 
-		// Generate parameter list
-		std::vector<std::string> paramTypes	 = {std::string(Detail::GetGLSLTypeName<Args>())...};
+		// Generate parameter list (use scalar types for type names, but original Args for inout check)
+		std::vector<std::string> paramTypes	 = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
 		std::vector<bool>		 isInOut	 = {Detail::IsInOutType<Args>()...};
 		for (size_t i = 0; i < paramTypes.size(); ++i) {
 			if (i > 0)
@@ -267,15 +305,20 @@ private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
 	std::string										   _baseName;
 	mutable std::string								   _mangledName;
+	
+	// Extract scalar types for Args (supports both C++ types and GPU types)
+	template<typename Arg>
+	using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
 
 public:
 	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)) {
+		// Use scalar types for the body generator
 		_bodyGenerator =
-			std::make_shared<Detail::CallableBodyGenerator<Func, Detail::RemoveRef<Args>...>>(std::forward<Func>(def));
+			std::make_shared<Detail::CallableBodyGenerator<Func, ScalarArg<Args>...>>(std::forward<Func>(def));
 	}
 
 	[[nodiscard]]
-	IR::Value::SideEffectToken operator()(const IR::Value::Expr<Detail::RemoveRef<Args>> &...args) const {
+	IR::Value::SideEffectToken operator()(const IR::Value::Expr<ScalarArg<Args>> &...args) const {
 		auto *context = IR::Builder::Builder::Get().Context();
 		if (!context) {
 			// No active build context, return empty token
@@ -308,7 +351,8 @@ private:
 	std::string GeneratePrototype() const {
 		std::string				 result		= "void " + _mangledName + "(";
 
-		std::vector<std::string> paramTypes = {std::string(Detail::GetGLSLTypeName<Args>())...};
+		std::vector<std::string> paramTypes = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
+		// Use original Args (not ScalarArg) for inout check, as ScalarArg removes reference
 		std::vector<bool>		 isInOut	= {Detail::IsInOutType<Args>()...};
 		for (size_t i = 0; i < paramTypes.size(); ++i) {
 			if (i > 0)

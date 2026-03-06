@@ -300,6 +300,23 @@ The context auto-initializes on first GPU operation. If you see this:
 
 ## Advanced
 
+### What types can I use in Callable signatures?
+
+`Callable` supports both C++ types and EasyGPU types in its template signature:
+
+```cpp
+// C++ types (traditional)
+Callable<float(float, float)> Add1 = [](Float& a, Float& b) { Return(a + b); };
+Callable<void(int&)> Increment1 = [](Int& x) { x = x + 1; };
+
+// GPU types (also supported)
+Callable<Float(Float, Float)> Add2 = [](Float& a, Float& b) { Return(a + b); };
+Callable<void(Int&)> Increment2 = [](Int& x) { x = x + 1; };
+Callable<Float3(Float3, Float)> Scale = [](Float3& v, Float& s) { Return(v * s); };
+```
+
+Both forms are equivalent. The GPU types (`Float`, `Int`, `Float3`, etc.) are automatically converted to their underlying C++ types (`float`, `int`, `Math::Vec3`) for the GLSL function generation.
+
 ### Can I use templates in kernels?
 
 No. Kernels are compiled to GLSL at runtime, which doesn't support C++ templates. Use function overloading or macros instead:
