@@ -65,6 +65,26 @@ void EASYGPU_RegisterIfStruct() {}
             _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); Builder::Builder::Get().Build(*_varNode, true); } \
         explicit Var(const std::string& varName) { EASYGPU_RegisterDep_##StructType(); _node = std::make_unique<Node::LocalVariableNode>(varName, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName)); _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); } \
         EASYGPU_MEMBER_ACCESS P1 \
+        /* Copy constructor - handle external variables correctly */ \
+        Var(const Var& Other) { \
+            if (Other._varNode && Other._varNode->IsExternal()) { \
+                _node = std::make_unique<Node::LocalVariableNode>( \
+                    Other._varNode->VarName(), \
+                    std::string(GPU::Meta::StructMeta<StructType>::glslTypeName), \
+                    true); \
+                _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); \
+            } else { \
+                EASYGPU_RegisterDep_##StructType(); \
+                auto name = Builder::Builder::Get().Context()->AssignVarName(); \
+                _node = std::make_unique<Node::LocalVariableNode>(name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName)); \
+                _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); \
+                Builder::Builder::Get().Build(*_varNode, true); \
+                auto rhs = Other.Load(); \
+                auto lhs = Load(); \
+                auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs)); \
+                Builder::Builder::Get().Build(*store, true); \
+            } \
+        } \
         Var& operator=(const Var& other) { if (this != &other) { auto store = std::make_unique<Node::StoreNode>(Load(), other.Load()); Builder::Builder::Get().Build(*store, true); } return *this; } \
         operator Expr<StructType>() { return Expr<StructType>(Load()); } \\
         }; } \

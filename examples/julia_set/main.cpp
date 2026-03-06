@@ -56,7 +56,7 @@ constexpr float JULIA_CY = 0.156f;
 // =============================================================================
 // Color mapping function - Smooth gradient palette
 // =============================================================================
-Callable<Vec3(int)> GetColor = [](Int& iter) {
+Callable<Float3(Int)> GetColor = [](Int& iter) {
     Float3 color;
     If(iter == MAX_ITERATIONS, [&]() {
         // Inside set - deep navy/black
@@ -87,7 +87,7 @@ Callable<Vec3(int)> GetColor = [](Int& iter) {
 // =============================================================================
 // Julia set iteration function
 // =============================================================================
-Callable<int(float, float)> Julia = [](Float& zx, Float& zy) {
+Callable<Int(Float, Float)> Julia = [](Float& zx, Float& zy) {
     // Julia set: z = z^2 + c, where c is constant
     // z^2 = (zx + i*zy)^2 = zx^2 - zy^2 + 2*i*zx*zy
     

@@ -57,7 +57,7 @@ const float LIGHT_RADIUS_F = 2.0f;
 // =============================================================================
 
 // Intersect with rectangular light
-Callable<float(Vec3, Vec3)> intersect_light = [](Float3 pos, Float3 d) {
+Callable<Float(Float3, Float3)> intersect_light = [](Float3 pos, Float3 d) {
     Float3 light_pos = MakeFloat3(-1.5f, 0.6f, 0.3f);
     Float3 light_normal = MakeFloat3(1.0f, 0.0f, 0.0f);
     Float cos_w = Dot(-d, light_normal);
@@ -78,7 +78,7 @@ Callable<float(Vec3, Vec3)> intersect_light = [](Float3 pos, Float3 d) {
     };
 
 // Tea hash function for random number generation
-Callable<int(int, int)> tea = [](Int v0, Int v1) {
+Callable<Int(Int, Int)> tea = [](Int v0, Int v1) {
     Int s0 = MakeInt(0);
     Int sum = v0;
     Int sum2 = v1;
@@ -93,7 +93,7 @@ Callable<int(int, int)> tea = [](Int v0, Int v1) {
     };
 
 // Random number generator
-Callable<float(int&)> rand_f = [](Int& state) {
+Callable<Float(Int&)> rand_f = [](Int& state) {
     constexpr int lcg_a = 1664525;
     constexpr int lcg_c = 1013904223;
     state = lcg_a * state + lcg_c;
@@ -102,7 +102,7 @@ Callable<float(int&)> rand_f = [](Int& state) {
     };
 
 // Generate outgoing direction (cosine weighted hemisphere sampling)
-Callable<Vec3(Vec3, int&)> out_dir = [](Float3 n, Int& seed) {
+Callable<Float3(Float3, Int&)> out_dir = [](Float3 n, Int& seed) {
     Float3 u;
     If(Abs(n.y()) < 1.0f - EPS, [&]() {
         u = Normalize(Cross(n, MakeFloat3(0.0f, 1.0f, 0.0f)));
@@ -119,7 +119,7 @@ Callable<Vec3(Vec3, int&)> out_dir = [](Float3 n, Int& seed) {
     };
 
 // Helper to cast float to int for modulo
-Callable<int(float)> FloatToInt = [](Float f) {
+Callable<Int(Float)> FloatToInt = [](Float f) {
     Int result = ToInt(f);
     If(f < 0.0f, [&]() {
         result = result - MakeInt(1);
@@ -128,7 +128,7 @@ Callable<int(float)> FloatToInt = [](Float f) {
     };
 
 // Create nested pattern
-Callable<float(float)> make_nested = [](Float f) {
+Callable<Float(Float)> make_nested = [](Float f) {
     constexpr float freq = 40.0f;
     f = f * freq;
 
@@ -149,7 +149,7 @@ Callable<float(float)> make_nested = [](Float f) {
     };
 
 // Signed Distance Function
-Callable<float(Vec3)> sdf = [](Float3 o) {
+Callable<Float(Float3)> sdf = [](Float3 o) {
     Float wall = Min(o.y() + 0.1f, o.z() + 0.4f);
     Float sphere = Distance(o, MakeFloat3(0.0f, 0.35f, 0.0f)) - 0.36f;
 
@@ -167,7 +167,7 @@ Callable<float(Vec3)> sdf = [](Float3 o) {
     };
 
 // Ray marching
-Callable<float(Vec3, Vec3)> ray_march = [](Float3 p, Float3 d) {
+Callable<Float(Float3, Float3)> ray_march = [](Float3 p, Float3 d) {
     Float dist = MakeFloat(0.0f);
 
     For(0, 100, [&](Int&) {
@@ -182,7 +182,7 @@ Callable<float(Vec3, Vec3)> ray_march = [](Float3 p, Float3 d) {
     };
 
 // Compute SDF normal
-Callable<Vec3(Vec3)> sdf_normal = [](Float3 p) {
+Callable<Float3(Float3)> sdf_normal = [](Float3 p) {
     constexpr float delta = 1e-3f;
     Float3 n;
     Float sdf_center = sdf(p);
@@ -203,7 +203,7 @@ Callable<Vec3(Vec3)> sdf_normal = [](Float3 p) {
     };
 
 // Find next hit
-Callable<void(float&, Vec3&, Vec3&, Vec3, Vec3)> next_hit = [](
+Callable<void(Float&, Float3&, Float3&, Float3, Float3)> next_hit = [](
     Float& closest, Float3& normal, Float3& c, Float3 pos, Float3 d) {
 
         closest = INF;

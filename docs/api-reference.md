@@ -752,7 +752,7 @@ void Return(Expr<T> value);
 **Example:**
 
 ```cpp
-Callable<float(float)> Square = [](Float& x) {
+Callable<Float(Float)> Square = [](Float& x) {
     Return(x * x);
 };
 ```
@@ -959,17 +959,24 @@ Define reusable functions.
 template<typename Signature>
 class Callable;
 
-// Example: float(float, float)
-Callable<float(float, float)> Add = [](Float& a, Float& b) {
+// Recommended: Use GPU types in signature
+Callable<Float(Float, Float)> Add = [](Float& a, Float& b) {
     Return(a + b);
 };
 
-// Also supports GPU types in signature
-Callable<Float(Float, Float)> Add2 = [](Float& a, Float& b) {
+// Also supported: C++ scalar types (auto-converted to GPU types)
+Callable<float(float, float)> Add2 = [](Float& a, Float& b) {
     Return(a + b);
 };
 ```
-```
+
+**Type Mapping:**
+- `Float` ↔ `float`
+- `Int` ↔ `int`  
+- `Float2` ↔ `Math::Vec2`
+- `Float3` ↔ `Math::Vec3`
+- `Float4` ↔ `Math::Vec4`
+- etc.
 
 **Features:**
 - Can be called from any kernel
@@ -980,7 +987,7 @@ Callable<Float(Float, Float)> Add2 = [](Float& a, Float& b) {
 **Reference Parameters:**
 
 ```cpp
-Callable<void(float, float&)> GetComponents = [](Float& v, Float& x, Float& y) {
+Callable<void(Float, Float&)> GetComponents = [](Float& v, Float& x, Float& y) {
     x = v;
     y = v * 2;
 };
@@ -995,7 +1002,7 @@ GetComponents(value, x, y);
 `Callable<void>` automatically handles side-effects when called as a statement:
 
 ```cpp
-Callable<void(int&)> A = [](Int &a) { a = 20; };
+Callable<void(Int&)> A = [](Int &a) { a = 20; };
 Int b;
 A(b);  // Side-effect automatically preserved
 ```
@@ -1003,7 +1010,7 @@ A(b);  // Side-effect automatically preserved
 For `Callable<T>` where `T` is not `void`, if you ignore the return value but need side-effects (e.g., from reference parameters), use `ExprBase::NotUse()`:
 
 ```cpp
-Callable<float(float, float&)> B = [](Float x, Float& out) {
+Callable<Float(Float, Float&)> B = [](Float x, Float& out) {
     out = x * 2;
     Return(x + 1);
 };

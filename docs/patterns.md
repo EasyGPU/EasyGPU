@@ -344,7 +344,7 @@ Kernel1D transform([&](Int i) {
 ### Gaussian Blur
 
 ```cpp
-Callable<Vec4(BufferRef<Vec4>&, Int, Int, Int, Int)> GaussianBlur = 
+Callable<Float4(BufferRef<Vec4>&, Int, Int, Int, Int)> GaussianBlur = 
 [](BufferRef<Vec4>& img, Int& x, Int& y, Int& width, Int& height) {
     Float4 sum = MakeFloat4(0.0f);
     Float weight_sum = MakeFloat(0.0f);
@@ -532,7 +532,7 @@ Callable<Mat4(Float3, Float3, Float3)> BuildTransform =
 ### LCG Random Number Generator
 
 ```cpp
-Callable<float(int&)> Random = [](Int& state) {
+Callable<Float(Int&)> Random = [](Int& state) {
     // Linear Congruential Generator
     // Constants from Numerical Recipes
     state = (state * 1664525 + 1013904223);
@@ -540,12 +540,12 @@ Callable<float(int&)> Random = [](Int& state) {
     Return(ToFloat(result) / 2147483647.0f);
 };
 
-Callable<float(int&, float, float)> RandomRange = 
+Callable<Float(Int&, Float, Float)> RandomRange = 
 [](Int& state, Float& min, Float& max) {
     Return(min + Random(state) * (max - min));
 };
 
-Callable<Vec3(int&)> RandomInUnitSphere = [](Int& state) {
+Callable<Float3(Int&)> RandomInUnitSphere = [](Int& state) {
     Float3 p;
     For(0, 50, [&](Int&) {
         p = MakeFloat3(
@@ -612,7 +612,7 @@ Kernel2D to_1d([](Int x, Int y) {
 ### Bounds Checking
 
 ```cpp
-Callable<bool(Int, Int, Int, Int)> InBounds = 
+Callable<Bool(Int, Int, Int, Int)> InBounds = 
 [](Int& x, Int& y, Int& width, Int& height) {
     Return(x >= 0 && x < width && y >= 0 && y < height);
 };

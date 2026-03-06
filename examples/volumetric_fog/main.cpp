@@ -64,7 +64,7 @@ constexpr int NOISE_OCTAVES = 4;
 // =============================================================================
 // Hash function for pseudo-random numbers
 // =============================================================================
-Callable<float(Vec3)> Hash = [](Float3& p) {
+Callable<Float(Float3)> Hash = [](Float3& p) {
     Float3 q = p * MakeFloat3(0.1031f, 0.1030f, 0.0973f);
     Float h = Fract(q.x() + q.y() + q.z());
     h = h * 0.47f;
@@ -74,7 +74,7 @@ Callable<float(Vec3)> Hash = [](Float3& p) {
 // =============================================================================
 // 3D Value Noise
 // =============================================================================
-Callable<float(Vec3)> ValueNoise = [](Float3& p) {
+Callable<Float(Float3)> ValueNoise = [](Float3& p) {
     Float3 i = Floor(p);
     Float3 f = Fract(p);
     f = f * f * (MakeFloat3(3.0f) - MakeFloat3(2.0f) * f);
@@ -105,7 +105,7 @@ Callable<float(Vec3)> ValueNoise = [](Float3& p) {
 // =============================================================================
 // Fractal Brownian Motion - layered noise for cloud detail
 // =============================================================================
-Callable<float(Vec3)> Fbm = [](Float3& p) {
+Callable<Float(Float3)> Fbm = [](Float3& p) {
     Float value = MakeFloat(0.0f);
     Float amplitude = MakeFloat(NOISE_AMP);
     Float frequency = MakeFloat(NOISE_FREQ);
@@ -123,7 +123,7 @@ Callable<float(Vec3)> Fbm = [](Float3& p) {
 // =============================================================================
 // Cloud density function - procedural cloud shape
 // =============================================================================
-Callable<float(Vec3)> GetDensity = [](Float3& pos) {
+Callable<Float(Float3)> GetDensity = [](Float3& pos) {
     // Base cloud shape - ellipsoid
     Float3 center = MakeFloat3(0.0f, 0.5f, 0.0f);
     Float3 scale = MakeFloat3(1.5f, 0.8f, 1.5f);
@@ -154,7 +154,7 @@ Callable<float(Vec3)> GetDensity = [](Float3& pos) {
 // =============================================================================
 // Light transmittance through cloud (Beer-Lambert law)
 // =============================================================================
-Callable<float(Vec3, Vec3)> LightTransmittance = [](Float3& from, Float3& to) {
+Callable<Float(Float3, Float3)> LightTransmittance = [](Float3& from, Float3& to) {
     Float3 dir = Normalize(to - from);
     Float dist = Distance(to, from);
     
@@ -181,7 +181,7 @@ Callable<float(Vec3, Vec3)> LightTransmittance = [](Float3& from, Float3& to) {
 // =============================================================================
 // Henyey-Greenstein phase function for anisotropic scattering
 // =============================================================================
-Callable<float(float)> PhaseHG = [](Float& cosTheta) {
+Callable<Float(Float)> PhaseHG = [](Float& cosTheta) {
     // Asymmetry parameter - positive = forward scattering
     Float g = MakeFloat(0.3f);
     Float gg = g * g;
@@ -193,7 +193,7 @@ Callable<float(float)> PhaseHG = [](Float& cosTheta) {
 // =============================================================================
 // Background sky with atmospheric gradient
 // =============================================================================
-Callable<Vec3(Vec3)> SkyColor = [](Float3& rayDir) {
+Callable<Float3(Float3)> SkyColor = [](Float3& rayDir) {
     Float y = rayDir.y();
     
     // Horizon color - warm orange
@@ -221,7 +221,7 @@ Callable<Vec3(Vec3)> SkyColor = [](Float3& rayDir) {
 // =============================================================================
 // Main volumetric rendering
 // =============================================================================
-Callable<Vec3(Vec3, Vec3)> RenderVolume = [](Float3& rayOrigin, Float3& rayDir) {
+Callable<Float3(Float3, Float3)> RenderVolume = [](Float3& rayOrigin, Float3& rayDir) {
     // Background color
     Float3 bgColor = SkyColor(rayDir);
     
@@ -300,7 +300,7 @@ Callable<Vec3(Vec3, Vec3)> RenderVolume = [](Float3& rayOrigin, Float3& rayDir) 
 // =============================================================================
 // Tone mapping - ACES filmic curve
 // =============================================================================
-Callable<Vec3(Vec3)> ToneMapACES = [](Float3& color) {
+Callable<Float3(Float3)> ToneMapACES = [](Float3& color) {
     Float a = MakeFloat(2.51f);
     Float b = MakeFloat(0.03f);
     Float c = MakeFloat(2.43f);

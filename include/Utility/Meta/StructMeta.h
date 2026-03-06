@@ -964,11 +964,28 @@ namespace GPU::Meta {
                 _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); \
             }                           \
             /* Copy constructor - like VarBase */ \
-            Var(const Var &Other) : Var() { \
-                auto rhs = Other.Load(); \
-                auto lhs = Load(); \
-                auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs)); \
-                Builder::Builder::Get().Build(*store, true); \
+            Var(const Var &Other) { \
+                if (Other._varNode && Other._varNode->IsExternal()) { \
+                    /* If source is external (function parameter), don't generate copy \
+                     * Just mark this as external too, referencing the same name */ \
+                    _node = std::make_unique<Node::LocalVariableNode>( \
+                        Other._varNode->VarName(), \
+                        std::string(GPU::Meta::StructMeta<StructType>::glslTypeName), \
+                        true); \
+                    _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); \
+                } else { \
+                    /* Normal copy: create new variable and copy value via IR load/store */ \
+                    GPU::Meta::RegisterStructWithDependencies<StructType>(); \
+                    auto name = Builder::Builder::Get().Context()->AssignVarName(); \
+                    _node = std::make_unique<Node::LocalVariableNode>( \
+                        name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName)); \
+                    _varNode = dynamic_cast<Node::LocalVariableNode*>(_node.get()); \
+                    Builder::Builder::Get().Build(*_varNode, true); \
+                    auto rhs = Other.Load(); \
+                    auto lhs = Load(); \
+                    auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs)); \
+                    Builder::Builder::Get().Build(*store, true); \
+                } \
             } \
             \
             /* From CPU struct (uniform capture) */ \

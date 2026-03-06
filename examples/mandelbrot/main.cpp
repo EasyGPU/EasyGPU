@@ -49,7 +49,7 @@ constexpr float ZOOM = 1.5f;
 // =============================================================================
 // Color mapping function - Ultra Fractal style palette
 // =============================================================================
-Callable<Vec3(int)> GetColor = [](Int& iter) {
+Callable<Float3(Int)> GetColor = [](Int& iter) {
     Float3 color;
     If(iter == MAX_ITERATIONS, [&]() {
         // Inside set - deep black with subtle blue tint
@@ -91,7 +91,7 @@ Callable<Vec3(int)> GetColor = [](Int& iter) {
 // =============================================================================
 // Mandelbrot iteration function
 // =============================================================================
-Callable<int(float, float)> Mandelbrot = [](Float& cx, Float& cy) {
+Callable<Int(Float, Float)> Mandelbrot = [](Float& cx, Float& cy) {
     Float zx = MakeFloat(0.0f);
     Float zy = MakeFloat(0.0f);
     Int iter = MakeInt(0);

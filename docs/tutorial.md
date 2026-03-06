@@ -570,7 +570,7 @@ render.Dispatch(64, 64, true);
 ### Image Processing: Gaussian Blur
 
 ```cpp
-Callable<Vec4(BufferRef<Vec4>&, Int, Int)> Sample = 
+Callable<Float4(BufferRef<Vec4>&, Int, Int)> Sample = 
 [](BufferRef<Vec4>& img, Int& x, Int& y) {
     // Clamp to image bounds
     Int cx = Clamp(x, 0, WIDTH - 1);
@@ -764,7 +764,7 @@ Use `Callable` to define functions that can be called from kernels.
 
 ```cpp
 // Define a function: float -> float
-Callable<float(float)> Square = [](Float& x) {
+Callable<Float(Float)> Square = [](Float& x) {
     Return(x * x);
 };
 
@@ -778,7 +778,7 @@ Kernel1D compute([](Int i) {
 ### Multiple Parameters
 
 ```cpp
-Callable<float(float, float)> Lerp = [](Float& a, Float& b, Float& t) {
+Callable<Float(Float, Float)> Lerp = [](Float& a, Float& b, Float& t) {
     Return(a + (b - a) * t);
 };
 
@@ -790,7 +790,7 @@ Float result = Lerp(v0, v1, 0.5f);
 
 ```cpp
 // Return multiple values via reference
-Callable<void(float, float, float&)> PolarToCartesian = 
+Callable<void(Float, Float, Float&)> PolarToCartesian = 
 [](Float& r, Float& theta, Float& x, Float& y) {
     x = r * Cos(theta);
     y = r * Sin(theta);
@@ -805,14 +805,14 @@ PolarToCartesian(radius, angle, x, y);
 
 ```cpp
 // Linear Congruential Generator
-Callable<float(int&)> Random = [](Int& state) {
+Callable<Float(Int&)> Random = [](Int& state) {
     state = (state * 747796405 + 2891336453) & 0x7FFFFFFF;
     Int result = Abs(state);
     Return(ToFloat(result) / 2147483647.0f);
 };
 
 // Random in unit sphere
-Callable<Vec3(int&)> RandomInUnitSphere = [](Int& state) {
+Callable<Float3(Int&)> RandomInUnitSphere = [](Int& state) {
     Float3 p;
     For(0, 100, [&](Int&) {
         p = MakeFloat3(Random(state), Random(state), Random(state)) * 2.0f 
@@ -962,13 +962,13 @@ int main() {
     rng_states.Upload(seeds);
     
     // Random number generator
-    Callable<float(int&)> Random = [](Int& state) {
+    Callable<Float(Int&)> Random = [](Int& state) {
         state = (state * 747796405 + 2891336453) & 0x7FFFFFFF;
         Int result = Abs(state);
         Return(ToFloat(result) / 2147483647.0f);
     };
     
-    Callable<float(int&, float, float)> RandomRange = 
+    Callable<Float(Int&, Float, Float)> RandomRange = 
     [](Int& state, Float& min, Float& max) {
         Return(min + Random(state) * (max - min));
     };
@@ -1334,7 +1334,7 @@ Uniform<float> uTime;
 Uniform<Vec2> uMouse;
 
 // Callable for rotation
-Callable<Vec2(Vec2, float)> Rotate = [](Float2& uv, Float& angle) {
+Callable<Float2(Float2, Float)> Rotate = [](Float2& uv, Float& angle) {
     Float cosA = Cos(angle);
     Float sinA = Sin(angle);
     Float2 center = MakeFloat2(0.5f, 0.5f);

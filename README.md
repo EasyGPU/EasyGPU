@@ -201,7 +201,7 @@ Buffer<Particle> particles(1000);
 ### Reusable Functions
 
 ```cpp
-Callable<float(float)> square = [](Float x) {
+Callable<Float(Float)> square = [](Float x) {
     Return(x * x);
 };
 
@@ -430,12 +430,12 @@ A = Expr<int>(B);
 **Use `ExprBase::NotUse()`** for expressions with side-effects that aren't captured by operators:
 
 ```cpp
-Callable<void(int&)> A = [](Int &a) { a = 20; };
+Callable<void(Int&)> A = [](Int &a) { a = 20; };
 
 // ✅ CORRECT: Void-returning Callables automatically preserve side-effects
 A(b);
 
-Callable<float(float, float&)> B = [](Float x, Float& out) {
+Callable<Float(Float, Float&)> B = [](Float x, Float& out) {
     out = x * 2;
     Return(x + 1);
 };
