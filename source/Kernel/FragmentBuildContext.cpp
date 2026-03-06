@@ -114,11 +114,6 @@ namespace GPU::Kernel {
             oss << textureDecls << "\n";
         }
         
-        std::string texture3DDecls = GetTexture3DDeclarations();
-        if (!texture3DDecls.empty()) {
-            oss << texture3DDecls << "\n";
-        }
-        
         // Output buffer declarations
         std::string bufferDecls = GetBufferDeclarations();
         if (!bufferDecls.empty()) {
@@ -188,11 +183,6 @@ namespace GPU::Kernel {
             oss << textureDecls << "\n";
         }
         
-        std::string texture3DDecls = GetTexture3DDeclarations();
-        if (!texture3DDecls.empty()) {
-            oss << texture3DDecls << "\n";
-        }
-        
         // Output buffer declarations
         std::string bufferDecls = GetBufferDeclarations();
         if (!bufferDecls.empty()) {
@@ -210,16 +200,6 @@ namespace GPU::Kernel {
         for (const auto &tex: _textures) {
             // Fragment shaders use sampler2D for reading (not image2D)
             oss << std::format("layout(binding={}) uniform sampler2D {};\n",
-                               tex.binding, tex.textureName);
-        }
-        return oss.str();
-    }
-
-    std::string FragmentBuildContext::GetTexture3DDeclarations() const {
-        std::ostringstream oss;
-        for (const auto &tex: _textures3D) {
-            // Fragment shaders use sampler3D for reading
-            oss << std::format("layout(binding={}) uniform sampler3D {};\n",
                                tex.binding, tex.textureName);
         }
         return oss.str();

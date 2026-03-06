@@ -186,62 +186,6 @@ namespace GPU::Kernel {
 
     public:
         // ===================================================================
-        // Texture Support (3D)
-        // ===================================================================
-        
-        /**
-         * Allocate a binding slot for 3D texture/image
-         * @return The allocated binding slot index
-         */
-        uint32_t AllocateTexture3DBinding() override;
-
-        /**
-         * Register a 3D texture for the kernel
-         * @param binding The binding slot
-         * @param format The pixel format
-         * @param textureName The texture variable name in GLSL
-         * @param width Texture width
-         * @param height Texture height
-         * @param depth Texture depth
-         */
-        void RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
-                              const std::string& textureName,
-                              uint32_t width, uint32_t height, uint32_t depth) override;
-
-        /**
-         * Get the 3D texture declarations for GLSL
-         * @return The texture declaration string
-         */
-        std::string GetTexture3DDeclarations() const override;
-
-        /**
-         * Get all registered 3D texture bindings
-         * @return Vector of binding slots
-         */
-        const std::vector<uint32_t>& GetTexture3DBindings() const override {
-            return _texture3DBindings;
-        }
-
-        /**
-         * Bind a runtime GPU 3D texture to a binding slot
-         * This is called by Texture3D::Bind() to associate the actual GL texture with the binding
-         * @param binding The binding slot
-         * @param textureHandle The OpenGL texture handle
-         */
-        void BindRuntimeTexture3D(uint32_t binding, uint32_t textureHandle) override {
-            _runtimeTextures3D[binding] = textureHandle;
-        }
-
-        /**
-         * Get all runtime 3D texture bindings for dispatch
-         * @return Map of binding slot -> OpenGL texture handle
-         */
-        const std::unordered_map<uint32_t, uint32_t>& GetRuntimeTexture3DBindings() const override {
-            return _runtimeTextures3D;
-        }
-
-    public:
-        // ===================================================================
         // Uniform Support
         // ===================================================================
         
@@ -267,6 +211,43 @@ namespace GPU::Kernel {
          * @param program The OpenGL shader program handle
          */
         void UploadUniformValues(uint32_t program) const;
+
+    public:
+        // ===================================================================
+        // Buffer/Texture Slot Support (Dynamic Resource Switching)
+        // ===================================================================
+        
+        /**
+         * Register a buffer slot for dynamic binding at dispatch time
+         * This is called by BufferSlot::Bind() to register the slot.
+         * The actual buffer binding happens at dispatch time.
+         * @param slot Pointer to the BufferSlotBase
+         */
+        void RegisterBufferSlot(Runtime::BufferSlotBase* slot) override;
+        
+        /**
+         * Register a texture slot for dynamic binding at dispatch time
+         * This is called by TextureSlot::Bind() to register the slot.
+         * The actual texture binding happens at dispatch time.
+         * @param slot Pointer to the TextureSlotBase
+         */
+        void RegisterTextureSlot(Runtime::TextureSlotBase* slot) override;
+        
+        /**
+         * Get all registered buffer slots
+         * @return Vector of buffer slot pointers
+         */
+        const std::vector<Runtime::BufferSlotBase*>& GetBufferSlots() const {
+            return _bufferSlots;
+        }
+        
+        /**
+         * Get all registered texture slots
+         * @return Vector of texture slot pointers
+         */
+        const std::vector<Runtime::TextureSlotBase*>& GetTextureSlots() const {
+            return _textureSlots;
+        }
 
     public:
         // ===================================================================
@@ -346,32 +327,14 @@ namespace GPU::Kernel {
             uint32_t height;
         };
 
-        /**
-         * Texture registration info (3D)
-         */
-        struct Texture3DInfo {
-            uint32_t binding;
-            Runtime::PixelFormat format;
-            std::string textureName;
-            uint32_t width;
-            uint32_t height;
-            uint32_t depth;
-        };
-
         uint32_t _nextBinding = 0;
-        uint32_t _nextTextureBinding = 0;  // Separate counter for 2D textures
-        uint32_t _nextTexture3DBinding = 0;  // Separate counter for 3D textures
         std::vector<BufferInfo> _buffers;
         std::vector<uint32_t> _bufferBindings;
         std::unordered_map<uint32_t, uint32_t> _runtimeBuffers;  // binding -> GL buffer handle
         
         std::vector<TextureInfo> _textures;
         std::vector<uint32_t> _textureBindings;
-        std::unordered_map<uint32_t, uint32_t> _runtimeTextures;  // binding -> GL 2D texture handle
-        
-        std::vector<Texture3DInfo> _textures3D;
-        std::vector<uint32_t> _texture3DBindings;
-        std::unordered_map<uint32_t, uint32_t> _runtimeTextures3D;  // binding -> GL 3D texture handle
+        std::unordered_map<uint32_t, uint32_t> _runtimeTextures;  // binding -> GL texture handle
         
         /**
          * Uniform registration info
@@ -385,6 +348,10 @@ namespace GPU::Kernel {
         
         std::vector<UniformEntry> _uniforms;
         int _nextUniformIndex = 0;
+        
+        // Slot support for dynamic resource switching
+        std::vector<Runtime::BufferSlotBase*> _bufferSlots;      // Buffer slots registered via Bind()
+        std::vector<Runtime::TextureSlotBase*> _textureSlots;    // Texture slots registered via Bind()
         
     public:
         // ===================================================================

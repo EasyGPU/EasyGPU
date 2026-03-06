@@ -506,11 +506,11 @@ Int i = otherVar;              // Copy
 > ```cpp
 > auto buf = buffer.Bind();
 > 
-> // ✅ CORRECT: Explicitly create a new variable with a copy of the value
+> // �?CORRECT: Explicitly create a new variable with a copy of the value
 > Int val = MakeInt(buf[i]);
 > val = 5;  // Only modifies val, NOT buf[i]
 > 
-> // ❌ DANGEROUS: Direct initialization may create a reference
+> // �?DANGEROUS: Direct initialization may create a reference
 > Int val = buf[i];
 > val = 5;  // May unexpectedly modify buf[i] in the generated GLSL!
 > ```
@@ -812,7 +812,7 @@ Expr<int> Ceil(Expr<float> x);      // Ceiling (round up)
 
 | API | Purpose | Has Conversion Semantics |
 |:----|:--------|:-------------------------|
-| `ToFloat(Var<int>)` | Convert `Var<int>` to `Var<float>` | Yes (int → float conversion) |
+| `ToFloat(Var<int>)` | Convert `Var<int>` to `Var<float>` | Yes (int �?float conversion) |
 | `MakeFloat(1.0f)` | Create `Var<float>` from literal | No (just wraps the value) |
 | `ToInt(Var<float>)` | Convert `Var<float>` to `Var<int>` | Yes (truncation) |
 | `MakeInt(5)` | Create `Var<int>` from literal | No (just wraps the value) |
@@ -971,11 +971,11 @@ Callable<float(float, float)> Add2 = [](Float& a, Float& b) {
 ```
 
 **Type Mapping:**
-- `Float` ↔ `float`
-- `Int` ↔ `int`  
-- `Float2` ↔ `Math::Vec2`
-- `Float3` ↔ `Math::Vec3`
-- `Float4` ↔ `Math::Vec4`
+- `Float` �?`float`
+- `Int` �?`int`  
+- `Float2` �?`Math::Vec2`
+- `Float3` �?`Math::Vec3`
+- `Float4` �?`Math::Vec4`
 - etc.
 
 **Features:**
@@ -1099,6 +1099,84 @@ EASYGPU_STRUCT(Triangle,
 
 ---
 
+## Resource Slots
+
+Slots enable dynamic resource switching at runtime without kernel recompilation.
+
+### BufferSlot
+
+Dynamic buffer binding for ping-pong and multi-pass algorithms.
+
+```cpp
+BufferSlot<float> dataSlot;
+
+Kernel1D kernel([&](Int i) {
+    auto data = dataSlot.Bind();
+    data[i] = data[i] * 2.0f;
+});
+
+Buffer<float> bufA(1024), bufB(1024);
+
+dataSlot.Attach(bufA);
+kernel.Dispatch(4, true);  // Process bufA
+
+dataSlot.Attach(bufB);
+kernel.Dispatch(4, true);  // Process bufB - same kernel!
+```
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Attach(Buffer<T>& buffer)` | Attach a buffer to this slot |
+| `Detach()` | Detach current buffer |
+| `IsAttached()` | Check if a buffer is attached |
+| `GetAttached()` | Get pointer to attached buffer |
+| `Bind()` | Bind slot in kernel (returns `BufferRef<T>`) |
+
+### TextureSlot
+
+Dynamic texture binding for image processing pipelines.
+
+```cpp
+TextureSlot<RGBA8> imageSlot;
+
+Kernel2D kernel([&](Int x, Int y) {
+    auto img = imageSlot.Bind();
+    Float4 color = img.Read(x, y);
+    img.Write(x, y, color * 0.5f);
+});
+
+TextureRGBA8 texA(1024, 1024), texB(1024, 1024);
+
+imageSlot.Attach(texA);
+kernel.Dispatch(64, 64, true);  // Process texA
+
+imageSlot.Attach(texB);
+kernel.Dispatch(64, 64, true);  // Process texB - same kernel!
+```
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Attach(Texture2D<Format>& texture)` | Attach a texture to this slot |
+| `Detach()` | Detach current texture |
+| `IsAttached()` | Check if a texture is attached |
+| `GetAttached()` | Get pointer to attached texture |
+| `Bind()` | Bind slot in kernel (returns `TextureRef<Format>`) |
+| `GetDimensions(width, height)` | Get dimensions of attached texture |
+
+### Why Use Slots?
+
+| Without Slots | With Slots |
+|:--------------|:-----------|
+| Recompile kernel for each resource | Compile once, switch at runtime |
+| Resource fixed at definition time | Dynamic switching at dispatch time |
+| Code duplication for similar operations | Single kernel, multiple resources |
+
+---
+
 ## Textures
 
 ### Texture2D
@@ -1193,81 +1271,16 @@ using image2d<Format> = IR::Value::TextureRef<Format>;  // Inside kernel
 ```
 
 ---
+---
 
 ### Texture3D
 
-3D texture for volume data.
-
-```cpp
-Texture3D<PixelFormat::RGBA8> volume(width, height, depth);
-```
-
-**Constructors:**
-
-```cpp
-Texture3D<PixelFormat::RGBA8> vol(width, height, depth);              // Empty volume
-Texture3D<PixelFormat::RGBA8> vol(width, height, depth, data);        // With initial data
-```
-
-**Methods:**
-
-| Method | Description |
-|:-------|:------------|
-| `Upload(const void* data)` | Upload voxel data to GPU (synchronous) |
-| `UploadSubRegion(x, y, z, w, h, d, data)` | Upload partial data |
-| `Download(void* outData)` | Download voxel data from GPU (synchronous) |
-
-**PBO Async Methods:**
-
-| Method | Description |
-|:-------|:------------|
-| `InitUploadPBOPool(bufferCount)` | Initialize PBO pool for async upload |
-| `InitDownloadPBOPool(bufferCount)` | Initialize PBO pool for async download |
-| `UploadAsync(data)` | Asynchronous upload using PBO |
-| `UploadAsyncStream(data, timeoutMs)` | Async upload with blocking wait |
-| `DownloadAsync()` | Start asynchronous download |
-| `GetDownloadData(outData)` | Get data from completed download |
-| `Sync()` | Wait for all async operations to complete |
-| `IsIdle()` | Check if all async operations are complete |
-| `Download(std::vector<T>& outData)` | Download to vector |
-| `Bind()` | Bind to current kernel (returns Texture3DRef) |
-| `GetWidth()` | Get volume width |
-| `GetHeight()` | Get volume height |
-| `GetDepth()` | Get volume depth |
-| `GetHandle()` | Get OpenGL texture ID |
-| `GetSizeInBytes()` | Get total size in bytes |
-
-**Usage in Kernel:**
-
-```cpp
-Texture3D<PixelFormat::R32F> volume(256, 256, 256);
-
-Kernel3D kernel([&](Int x, Int y, Int z) {
-    auto vol = volume.Bind();
-    
-    // Read voxel
-    Float4 value = vol.Read(x, y, z);
-    
-    // Write voxel
-    vol.Write(x, y, z, value * 2.0f);
-});
-
-kernel.Dispatch(32, 32, 32, true);
-```
-
-**Type Aliases:**
-
-```cpp
-using Texture3DRGBA8   = Texture3D<PixelFormat::RGBA8>;
-using Texture3DRGBA32F = Texture3D<PixelFormat::RGBA32F>;
-using Texture3DR32F    = Texture3D<PixelFormat::R32F>;
-using Texture3DRG32F   = Texture3D<PixelFormat::RG32F>;
-using Texture3DR8      = Texture3D<PixelFormat::R8>;
-using image3d<Format> = IR::Value::Texture3DRef<Format>;  // Inside kernel
-```
+**DEPRECATED**: Texture3D support has been removed due to OpenGL driver compatibility issues.
+Only Texture2D is supported.
 
 ---
 
+### TextureRef (2D)
 ### TextureRef (2D)
 
 Reference to a 2D texture inside a kernel, returned by `Texture2D::Bind()`.
@@ -1288,28 +1301,14 @@ img.Write(x, y, color);
 ```
 
 ---
+---
 
 ### Texture3DRef (3D)
 
-Reference to a 3D texture inside a kernel, returned by `Texture3D::Bind()`.
-
-**Read Methods:**
-
-```cpp
-// All combinations of Var<int>, Expr<int>, and literal int
-Float4 value = vol.Read(x, y, z);
-```
-
-**Write Methods:**
-
-```cpp
-// All combinations of Var<int>, Expr<int>, literal int for coordinates
-// and Var<Vec4>, Expr<Vec4> for value
-vol.Write(x, y, z, value);
-```
+**DEPRECATED**: Texture3D support has been removed due to OpenGL driver compatibility issues.
+Only Texture2D is supported.
 
 ---
-
 ## Texture Samplers
 
 Texture samplers provide filtered texture sampling for fragment kernels. Unlike `TextureRef` which uses `imageLoad`/`imageStore` for compute kernels, samplers use `texture()` for hardware-accelerated filtered sampling in fragment shaders.
@@ -1433,13 +1432,13 @@ Pixel Buffer Objects (PBOs) enable asynchronous CPU/GPU data transfers, allowing
 
 ```
 CPU Memory              GPU Memory
-     │                       │
-     │  Synchronous Upload   │
-     │ ─────────────────────>│  CPU waits for GPU
-     │                       │
-     │  Async with PBO       │
-     │ ─────────────────────>│  CPU continues immediately
-     │ (non-blocking)        │  GPU copies in background
+     �?                      �?
+     �? Synchronous Upload   �?
+     �?─────────────────────>�? CPU waits for GPU
+     �?                      �?
+     �? Async with PBO       �?
+     �?─────────────────────>�? CPU continues immediately
+     �?(non-blocking)        �? GPU copies in background
 ```
 
 ### Basic Async Upload

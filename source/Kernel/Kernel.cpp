@@ -13,9 +13,12 @@
 
 #include <IR/Value/Var.h>
 #include <IR/Value/VarArray.h>
+#include <Runtime/BufferSlot.h>
 #include <Runtime/Context.h>
 #include <Runtime/GLStateCache.h>
+#include <Runtime/PixelFormat.h>
 #include <Runtime/ShaderUtils.h>
+#include <Runtime/TextureSlot.h>
 
 #include <stdexcept>
 #include <iostream>
@@ -141,6 +144,31 @@ namespace GPU::Kernel {
         for (const auto& [binding, handle] : textureBindings) {
             // TODO: Format and access mode should be configurable per texture
             cache.BindImageTexture(binding, handle, GL_RGBA8, GL_READ_WRITE);
+        }
+
+        // Bind all buffer slots (dynamic resource switching)
+        const auto& bufferSlots = context.GetBufferSlots();
+        for (auto* slot : bufferSlots) {
+            if (!slot->IsAttached()) {
+                throw std::runtime_error("BufferSlot not attached at dispatch time");
+            }
+            uint32_t binding = static_cast<uint32_t>(slot->GetBinding());
+            uint32_t handle = slot->GetHandle();
+            cache.BindSSBO(binding, handle);
+        }
+
+        // Bind all texture slots
+        const auto& textureSlots = context.GetTextureSlots();
+        for (auto* slot : textureSlots) {
+            if (!slot->IsAttached()) {
+                throw std::runtime_error("TextureSlot not attached at dispatch time");
+            }
+            uint32_t binding = static_cast<uint32_t>(slot->GetBinding());
+            uint32_t handle = slot->GetHandle();
+            // Get the correct GL internal format for this slot's pixel format
+            auto [glInternalFormat, glFormat, glType] = Runtime::GetGLPixelFormatInfo(slot->GetFormat());
+            (void)glFormat; (void)glType; // Unused for image bindings
+            cache.BindImageTexture(binding, handle, glInternalFormat, GL_READ_WRITE);
         }
 
         // Dispatch the compute shader

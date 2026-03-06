@@ -146,7 +146,10 @@ add_library(EasyGPU STATIC
     
     # Runtime
     include/Runtime/Buffer.h
+    include/Runtime/BufferSlot.h
+    source/Runtime/BufferSlot.cpp
     include/Runtime/Texture.h
+    include/Runtime/TextureSlot.h
     include/Runtime/Uniform.h
     include/Runtime/Context.h
     source/Runtime/Context.cpp
@@ -202,7 +205,13 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestDSL.cpp
         tests/TestKernel1D.cpp
         tests/TestBuffer.cpp
+        tests/TestBufferSlot.cpp
+        tests/TestBufferSlotBasic.cpp
         tests/TestTexture.cpp
+        tests/TestTextureSlot.cpp
+        tests/TestSlotMixed.cpp
+        tests/TestSlotPingPong.cpp
+        tests/TestSlotError.cpp
         tests/TestFlowIf.cpp
         tests/TestFlowFor.cpp
         tests/TestFlowDoWhile.cpp

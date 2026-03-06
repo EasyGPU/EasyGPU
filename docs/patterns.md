@@ -16,6 +16,7 @@ Solutions to frequently encountered tasks in EasyGPU.
 
 ## Table of Contents
 
+- [Resource Slots - Dynamic Resource Switching](#resource-slots---dynamic-resource-switching)
 - [Local Array Patterns](#local-array-patterns)
 - [Parallel Reduction (Sum/Max)](#parallel-reduction-summax)
 - [Uniforms for Dynamic Parameters](#uniforms-for-dynamic-parameters)
@@ -27,6 +28,312 @@ Solutions to frequently encountered tasks in EasyGPU.
 - [Multi-Pass Rendering](#multi-pass-rendering)
 - [Debugging Output](#debugging-output)
 - [Async Data Transfer](#async-data-transfer)
+
+---
+
+## Resource Slots - Dynamic Resource Switching
+
+**Slots** are one of EasyGPU's most powerful features, enabling you to switch between different GPU resources (buffers, textures) at runtime **without recompiling kernels**.
+
+### Why Slots?
+
+In traditional GPU programming, when you want to process different data with the same kernel, you have two options:
+
+1. **Recompile the kernel** for each different resource - extremely slow
+2. **Use raw OpenGL handles** - breaks EasyGPU's type-safe abstraction
+
+**Slots solve both problems:**
+
+```cpp
+// Define kernel once with slots
+BufferSlot<float> dataSlot;
+
+Kernel1D process([](Int i) {
+    auto data = dataSlot.Bind();
+    data[i] = data[i] * 2.0f;
+});
+
+// Switch between different buffers at runtime
+Buffer<float> bufferA(1024), bufferB(1024);
+
+dataSlot.Attach(bufferA);
+process.Dispatch(4, true);  // Process buffer A
+
+dataSlot.Attach(bufferB);   
+process.Dispatch(4, true);  // Process buffer B - same kernel, no recompilation!
+```
+
+### How Slots Work
+
+Slots act as **indirection layers** between your kernel and actual GPU resources:
+
+```
+Kernel Definition          Dispatch Time
+     |                          |
+     v                          v
++-----------+             +-------------+
+| Slot.Bind | ----------> | Slot.Attach |
++-----------+             +-------------+
+     |                          |
+     | (GLSL)                   | (OpenGL)
+     v                          v
++-----------+             +-------------+
+|  slot_0   | <---------- |  Buffer A   |
+|  slot_1   | <---------- |  Buffer B   |
++-----------+             +-------------+
+```
+
+**Key Design Points:**
+
+1. **Late Binding**: Resources are bound at `Dispatch()` time, not kernel definition time
+2. **Type Safety**: Slot type (`BufferSlot<float>`) ensures compile-time type checking
+3. **Zero Overhead**: Slots compile to direct OpenGL bindings - no runtime indirection
+4. **Resource Lifetime**: Slots don't own resources - you manage buffer/texture lifetime
+
+### Slot Types
+
+| Slot Type | For | Description |
+|:----------|:----|:------------|
+| `BufferSlot<T>` | Buffers | Dynamic switching of `Buffer<T>` |
+| `TextureSlot<Format>` | 2D Textures | Dynamic switching of `Texture2D<Format>` |
+
+### Basic Usage Pattern
+
+```cpp
+// 1. Declare slots (global or class member)
+BufferSlot<Vec4> particleSlot;
+TextureSlot<RGBA8> imageSlot;
+
+// 2. Define kernel using slots
+Kernel2D effect([](Int x, Int y) {
+    auto particles = particleSlot.Bind();
+    auto image = imageSlot.Bind();
+    
+    // Use slots like regular buffers/textures
+    Vec4 p = particles[y * WIDTH + x];
+    image.Write(x, y, p);
+});
+
+// 3. Attach resources and dispatch
+Buffer<Vec4> frame1(N), frame2(N);
+TextureRGBA8 tex1(W, H), tex2(W, H);
+
+particleSlot.Attach(frame1);
+imageSlot.Attach(tex1);
+effect.Dispatch(groupsX, groupsY, true);  // Process frame1 -> tex1
+
+particleSlot.Attach(frame2);               // Switch buffers
+imageSlot.Attach(tex2);                    // Switch textures
+effect.Dispatch(groupsX, groupsY, true);  // Process frame2 -> tex2 (same kernel!)
+```
+
+### Common Patterns with Slots
+
+#### Pattern 1: Ping-Pong with Slots
+
+The classic multi-pass technique made clean and type-safe:
+
+```cpp
+BufferSlot<float> readSlot;
+BufferSlot<float> writeSlot;
+
+Kernel1D jacobi([](Int i) {
+    auto src = readSlot.Bind();
+    auto dst = writeSlot.Bind();
+    
+    // Smoothing: new[i] = (left + center + right) / 3
+    Float left  = src[Max(i - 1, 0)];
+    Float center = src[i];
+    Float right = src[Min(i + 1, 63)];
+    dst[i] = (left + center + right) / 3.0f;
+});
+
+Buffer<float> bufA(64), bufB(64);
+
+// Ping-pong between buffers
+for (int iter = 0; iter < 100; iter++) {
+    readSlot.Attach(bufA);
+    writeSlot.Attach(bufB);
+    jacobi.Dispatch(1, true);  // A -> B
+    
+    readSlot.Attach(bufB);
+    writeSlot.Attach(bufA);
+    jacobi.Dispatch(1, true);  // B -> A
+}
+```
+
+#### Pattern 2: Multi-Texture Processing
+
+Process multiple textures with the same kernel:
+
+```cpp
+TextureSlot<RGBA8> sourceSlot;
+TextureSlot<RGBA8> outputSlot;
+
+Kernel2D blur([](Int x, Int y) {
+    auto src = sourceSlot.Bind();
+    auto dst = outputSlot.Bind();
+    
+    // 3x3 box blur
+    Float4 sum = MakeFloat4(0.0f);
+    For(-1, 2, [&](Int& dy) {
+        For(-1, 2, [&](Int& dx) {
+            sum = sum + src.Read(Clamp(x + dx, 0, W-1), 
+                                  Clamp(y + dy, 0, H-1));
+        });
+    });
+    dst.Write(x, y, sum / 9.0f);
+});
+
+// Process multiple images
+std::vector<TextureRGBA8> images = LoadImages(10);
+TextureRGBA8 output(W, H);
+
+outputSlot.Attach(output);
+for (auto& img : images) {
+    sourceSlot.Attach(img);
+    blur.Dispatch(groupsX, groupsY, true);
+    SaveTexture(output);
+}
+```
+
+#### Pattern 3: Resolution-Independent Kernels
+
+Write kernels that work with any size texture:
+
+```cpp
+TextureSlot<R32F> dataSlot;
+
+// This kernel works with 512x512, 1024x1024, or any size!
+Kernel2D normalize([](Int x, Int y) {
+    auto data = dataSlot.Bind();
+    
+    uint32_t width, height;
+    dataSlot.GetDimensions(width, height);  // Query attached size
+    
+    Float value = data.Read(x, y).x();
+    Float normalized = value / 255.0f;
+    data.Write(x, y, MakeFloat4(normalized, 0, 0, 1));
+}, 16, 16);  // Workgroup size, not image size!
+
+TextureR32F small(512, 512);
+TextureR32F large(2048, 2048);
+
+dataSlot.Attach(small);
+normalize.Dispatch(32, 32, true);   // 512/16 = 32 groups
+
+dataSlot.Attach(large);
+normalize.Dispatch(128, 128, true); // 2048/16 = 128 groups
+```
+
+#### Pattern 4: Conditional Resource Switching
+
+Dynamic resource selection based on runtime conditions:
+
+```cpp
+BufferSlot<Vec4> primarySlot;
+BufferSlot<Vec4> secondarySlot;
+
+Kernel1D blend([](Int i) {
+    auto primary = primarySlot.Bind();
+    auto secondary = secondarySlot.Bind();
+    
+    // Mix based on some condition
+    Vec4 a = primary[i];
+    Vec4 b = secondary[i];
+    primary[i] = a * 0.7f + b * 0.3f;
+});
+
+Buffer<Vec4> highRes(N), lowRes(N);
+
+void RenderFrame(bool useLOD) {
+    if (useLOD) {
+        primarySlot.Attach(lowRes);
+        secondarySlot.Attach(highRes);
+    } else {
+        primarySlot.Attach(highRes);
+        secondarySlot.Attach(lowRes);
+    }
+    blend.Dispatch(groups, true);
+}
+```
+
+### Slot vs Direct Binding
+
+| Feature | Direct Binding (`Buffer::Bind()`) | Slot (`BufferSlot::Bind()`) |
+|:--------|:----------------------------------|:----------------------------|
+| **Flexibility** | Fixed at kernel definition | Switchable at runtime |
+| **Performance** | Zero overhead | Zero overhead |
+| **Recompilation** | Required for each resource | Once for all resources |
+| **Use Case** | Static pipelines | Dynamic/multi-pass |
+| **Type Safety** | ✓ | ✓ |
+
+### Best Practices
+
+1. **Use Slots for multi-pass algorithms**
+   ```cpp
+   // Good: Clean ping-pong
+   BufferSlot<float> read, write;
+   ```
+
+2. **Use direct binding for static pipelines**
+   ```cpp
+   // Good: Simple and clear
+   Buffer<float> data(N);
+   kernel([&](Int i) { auto d = data.Bind(); ... });
+   ```
+
+3. **Always check IsAttached() before dispatch**
+   ```cpp
+   if (!mySlot.IsAttached()) {
+       throw std::runtime_error("Slot not attached!");
+   }
+   kernel.Dispatch(...);
+   ```
+
+4. **Manage resource lifetimes carefully**
+   ```cpp
+   // DANGER: Buffer destroyed while Slot holds reference
+   {
+       Buffer<float> temp(100);
+       slot.Attach(temp);
+   }  // temp destroyed here!
+   kernel.Dispatch(...);  // Undefined behavior!
+   ```
+
+### Advanced: Slots with Uniforms
+
+Combine slots with uniforms for maximum flexibility:
+
+```cpp
+BufferSlot<Vec4> particleSlot;
+Uniform<float> timeStep;
+Uniform<int> mode;
+
+Kernel1D update([&](Int i) {
+    auto p = particleSlot.Bind();
+    auto dt = timeStep.Load();
+    auto m = mode.Load();
+    
+    // Different physics based on runtime mode
+    If(m == 0, [&]() {
+        // Euler integration
+        p[i].velocity() = p[i].velocity() + gravity * dt;
+    }).ElseIf(m == 1, [&]() {
+        // Verlet integration
+        // ...
+    });
+});
+
+// Different update modes without recompilation
+mode = 0;  // Euler
+particleSlot.Attach(physicsSetA);
+update.Dispatch(groups, true);
+
+mode = 1;  // Verlet
+particleSlot.Attach(physicsSetB);
+update.Dispatch(groups, true);
+```
 
 ---
 

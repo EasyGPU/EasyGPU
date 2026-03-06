@@ -9,6 +9,8 @@
 #include <Kernel/KernelBuildContext.h>
 
 #include <IR/Builder/Builder.h>
+#include <Runtime/BufferSlot.h>
+#include <Runtime/TextureSlot.h>
 
 #include <format>
 #include <sstream>
@@ -142,12 +144,6 @@ namespace GPU::Kernel {
         std::string textureDecls = GetTextureDeclarations();
         if (!textureDecls.empty()) {
             oss << textureDecls << "\n";
-        }
-
-        // Output 3D texture declarations (after 2D texture declarations, before buffers)
-        std::string texture3DDecls = GetTexture3DDeclarations();
-        if (!texture3DDecls.empty()) {
-            oss << texture3DDecls << "\n";
         }
 
         // Output buffer declarations (after texture declarations)
@@ -293,7 +289,9 @@ namespace GPU::Kernel {
      * @return The allocated binding slot index
      */
     uint32_t KernelBuildContext::AllocateTextureBinding() {
-        return _nextTextureBinding++;
+        // Use the same counter as buffers to avoid binding conflicts
+        // Buffers and textures share the same OpenGL binding namespace
+        return _nextBinding++;
     }
 
     /**
@@ -320,44 +318,6 @@ namespace GPU::Kernel {
         for (const auto &tex: _textures) {
             std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
             oss << std::format("layout({}, binding={}) uniform image2D {};\n",
-                               formatQualifier, tex.binding, tex.textureName);
-        }
-        return oss.str();
-    }
-
-    /**
-     * Allocate a binding slot for 3D texture/image
-     * @return The allocated binding slot index
-     */
-    uint32_t KernelBuildContext::AllocateTexture3DBinding() {
-        return _nextTexture3DBinding++;
-    }
-
-    /**
-     * Register a 3D texture for the kernel
-     * @param binding The binding slot
-     * @param format The pixel format
-     * @param textureName The texture variable name in GLSL
-     * @param width Texture width
-     * @param height Texture height
-     * @param depth Texture depth
-     */
-    void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
-                                               const std::string &textureName,
-                                               uint32_t width, uint32_t height, uint32_t depth) {
-        _textures3D.push_back({binding, format, textureName, width, height, depth});
-        _texture3DBindings.push_back(binding);
-    }
-
-    /**
-     * Get the 3D texture declarations for GLSL
-     * @return The texture declaration string
-     */
-    std::string KernelBuildContext::GetTexture3DDeclarations() const {
-        std::ostringstream oss;
-        for (const auto &tex: _textures3D) {
-            std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
-            oss << std::format("layout({}, binding={}) uniform image3D {};\n",
                                formatQualifier, tex.binding, tex.textureName);
         }
         return oss.str();
@@ -469,5 +429,45 @@ namespace GPU::Kernel {
                 entry.uploadFunc(program, entry.name, entry.uniformPtr);
             }
         }
+    }
+
+    // ===================================================================
+    // Buffer/Texture Slot Support
+    // ===================================================================
+
+    void KernelBuildContext::RegisterBufferSlot(Runtime::BufferSlotBase* slot) {
+        // Allocate a binding slot for this buffer slot
+        uint32_t binding = AllocateBindingSlot();
+        
+        // Generate buffer variable name
+        std::string bufferName = std::format("buf_slot_{}", binding);
+        
+        // Get the buffer mode from the slot
+        // For now, default to READ_WRITE since GetMode is not in base class
+        int mode = 0x88BA;  // GL_READ_WRITE
+        
+        // Register the buffer in the GLSL code
+        RegisterBuffer(binding, slot->GetTypeName(), bufferName, mode);
+        
+        // Store the slot and update its binding info
+        slot->SetBindingInfo(static_cast<int>(binding), bufferName);
+        _bufferSlots.push_back(slot);
+    }
+
+    void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase* slot) {
+        // Use the same binding allocator for 2D textures
+        uint32_t binding = AllocateTextureBinding();
+        std::string textureName = std::format("tex_slot_{}", binding);
+        
+        // Get dimensions
+        uint32_t width = 0, height = 0;
+        slot->GetDimensions(width, height);
+        
+        // Register the 2D texture in the GLSL code
+        RegisterTexture(binding, slot->GetFormat(), textureName, width, height);
+        
+        // Store the slot and update its binding info
+        slot->SetBindingInfo(static_cast<int>(binding), textureName);
+        _textureSlots.push_back(slot);
     }
 }

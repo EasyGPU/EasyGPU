@@ -17,6 +17,12 @@
 #include <vector>
 #include <functional>
 
+// Forward declarations for Slot support
+namespace GPU::Runtime {
+    class BufferSlotBase;
+    class TextureSlotBase;
+}
+
 namespace GPU::IR::Builder {
     /**
      * Generation state for callable functions
@@ -164,56 +170,6 @@ namespace GPU::IR::Builder {
 
     public:
         // ===================================================================
-        // Texture Support (3D)
-        // ===================================================================
-        
-        /**
-         * Allocate a binding slot for 3D texture/image
-         * @return The allocated binding slot index
-         */
-        virtual uint32_t AllocateTexture3DBinding() = 0;
-
-        /**
-         * Register a 3D texture for the kernel
-         * @param binding The binding slot
-         * @param format The pixel format
-         * @param textureName The texture variable name in GLSL
-         * @param width Texture width
-         * @param height Texture height
-         * @param depth Texture depth
-         */
-        virtual void RegisterTexture3D(uint32_t binding, PixelFormat format,
-                                      const std::string& textureName,
-                                      uint32_t width, uint32_t height, uint32_t depth) = 0;
-
-        /**
-         * Get the 3D texture declarations for GLSL
-         * @return The texture declaration string
-         */
-        virtual std::string GetTexture3DDeclarations() const = 0;
-
-        /**
-         * Get all registered 3D texture bindings
-         * @return Vector of binding slots
-         */
-        virtual const std::vector<uint32_t>& GetTexture3DBindings() const = 0;
-
-        /**
-         * Bind a runtime GPU 3D texture to a binding slot
-         * This is called by Texture3D::Bind() to associate the actual GL texture with the binding
-         * @param binding The binding slot
-         * @param textureHandle The OpenGL texture handle
-         */
-        virtual void BindRuntimeTexture3D(uint32_t binding, uint32_t textureHandle) = 0;
-
-        /**
-         * Get all runtime 3D texture bindings for dispatch
-         * @return Map of binding slot -> OpenGL texture handle
-         */
-        virtual const std::unordered_map<uint32_t, uint32_t>& GetRuntimeTexture3DBindings() const = 0;
-
-    public:
-        // ===================================================================
         // Uniform Support
         // ===================================================================
         
@@ -284,6 +240,23 @@ namespace GPU::IR::Builder {
          * @return The complete callable function definitions string
          */
         virtual std::string GenerateCallableBodies() = 0;
+
+    public:
+        // ===================================================================
+        // Slot Support (Dynamic Resource Switching)
+        // ===================================================================
+        
+        /**
+         * Register a buffer slot for dynamic binding at dispatch time
+         * @param slot Pointer to the BufferSlotBase
+         */
+        virtual void RegisterBufferSlot(Runtime::BufferSlotBase* slot) {}
+        
+        /**
+         * Register a texture slot for dynamic binding at dispatch time
+         * @param slot Pointer to the TextureSlotBase
+         */
+        virtual void RegisterTextureSlot(Runtime::TextureSlotBase* slot) {}
 
     protected:
         std::unordered_map<const void*, CallableGenState> _callableStates;

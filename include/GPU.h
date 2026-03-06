@@ -73,7 +73,9 @@
 // Runtime
 // =============================================================================
 #include <Runtime/Buffer.h>
+#include <Runtime/BufferSlot.h>
 #include <Runtime/Texture.h>
+#include <Runtime/TextureSlot.h>
 #include <Runtime/Uniform.h>
 #include <Runtime/Context.h>
 #include <Runtime/PixelFormat.h>

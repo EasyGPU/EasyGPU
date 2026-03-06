@@ -67,12 +67,6 @@ namespace GPU::Kernel {
          */
         std::string GetTextureDeclarations() const override;
 
-        /**
-         * Get 3D texture declarations for fragment shader
-         * Uses sampler3D instead of image3D
-         */
-        std::string GetTexture3DDeclarations() const override;
-
     public:
         // ===================================================================
         // Fragment-specific Methods
