@@ -98,6 +98,8 @@ add_library(EasyGPU STATIC
     source/IR/Value/Var.cpp
     include/IR/Value/VarArray.h
     source/IR/Value/VarArray.cpp
+    include/IR/Value/SideEffectToken.h
+    source/IR/Value/SideEffectToken.cpp
     include/IR/Value/VarVector.h
     include/IR/Value/VarIVector.h
     include/IR/Value/VarMatrix.h

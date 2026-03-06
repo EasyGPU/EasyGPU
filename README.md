@@ -432,12 +432,24 @@ A = Expr<int>(B);
 ```cpp
 Callable<void(int&)> A = [](Int &a) { a = 20; };
 
-// ❌ WRONG: Side-effect won't be translated into IR
+// ✅ CORRECT: Void-returning Callables automatically preserve side-effects
 A(b);
 
+Callable<float(float, float&)> B = [](Float x, Float& out) {
+    out = x * 2;
+    Return(x + 1);
+};
+
+// ❌ WRONG: Non-void return with ignored result may lose side-effect on 'out'
+Float y;
+B(MakeFloat(5.0f), y);
+
 // ✅ CORRECT: Explicitly mark the expression as "not used" to preserve side-effect
-ExprBase::NotUse(A(b));
+Float z;
+ExprBase::NotUse(B(MakeFloat(5.0f), z));
 ```
+
+> **Important:** Only `Callable<void>` automatically handles side-effects. For `Callable<T>` where `T` is not `void`, if you ignore the return value but need the side-effects (e.g., modifications to reference parameters), you **must** wrap the call with `ExprBase::NotUse()`.
 
 ## Documentation
 

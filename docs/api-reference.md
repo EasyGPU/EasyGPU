@@ -984,6 +984,43 @@ Float x, y;
 GetComponents(value, x, y);
 ```
 
+**Side-Effect Handling:**
+
+`Callable<void>` automatically handles side-effects when called as a statement:
+
+```cpp
+Callable<void(int&)> A = [](Int &a) { a = 20; };
+Int b;
+A(b);  // Side-effect automatically preserved
+```
+
+For `Callable<T>` where `T` is not `void`, if you ignore the return value but need side-effects (e.g., from reference parameters), use `ExprBase::NotUse()`:
+
+```cpp
+Callable<float(float, float&)> B = [](Float x, Float& out) {
+    out = x * 2;
+    Return(x + 1);
+};
+
+Float result;
+ExprBase::NotUse(B(MakeFloat(5.0f), result));  // Explicitly preserve side-effect
+```
+
+---
+
+## SideEffectToken
+
+Internal token class used by `Callable<void>` to ensure side-effects are recorded.
+
+```cpp
+// Returned by Callable<void>::operator()
+// Automatically commits side-effects at statement end
+Callable<void(int&)> A = [](Int &a) { a = 20; };
+A(b);  // Creates and destroys SideEffectToken, committing the effect
+```
+
+**Note:** This is an implementation detail. Users do not interact with `SideEffectToken` directly.
+
 ---
 
 ## Structs

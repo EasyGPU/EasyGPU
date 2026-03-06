@@ -357,9 +357,12 @@ See [Patterns](patterns.md#async-data-transfer) for more examples.
 
 ### How do I handle expressions with side-effects?
 
-The EasyGPU DSL cannot automatically handle side-effects from expressions. If a function or callable produces a side-effect (like modifying a reference parameter) and its return value is not used by any operator, the expression may be incorrectly optimized away and not translated into IR.
+The EasyGPU DSL cannot automatically handle side-effects from expressions in all cases. If a function or callable produces a side-effect (like modifying a reference parameter) and its return value is not used by any operator, the expression may be incorrectly optimized away and not translated into IR.
 
-**Problem:**
+**Automatic handling for `Callable<void>`:**
+
+`Callable<void>` automatically preserves side-effects when called as a statement:
+
 ```cpp
 Callable<void(int&)> A = [](Int &a) {
     a = 20;  // Side-effect: modifies the input parameter
@@ -367,26 +370,36 @@ Callable<void(int&)> A = [](Int &a) {
 
 Kernel1D kernel([](Int i) {
     Int b = MakeInt(0);
-    A(b);  // ❌ WRONG: Side-effect won't work!
-           // This call may be optimized away and not generate IR
-    // b is still 0 here, not 20
-});
-```
-
-**Solution:**
-Use `ExprBase::NotUse()` to explicitly mark expressions with side-effects that must be preserved:
-
-```cpp
-Kernel1D kernel([](Int i) {
-    Int b = MakeInt(0);
-    ExprBase::NotUse(A(b));  // ✅ CORRECT: Side-effect is preserved
+    A(b);  // ✅ Side-effect is automatically preserved
     // b is now 20 as expected
 });
 ```
 
+**Explicit handling for `Callable<T>` (T is not void):**
+
+For non-void Callables, if you ignore the return value but need the side-effects, you **must** use `ExprBase::NotUse()`:
+
+```cpp
+Callable<float(float, float&)> B = [](Float x, Float& out) {
+    out = x * 2;  // Side-effect: modifies 'out'
+    Return(x + 1);
+};
+
+Kernel1D kernel([](Int i) {
+    Float result;
+    
+    // ❌ WRONG: Return value ignored, side-effect on 'result' may be lost
+    B(MakeFloat(5.0f), result);
+    
+    // ✅ CORRECT: Explicitly mark as "not used" to preserve side-effect
+    ExprBase::NotUse(B(MakeFloat(5.0f), result));
+    // result is now 10.0f as expected
+});
+```
+
 **When to use `ExprBase::NotUse`:**
-- When calling a `Callable` that modifies its parameters (reference parameters)
-- When the return value of an expression is not used by any other operation
+- When calling a non-void `Callable` that modifies its parameters (reference parameters)
+- When the return value of an expression is intentionally ignored but side-effects are required
 - When you need to ensure an expression is evaluated for its side-effects only
 
 **Note:** `ExprBase::NotUse` takes an `ExprBase` (the base class of all expressions). Most function calls in the DSL return typed expressions (`Expr<T>`), which can be implicitly converted to `ExprBase`.
