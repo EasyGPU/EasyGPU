@@ -13,33 +13,33 @@
 #include <memory>
 
 namespace GPU::IR::Value {
-    /**
-     * The value class which maintains node pointer
-     */
-    class Value {
-    public:
-        Value() = default;
+/**
+ * The value class which maintains node pointer
+ */
+class Value {
+public:
+	Value()							= default;
 
-        Value(const Value &) = delete;
-        Value &operator=(const Value &) = delete;
+	Value(const Value &)			= delete;
+	Value &operator=(const Value &) = delete;
 
-        Value(Value &&other) noexcept;
-        Value &operator=(Value &&other) noexcept;
+	Value(Value &&other) noexcept;
+	Value &operator=(Value &&other) noexcept;
 
-        ~Value() = default;
+	~Value() = default;
 
-    public:
-        /**
-         * Release ownership of the node
-         * @return The owned node as unique_ptr
-         */
-        [[nodiscard]] std::unique_ptr<Node::Node> Release() noexcept {
-            return std::move(_node);
-        }
+public:
+	/**
+	 * Release ownership of the node
+	 * @return The owned node as unique_ptr
+	 */
+	[[nodiscard]] std::unique_ptr<Node::Node> Release() noexcept {
+		return std::move(_node);
+	}
 
-    protected:
-        std::unique_ptr<Node::Node> _node;
-    };
-}
+protected:
+	std::unique_ptr<Node::Node> _node;
+};
+} // namespace GPU::IR::Value
 
-#endif //EASYGPU_VALUE_H
+#endif // EASYGPU_VALUE_H

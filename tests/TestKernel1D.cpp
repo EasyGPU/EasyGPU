@@ -4,35 +4,35 @@
  *      @Date           :   2/13/2026
  */
 
+#include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>
-#include <IR/Value/Var.h>
 
 #include <iostream>
 
 int main() {
-    using namespace GPU;
+	using namespace GPU;
 
-    std::vector<float> input = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    std::vector<float> output;
+	std::vector<float>	   input = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+	std::vector<float>	   output;
 
-    Runtime::Buffer<float> buffer(input.size());
-    Runtime::Buffer<float> inputBuffer(input);
+	Runtime::Buffer<float> buffer(input.size());
+	Runtime::Buffer<float> inputBuffer(input);
 
-    Kernel::Kernel1D kernel(
-            [&](IR::Value::Var<int> &Id) {
-                auto boundBuffer = buffer.Bind();
-                auto boundInputBuffer = inputBuffer.Bind();
+	Kernel::Kernel1D	   kernel(
+		  [&](IR::Value::Var<int> &Id) {
+			  auto boundBuffer		= buffer.Bind();
+			  auto boundInputBuffer = inputBuffer.Bind();
 
-                boundBuffer[Id] = boundInputBuffer[Id] + 1.f;
-            },
-            input.size());
-    kernel.Dispatch(1, true);
+			  boundBuffer[Id]		= boundInputBuffer[Id] + 1.f;
+		  },
+		  input.size());
+	kernel.Dispatch(1, true);
 
-    buffer.Download(output);
-    for (auto &item : output) {
-        std::cout << item << " ";
-    }
+	buffer.Download(output);
+	for (auto &item : output) {
+		std::cout << item << " ";
+	}
 
-    return 0;
+	return 0;
 }

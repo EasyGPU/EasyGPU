@@ -6,5 +6,4 @@
 
 #include <IR/Value/Var.h>
 
-namespace GPU::IR::Value {
-}
+namespace GPU::IR::Value {}

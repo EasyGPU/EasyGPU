@@ -11,45 +11,45 @@
 
 #include <IR/Node/Node.h>
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 namespace GPU::IR::Node {
-    /**
-     * The node for while loop control flow
-     * Structure: while (condition) { body }
-     */
-    class WhileNode : public Node {
-    public:
-        /**
-         * Constructor for while node
-         * @param Condition The loop condition
-         * @param Body The loop body statements
-         */
-        WhileNode(std::unique_ptr<Node> &Condition, std::vector<std::unique_ptr<Node>> &Body);
+/**
+ * The node for while loop control flow
+ * Structure: while (condition) { body }
+ */
+class WhileNode : public Node {
+public:
+	/**
+	 * Constructor for while node
+	 * @param Condition The loop condition
+	 * @param Body The loop body statements
+	 */
+	WhileNode(std::unique_ptr<Node> &Condition, std::vector<std::unique_ptr<Node>> &Body);
 
-    public:
-        [[nodiscard]] NodeType Type() const override;
+public:
+	[[nodiscard]] NodeType Type() const override;
 
-    public:
-        /**
-         * Getting the loop condition
-         * @return The condition of the while loop
-         */
-        [[nodiscard]] const std::unique_ptr<Node> &Condition() const;
+public:
+	/**
+	 * Getting the loop condition
+	 * @return The condition of the while loop
+	 */
+	[[nodiscard]] const std::unique_ptr<Node>			   &Condition() const;
 
-        /**
-         * Getting the loop body
-         * @return The node list of the loop body
-         */
-        [[nodiscard]] const std::vector<std::unique_ptr<Node>> &Body() const;
+	/**
+	 * Getting the loop body
+	 * @return The node list of the loop body
+	 */
+	[[nodiscard]] const std::vector<std::unique_ptr<Node>> &Body() const;
 
-        [[nodiscard]] std::unique_ptr<Node> Clone() const override;
+	[[nodiscard]] std::unique_ptr<Node>						Clone() const override;
 
-    private:
-        std::unique_ptr<Node> _condition;
-        std::vector<std::unique_ptr<Node>> _body;
-    };
-}
+private:
+	std::unique_ptr<Node>			   _condition;
+	std::vector<std::unique_ptr<Node>> _body;
+};
+} // namespace GPU::IR::Node
 
-#endif //EASYGPU_WHILE_H
+#endif // EASYGPU_WHILE_H

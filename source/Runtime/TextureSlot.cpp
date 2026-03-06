@@ -7,7 +7,7 @@
 #include <Runtime/TextureSlot.h>
 
 namespace GPU::Runtime {
-    // TextureSlotBase is an abstract class with pure virtual methods.
-    // All template-specific implementations are in the header.
-    // This file exists for build system consistency.
+// TextureSlotBase is an abstract class with pure virtual methods.
+// All template-specific implementations are in the header.
+// This file exists for build system consistency.
 }

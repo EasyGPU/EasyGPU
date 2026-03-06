@@ -19,116 +19,127 @@
 #include <format>
 
 namespace GPU::IR::Value {
-    // Swizzle macros for vectors
-#define MEM(n) Var<int> n() { return std::move(Var<int>(std::format("{}.{}", _varNode->VarName(), #n))); }
+// Swizzle macros for vectors
+#define MEM(n)                                                                                                         \
+	Var<int> n() {                                                                                                     \
+		return std::move(Var<int>(std::format("{}.{}", _varNode->VarName(), #n)));                                     \
+	}
 
-#define SWZ2(n) Var<Math::IVec2> n() { return std::move(Var<Math::IVec2>(std::format("{}.{}", _varNode->VarName(), #n))); }
-#define SWZ3(n) Var<Math::IVec3> n() { return std::move(Var<Math::IVec3>(std::format("{}.{}", _varNode->VarName(), #n))); }
-#define SWZ4(n) Var<Math::IVec4> n() { return std::move(Var<Math::IVec4>(std::format("{}.{}", _varNode->VarName(), #n))); }
+#define SWZ2(n)                                                                                                        \
+	Var<Math::IVec2> n() {                                                                                             \
+		return std::move(Var<Math::IVec2>(std::format("{}.{}", _varNode->VarName(), #n)));                             \
+	}
+#define SWZ3(n)                                                                                                        \
+	Var<Math::IVec3> n() {                                                                                             \
+		return std::move(Var<Math::IVec3>(std::format("{}.{}", _varNode->VarName(), #n)));                             \
+	}
+#define SWZ4(n)                                                                                                        \
+	Var<Math::IVec4> n() {                                                                                             \
+		return std::move(Var<Math::IVec4>(std::format("{}.{}", _varNode->VarName(), #n)));                             \
+	}
 
-    // Swizzle accessing for IVec2
-    template<>
-    class Var<Math::IVec2> : public VarBase<Math::IVec2> {
-    public:
-        using VarBase<Math::IVec2>::VarBase;
-        using VarBase<Math::IVec2>::Load;
-        using VarBase<Math::IVec2>::operator=;
-        using VarBase<Math::IVec2>::operator Expr<Math::IVec2>;
+// Swizzle accessing for IVec2
+template <> class Var<Math::IVec2> : public VarBase<Math::IVec2> {
+public:
+	using VarBase<Math::IVec2>::VarBase;
+	using VarBase<Math::IVec2>::Load;
+	using VarBase<Math::IVec2>::operator=;
+	using VarBase<Math::IVec2>::operator Expr<Math::IVec2>;
 
-        // Component constructor: Var<IVec2> v(x, y)
-        template<typename X, typename Y>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> || std::same_as<std::remove_cvref_t<X>, int>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<int>> || std::same_as<std::remove_cvref_t<Y>, Expr<int>> || std::same_as<std::remove_cvref_t<Y>, int>)
-        Var(X&& x, Y&& y) : VarBase() {
-            std::string xStr = ComponentToString(std::forward<X>(x));
-            std::string yStr = ComponentToString(std::forward<Y>(y));
-            auto initCode = std::format("{}=ivec2({}, {});\n", _varNode->VarName(), xStr, yStr);
-            Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
-        }
+	// Component constructor: Var<IVec2> v(x, y)
+	template <typename X, typename Y>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<X>, int>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<int>> || std::same_as<std::remove_cvref_t<Y>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<Y>, int>)
+	Var(X &&x, Y &&y) : VarBase() {
+		std::string xStr	 = ComponentToString(std::forward<X>(x));
+		std::string yStr	 = ComponentToString(std::forward<Y>(y));
+		auto		initCode = std::format("{}=ivec2({}, {});\n", _varNode->VarName(), xStr, yStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
 
-    public:
-        template<CountableType T>
-        Var<int> operator[](T Index) {
-            return Var<int>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
-        }
-        
-        Var<int> operator[](ExprBase Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+public:
+	template <CountableType T> Var<int> operator[](T Index) {
+		return Var<int>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
+	}
 
-        template<ScalarType IndexT>
-        Var<int> operator[](Expr<IndexT> Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+	Var<int> operator[](ExprBase Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
 
-    public:
-        /* clang-format off */
+	template <ScalarType IndexT> Var<int> operator[](Expr<IndexT> Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
+
+public:
+	/* clang-format off */
         MEM(x) MEM(y)
 
         // 2-component swizzles (4)
         SWZ2(xx) SWZ2(xy) SWZ2(yx) SWZ2(yy)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert component to string
-        template<typename T>
-        static std::string ComponentToString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, int>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<int>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<int>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
-    };
+	private :
+	// Helper to convert component to string
+	template <typename T>
+	static std::string ComponentToString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, int>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<int>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<int>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
+};
 
-    // Swizzle accessing for IVec3
-    template<>
-    class Var<Math::IVec3> : public VarBase<Math::IVec3> {
-    public:
-        using VarBase<Math::IVec3>::VarBase;
-        using VarBase<Math::IVec3>::Load;
-        using VarBase<Math::IVec3>::operator=;
-        using VarBase<Math::IVec3>::operator Expr<Math::IVec3>;
+// Swizzle accessing for IVec3
+template <> class Var<Math::IVec3> : public VarBase<Math::IVec3> {
+public:
+	using VarBase<Math::IVec3>::VarBase;
+	using VarBase<Math::IVec3>::Load;
+	using VarBase<Math::IVec3>::operator=;
+	using VarBase<Math::IVec3>::operator Expr<Math::IVec3>;
 
-        // Component constructor: Var<IVec3> v(x, y, z)
-        template<typename X, typename Y, typename Z>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> || std::same_as<std::remove_cvref_t<X>, int>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<int>> || std::same_as<std::remove_cvref_t<Y>, Expr<int>> || std::same_as<std::remove_cvref_t<Y>, int>) &&
-                     (std::same_as<std::remove_cvref_t<Z>, Var<int>> || std::same_as<std::remove_cvref_t<Z>, Expr<int>> || std::same_as<std::remove_cvref_t<Z>, int>)
-        Var(X&& x, Y&& y, Z&& z) : VarBase() {
-            std::string xStr = ComponentToString(std::forward<X>(x));
-            std::string yStr = ComponentToString(std::forward<Y>(y));
-            std::string zStr = ComponentToString(std::forward<Z>(z));
-            auto initCode = std::format("{}=ivec3({}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr);
-            Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
-        }
+	// Component constructor: Var<IVec3> v(x, y, z)
+	template <typename X, typename Y, typename Z>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<X>, int>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<int>> || std::same_as<std::remove_cvref_t<Y>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<Y>, int>) &&
+				(std::same_as<std::remove_cvref_t<Z>, Var<int>> || std::same_as<std::remove_cvref_t<Z>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<Z>, int>)
+	Var(X &&x, Y &&y, Z &&z) : VarBase() {
+		std::string xStr	 = ComponentToString(std::forward<X>(x));
+		std::string yStr	 = ComponentToString(std::forward<Y>(y));
+		std::string zStr	 = ComponentToString(std::forward<Z>(z));
+		auto		initCode = std::format("{}=ivec3({}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
 
-    public:
-        template<CountableType T>
-        Var<int> operator[](T Index) {
-            return Var<int>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
-        }
-        
-        Var<int> operator[](ExprBase Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+public:
+	template <CountableType T> Var<int> operator[](T Index) {
+		return Var<int>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
+	}
 
-        template<ScalarType IndexT>
-        Var<int> operator[](Expr<IndexT> Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+	Var<int> operator[](ExprBase Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
 
-    public:
-        /* clang-format off */
+	template <ScalarType IndexT> Var<int> operator[](Expr<IndexT> Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
+
+public:
+	/* clang-format off */
         MEM(x) MEM(y) MEM(z)
 
         // 2-component swizzles
@@ -148,68 +159,69 @@ namespace GPU::IR::Value {
         SWZ3(zxx) SWZ3(zxy) SWZ3(zxz)
         SWZ3(zyx) SWZ3(zyy) SWZ3(zyz)
         SWZ3(zzx) SWZ3(zzy) SWZ3(zzz)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert component to string
-        template<typename T>
-        static std::string ComponentToString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, int>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<int>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<int>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
-    };
+	private :
+	// Helper to convert component to string
+	template <typename T>
+	static std::string ComponentToString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, int>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<int>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<int>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
+};
 
-    // Swizzle accessing for IVec4
-    template<>
-    class Var<Math::IVec4> : public VarBase<Math::IVec4> {
-    public:
-        using VarBase<Math::IVec4>::VarBase;
-        using VarBase<Math::IVec4>::Load;
-        using VarBase<Math::IVec4>::operator=;
-        using VarBase<Math::IVec4>::operator Expr<Math::IVec4>;
+// Swizzle accessing for IVec4
+template <> class Var<Math::IVec4> : public VarBase<Math::IVec4> {
+public:
+	using VarBase<Math::IVec4>::VarBase;
+	using VarBase<Math::IVec4>::Load;
+	using VarBase<Math::IVec4>::operator=;
+	using VarBase<Math::IVec4>::operator Expr<Math::IVec4>;
 
-        // Component constructor: Var<IVec4> v(x, y, z, w)
-        template<typename X, typename Y, typename Z, typename W>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> || std::same_as<std::remove_cvref_t<X>, int>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<int>> || std::same_as<std::remove_cvref_t<Y>, Expr<int>> || std::same_as<std::remove_cvref_t<Y>, int>) &&
-                     (std::same_as<std::remove_cvref_t<Z>, Var<int>> || std::same_as<std::remove_cvref_t<Z>, Expr<int>> || std::same_as<std::remove_cvref_t<Z>, int>) &&
-                     (std::same_as<std::remove_cvref_t<W>, Var<int>> || std::same_as<std::remove_cvref_t<W>, Expr<int>> || std::same_as<std::remove_cvref_t<W>, int>)
-        Var(X&& x, Y&& y, Z&& z, W&& w) : VarBase() {
-            std::string xStr = ComponentToString(std::forward<X>(x));
-            std::string yStr = ComponentToString(std::forward<Y>(y));
-            std::string zStr = ComponentToString(std::forward<Z>(z));
-            std::string wStr = ComponentToString(std::forward<W>(w));
-            auto initCode = std::format("{}=ivec4({}, {}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr, wStr);
-            Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
-        }
+	// Component constructor: Var<IVec4> v(x, y, z, w)
+	template <typename X, typename Y, typename Z, typename W>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<X>, int>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<int>> || std::same_as<std::remove_cvref_t<Y>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<Y>, int>) &&
+				(std::same_as<std::remove_cvref_t<Z>, Var<int>> || std::same_as<std::remove_cvref_t<Z>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<Z>, int>) &&
+				(std::same_as<std::remove_cvref_t<W>, Var<int>> || std::same_as<std::remove_cvref_t<W>, Expr<int>> ||
+				 std::same_as<std::remove_cvref_t<W>, int>)
+	Var(X &&x, Y &&y, Z &&z, W &&w) : VarBase() {
+		std::string xStr	 = ComponentToString(std::forward<X>(x));
+		std::string yStr	 = ComponentToString(std::forward<Y>(y));
+		std::string zStr	 = ComponentToString(std::forward<Z>(z));
+		std::string wStr	 = ComponentToString(std::forward<W>(w));
+		auto		initCode = std::format("{}=ivec4({}, {}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr, wStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
 
-    public:
-        template<CountableType T>
-        Var<int> operator[](T Index) {
-            return Var<int>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
-        }
-        
-        Var<int> operator[](ExprBase Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+public:
+	template <CountableType T> Var<int> operator[](T Index) {
+		return Var<int>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
+	}
 
-        template<ScalarType IndexT>
-        Var<int> operator[](Expr<IndexT> Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+	Var<int> operator[](ExprBase Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
 
-    public:
-        /* clang-format off */
+	template <ScalarType IndexT> Var<int> operator[](Expr<IndexT> Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
+
+public:
+	/* clang-format off */
         MEM(x) MEM(y) MEM(z) MEM(w)
 
         // 2-component swizzles (16)
@@ -279,246 +291,270 @@ namespace GPU::IR::Value {
 
         SWZ4(wwxx) SWZ4(wwxy) SWZ4(wwxz) SWZ4(wwxw) SWZ4(wwyx) SWZ4(wwyy) SWZ4(wwyz) SWZ4(wwyw)
         SWZ4(wwzx) SWZ4(wwzy) SWZ4(wwzz) SWZ4(wwzw) SWZ4(wwwx) SWZ4(wwwy) SWZ4(wwwz) SWZ4(wwww)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert component to string
-        template<typename T>
-        static std::string ComponentToString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, int>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<int>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<int>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
-    };
+	private :
+	// Helper to convert component to string
+	template <typename T>
+	static std::string ComponentToString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, int>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<int>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<int>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
+};
 
 #undef SWZ2
 #undef SWZ3
 #undef SWZ4
 #undef MEM
 
-    // ============================================================================
-    // Var-Expr and Expr-Var Cross Operators for IVector Types
-    // ============================================================================
-    
-    // IVec2: Var op Expr
-    [[nodiscard]] inline Expr<Math::IVec2> operator+(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator-(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator*(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator/(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // IVec2: Expr op Var
-    [[nodiscard]] inline Expr<Math::IVec2> operator+(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator-(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator*(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator/(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // IVec3: Var op Expr
-    [[nodiscard]] inline Expr<Math::IVec3> operator+(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator-(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator*(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator/(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // IVec3: Expr op Var
-    [[nodiscard]] inline Expr<Math::IVec3> operator+(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator-(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator*(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator/(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // IVec4: Var op Expr
-    [[nodiscard]] inline Expr<Math::IVec4> operator+(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator-(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator*(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator/(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // IVec4: Expr op Var
-    [[nodiscard]] inline Expr<Math::IVec4> operator+(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator-(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator*(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator/(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // Bitwise operators for IVec types
-    [[nodiscard]] inline Expr<Math::IVec2> operator&(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator|(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator^(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator&(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator|(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator^(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
-    }
-    
-    [[nodiscard]] inline Expr<Math::IVec3> operator&(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator|(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator^(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator&(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator|(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator^(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
-    }
-    
-    [[nodiscard]] inline Expr<Math::IVec4> operator&(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator|(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator^(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator&(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator|(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator^(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
-    }
+// ============================================================================
+// Var-Expr and Expr-Var Cross Operators for IVector Types
+// ============================================================================
 
-    // ============================================================================
-    // IVector Compound Assignment with Scalar Expr
-    // ============================================================================
-
-    // IVec2 compound assignment with Expr<int> (scalar)
-    inline Var<Math::IVec2> &operator*=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::MulAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-    inline Var<Math::IVec2> &operator/=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::DivAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-
-    // IVec3 compound assignment with Expr<int> (scalar)
-    inline Var<Math::IVec3> &operator*=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::MulAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-    inline Var<Math::IVec3> &operator/=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::DivAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-
-    // IVec4 compound assignment with Expr<int> (scalar)
-    inline Var<Math::IVec4> &operator*=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::MulAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-    inline Var<Math::IVec4> &operator/=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::DivAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-
+// IVec2: Var op Expr
+[[nodiscard]] inline Expr<Math::IVec2> operator+(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator-(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator*(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator/(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
 }
 
-#endif //EASYGPU_VARIVECTOR_H
+// IVec2: Expr op Var
+[[nodiscard]] inline Expr<Math::IVec2> operator+(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator-(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator*(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator/(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// IVec3: Var op Expr
+[[nodiscard]] inline Expr<Math::IVec3> operator+(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator-(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator*(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator/(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
+}
+
+// IVec3: Expr op Var
+[[nodiscard]] inline Expr<Math::IVec3> operator+(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator-(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator*(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator/(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// IVec4: Var op Expr
+[[nodiscard]] inline Expr<Math::IVec4> operator+(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator-(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator*(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator/(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
+}
+
+// IVec4: Expr op Var
+[[nodiscard]] inline Expr<Math::IVec4> operator+(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator-(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator*(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator/(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// Bitwise operators for IVec types
+[[nodiscard]] inline Expr<Math::IVec2> operator&(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator|(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator^(const VarBase<Math::IVec2> &lhs, const Expr<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator&(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator|(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator^(const Expr<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
+}
+
+[[nodiscard]] inline Expr<Math::IVec3> operator&(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator|(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator^(const VarBase<Math::IVec3> &lhs, const Expr<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator&(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator|(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator^(const Expr<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
+}
+
+[[nodiscard]] inline Expr<Math::IVec4> operator&(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator|(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator^(const VarBase<Math::IVec4> &lhs, const Expr<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator&(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator|(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator^(const Expr<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
+}
+
+// ============================================================================
+// IVector Compound Assignment with Scalar Expr
+// ============================================================================
+
+// IVec2 compound assignment with Expr<int> (scalar)
+inline Var<Math::IVec2> &operator*=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::MulAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+inline Var<Math::IVec2> &operator/=(Var<Math::IVec2> &lhs, const Expr<int> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::DivAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+
+// IVec3 compound assignment with Expr<int> (scalar)
+inline Var<Math::IVec3> &operator*=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::MulAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+inline Var<Math::IVec3> &operator/=(Var<Math::IVec3> &lhs, const Expr<int> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::DivAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+
+// IVec4 compound assignment with Expr<int> (scalar)
+inline Var<Math::IVec4> &operator*=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::MulAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+inline Var<Math::IVec4> &operator/=(Var<Math::IVec4> &lhs, const Expr<int> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::DivAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+
+} // namespace GPU::IR::Value
+
+#endif // EASYGPU_VARIVECTOR_H

@@ -5,7 +5,7 @@
  *      @Descripiton    :   Build context for FragmentKernel - generates vertex/fragment shader pair
  *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/19/2026
- * 
+ *
  * Inherits from KernelBuildContext to reuse all resource management.
  * Overrides code generation to produce VS/FS pair instead of compute shader.
  */
@@ -17,113 +17,121 @@
 
 namespace GPU::Kernel {
 
-    /**
-     * Build context for fragment shader generation
-     * Generates VS + FS pair for rasterization-based rendering
-     */
-    class FragmentBuildContext : public KernelBuildContext {
-    public:
-        /**
-         * Construct a fragment build context
-         * @param width Rendering width
-         * @param height Rendering height
-         */
-        FragmentBuildContext(uint32_t width, uint32_t height);
-        
-        ~FragmentBuildContext() override = default;
+/**
+ * Build context for fragment shader generation
+ * Generates VS + FS pair for rasterization-based rendering
+ */
+class FragmentBuildContext : public KernelBuildContext {
+public:
+	/**
+	 * Construct a fragment build context
+	 * @param width Rendering width
+	 * @param height Rendering height
+	 */
+	FragmentBuildContext(uint32_t width, uint32_t height);
 
-        // Disable copy
-        FragmentBuildContext(const FragmentBuildContext&) = delete;
-        FragmentBuildContext& operator=(const FragmentBuildContext&) = delete;
+	~FragmentBuildContext() override							  = default;
 
-        // Allow move
-        FragmentBuildContext(FragmentBuildContext&&) = default;
-        FragmentBuildContext& operator=(FragmentBuildContext&&) = default;
+	// Disable copy
+	FragmentBuildContext(const FragmentBuildContext &)			  = delete;
+	FragmentBuildContext &operator=(const FragmentBuildContext &) = delete;
 
-    public:
-        // ===================================================================
-        // Overrides from KernelBuildContext
-        // ===================================================================
-        
-        /**
-         * Get complete shader program source (VS + FS)
-         * Overrides to generate vertex/fragment shader pair instead of compute shader
-         */
-        std::string GetCompleteCode() override;
+	// Allow move
+	FragmentBuildContext(FragmentBuildContext &&)				  = default;
+	FragmentBuildContext &operator=(FragmentBuildContext &&)	  = default;
 
-        /**
-         * Get vertex shader source only
-         */
-        std::string GetVertexShaderSource();
+public:
+	// ===================================================================
+	// Overrides from KernelBuildContext
+	// ===================================================================
 
-        /**
-         * Get fragment shader source only
-         */
-        std::string GetFragmentShaderSource();
+	/**
+	 * Get complete shader program source (VS + FS)
+	 * Overrides to generate vertex/fragment shader pair instead of compute shader
+	 */
+	std::string GetCompleteCode() override;
 
-        /**
-         * Get texture declarations for fragment shader
-         * Uses sampler2D instead of image2D
-         */
-        std::string GetTextureDeclarations() const override;
+	/**
+	 * Get vertex shader source only
+	 */
+	std::string GetVertexShaderSource();
 
-    public:
-        // ===================================================================
-        // Fragment-specific Methods
-        // ===================================================================
-        
-        /**
-         * Get current resolution width
-         */
-        uint32_t GetWidth() const { return _width; }
+	/**
+	 * Get fragment shader source only
+	 */
+	std::string GetFragmentShaderSource();
 
-        /**
-         * Get current resolution height
-         */
-        uint32_t GetHeight() const { return _height; }
+	/**
+	 * Get texture declarations for fragment shader
+	 * Uses sampler2D instead of image2D
+	 */
+	std::string GetTextureDeclarations() const override;
 
-        /**
-         * Set resolution (called on window resize)
-         */
-        void SetResolution(uint32_t width, uint32_t height);
+public:
+	// ===================================================================
+	// Fragment-specific Methods
+	// ===================================================================
 
-        /**
-         * Mark that shader needs recompilation
-         */
-        void InvalidateShader() { InvalidateCachedProgram(); }
+	/**
+	 * Get current resolution width
+	 */
+	uint32_t GetWidth() const {
+		return _width;
+	}
 
-        /**
-         * Check if shader is valid for current state
-         */
-        bool IsShaderValid() const { return HasCachedProgram(); }
+	/**
+	 * Get current resolution height
+	 */
+	uint32_t GetHeight() const {
+		return _height;
+	}
 
-    protected:
-        /**
-         * Generate common headers (structs, uniforms, callables)
-         */
-        void GenerateCommonHeaders(std::ostringstream& oss);
+	/**
+	 * Set resolution (called on window resize)
+	 */
+	void SetResolution(uint32_t width, uint32_t height);
 
-        /**
-         * Generate vertex shader source
-         * Creates a simple pass-through shader that generates a full-screen triangle
-         */
-        std::string GenerateVertexShader();
+	/**
+	 * Mark that shader needs recompilation
+	 */
+	void InvalidateShader() {
+		InvalidateCachedProgram();
+	}
 
-        /**
-         * Generate fragment shader source
-         * Wraps user code with necessary declarations and output
-         */
-        std::string GenerateFragmentShader();
+	/**
+	 * Check if shader is valid for current state
+	 */
+	bool IsShaderValid() const {
+		return HasCachedProgram();
+	}
 
-        /**
-         * Generate version directive
-         */
-        static std::string GenerateHeader();
+protected:
+	/**
+	 * Generate common headers (structs, uniforms, callables)
+	 */
+	void			   GenerateCommonHeaders(std::ostringstream &oss);
 
-    protected:
-        uint32_t _width;
-        uint32_t _height;
-    };
+	/**
+	 * Generate vertex shader source
+	 * Creates a simple pass-through shader that generates a full-screen triangle
+	 */
+	std::string		   GenerateVertexShader();
+
+	/**
+	 * Generate fragment shader source
+	 * Wraps user code with necessary declarations and output
+	 */
+	std::string		   GenerateFragmentShader();
+
+	/**
+	 * Generate version directive
+	 */
+	static std::string GenerateHeader();
+
+protected:
+	uint32_t _width;
+	uint32_t _height;
+};
 
 } // namespace GPU::Kernel
 

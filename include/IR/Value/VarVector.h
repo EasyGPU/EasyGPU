@@ -19,116 +19,127 @@
 #include <format>
 
 namespace GPU::IR::Value {
-    // Swizzle macros for vectors
-#define MEM(n) Var<float> n() { return std::move(Var<float>(std::format("{}.{}", _varNode->VarName(), #n))); }
+// Swizzle macros for vectors
+#define MEM(n)                                                                                                         \
+	Var<float> n() {                                                                                                   \
+		return std::move(Var<float>(std::format("{}.{}", _varNode->VarName(), #n)));                                   \
+	}
 
-#define SWZ2(n) Var<Math::Vec2> n() { return std::move(Var<Math::Vec2>(std::format("{}.{}", _varNode->VarName(), #n))); }
-#define SWZ3(n) Var<Math::Vec3> n() { return std::move(Var<Math::Vec3>(std::format("{}.{}", _varNode->VarName(), #n))); }
-#define SWZ4(n) Var<Math::Vec4> n() { return std::move(Var<Math::Vec4>(std::format("{}.{}", _varNode->VarName(), #n))); }
+#define SWZ2(n)                                                                                                        \
+	Var<Math::Vec2> n() {                                                                                              \
+		return std::move(Var<Math::Vec2>(std::format("{}.{}", _varNode->VarName(), #n)));                              \
+	}
+#define SWZ3(n)                                                                                                        \
+	Var<Math::Vec3> n() {                                                                                              \
+		return std::move(Var<Math::Vec3>(std::format("{}.{}", _varNode->VarName(), #n)));                              \
+	}
+#define SWZ4(n)                                                                                                        \
+	Var<Math::Vec4> n() {                                                                                              \
+		return std::move(Var<Math::Vec4>(std::format("{}.{}", _varNode->VarName(), #n)));                              \
+	}
 
-    // Swizzle accessing for Vec2
-    template<>
-    class Var<Math::Vec2> : public VarBase<Math::Vec2> {
-    public:
-        using VarBase<Math::Vec2>::VarBase;
-        using VarBase<Math::Vec2>::Load;
-        using VarBase<Math::Vec2>::operator=;
-        using VarBase<Math::Vec2>::operator Expr<Math::Vec2>;
+// Swizzle accessing for Vec2
+template <> class Var<Math::Vec2> : public VarBase<Math::Vec2> {
+public:
+	using VarBase<Math::Vec2>::VarBase;
+	using VarBase<Math::Vec2>::Load;
+	using VarBase<Math::Vec2>::operator=;
+	using VarBase<Math::Vec2>::operator Expr<Math::Vec2>;
 
-        // Component constructor: Var<Vec2> v(x, y)
-        template<typename X, typename Y>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<float>> || std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<float>> || std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>)
-        Var(X&& x, Y&& y) : VarBase() {
-            std::string xStr = ComponentToString(std::forward<X>(x));
-            std::string yStr = ComponentToString(std::forward<Y>(y));
-            auto initCode = std::format("{}=vec2({}, {});\n", _varNode->VarName(), xStr, yStr);
-            Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
-        }
+	// Component constructor: Var<Vec2> v(x, y)
+	template <typename X, typename Y>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>)
+	Var(X &&x, Y &&y) : VarBase() {
+		std::string xStr	 = ComponentToString(std::forward<X>(x));
+		std::string yStr	 = ComponentToString(std::forward<Y>(y));
+		auto		initCode = std::format("{}=vec2({}, {});\n", _varNode->VarName(), xStr, yStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
 
-    public:
-        template<CountableType T>
-        Var<float> operator[](T Index) {
-            return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
-        }
-        
-        Var<float> operator[](ExprBase Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+public:
+	template <CountableType T> Var<float> operator[](T Index) {
+		return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
+	}
 
-        template<ScalarType IndexT>
-        Var<float> operator[](Expr<IndexT> Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+	Var<float> operator[](ExprBase Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
 
-    public:
-        /* clang-format off */
+	template <ScalarType IndexT> Var<float> operator[](Expr<IndexT> Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
+
+public:
+	/* clang-format off */
         MEM(x) MEM(y)
 
         // 2-component swizzles (4)
         SWZ2(xx) SWZ2(xy) SWZ2(yx) SWZ2(yy)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert component to string
-        template<typename T>
-        static std::string ComponentToString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, float>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
-    };
+	private :
+	// Helper to convert component to string
+	template <typename T>
+	static std::string ComponentToString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, float>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
+};
 
-    // Swizzle accessing for Vec3
-    template<>
-    class Var<Math::Vec3> : public VarBase<Math::Vec3> {
-    public:
-        using VarBase<Math::Vec3>::VarBase;
-        using VarBase<Math::Vec3>::Load;
-        using VarBase<Math::Vec3>::operator=;
-        using VarBase<Math::Vec3>::operator Expr<Math::Vec3>;
+// Swizzle accessing for Vec3
+template <> class Var<Math::Vec3> : public VarBase<Math::Vec3> {
+public:
+	using VarBase<Math::Vec3>::VarBase;
+	using VarBase<Math::Vec3>::Load;
+	using VarBase<Math::Vec3>::operator=;
+	using VarBase<Math::Vec3>::operator Expr<Math::Vec3>;
 
-        // Component constructor: Var<Vec3> v(x, y, z)
-        template<typename X, typename Y, typename Z>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<float>> || std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<float>> || std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Z>, Var<float>> || std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>)
-        Var(X&& x, Y&& y, Z&& z) : VarBase() {
-            std::string xStr = ComponentToString(std::forward<X>(x));
-            std::string yStr = ComponentToString(std::forward<Y>(y));
-            std::string zStr = ComponentToString(std::forward<Z>(z));
-            auto initCode = std::format("{}=vec3({}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr);
-            Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
-        }
+	// Component constructor: Var<Vec3> v(x, y, z)
+	template <typename X, typename Y, typename Z>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
+				(std::same_as<std::remove_cvref_t<Z>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>)
+	Var(X &&x, Y &&y, Z &&z) : VarBase() {
+		std::string xStr	 = ComponentToString(std::forward<X>(x));
+		std::string yStr	 = ComponentToString(std::forward<Y>(y));
+		std::string zStr	 = ComponentToString(std::forward<Z>(z));
+		auto		initCode = std::format("{}=vec3({}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
 
-    public:
-        template<CountableType T>
-        Var<float> operator[](T Index) {
-            return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
-        }
-        
-        Var<float> operator[](ExprBase Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+public:
+	template <CountableType T> Var<float> operator[](T Index) {
+		return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
+	}
 
-        template<ScalarType IndexT>
-        Var<float> operator[](Expr<IndexT> Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+	Var<float> operator[](ExprBase Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
 
-    public:
-        /* clang-format off */
+	template <ScalarType IndexT> Var<float> operator[](Expr<IndexT> Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
+
+public:
+	/* clang-format off */
         MEM(x) MEM(y) MEM(z)
 
         // 2-component swizzles
@@ -148,69 +159,70 @@ namespace GPU::IR::Value {
         SWZ3(zxx) SWZ3(zxy) SWZ3(zxz)
         SWZ3(zyx) SWZ3(zyy) SWZ3(zyz)
         SWZ3(zzx) SWZ3(zzy) SWZ3(zzz)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert component to string
-        template<typename T>
-        static std::string ComponentToString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, float>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
-    };
+	private :
+	// Helper to convert component to string
+	template <typename T>
+	static std::string ComponentToString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, float>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
+};
 
-    // Swizzle accessing for Vec4
+// Swizzle accessing for Vec4
 
-    template<>
-    class Var<Math::Vec4> : public VarBase<Math::Vec4> {
-    public:
-        using VarBase<Math::Vec4>::VarBase;
-        using VarBase<Math::Vec4>::Load;
-        using VarBase<Math::Vec4>::operator=;
-        using VarBase<Math::Vec4>::operator Expr<Math::Vec4>;
+template <> class Var<Math::Vec4> : public VarBase<Math::Vec4> {
+public:
+	using VarBase<Math::Vec4>::VarBase;
+	using VarBase<Math::Vec4>::Load;
+	using VarBase<Math::Vec4>::operator=;
+	using VarBase<Math::Vec4>::operator Expr<Math::Vec4>;
 
-        // Component constructor: Var<Vec4> v(x, y, z, w)
-        template<typename X, typename Y, typename Z, typename W>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<float>> || std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<float>> || std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Z>, Var<float>> || std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>) &&
-                     (std::same_as<std::remove_cvref_t<W>, Var<float>> || std::same_as<std::remove_cvref_t<W>, Expr<float>> || std::same_as<std::remove_cvref_t<W>, float>)
-        Var(X&& x, Y&& y, Z&& z, W&& w) : VarBase() {
-            std::string xStr = ComponentToString(std::forward<X>(x));
-            std::string yStr = ComponentToString(std::forward<Y>(y));
-            std::string zStr = ComponentToString(std::forward<Z>(z));
-            std::string wStr = ComponentToString(std::forward<W>(w));
-            auto initCode = std::format("{}=vec4({}, {}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr, wStr);
-            Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
-        }
+	// Component constructor: Var<Vec4> v(x, y, z, w)
+	template <typename X, typename Y, typename Z, typename W>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
+				(std::same_as<std::remove_cvref_t<Z>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>) &&
+				(std::same_as<std::remove_cvref_t<W>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<W>, Expr<float>> || std::same_as<std::remove_cvref_t<W>, float>)
+	Var(X &&x, Y &&y, Z &&z, W &&w) : VarBase() {
+		std::string xStr	 = ComponentToString(std::forward<X>(x));
+		std::string yStr	 = ComponentToString(std::forward<Y>(y));
+		std::string zStr	 = ComponentToString(std::forward<Z>(z));
+		std::string wStr	 = ComponentToString(std::forward<W>(w));
+		auto		initCode = std::format("{}=vec4({}, {}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr, wStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
 
-    public:
-        template<CountableType T>
-        Var<float> operator[](T Index) {
-            return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
-        }
-        
-        Var<float> operator[](ExprBase Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+public:
+	template <CountableType T> Var<float> operator[](T Index) {
+		return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
+	}
 
-        template<ScalarType IndexT>
-        Var<float> operator[](Expr<IndexT> Index) {
-            std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
-            return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
-        }
+	Var<float> operator[](ExprBase Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
 
-    public:
-        /* clang-format off */
+	template <ScalarType IndexT> Var<float> operator[](Expr<IndexT> Index) {
+		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
+		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
+	}
+
+public:
+	/* clang-format off */
         MEM(x) MEM(y) MEM(z) MEM(w)
 
         // 2-component swizzles (16)
@@ -280,521 +292,609 @@ namespace GPU::IR::Value {
 
         SWZ4(wwxx) SWZ4(wwxy) SWZ4(wwxz) SWZ4(wwxw) SWZ4(wwyx) SWZ4(wwyy) SWZ4(wwyz) SWZ4(wwyw)
         SWZ4(wwzx) SWZ4(wwzy) SWZ4(wwzz) SWZ4(wwzw) SWZ4(wwwx) SWZ4(wwwy) SWZ4(wwwz) SWZ4(wwww)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert component to string
-        template<typename T>
-        static std::string ComponentToString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, float>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
-    };
+	private :
+	// Helper to convert component to string
+	template <typename T>
+	static std::string ComponentToString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, float>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
+};
 
 #undef SWZ2
 #undef SWZ3
 #undef SWZ4
 #undef MEM
 
-    // ============================================================================
-    // Var-Expr and Expr-Var Cross Operators for Vector Types
-    // ============================================================================
-    
-    // Vec2: Var op Expr
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator/(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Vec2: Expr op Var
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // Vec3: Var op Expr
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator/(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Vec3: Expr op Var
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // Vec4: Var op Expr
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator/(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Vec4: Expr op Var
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // ============================================================================
-    // Vector * Scalar (Var<float>/Expr<float>) Mixed Operations
-    // ============================================================================
-    
-    // Vec2 * Scalar
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator/(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator/(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Scalar * Vec2
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<float> &lhs, const VarBase<Math::Vec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<float> &lhs, const VarBase<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    // Expr<float> * Expr<Vec2> (to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
-    }
-    
-    // Vec2 * Scalar (Expr versions - to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
-    }
-    
-    // Expr<Vec2> * VarBase<float> (to resolve ambiguity with VarBase<Vec2> * VarBase<float>)
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // VarBase<float> * Expr<Vec2> (to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<float> &lhs, const Expr<Math::Vec2> &rhs) {
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Vec3 * Scalar
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator/(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator/(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Scalar * Vec3
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<float> &lhs, const VarBase<Math::Vec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<float> &lhs, const VarBase<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    // Expr<float> * Expr<Vec3> (to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
-    }
-    
-    // Vec3 * Scalar (Expr versions - to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
-    }
-    
-    // Expr<Vec3> * VarBase<float> (to resolve ambiguity with VarBase<Vec3> * VarBase<float>)
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // VarBase<float> * Expr<Vec3> (to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<float> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Expr<float> * Expr<Vec3> operators
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
-    }
-    
-    // Vec4 * Scalar
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator/(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator/(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // Vec4 * Scalar (Expr versions - to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
-    }
+// ============================================================================
+// Var-Expr and Expr-Var Cross Operators for Vector Types
+// ============================================================================
 
-    // ============================================================================
-    // Vector Compound Assignment with Expr
-    // ============================================================================
-
-    // Vec2 compound assignment with Expr<float> (scalar)
-    inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::MulAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-    inline Var<Math::Vec2> &operator/=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::DivAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-
-    // Vec3 compound assignment with Expr<float> (scalar)
-    inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::MulAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-    inline Var<Math::Vec3> &operator/=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::DivAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-
-    // Vec4 compound assignment with Expr<float> (scalar)
-    inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::MulAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-    inline Var<Math::Vec4> &operator/=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(
-            Node::CompoundAssignmentCode::DivAssign,
-            std::move(lhsLoad),
-            CloneNode(rhs)
-        );
-        Builder::Builder::Get().Build(*comAssign, true);
-        return lhs;
-    }
-
-    // Expr<Vec4> * VarBase<float> (to resolve ambiguity with VarBase<Vec4> * VarBase<float>)
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
-    }
-    
-    // VarBase<float> * Expr<Vec4> (to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<float> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
-    }
-    
-    // CPU Vec * GPU Scalar (for mixed operations like cameraRight * u)
-    [[nodiscard]] inline Expr<Math::Vec2> operator*(const Math::Vec2 &lhs, const VarBase<float> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsUniform), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator*(const Math::Vec3 &lhs, const VarBase<float> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsUniform), rhs.Load()));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Math::Vec4 &lhs, const VarBase<float> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsUniform), rhs.Load()));
-    }
-
-    // CPU Vec + GPU Vec (for mixed operations like cameraForward + cameraRight * u)
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const Math::Vec2 &lhs, const Expr<Math::Vec2> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsUniform), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const Math::Vec2 &rhs) {
-        auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), std::move(rhsUniform)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const Math::Vec3 &lhs, const Expr<Math::Vec3> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsUniform), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const Math::Vec3 &rhs) {
-        auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), std::move(rhsUniform)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const Math::Vec4 &lhs, const Expr<Math::Vec4> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsUniform), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const Math::Vec4 &rhs) {
-        auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), std::move(rhsUniform)));
-    }
-    
-    // CPU Vec - GPU Vec
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const Math::Vec2 &lhs, const Expr<Math::Vec2> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsUniform), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const Math::Vec2 &rhs) {
-        auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::Vec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), std::move(rhsUniform)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec3> operator-(const Math::Vec3 &lhs, const Expr<Math::Vec3> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsUniform), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const Math::Vec4 &lhs, const Expr<Math::Vec4> &rhs) {
-        auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsUniform), CloneNode(rhs)));
-    }
-    
-    // Scalar * Vec4
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<float> &lhs, const VarBase<Math::Vec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<float> &lhs, const VarBase<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
-    }
-    // Expr<float> * Expr<Vec4> (to resolve ambiguity)
-    [[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
-    }
-    [[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
-        return Expr<Math::Vec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
-    }
+// Vec2: Var op Expr
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator/(const VarBase<Math::Vec2> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
 }
 
-#endif //EASYGPU_VARVECTOR_H
+// Vec2: Expr op Var
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<Math::Vec2> &lhs, const VarBase<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// Vec3: Var op Expr
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator/(const VarBase<Math::Vec3> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
+}
+
+// Vec3: Expr op Var
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<Math::Vec3> &lhs, const VarBase<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// Vec4: Var op Expr
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator/(const VarBase<Math::Vec4> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
+}
+
+// Vec4: Expr op Var
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<Math::Vec4> &lhs, const VarBase<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// ============================================================================
+// Vector * Scalar (Var<float>/Expr<float>) Mixed Operations
+// ============================================================================
+
+// Vec2 * Scalar
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator/(const VarBase<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator/(const VarBase<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
+}
+
+// Scalar * Vec2
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<float> &lhs, const VarBase<Math::Vec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<float> &lhs, const VarBase<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+// Expr<float> * Expr<Vec2> (to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<float> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
+}
+
+// Vec2 * Scalar (Expr versions - to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
+}
+
+// Expr<Vec2> * VarBase<float> (to resolve ambiguity with VarBase<Vec2> * VarBase<float>)
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator/(const Expr<Math::Vec2> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// VarBase<float> * Expr<Vec2> (to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const VarBase<float> &lhs, const Expr<Math::Vec2> &rhs) {
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+
+// Vec3 * Scalar
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator/(const VarBase<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator/(const VarBase<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
+}
+
+// Scalar * Vec3
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<float> &lhs, const VarBase<Math::Vec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<float> &lhs, const VarBase<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+// Expr<float> * Expr<Vec3> (to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+}
+
+// Vec3 * Scalar (Expr versions - to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
+}
+
+// Expr<Vec3> * VarBase<float> (to resolve ambiguity with VarBase<Vec3> * VarBase<float>)
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<Math::Vec3> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// VarBase<float> * Expr<Vec3> (to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const VarBase<float> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+
+// Expr<float> * Expr<Vec3> operators
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator/(const Expr<float> &lhs, const Expr<Math::Vec3> &rhs) {
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
+}
+
+// Vec4 * Scalar
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator/(const VarBase<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator/(const VarBase<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), CloneNode(rhs)));
+}
+
+// Vec4 * Scalar (Expr versions - to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
+}
+
+// ============================================================================
+// Vector Compound Assignment with Expr
+// ============================================================================
+
+// Vec2 compound assignment with Expr<float> (scalar)
+inline Var<Math::Vec2> &operator*=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::MulAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+inline Var<Math::Vec2> &operator/=(Var<Math::Vec2> &lhs, const Expr<float> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::DivAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+
+// Vec3 compound assignment with Expr<float> (scalar)
+inline Var<Math::Vec3> &operator*=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::MulAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+inline Var<Math::Vec3> &operator/=(Var<Math::Vec3> &lhs, const Expr<float> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::DivAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+
+// Vec4 compound assignment with Expr<float> (scalar)
+inline Var<Math::Vec4> &operator*=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::MulAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+inline Var<Math::Vec4> &operator/=(Var<Math::Vec4> &lhs, const Expr<float> &rhs) {
+	auto lhsLoad   = lhs.Load();
+	auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::DivAssign,
+																	std::move(lhsLoad), CloneNode(rhs));
+	Builder::Builder::Get().Build(*comAssign, true);
+	return lhs;
+}
+
+// Expr<Vec4> * VarBase<float> (to resolve ambiguity with VarBase<Vec4> * VarBase<float>)
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<Math::Vec4> &lhs, const VarBase<float> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), rhs.Load()));
+}
+
+// VarBase<float> * Expr<Vec4> (to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<float> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), CloneNode(rhs)));
+}
+
+// CPU Vec * GPU Scalar (for mixed operations like cameraRight * u)
+[[nodiscard]] inline Expr<Math::Vec2> operator*(const Math::Vec2 &lhs, const VarBase<float> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsUniform), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator*(const Math::Vec3 &lhs, const VarBase<float> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsUniform), rhs.Load()));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const Math::Vec4 &lhs, const VarBase<float> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsUniform), rhs.Load()));
+}
+
+// CPU Vec + GPU Vec (for mixed operations like cameraForward + cameraRight * u)
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const Math::Vec2 &lhs, const Expr<Math::Vec2> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsUniform), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator+(const Expr<Math::Vec2> &lhs, const Math::Vec2 &rhs) {
+	auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), std::move(rhsUniform)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const Math::Vec3 &lhs, const Expr<Math::Vec3> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsUniform), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator+(const Expr<Math::Vec3> &lhs, const Math::Vec3 &rhs) {
+	auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), std::move(rhsUniform)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const Math::Vec4 &lhs, const Expr<Math::Vec4> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsUniform), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<Math::Vec4> &lhs, const Math::Vec4 &rhs) {
+	auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), std::move(rhsUniform)));
+}
+
+// CPU Vec - GPU Vec
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const Math::Vec2 &lhs, const Expr<Math::Vec2> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsUniform), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec2> operator-(const Expr<Math::Vec2> &lhs, const Math::Vec2 &rhs) {
+	auto rhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::Vec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), std::move(rhsUniform)));
+}
+[[nodiscard]] inline Expr<Math::Vec3> operator-(const Math::Vec3 &lhs, const Expr<Math::Vec3> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsUniform), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const Math::Vec4 &lhs, const Expr<Math::Vec4> &rhs) {
+	auto lhsUniform = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsUniform), CloneNode(rhs)));
+}
+
+// Scalar * Vec4
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const VarBase<float> &lhs, const VarBase<Math::Vec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<float> &lhs, const VarBase<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), rhs.Load()));
+}
+// Expr<float> * Expr<Vec4> (to resolve ambiguity)
+[[nodiscard]] inline Expr<Math::Vec4> operator*(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator+(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator-(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, CloneNode(lhs), CloneNode(rhs)));
+}
+[[nodiscard]] inline Expr<Math::Vec4> operator/(const Expr<float> &lhs, const Expr<Math::Vec4> &rhs) {
+	return Expr<Math::Vec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
+}
+} // namespace GPU::IR::Value
+
+#endif // EASYGPU_VARVECTOR_H

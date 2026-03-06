@@ -16,41 +16,41 @@
 #include <vector>
 
 namespace GPU::IR::Node {
-    /**
-     * The intrinsic call node
-     */
-    class IntrinsicCallNode : public Node {
-    public:
-        IntrinsicCallNode(std::string Name, std::vector<std::unique_ptr<Node>> Parameter);
+/**
+ * The intrinsic call node
+ */
+class IntrinsicCallNode : public Node {
+public:
+	IntrinsicCallNode(std::string Name, std::vector<std::unique_ptr<Node>> Parameter);
 
-        ~IntrinsicCallNode() override = default;
+	~IntrinsicCallNode() override = default;
 
-    public:
-        [[nodiscard]] NodeType Type() const override;
+public:
+	[[nodiscard]] NodeType Type() const override;
 
-    public:
-        /**
-         * Getting the name of the call
-         * @return The name of the calling
-         */
-        [[nodiscard]] std::string_view Name() const;
+public:
+	/**
+	 * Getting the name of the call
+	 * @return The name of the calling
+	 */
+	[[nodiscard]] std::string_view							Name() const;
 
-        /**
-         * Get the parameters of the calling
-         * @return The parameters of the calling
-         */
-        [[nodiscard]] const std::vector<std::unique_ptr<Node>> &Parameter() const;
+	/**
+	 * Get the parameters of the calling
+	 * @return The parameters of the calling
+	 */
+	[[nodiscard]] const std::vector<std::unique_ptr<Node>> &Parameter() const;
 
-        /**
-         * Clone this node and its arguments
-         * @return A deep copy of this node
-         */
-        [[nodiscard]] std::unique_ptr<Node> Clone() const override;
+	/**
+	 * Clone this node and its arguments
+	 * @return A deep copy of this node
+	 */
+	[[nodiscard]] std::unique_ptr<Node>						Clone() const override;
 
-    private:
-        std::string                        _name;
-        std::vector<std::unique_ptr<Node>> _parameter;
-    };
-}
+private:
+	std::string						   _name;
+	std::vector<std::unique_ptr<Node>> _parameter;
+};
+} // namespace GPU::IR::Node
 
-#endif //EASYGPU_CALLINST_H
+#endif // EASYGPU_CALLINST_H

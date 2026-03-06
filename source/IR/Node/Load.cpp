@@ -7,9 +7,9 @@
 #include <IR/Node/Load.h>
 
 namespace GPU::IR::Node {
-    NodeType LoadNode::Type() const {
-        return NodeType::Load;
-    }
-    
-    // Clone() is pure virtual - implemented by derived classes
+NodeType LoadNode::Type() const {
+	return NodeType::Load;
 }
+
+// Clone() is pure virtual - implemented by derived classes
+} // namespace GPU::IR::Node

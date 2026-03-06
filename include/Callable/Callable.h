@@ -13,8 +13,8 @@
 #include <IR/Builder/BuilderContext.h>
 #include <IR/Node/Call.h>
 #include <IR/Value/Expr.h>
-#include <IR/Value/Var.h>
 #include <IR/Value/SideEffectToken.h>
+#include <IR/Value/Var.h>
 #include <Utility/Meta/StructMeta.h>
 
 #include <atomic>
@@ -31,43 +31,38 @@ namespace Detail {
  * Helper to remove reference from type
  * Var<int&> -> Var<int>
  */
-template <typename T> using RemoveRef				   = std::remove_reference_t<T>;
+template <typename T> using RemoveRef			  = std::remove_reference_t<T>;
 
 /**
  * Helper to check if a type is a reference
  */
-template <typename T> inline constexpr bool		 IsRef = std::is_reference_v<T>;
+template <typename T> inline constexpr bool IsRef = std::is_reference_v<T>;
 
 // Forward declarations for type extraction
 namespace TypeExtractor {
-    // Primary template: assume T is already a scalar type
-    template<typename T>
-    struct ExtractScalar {
-        using type = T;
-        static constexpr bool isGpuType = false;
-    };
-    
-    // Specialization for Var<T>
-    template<typename T>
-    struct ExtractScalar<IR::Value::Var<T>> {
-        using type = T;
-        static constexpr bool isGpuType = true;
-    };
-    
-    // Specialization for Expr<T>
-    template<typename T>
-    struct ExtractScalar<IR::Value::Expr<T>> {
-        using type = T;
-        static constexpr bool isGpuType = true;
-    };
-    
-    // Helper alias
-    template<typename T>
-    using ToScalar = typename ExtractScalar<RemoveRef<T>>::type;
-    
-    template<typename T>
-    inline constexpr bool IsGpuType = ExtractScalar<RemoveRef<T>>::isGpuType;
-}
+// Primary template: assume T is already a scalar type
+template <typename T> struct ExtractScalar {
+	using type						= T;
+	static constexpr bool isGpuType = false;
+};
+
+// Specialization for Var<T>
+template <typename T> struct ExtractScalar<IR::Value::Var<T>> {
+	using type						= T;
+	static constexpr bool isGpuType = true;
+};
+
+// Specialization for Expr<T>
+template <typename T> struct ExtractScalar<IR::Value::Expr<T>> {
+	using type						= T;
+	static constexpr bool isGpuType = true;
+};
+
+// Helper alias
+template <typename T> using ToScalar				  = typename ExtractScalar<RemoveRef<T>>::type;
+
+template <typename T> inline constexpr bool IsGpuType = ExtractScalar<RemoveRef<T>>::isGpuType;
+} // namespace TypeExtractor
 
 /**
  * Helper to get type name as string for GLSL
@@ -196,11 +191,10 @@ private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
 	std::string										   _baseName;	 // Base name for the function
 	mutable std::string								   _mangledName; // Generated unique name
-	
+
 	// Extract scalar types for Args and R (supports both C++ types and GPU types like Float, Float3)
-	using ScalarR = Detail::TypeExtractor::ToScalar<R>;
-	template<typename Arg>
-	using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
+	using ScalarR							= Detail::TypeExtractor::ToScalar<R>;
+	template <typename Arg> using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
 
 public:
 	/**
@@ -305,10 +299,9 @@ private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
 	std::string										   _baseName;
 	mutable std::string								   _mangledName;
-	
+
 	// Extract scalar types for Args (supports both C++ types and GPU types)
-	template<typename Arg>
-	using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
+	template <typename Arg> using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
 
 public:
 	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)) {
@@ -342,7 +335,7 @@ public:
 		(argNodes.push_back(IR::Value::CloneNode(args)), ...);
 
 		auto callNode = std::make_unique<IR::Node::CallNode>(_mangledName, std::move(argNodes));
-		
+
 		// Return a token that will commit the side effect on destruction
 		return IR::Value::SideEffectToken(std::move(callNode));
 	}

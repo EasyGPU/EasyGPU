@@ -9,307 +9,268 @@
 #ifndef EASYGPU_EXPRIVECTOR_H
 #define EASYGPU_EXPRIVECTOR_H
 
-#include <IR/Value/Expr.h>
 #include <IR/Builder/Builder.h>
+#include <IR/Value/Expr.h>
 
 #include <Utility/Vec.h>
 
 #include <format>
 
 namespace GPU::IR::Value {
-    // Swizzle macros for int vector expressions
-    // Single component access returns Expr<int>
-#define EXPR_IVEC_MEM(n) Expr<int> n() && { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<int>(std::make_unique<Node::LoadUniformNode>(std::format("{}.{}", exprStr, #n))); \
-}
+// Swizzle macros for int vector expressions
+// Single component access returns Expr<int>
+#define EXPR_IVEC_MEM(n)                                                                                               \
+	Expr<int> n() && {                                                                                                 \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<int>(std::make_unique<Node::LoadUniformNode>(std::format("{}.{}", exprStr, #n)));                  \
+	}
 
-    // 2-component swizzle
-#define EXPR_IVEC_SWZ2(n) Expr<Math::IVec2> n() && { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<Math::IVec2>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n))); \
-}
+// 2-component swizzle
+#define EXPR_IVEC_SWZ2(n)                                                                                              \
+	Expr<Math::IVec2> n() && {                                                                                         \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<Math::IVec2>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n)));        \
+	}
 
-    // 3-component swizzle
-#define EXPR_IVEC_SWZ3(n) Expr<Math::IVec3> n() && { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<Math::IVec3>(std::make_unique<Node::LoadUniformNode>(std::format("{}.{}", exprStr, #n))); \
-}
+// 3-component swizzle
+#define EXPR_IVEC_SWZ3(n)                                                                                              \
+	Expr<Math::IVec3> n() && {                                                                                         \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<Math::IVec3>(std::make_unique<Node::LoadUniformNode>(std::format("{}.{}", exprStr, #n)));          \
+	}
 
-    // 4-component swizzle
-#define EXPR_IVEC_SWZ4(n) Expr<Math::IVec4> n() && { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<Math::IVec4>(std::make_unique<Node::LoadUniformNode>(std::format("{}.{}", exprStr, #n))); \
-}
+// 4-component swizzle
+#define EXPR_IVEC_SWZ4(n)                                                                                              \
+	Expr<Math::IVec4> n() && {                                                                                         \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<Math::IVec4>(std::make_unique<Node::LoadUniformNode>(std::format("{}.{}", exprStr, #n)));          \
+	}
 
-    // Specialization for IVec2 expressions with swizzle access
-    template<>
-    class Expr<Math::IVec2> : public ExprBase {
-    public:
-        using ValueType = Math::IVec2;
-        using ElementType_t = int;
+// Specialization for IVec2 expressions with swizzle access
+template <> class Expr<Math::IVec2> : public ExprBase {
+public:
+	using ValueType		= Math::IVec2;
+	using ElementType_t = int;
 
-        Expr() = default;
-        Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
-        
-        // Construct from same-type Var
-        Expr(const Var<Math::IVec2>& var);
-        
-        ~Expr() = default;
+	Expr()				= default;
+	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
+	}
+	explicit Expr(const ExprBase &base)
+		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	}
+	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
+	}
 
-        // Subscript access
-        template<CountableType IndexType>
-        Expr<int> operator[](IndexType index) && {
-            auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
-        }
-        
-        template<CountableType IndexType>
-        Expr<int> operator[](IndexType index) & = delete;
+	// Construct from same-type Var
+	Expr(const Var<Math::IVec2> &var);
 
-        Expr<int> operator[](ExprBase index) && {
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        Expr<int> operator[](ExprBase index) & = delete;
+	~Expr() = default;
 
-        template<ScalarType IndexT>
-        Expr<int> operator[](Expr<IndexT> index) && {
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        template<ScalarType IndexT>
-        Expr<int> operator[](Expr<IndexT> index) & = delete;
+	// Subscript access
+	template <CountableType IndexType> Expr<int> operator[](IndexType index) && {
+		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
+	}
 
-        // Swizzle access (rvalue only)
-        /* clang-format off */
+	template <CountableType IndexType> Expr<int> operator[](IndexType index) & = delete;
+
+	Expr<int>									 operator[](ExprBase index)									   &&{
+		   return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	Expr<int>							   operator[](ExprBase index) & = delete;
+
+	template <ScalarType IndexT> Expr<int> operator[](Expr<IndexT> index) && {
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	template <ScalarType IndexT> Expr<int> operator[](Expr<IndexT> index) & = delete;
+
+	// Swizzle access (rvalue only)
+	/* clang-format off */
         EXPR_IVEC_MEM(x) EXPR_IVEC_MEM(y)
 
         // 2-component swizzles
         EXPR_IVEC_SWZ2(xx) EXPR_IVEC_SWZ2(xy) EXPR_IVEC_SWZ2(yx) EXPR_IVEC_SWZ2(yy)
-        /* clang-format on */
+	/* clang-format on */
 
-    public:
-        // Arithmetic operations
-        friend Expr<Math::IVec2> operator+(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Release()));
-        }
+	public :
+	// Arithmetic operations
+	friend Expr<Math::IVec2>
+	operator+(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator-(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec2> operator-(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator*(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec2> operator*(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator/(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec2> operator/(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Release()));
+	}
 
-        // Scalar operations with int literal
-        friend Expr<Math::IVec2> operator*(Expr<Math::IVec2> lhs, int rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec2> operator*(int lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
-        friend Expr<Math::IVec2> operator/(Expr<Math::IVec2> lhs, int rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec2> operator+(Expr<Math::IVec2> lhs, int rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec2> operator+(int lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
-        friend Expr<Math::IVec2> operator-(Expr<Math::IVec2> lhs, int rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec2> operator-(int lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
+	// Scalar operations with int literal
+	friend Expr<Math::IVec2> operator*(Expr<Math::IVec2> lhs, int rhs) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Mul, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec2> operator*(int lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Mul, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
+	friend Expr<Math::IVec2> operator/(Expr<Math::IVec2> lhs, int rhs) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Div, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec2> operator+(Expr<Math::IVec2> lhs, int rhs) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Add, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec2> operator+(int lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Add, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
+	friend Expr<Math::IVec2> operator-(Expr<Math::IVec2> lhs, int rhs) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Sub, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec2> operator-(int lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Sub, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
 
-        // Scalar operations with Var<int>
-        friend Expr<Math::IVec2> operator*(Expr<Math::IVec2> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec2> operator*(const Var<int>& lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Load(), rhs.Release()));
-        }
-        friend Expr<Math::IVec2> operator/(Expr<Math::IVec2> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec2> operator+(Expr<Math::IVec2> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec2> operator+(const Var<int>& lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Load(), rhs.Release()));
-        }
-        friend Expr<Math::IVec2> operator-(Expr<Math::IVec2> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec2> operator-(const Var<int>& lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Load(), rhs.Release()));
-        }
+	// Scalar operations with Var<int>
+	friend Expr<Math::IVec2> operator*(Expr<Math::IVec2> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec2> operator*(const Var<int> &lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), rhs.Release()));
+	}
+	friend Expr<Math::IVec2> operator/(Expr<Math::IVec2> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec2> operator+(Expr<Math::IVec2> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec2> operator+(const Var<int> &lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), rhs.Release()));
+	}
+	friend Expr<Math::IVec2> operator-(Expr<Math::IVec2> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec2> operator-(const Var<int> &lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), rhs.Release()));
+	}
 
-        // Bitwise operations
-        friend Expr<Math::IVec2> operator&(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitAnd, lhs.Release(), rhs.Release()));
-        }
+	// Bitwise operations
+	friend Expr<Math::IVec2> operator&(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator|(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitOr, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec2> operator|(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator^(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitXor, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec2> operator^(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator~(Expr<Math::IVec2> val) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitNot, val.Release()));
-        }
+	friend Expr<Math::IVec2> operator~(Expr<Math::IVec2> val) {
+		return Expr<Math::IVec2>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitNot, val.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator<<(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Shl, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec2> operator<<(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec2> operator>>(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<Math::IVec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Shr, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec2> operator>>(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<Math::IVec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, lhs.Release(), rhs.Release()));
+	}
 
-        // Comparison
-        friend Expr<bool> operator<(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Less, lhs.Release(), rhs.Release()));
-        }
+	// Comparison
+	friend Expr<bool> operator<(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Less, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator>(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator>(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator==(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator==(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator!=(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
-        }
-    };
+	friend Expr<bool> operator!=(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
+	}
+};
 
-    // Specialization for IVec3 expressions with swizzle access
-    template<>
-    class Expr<Math::IVec3> : public ExprBase {
-    public:
-        using ValueType = Math::IVec3;
-        using ElementType_t = int;
+// Specialization for IVec3 expressions with swizzle access
+template <> class Expr<Math::IVec3> : public ExprBase {
+public:
+	using ValueType		= Math::IVec3;
+	using ElementType_t = int;
 
-        Expr() = default;
-        Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
-        
-        // Construct from same-type Var
-        Expr(const Var<Math::IVec3>& var);
-        
-        ~Expr() = default;
+	Expr()				= default;
+	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
+	}
+	explicit Expr(const ExprBase &base)
+		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	}
+	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
+	}
 
-        // Subscript access
-        template<CountableType IndexType>
-        Expr<int> operator[](IndexType index) && {
-            auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
-        }
-        
-        template<CountableType IndexType>
-        Expr<int> operator[](IndexType index) & = delete;
+	// Construct from same-type Var
+	Expr(const Var<Math::IVec3> &var);
 
-        Expr<int> operator[](ExprBase index) && {
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        Expr<int> operator[](ExprBase index) & = delete;
+	~Expr() = default;
 
-        template<ScalarType IndexT>
-        Expr<int> operator[](Expr<IndexT> index) && {
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        template<ScalarType IndexT>
-        Expr<int> operator[](Expr<IndexT> index) & = delete;
+	// Subscript access
+	template <CountableType IndexType> Expr<int> operator[](IndexType index) && {
+		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
+	}
 
-        // Swizzle access (rvalue only)
-        /* clang-format off */
+	template <CountableType IndexType> Expr<int> operator[](IndexType index) & = delete;
+
+	Expr<int>									 operator[](ExprBase index)									   &&{
+		   return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	Expr<int>							   operator[](ExprBase index) & = delete;
+
+	template <ScalarType IndexT> Expr<int> operator[](Expr<IndexT> index) && {
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	template <ScalarType IndexT> Expr<int> operator[](Expr<IndexT> index) & = delete;
+
+	// Swizzle access (rvalue only)
+	/* clang-format off */
         EXPR_IVEC_MEM(x) EXPR_IVEC_MEM(y) EXPR_IVEC_MEM(z)
 
         // 2-component swizzles
@@ -329,224 +290,185 @@ namespace GPU::IR::Value {
         EXPR_IVEC_SWZ3(zxx) EXPR_IVEC_SWZ3(zxy) EXPR_IVEC_SWZ3(zxz)
         EXPR_IVEC_SWZ3(zyx) EXPR_IVEC_SWZ3(zyy) EXPR_IVEC_SWZ3(zyz)
         EXPR_IVEC_SWZ3(zzx) EXPR_IVEC_SWZ3(zzy) EXPR_IVEC_SWZ3(zzz)
-        /* clang-format on */
+	/* clang-format on */
 
-    public:
-        // Arithmetic operations
-        friend Expr<Math::IVec3> operator+(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Release()));
-        }
+	public :
+	// Arithmetic operations
+	friend Expr<Math::IVec3>
+	operator+(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator-(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec3> operator-(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator*(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec3> operator*(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator/(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec3> operator/(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Release()));
+	}
 
-        // Scalar operations with int literal
-        friend Expr<Math::IVec3> operator*(Expr<Math::IVec3> lhs, int rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec3> operator*(int lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
-        friend Expr<Math::IVec3> operator/(Expr<Math::IVec3> lhs, int rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec3> operator+(Expr<Math::IVec3> lhs, int rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec3> operator+(int lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
-        friend Expr<Math::IVec3> operator-(Expr<Math::IVec3> lhs, int rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec3> operator-(int lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
+	// Scalar operations with int literal
+	friend Expr<Math::IVec3> operator*(Expr<Math::IVec3> lhs, int rhs) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Mul, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec3> operator*(int lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Mul, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
+	friend Expr<Math::IVec3> operator/(Expr<Math::IVec3> lhs, int rhs) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Div, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec3> operator+(Expr<Math::IVec3> lhs, int rhs) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Add, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec3> operator+(int lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Add, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
+	friend Expr<Math::IVec3> operator-(Expr<Math::IVec3> lhs, int rhs) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Sub, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec3> operator-(int lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Sub, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
 
-        // Scalar operations with Var<int>
-        friend Expr<Math::IVec3> operator*(Expr<Math::IVec3> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec3> operator*(const Var<int>& lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Load(), rhs.Release()));
-        }
-        friend Expr<Math::IVec3> operator/(Expr<Math::IVec3> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec3> operator+(Expr<Math::IVec3> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec3> operator+(const Var<int>& lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Load(), rhs.Release()));
-        }
-        friend Expr<Math::IVec3> operator-(Expr<Math::IVec3> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec3> operator-(const Var<int>& lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Load(), rhs.Release()));
-        }
+	// Scalar operations with Var<int>
+	friend Expr<Math::IVec3> operator*(Expr<Math::IVec3> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec3> operator*(const Var<int> &lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), rhs.Release()));
+	}
+	friend Expr<Math::IVec3> operator/(Expr<Math::IVec3> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec3> operator+(Expr<Math::IVec3> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec3> operator+(const Var<int> &lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), rhs.Release()));
+	}
+	friend Expr<Math::IVec3> operator-(Expr<Math::IVec3> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec3> operator-(const Var<int> &lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), rhs.Release()));
+	}
 
-        // Bitwise operations
-        friend Expr<Math::IVec3> operator&(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitAnd, lhs.Release(), rhs.Release()));
-        }
+	// Bitwise operations
+	friend Expr<Math::IVec3> operator&(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator|(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitOr, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec3> operator|(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator^(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitXor, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec3> operator^(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator~(Expr<Math::IVec3> val) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitNot, val.Release()));
-        }
+	friend Expr<Math::IVec3> operator~(Expr<Math::IVec3> val) {
+		return Expr<Math::IVec3>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitNot, val.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator<<(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Shl, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec3> operator<<(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec3> operator>>(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<Math::IVec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Shr, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec3> operator>>(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<Math::IVec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, lhs.Release(), rhs.Release()));
+	}
 
-        // Comparison
-        friend Expr<bool> operator<(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Less, lhs.Release(), rhs.Release()));
-        }
+	// Comparison
+	friend Expr<bool> operator<(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Less, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator>(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator>(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator==(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator==(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator!=(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
-        }
-    };
+	friend Expr<bool> operator!=(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
+	}
+};
 
-    // Specialization for IVec4 expressions with swizzle access
-    template<>
-    class Expr<Math::IVec4> : public ExprBase {
-    public:
-        using ValueType = Math::IVec4;
-        using ElementType_t = int;
+// Specialization for IVec4 expressions with swizzle access
+template <> class Expr<Math::IVec4> : public ExprBase {
+public:
+	using ValueType		= Math::IVec4;
+	using ElementType_t = int;
 
-        Expr() = default;
-        Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
-        
-        // Construct from same-type Var
-        Expr(const Var<Math::IVec4>& var);
-        
-        ~Expr() = default;
+	Expr()				= default;
+	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
+	}
+	explicit Expr(const ExprBase &base)
+		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	}
+	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
+	}
 
-        // Subscript access
-        template<CountableType IndexType>
-        Expr<int> operator[](IndexType index) && {
-            auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
-        }
-        
-        template<CountableType IndexType>
-        Expr<int> operator[](IndexType index) & = delete;
+	// Construct from same-type Var
+	Expr(const Var<Math::IVec4> &var);
 
-        Expr<int> operator[](ExprBase index) && {
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        Expr<int> operator[](ExprBase index) & = delete;
+	~Expr() = default;
 
-        template<ScalarType IndexT>
-        Expr<int> operator[](Expr<IndexT> index) && {
-            return Expr<int>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        template<ScalarType IndexT>
-        Expr<int> operator[](Expr<IndexT> index) & = delete;
+	// Subscript access
+	template <CountableType IndexType> Expr<int> operator[](IndexType index) && {
+		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
+	}
 
-        // Swizzle access (rvalue only)
-        /* clang-format off */
+	template <CountableType IndexType> Expr<int> operator[](IndexType index) & = delete;
+
+	Expr<int>									 operator[](ExprBase index)									   &&{
+		   return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	Expr<int>							   operator[](ExprBase index) & = delete;
+
+	template <ScalarType IndexT> Expr<int> operator[](Expr<IndexT> index) && {
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	template <ScalarType IndexT> Expr<int> operator[](Expr<IndexT> index) & = delete;
+
+	// Swizzle access (rvalue only)
+	/* clang-format off */
         EXPR_IVEC_MEM(x) EXPR_IVEC_MEM(y) EXPR_IVEC_MEM(z) EXPR_IVEC_MEM(w)
 
         // 2-component swizzles (16)
@@ -616,563 +538,528 @@ namespace GPU::IR::Value {
 
         EXPR_IVEC_SWZ4(wwxx) EXPR_IVEC_SWZ4(wwxy) EXPR_IVEC_SWZ4(wwxz) EXPR_IVEC_SWZ4(wwxw) EXPR_IVEC_SWZ4(wwyx) EXPR_IVEC_SWZ4(wwyy) EXPR_IVEC_SWZ4(wwyz) EXPR_IVEC_SWZ4(wwyw)
         EXPR_IVEC_SWZ4(wwzx) EXPR_IVEC_SWZ4(wwzy) EXPR_IVEC_SWZ4(wwzz) EXPR_IVEC_SWZ4(wwzw) EXPR_IVEC_SWZ4(wwwx) EXPR_IVEC_SWZ4(wwwy) EXPR_IVEC_SWZ4(wwwz) EXPR_IVEC_SWZ4(wwww)
-        /* clang-format on */
+	/* clang-format on */
 
-    public:
-        // Arithmetic operations
-        friend Expr<Math::IVec4> operator+(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Release()));
-        }
+	public :
+	// Arithmetic operations
+	friend Expr<Math::IVec4>
+	operator+(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator-(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec4> operator-(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator*(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec4> operator*(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator/(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec4> operator/(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Release()));
+	}
 
-        // Scalar operations with int literal
-        friend Expr<Math::IVec4> operator*(Expr<Math::IVec4> lhs, int rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec4> operator*(int lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
-        friend Expr<Math::IVec4> operator/(Expr<Math::IVec4> lhs, int rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec4> operator+(Expr<Math::IVec4> lhs, int rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec4> operator+(int lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
-        friend Expr<Math::IVec4> operator-(Expr<Math::IVec4> lhs, int rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(),
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
-        }
-        friend Expr<Math::IVec4> operator-(int lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub,
-                    std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
-        }
+	// Scalar operations with int literal
+	friend Expr<Math::IVec4> operator*(Expr<Math::IVec4> lhs, int rhs) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Mul, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec4> operator*(int lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Mul, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
+	friend Expr<Math::IVec4> operator/(Expr<Math::IVec4> lhs, int rhs) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Div, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec4> operator+(Expr<Math::IVec4> lhs, int rhs) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Add, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec4> operator+(int lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Add, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
+	friend Expr<Math::IVec4> operator-(Expr<Math::IVec4> lhs, int rhs) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Sub, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString(rhs))));
+	}
+	friend Expr<Math::IVec4> operator-(int lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(
+			Node::OperationCode::Sub, std::make_unique<Node::LoadUniformNode>(ValueToString(lhs)), rhs.Release()));
+	}
 
-        // Scalar operations with Var<int>
-        friend Expr<Math::IVec4> operator*(Expr<Math::IVec4> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec4> operator*(const Var<int>& lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Load(), rhs.Release()));
-        }
-        friend Expr<Math::IVec4> operator/(Expr<Math::IVec4> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec4> operator+(Expr<Math::IVec4> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec4> operator+(const Var<int>& lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Load(), rhs.Release()));
-        }
-        friend Expr<Math::IVec4> operator-(Expr<Math::IVec4> lhs, const Var<int>& rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Load()));
-        }
-        friend Expr<Math::IVec4> operator-(const Var<int>& lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Load(), rhs.Release()));
-        }
+	// Scalar operations with Var<int>
+	friend Expr<Math::IVec4> operator*(Expr<Math::IVec4> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec4> operator*(const Var<int> &lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Load(), rhs.Release()));
+	}
+	friend Expr<Math::IVec4> operator/(Expr<Math::IVec4> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec4> operator+(Expr<Math::IVec4> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec4> operator+(const Var<int> &lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Load(), rhs.Release()));
+	}
+	friend Expr<Math::IVec4> operator-(Expr<Math::IVec4> lhs, const Var<int> &rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Load()));
+	}
+	friend Expr<Math::IVec4> operator-(const Var<int> &lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Load(), rhs.Release()));
+	}
 
-        // Bitwise operations
-        friend Expr<Math::IVec4> operator&(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitAnd, lhs.Release(), rhs.Release()));
-        }
+	// Bitwise operations
+	friend Expr<Math::IVec4> operator&(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator|(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitOr, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec4> operator|(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator^(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitXor, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec4> operator^(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator~(Expr<Math::IVec4> val) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::BitNot, val.Release()));
-        }
+	friend Expr<Math::IVec4> operator~(Expr<Math::IVec4> val) {
+		return Expr<Math::IVec4>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitNot, val.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator<<(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Shl, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec4> operator<<(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::IVec4> operator>>(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<Math::IVec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Shr, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::IVec4> operator>>(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<Math::IVec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, lhs.Release(), rhs.Release()));
+	}
 
-        // Comparison
-        friend Expr<bool> operator<(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Less, lhs.Release(), rhs.Release()));
-        }
+	// Comparison
+	friend Expr<bool> operator<(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Less, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator>(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator>(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator==(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator==(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator!=(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
-        }
-    };
+	friend Expr<bool> operator!=(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
+	}
+};
 
 #undef EXPR_IVEC_MEM
 #undef EXPR_IVEC_SWZ2
 #undef EXPR_IVEC_SWZ3
 #undef EXPR_IVEC_SWZ4
 
-    // ==================== Var IVector Scalar Operations ====================
-    // IVec2 * int
-    [[nodiscard]] inline Expr<Math::IVec2> operator*(const VarBase<Math::IVec2> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator*(int lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec2 / int
-    [[nodiscard]] inline Expr<Math::IVec2> operator/(const VarBase<Math::IVec2> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec2 + int
-    [[nodiscard]] inline Expr<Math::IVec2> operator+(const VarBase<Math::IVec2> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator+(int lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec2 - int
-    [[nodiscard]] inline Expr<Math::IVec2> operator-(const VarBase<Math::IVec2> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator-(int lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // IVec3 * int
-    [[nodiscard]] inline Expr<Math::IVec3> operator*(const VarBase<Math::IVec3> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator*(int lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec3 / int
-    [[nodiscard]] inline Expr<Math::IVec3> operator/(const VarBase<Math::IVec3> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec3 + int
-    [[nodiscard]] inline Expr<Math::IVec3> operator+(const VarBase<Math::IVec3> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator+(int lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec3 - int
-    [[nodiscard]] inline Expr<Math::IVec3> operator-(const VarBase<Math::IVec3> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator-(int lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // IVec4 * int
-    [[nodiscard]] inline Expr<Math::IVec4> operator*(const VarBase<Math::IVec4> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator*(int lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec4 / int
-    [[nodiscard]] inline Expr<Math::IVec4> operator/(const VarBase<Math::IVec4> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec4 + int
-    [[nodiscard]] inline Expr<Math::IVec4> operator+(const VarBase<Math::IVec4> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator+(int lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec4 - int
-    [[nodiscard]] inline Expr<Math::IVec4> operator-(const VarBase<Math::IVec4> &lhs, int rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator-(int lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // ==================== Var IVector with Var<int> Operations ====================
-    // IVec2 * Var<int>
-    [[nodiscard]] inline Expr<Math::IVec2> operator*(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator*(const Var<int> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec2 / Var<int>
-    [[nodiscard]] inline Expr<Math::IVec2> operator/(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec2 + Var<int>
-    [[nodiscard]] inline Expr<Math::IVec2> operator+(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator+(const Var<int> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec2 - Var<int>
-    [[nodiscard]] inline Expr<Math::IVec2> operator-(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator-(const Var<int> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // IVec3 * Var<int>
-    [[nodiscard]] inline Expr<Math::IVec3> operator*(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator*(const Var<int> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec3 / Var<int>
-    [[nodiscard]] inline Expr<Math::IVec3> operator/(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec3 + Var<int>
-    [[nodiscard]] inline Expr<Math::IVec3> operator+(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator+(const Var<int> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec3 - Var<int>
-    [[nodiscard]] inline Expr<Math::IVec3> operator-(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator-(const Var<int> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // IVec4 * Var<int>
-    [[nodiscard]] inline Expr<Math::IVec4> operator*(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator*(const Var<int> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec4 / Var<int>
-    [[nodiscard]] inline Expr<Math::IVec4> operator/(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec4 + Var<int>
-    [[nodiscard]] inline Expr<Math::IVec4> operator+(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator+(const Var<int> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    // IVec4 - Var<int>
-    [[nodiscard]] inline Expr<Math::IVec4> operator-(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator-(const Var<int> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // IVec2 VarBase & VarBase operations
-    [[nodiscard]] inline Expr<Math::IVec2> operator&(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator|(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator^(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator<<(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec2> operator>>(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec2>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // IVec3 VarBase & VarBase operations
-    [[nodiscard]] inline Expr<Math::IVec3> operator&(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator|(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator^(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator<<(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec3> operator>>(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec3>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
-    // IVec4 VarBase & VarBase operations
-    [[nodiscard]] inline Expr<Math::IVec4> operator&(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator|(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator^(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator<<(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-    [[nodiscard]] inline Expr<Math::IVec4> operator>>(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
-        auto lhsLoad = lhs.Load();
-        auto rhsLoad = rhs.Load();
-        return Expr<Math::IVec4>(
-            std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
-    }
-
+// ==================== Var IVector Scalar Operations ====================
+// IVec2 * int
+[[nodiscard]] inline Expr<Math::IVec2> operator*(const VarBase<Math::IVec2> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator*(int lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec2 / int
+[[nodiscard]] inline Expr<Math::IVec2> operator/(const VarBase<Math::IVec2> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec2 + int
+[[nodiscard]] inline Expr<Math::IVec2> operator+(const VarBase<Math::IVec2> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator+(int lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec2 - int
+[[nodiscard]] inline Expr<Math::IVec2> operator-(const VarBase<Math::IVec2> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator-(int lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
 }
 
-#endif //EASYGPU_EXPRIVECTOR_H
+// IVec3 * int
+[[nodiscard]] inline Expr<Math::IVec3> operator*(const VarBase<Math::IVec3> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator*(int lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec3 / int
+[[nodiscard]] inline Expr<Math::IVec3> operator/(const VarBase<Math::IVec3> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec3 + int
+[[nodiscard]] inline Expr<Math::IVec3> operator+(const VarBase<Math::IVec3> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator+(int lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec3 - int
+[[nodiscard]] inline Expr<Math::IVec3> operator-(const VarBase<Math::IVec3> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator-(int lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// IVec4 * int
+[[nodiscard]] inline Expr<Math::IVec4> operator*(const VarBase<Math::IVec4> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator*(int lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec4 / int
+[[nodiscard]] inline Expr<Math::IVec4> operator/(const VarBase<Math::IVec4> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec4 + int
+[[nodiscard]] inline Expr<Math::IVec4> operator+(const VarBase<Math::IVec4> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator+(int lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec4 - int
+[[nodiscard]] inline Expr<Math::IVec4> operator-(const VarBase<Math::IVec4> &lhs, int rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator-(int lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// ==================== Var IVector with Var<int> Operations ====================
+// IVec2 * Var<int>
+[[nodiscard]] inline Expr<Math::IVec2> operator*(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator*(const Var<int> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec2 / Var<int>
+[[nodiscard]] inline Expr<Math::IVec2> operator/(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec2 + Var<int>
+[[nodiscard]] inline Expr<Math::IVec2> operator+(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator+(const Var<int> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec2 - Var<int>
+[[nodiscard]] inline Expr<Math::IVec2> operator-(const VarBase<Math::IVec2> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator-(const Var<int> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// IVec3 * Var<int>
+[[nodiscard]] inline Expr<Math::IVec3> operator*(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator*(const Var<int> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec3 / Var<int>
+[[nodiscard]] inline Expr<Math::IVec3> operator/(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec3 + Var<int>
+[[nodiscard]] inline Expr<Math::IVec3> operator+(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator+(const Var<int> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec3 - Var<int>
+[[nodiscard]] inline Expr<Math::IVec3> operator-(const VarBase<Math::IVec3> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator-(const Var<int> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// IVec4 * Var<int>
+[[nodiscard]] inline Expr<Math::IVec4> operator*(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator*(const Var<int> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec4 / Var<int>
+[[nodiscard]] inline Expr<Math::IVec4> operator/(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec4 + Var<int>
+[[nodiscard]] inline Expr<Math::IVec4> operator+(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator+(const Var<int> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Add, std::move(lhsLoad), std::move(rhsLoad)));
+}
+// IVec4 - Var<int>
+[[nodiscard]] inline Expr<Math::IVec4> operator-(const VarBase<Math::IVec4> &lhs, const Var<int> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator-(const Var<int> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// IVec2 VarBase & VarBase operations
+[[nodiscard]] inline Expr<Math::IVec2> operator&(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator|(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator^(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator<<(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec2> operator>>(const VarBase<Math::IVec2> &lhs, const VarBase<Math::IVec2> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec2>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// IVec3 VarBase & VarBase operations
+[[nodiscard]] inline Expr<Math::IVec3> operator&(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator|(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator^(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator<<(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec3> operator>>(const VarBase<Math::IVec3> &lhs, const VarBase<Math::IVec3> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec3>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// IVec4 VarBase & VarBase operations
+[[nodiscard]] inline Expr<Math::IVec4> operator&(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator|(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator^(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator<<(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
+}
+[[nodiscard]] inline Expr<Math::IVec4> operator>>(const VarBase<Math::IVec4> &lhs, const VarBase<Math::IVec4> &rhs) {
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = rhs.Load();
+	return Expr<Math::IVec4>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+} // namespace GPU::IR::Value
+
+#endif // EASYGPU_EXPRIVECTOR_H

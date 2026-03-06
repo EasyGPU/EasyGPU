@@ -12,21 +12,21 @@
 #include <IR/Node/Load.h>
 
 namespace GPU::IR::Node {
-    /**
-     * The load node for local array
-     */
-    class LoadLocalArrayNode : public LoadNode {
-    public:
-        LoadLocalArrayNode(std::string Name);
+/**
+ * The load node for local array
+ */
+class LoadLocalArrayNode : public LoadNode {
+public:
+	LoadLocalArrayNode(std::string Name);
 
-    public:
-        [[nodiscard]] std::string Unwarp() const override;
+public:
+	[[nodiscard]] std::string			Unwarp() const override;
 
-        [[nodiscard]] std::unique_ptr<Node> Clone() const override;
+	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 
-    private:
-        std::string _name;
-    };
-}
+private:
+	std::string _name;
+};
+} // namespace GPU::IR::Node
 
-#endif //EASYGPU_LOADLOCALARRAY_H
+#endif // EASYGPU_LOADLOCALARRAY_H

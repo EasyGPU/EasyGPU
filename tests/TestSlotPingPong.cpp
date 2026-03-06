@@ -37,7 +37,7 @@ int main() {
 				  Int	left  = Max(i - 1, 0);
 				  Int	right = Min(i + 1, 63);
 
-				  Float	 sum	  = src[left] + src[i] + src[right];
+				  Float sum	  = src[left] + src[i] + src[right];
 				  dst[i]	  = sum / 3.0f;
 			  });
 
@@ -170,10 +170,10 @@ int main() {
 			std::cout << "[Test 3] Texture slot ping-pong..." << std::flush;
 			testsTotal++;
 
-			TextureSlot<PixelFormat::R32F>  readSlot;
-			TextureSlot<PixelFormat::R32F>  writeSlot;
+			TextureSlot<PixelFormat::R32F> readSlot;
+			TextureSlot<PixelFormat::R32F> writeSlot;
 
-			Kernel2D		   relax([&](Int x, Int y) {
+			Kernel2D					   relax([&](Int x, Int y) {
 				  auto	src = readSlot.Bind();
 				  auto	dst = writeSlot.Bind();
 
@@ -188,8 +188,8 @@ int main() {
 			  });
 
 			// Create checkerboard pattern
-			std::vector<float> ping(16 * 16, 0.0f);
-			std::vector<float> pong(16 * 16, 0.0f);
+			std::vector<float>			   ping(16 * 16, 0.0f);
+			std::vector<float>			   pong(16 * 16, 0.0f);
 			for (int y = 0; y < 16; ++y) {
 				for (int x = 0; x < 16; ++x) {
 					ping[y * 16 + x] = ((x + y) % 2 == 0) ? 100.0f : 0.0f;

@@ -9,231 +9,223 @@
 #ifndef EASYGPU_EXPRVECTOR_H
 #define EASYGPU_EXPRVECTOR_H
 
-#include <IR/Value/Expr.h>
 #include <IR/Builder/Builder.h>
+#include <IR/Value/Expr.h>
 
 #include <Utility/Vec.h>
 
 #include <format>
 
 namespace GPU::IR::Value {
-    // Forward declaration of Var for friend declarations
-    template<ScalarType T>
-    class Var;
+// Forward declaration of Var for friend declarations
+template <ScalarType T> class Var;
 
-    // Swizzle macros for expression vectors
-    // Single component access returns Expr<float>
-#define EXPR_MEM(n) Expr<float> n() { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<float>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n))); \
-}
+// Swizzle macros for expression vectors
+// Single component access returns Expr<float>
+#define EXPR_MEM(n)                                                                                                    \
+	Expr<float> n() {                                                                                                  \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<float>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n)));              \
+	}
 
-    // 2-component swizzle
-#define EXPR_SWZ2(n) Expr<Math::Vec2> n() { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<Math::Vec2>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n))); \
-}
+// 2-component swizzle
+#define EXPR_SWZ2(n)                                                                                                   \
+	Expr<Math::Vec2> n() {                                                                                             \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<Math::Vec2>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n)));         \
+	}
 
-    // 3-component swizzle
-#define EXPR_SWZ3(n) Expr<Math::Vec3> n() { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<Math::Vec3>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n))); \
-}
+// 3-component swizzle
+#define EXPR_SWZ3(n)                                                                                                   \
+	Expr<Math::Vec3> n() {                                                                                             \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<Math::Vec3>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n)));         \
+	}
 
-    // 4-component swizzle
-#define EXPR_SWZ4(n) Expr<Math::Vec4> n() { \
-    std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node()); \
-    return Expr<Math::Vec4>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n))); \
-}
+// 4-component swizzle
+#define EXPR_SWZ4(n)                                                                                                   \
+	Expr<Math::Vec4> n() {                                                                                             \
+		std::string exprStr = Builder::Builder::Get().BuildNode(*this->Node());                                        \
+		return Expr<Math::Vec4>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n)));         \
+	}
 
-    // Specialization for Vec2 expressions with swizzle access
-    template<>
-    class Expr<Math::Vec2> : public ExprBase {
-    public:
-        using ValueType = Math::Vec2;
-        using ElementType_t = float;
+// Specialization for Vec2 expressions with swizzle access
+template <> class Expr<Math::Vec2> : public ExprBase {
+public:
+	using ValueType		= Math::Vec2;
+	using ElementType_t = float;
 
-        Expr() = default;
-        Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
-        
-        // Construct from same-type Var
-        Expr(const Var<Math::Vec2>& var);
-        
-        // Construct from components
-        template<typename X, typename Y>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<float>> || std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<float>> || std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>)
-        Expr(X&& x, Y&& y) {
-            std::string xStr = ToGLSLString(std::forward<X>(x));
-            std::string yStr = ToGLSLString(std::forward<Y>(y));
-            _node = std::make_unique<Node::LoadUniformNode>(std::format("vec2({}, {})", xStr, yStr));
-        }
-        
-        ~Expr() = default;
+	Expr()				= default;
+	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
+	}
+	explicit Expr(const ExprBase &base)
+		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	}
+	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
+	}
 
-        // Subscript access
-        template<CountableType IndexType>
-        Expr<float> operator[](IndexType index) && {
-            auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
-        }
-        
-        template<CountableType IndexType>
-        Expr<float> operator[](IndexType index) & = delete;
+	// Construct from same-type Var
+	Expr(const Var<Math::Vec2> &var);
 
-        Expr<float> operator[](ExprBase index) && {
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        Expr<float> operator[](ExprBase index) & = delete;
+	// Construct from components
+	template <typename X, typename Y>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>)
+	Expr(X &&x, Y &&y) {
+		std::string xStr = ToGLSLString(std::forward<X>(x));
+		std::string yStr = ToGLSLString(std::forward<Y>(y));
+		_node			 = std::make_unique<Node::LoadUniformNode>(std::format("vec2({}, {})", xStr, yStr));
+	}
 
-        template<ScalarType IndexT>
-        Expr<float> operator[](Expr<IndexT> index) && {
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        template<ScalarType IndexT>
-        Expr<float> operator[](Expr<IndexT> index) & = delete;
+	~Expr() = default;
 
-        // Swizzle access (rvalue only)
-        /* clang-format off */
+	// Subscript access
+	template <CountableType IndexType> Expr<float> operator[](IndexType index) && {
+		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
+	}
+
+	template <CountableType IndexType> Expr<float> operator[](IndexType index) & = delete;
+
+	Expr<float>									   operator[](ExprBase index)									 &&{
+		   return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	Expr<float>								 operator[](ExprBase index) & = delete;
+
+	template <ScalarType IndexT> Expr<float> operator[](Expr<IndexT> index) && {
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	template <ScalarType IndexT> Expr<float> operator[](Expr<IndexT> index) & = delete;
+
+	// Swizzle access (rvalue only)
+	/* clang-format off */
         EXPR_MEM(x) EXPR_MEM(y)
 
         // 2-component swizzles
         EXPR_SWZ2(xx) EXPR_SWZ2(xy) EXPR_SWZ2(yx) EXPR_SWZ2(yy)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert value to GLSL string
-        template<typename T>
-        static std::string ToGLSLString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, float>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
+	private :
+	// Helper to convert value to GLSL string
+	template <typename T>
+	static std::string ToGLSLString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, float>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
 
-    public:
-        // Arithmetic operations
-        friend Expr<Math::Vec2> operator+(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<Math::Vec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Release()));
-        }
+public:
+	// Arithmetic operations
+	friend Expr<Math::Vec2> operator+(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<Math::Vec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec2> operator-(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<Math::Vec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec2> operator-(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<Math::Vec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec2> operator*(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<Math::Vec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec2> operator*(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<Math::Vec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec2> operator/(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<Math::Vec2>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec2> operator/(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<Math::Vec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Release()));
+	}
 
-        // Comparison
-        friend Expr<bool> operator<(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Less, lhs.Release(), rhs.Release()));
-        }
+	// Comparison
+	friend Expr<bool> operator<(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Less, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator>(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator>(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator==(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator==(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator!=(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
-        }
-    };
+	friend Expr<bool> operator!=(Expr<Math::Vec2> lhs, Expr<Math::Vec2> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
+	}
+};
 
-    // Specialization for Vec3 expressions with swizzle access
-    template<>
-    class Expr<Math::Vec3> : public ExprBase {
-    public:
-        using ValueType = Math::Vec3;
-        using ElementType_t = float;
+// Specialization for Vec3 expressions with swizzle access
+template <> class Expr<Math::Vec3> : public ExprBase {
+public:
+	using ValueType		= Math::Vec3;
+	using ElementType_t = float;
 
-        Expr() = default;
-        Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
-        
-        // Construct from same-type Var
-        Expr(const Var<Math::Vec3>& var);
-        
-        // Construct from components
-        template<typename X, typename Y, typename Z>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<float>> || std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<float>> || std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Z>, Var<float>> || std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>)
-        Expr(X&& x, Y&& y, Z&& z) {
-            std::string xStr = ToGLSLString(std::forward<X>(x));
-            std::string yStr = ToGLSLString(std::forward<Y>(y));
-            std::string zStr = ToGLSLString(std::forward<Z>(z));
-            _node = std::make_unique<Node::LoadUniformNode>(std::format("vec3({}, {}, {})", xStr, yStr, zStr));
-        }
-        
-        ~Expr() = default;
+	Expr()				= default;
+	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
+	}
+	explicit Expr(const ExprBase &base)
+		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	}
+	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
+	}
 
-        // Subscript access
-        template<CountableType IndexType>
-        Expr<float> operator[](IndexType index) && {
-            auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
-        }
-        
-        template<CountableType IndexType>
-        Expr<float> operator[](IndexType index) & = delete;
+	// Construct from same-type Var
+	Expr(const Var<Math::Vec3> &var);
 
-        Expr<float> operator[](ExprBase index) && {
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        Expr<float> operator[](ExprBase index) & = delete;
+	// Construct from components
+	template <typename X, typename Y, typename Z>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
+				(std::same_as<std::remove_cvref_t<Z>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>)
+	Expr(X &&x, Y &&y, Z &&z) {
+		std::string xStr = ToGLSLString(std::forward<X>(x));
+		std::string yStr = ToGLSLString(std::forward<Y>(y));
+		std::string zStr = ToGLSLString(std::forward<Z>(z));
+		_node			 = std::make_unique<Node::LoadUniformNode>(std::format("vec3({}, {}, {})", xStr, yStr, zStr));
+	}
 
-        template<ScalarType IndexT>
-        Expr<float> operator[](Expr<IndexT> index) && {
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        template<ScalarType IndexT>
-        Expr<float> operator[](Expr<IndexT> index) & = delete;
+	~Expr() = default;
 
-        // Swizzle access (rvalue only)
-        /* clang-format off */
+	// Subscript access
+	template <CountableType IndexType> Expr<float> operator[](IndexType index) && {
+		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
+	}
+
+	template <CountableType IndexType> Expr<float> operator[](IndexType index) & = delete;
+
+	Expr<float>									   operator[](ExprBase index)									 &&{
+		   return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	Expr<float>								 operator[](ExprBase index) & = delete;
+
+	template <ScalarType IndexT> Expr<float> operator[](Expr<IndexT> index) && {
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	template <ScalarType IndexT> Expr<float> operator[](Expr<IndexT> index) & = delete;
+
+	// Swizzle access (rvalue only)
+	/* clang-format off */
         EXPR_MEM(x) EXPR_MEM(y) EXPR_MEM(z)
 
         // 2-component swizzles
@@ -253,136 +245,128 @@ namespace GPU::IR::Value {
         EXPR_SWZ3(zxx) EXPR_SWZ3(zxy) EXPR_SWZ3(zxz)
         EXPR_SWZ3(zyx) EXPR_SWZ3(zyy) EXPR_SWZ3(zyz)
         EXPR_SWZ3(zzx) EXPR_SWZ3(zzy) EXPR_SWZ3(zzz)
-        /* clang-format on */
+	/* clang-format on */
 
-    private:
-        // Helper to convert value to GLSL string
-        template<typename T>
-        static std::string ToGLSLString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, float>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
+	private :
+	// Helper to convert value to GLSL string
+	template <typename T>
+	static std::string ToGLSLString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, float>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
 
-    public:
-        // Arithmetic operations
-        friend Expr<Math::Vec3> operator+(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<Math::Vec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Release()));
-        }
+public:
+	// Arithmetic operations
+	friend Expr<Math::Vec3> operator+(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<Math::Vec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec3> operator-(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<Math::Vec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec3> operator-(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<Math::Vec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec3> operator*(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<Math::Vec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec3> operator*(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<Math::Vec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec3> operator/(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<Math::Vec3>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec3> operator/(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<Math::Vec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Release()));
+	}
 
-        // Comparison
-        friend Expr<bool> operator<(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Less, lhs.Release(), rhs.Release()));
-        }
+	// Comparison
+	friend Expr<bool> operator<(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Less, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator>(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator>(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator==(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator==(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator!=(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
-        }
-    };
+	friend Expr<bool> operator!=(Expr<Math::Vec3> lhs, Expr<Math::Vec3> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
+	}
+};
 
-    // Specialization for Vec4 expressions with swizzle access
-    template<>
-    class Expr<Math::Vec4> : public ExprBase {
-    public:
-        using ValueType = Math::Vec4;
-        using ElementType_t = float;
+// Specialization for Vec4 expressions with swizzle access
+template <> class Expr<Math::Vec4> : public ExprBase {
+public:
+	using ValueType		= Math::Vec4;
+	using ElementType_t = float;
 
-        Expr() = default;
-        Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {}
-        explicit Expr(const ExprBase& base) : ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase&>(base).Release().release())) {}
-        explicit Expr(ExprBase&& base) : ExprBase(base.Release()) {}
-        
-        // Construct from same-type Var
-        Expr(const Var<Math::Vec4>& var);
-        
-        // Construct from components
-        template<typename X, typename Y, typename Z, typename W>
-            requires (std::same_as<std::remove_cvref_t<X>, Var<float>> || std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Y>, Var<float>> || std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
-                     (std::same_as<std::remove_cvref_t<Z>, Var<float>> || std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>) &&
-                     (std::same_as<std::remove_cvref_t<W>, Var<float>> || std::same_as<std::remove_cvref_t<W>, Expr<float>> || std::same_as<std::remove_cvref_t<W>, float>)
-        Expr(X&& x, Y&& y, Z&& z, W&& w) {
-            std::string xStr = ToGLSLString(std::forward<X>(x));
-            std::string yStr = ToGLSLString(std::forward<Y>(y));
-            std::string zStr = ToGLSLString(std::forward<Z>(z));
-            std::string wStr = ToGLSLString(std::forward<W>(w));
-            _node = std::make_unique<Node::LoadUniformNode>(std::format("vec4({}, {}, {}, {})", xStr, yStr, zStr, wStr));
-        }
-        
-        ~Expr() = default;
+	Expr()				= default;
+	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
+	}
+	explicit Expr(const ExprBase &base)
+		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	}
+	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
+	}
 
-        // Subscript access
-        template<CountableType IndexType>
-        Expr<float> operator[](IndexType index) && {
-            auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
-        }
-        
-        template<CountableType IndexType>
-        Expr<float> operator[](IndexType index) & = delete;
+	// Construct from same-type Var
+	Expr(const Var<Math::Vec4> &var);
 
-        Expr<float> operator[](ExprBase index) && {
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        Expr<float> operator[](ExprBase index) & = delete;
+	// Construct from components
+	template <typename X, typename Y, typename Z, typename W>
+		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
+				(std::same_as<std::remove_cvref_t<Y>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Y>, Expr<float>> || std::same_as<std::remove_cvref_t<Y>, float>) &&
+				(std::same_as<std::remove_cvref_t<Z>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<Z>, Expr<float>> || std::same_as<std::remove_cvref_t<Z>, float>) &&
+				(std::same_as<std::remove_cvref_t<W>, Var<float>> ||
+				 std::same_as<std::remove_cvref_t<W>, Expr<float>> || std::same_as<std::remove_cvref_t<W>, float>)
+	Expr(X &&x, Y &&y, Z &&z, W &&w) {
+		std::string xStr = ToGLSLString(std::forward<X>(x));
+		std::string yStr = ToGLSLString(std::forward<Y>(y));
+		std::string zStr = ToGLSLString(std::forward<Z>(z));
+		std::string wStr = ToGLSLString(std::forward<W>(w));
+		_node = std::make_unique<Node::LoadUniformNode>(std::format("vec4({}, {}, {}, {})", xStr, yStr, zStr, wStr));
+	}
 
-        template<ScalarType IndexT>
-        Expr<float> operator[](Expr<IndexT> index) && {
-            return Expr<float>(
-                std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
-        }
-        
-        template<ScalarType IndexT>
-        Expr<float> operator[](Expr<IndexT> index) & = delete;
+	~Expr() = default;
 
-        // Swizzle access (rvalue only)
-        /* clang-format off */
+	// Subscript access
+	template <CountableType IndexType> Expr<float> operator[](IndexType index) && {
+		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
+	}
+
+	template <CountableType IndexType> Expr<float> operator[](IndexType index) & = delete;
+
+	Expr<float>									   operator[](ExprBase index)									 &&{
+		   return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	Expr<float>								 operator[](ExprBase index) & = delete;
+
+	template <ScalarType IndexT> Expr<float> operator[](Expr<IndexT> index) && {
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+	}
+
+	template <ScalarType IndexT> Expr<float> operator[](Expr<IndexT> index) & = delete;
+
+	// Swizzle access (rvalue only)
+	/* clang-format off */
         EXPR_MEM(x) EXPR_MEM(y) EXPR_MEM(z) EXPR_MEM(w)
 
         // 2-component swizzles (16)
@@ -452,82 +436,73 @@ namespace GPU::IR::Value {
 
         EXPR_SWZ4(wwxx) EXPR_SWZ4(wwxy) EXPR_SWZ4(wwxz) EXPR_SWZ4(wwxw) EXPR_SWZ4(wwyx) EXPR_SWZ4(wwyy) EXPR_SWZ4(wwyz) EXPR_SWZ4(wwyw)
         EXPR_SWZ4(wwzx) EXPR_SWZ4(wwzy) EXPR_SWZ4(wwzz) EXPR_SWZ4(wwzw) EXPR_SWZ4(wwwx) EXPR_SWZ4(wwwy) EXPR_SWZ4(wwwz) EXPR_SWZ4(wwww)
-        /* clang-format on */
+	/* clang-format on */
 
-    public:
-        // Arithmetic operations
-        friend Expr<Math::Vec4> operator+(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<Math::Vec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Add, lhs.Release(), rhs.Release()));
-        }
+	public :
+	// Arithmetic operations
+	friend Expr<Math::Vec4>
+	operator+(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<Math::Vec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec4> operator-(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<Math::Vec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec4> operator-(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<Math::Vec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Sub, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec4> operator*(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<Math::Vec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec4> operator*(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<Math::Vec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<Math::Vec4> operator/(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<Math::Vec4>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Div, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<Math::Vec4> operator/(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<Math::Vec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Release(), rhs.Release()));
+	}
 
-        // Comparison
-        friend Expr<bool> operator<(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Less, lhs.Release(), rhs.Release()));
-        }
+	// Comparison
+	friend Expr<bool> operator<(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Less, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator>(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator>(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Greater, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator==(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator==(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Equal, lhs.Release(), rhs.Release()));
+	}
 
-        friend Expr<bool> operator!=(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
-            return Expr<bool>(
-                std::make_unique<Node::OperationNode>(
-                    Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
-        }
+	friend Expr<bool> operator!=(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+		return Expr<bool>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::NotEqual, lhs.Release(), rhs.Release()));
+	}
 
-    private:
-        // Helper to convert value to GLSL string
-        template<typename T>
-        static std::string ToGLSLString(T&& val) {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::same_as<U, float>) {
-                return ValueToString(val);
-            } else if constexpr (std::same_as<U, Expr<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Node());
-            } else if constexpr (std::same_as<U, Var<float>>) {
-                return Builder::Builder::Get().BuildNode(*val.Load().get());
-            } else {
-                return "";
-            }
-        }
-    };
+private:
+	// Helper to convert value to GLSL string
+	template <typename T> static std::string ToGLSLString(T &&val) {
+		using U = std::remove_cvref_t<T>;
+		if constexpr (std::same_as<U, float>) {
+			return ValueToString(val);
+		} else if constexpr (std::same_as<U, Expr<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Node());
+		} else if constexpr (std::same_as<U, Var<float>>) {
+			return Builder::Builder::Get().BuildNode(*val.Load().get());
+		} else {
+			return "";
+		}
+	}
+};
 
 #undef EXPR_MEM
 #undef EXPR_SWZ2
 #undef EXPR_SWZ3
 #undef EXPR_SWZ4
 
+} // namespace GPU::IR::Value
 
-}
-
-#endif //EASYGPU_EXPRVECTOR_H
+#endif // EASYGPU_EXPRVECTOR_H

@@ -13,40 +13,40 @@
 #include <memory>
 
 namespace GPU::IR::Node {
-    /**
-     * The node for store instruction
-     */
-    class StoreNode : public Node {
-    public:
-        StoreNode(std::unique_ptr<Node> LHS, std::unique_ptr<Node> RHS);
+/**
+ * The node for store instruction
+ */
+class StoreNode : public Node {
+public:
+	StoreNode(std::unique_ptr<Node> LHS, std::unique_ptr<Node> RHS);
 
-    public:
-        [[nodiscard]] NodeType Type() const override;
+public:
+	[[nodiscard]] NodeType Type() const override;
 
-    public:
-        /**
-         * Getting the left hand side node of the operation node
-         * @return The left hand side node of the operation node
-         */
-        [[nodiscard]] const Node * LHS() const;
+public:
+	/**
+	 * Getting the left hand side node of the operation node
+	 * @return The left hand side node of the operation node
+	 */
+	[[nodiscard]] const Node		   *LHS() const;
 
-        /**
-         * Getting the right hand side node of the operation node
-         * @return The right hand side node of the operation node, if it
-         * is unary, it will return nullptr
-         */
-        [[nodiscard]] const Node * RHS() const;
+	/**
+	 * Getting the right hand side node of the operation node
+	 * @return The right hand side node of the operation node, if it
+	 * is unary, it will return nullptr
+	 */
+	[[nodiscard]] const Node		   *RHS() const;
 
-        /**
-         * Clone this node and its children
-         * @return A deep copy of this node
-         */
-        [[nodiscard]] std::unique_ptr<Node> Clone() const override;
+	/**
+	 * Clone this node and its children
+	 * @return A deep copy of this node
+	 */
+	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 
-    private:
-        std::unique_ptr<Node> _lhs;
-        std::unique_ptr<Node> _rhs;
-    };
-}
+private:
+	std::unique_ptr<Node> _lhs;
+	std::unique_ptr<Node> _rhs;
+};
+} // namespace GPU::IR::Node
 
-#endif //EASYGPU_STORE_H
+#endif // EASYGPU_STORE_H

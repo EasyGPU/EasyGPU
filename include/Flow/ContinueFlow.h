@@ -9,25 +9,25 @@
 #ifndef EASYGPU_FLOW_CONTINUE_H
 #define EASYGPU_FLOW_CONTINUE_H
 
-#include <IR/Node/Continue.h>
 #include <IR/Builder/Builder.h>
+#include <IR/Node/Continue.h>
 
 namespace GPU::Flow {
-    /**
-     * Emit a continue statement to skip to the next iteration of the current loop
-     * 
-     * Usage:
-     *   For(0, 10, [&](Var<int>& i) {
-     *       If(i % 2 == 0, [&]() {
-     *           Continue();  // Skip even numbers
-     *       });
-     *       // Process odd numbers only
-     *   });
-     */
-    inline void Continue() {
-        auto continueNode = std::make_unique<IR::Node::ContinueNode>();
-        IR::Builder::Builder::Get().Build(*continueNode, true);
-    }
+/**
+ * Emit a continue statement to skip to the next iteration of the current loop
+ *
+ * Usage:
+ *   For(0, 10, [&](Var<int>& i) {
+ *       If(i % 2 == 0, [&]() {
+ *           Continue();  // Skip even numbers
+ *       });
+ *       // Process odd numbers only
+ *   });
+ */
+inline void Continue() {
+	auto continueNode = std::make_unique<IR::Node::ContinueNode>();
+	IR::Builder::Builder::Get().Build(*continueNode, true);
 }
+} // namespace GPU::Flow
 
-#endif //EASYGPU_FLOW_CONTINUE_H
+#endif // EASYGPU_FLOW_CONTINUE_H

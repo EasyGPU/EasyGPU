@@ -14,33 +14,33 @@
 #include <string>
 
 namespace GPU::IR::Node {
-    /**
-     * The node for storing raw GLSL code
-     * Used when collecting code from lambda for control flow statements
-     */
-    class RawCodeNode : public Node {
-    public:
-        /**
-         * Constructor from raw GLSL code string
-         * @param Code The GLSL code string
-         */
-        explicit RawCodeNode(std::string Code);
+/**
+ * The node for storing raw GLSL code
+ * Used when collecting code from lambda for control flow statements
+ */
+class RawCodeNode : public Node {
+public:
+	/**
+	 * Constructor from raw GLSL code string
+	 * @param Code The GLSL code string
+	 */
+	explicit RawCodeNode(std::string Code);
 
-    public:
-        [[nodiscard]] NodeType Type() const override;
+public:
+	[[nodiscard]] NodeType Type() const override;
 
-    public:
-        /**
-         * Getting the raw code
-         * @return The stored GLSL code
-         */
-        [[nodiscard]] const std::string &Code() const;
+public:
+	/**
+	 * Getting the raw code
+	 * @return The stored GLSL code
+	 */
+	[[nodiscard]] const std::string	   &Code() const;
 
-        [[nodiscard]] std::unique_ptr<Node> Clone() const override;
+	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 
-    private:
-        std::string _code;
-    };
-}
+private:
+	std::string _code;
+};
+} // namespace GPU::IR::Node
 
-#endif //EASYGPU_RAWCODE_H
+#endif // EASYGPU_RAWCODE_H

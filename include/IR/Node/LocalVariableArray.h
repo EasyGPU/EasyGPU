@@ -14,42 +14,42 @@
 #include <string>
 
 namespace GPU::IR::Node {
-    /**
-     * The node for the local variable array definition
-     */
-    class LocalVariableArrayNode : public Node {
-    public:
-        LocalVariableArrayNode(std::string Name, std::string Type, int Size);
+/**
+ * The node for the local variable array definition
+ */
+class LocalVariableArrayNode : public Node {
+public:
+	LocalVariableArrayNode(std::string Name, std::string Type, int Size);
 
-    public:
-        NodeType Type() const override;
+public:
+	NodeType Type() const override;
 
-    public:
-        /**
-         * Getting name of the variable
-         * @return The name of the local variable
-         */
-        [[nodiscard]] std::string VarName() const;
+public:
+	/**
+	 * Getting name of the variable
+	 * @return The name of the local variable
+	 */
+	[[nodiscard]] std::string			VarName() const;
 
-        /**
-         * Getting type of the variable
-         * @return The type of the local variable
-         */
-        [[nodiscard]] std::string VarType() const;
+	/**
+	 * Getting type of the variable
+	 * @return The type of the local variable
+	 */
+	[[nodiscard]] std::string			VarType() const;
 
-        /**
-         * Getting the size of the array
-         * @return The size of the array
-         */
-        [[nodiscard]] int Size() const;
+	/**
+	 * Getting the size of the array
+	 * @return The size of the array
+	 */
+	[[nodiscard]] int					Size() const;
 
-        [[nodiscard]] std::unique_ptr<Node> Clone() const override;
+	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 
-    private:
-        std::string _name;
-        std::string _type;
-        int         _size;
-    };
-}
+private:
+	std::string _name;
+	std::string _type;
+	int			_size;
+};
+} // namespace GPU::IR::Node
 
-#endif //EASYGPU_LOCALVARIABLEARRAY_H
+#endif // EASYGPU_LOCALVARIABLEARRAY_H

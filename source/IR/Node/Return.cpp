@@ -7,27 +7,27 @@
 #include <IR/Node/Return.h>
 
 namespace GPU::IR::Node {
-    ReturnNode::ReturnNode() = default;
+ReturnNode::ReturnNode() = default;
 
-    ReturnNode::ReturnNode(std::unique_ptr<Node> Value) : _value(std::move(Value)) {
-    }
-
-    NodeType ReturnNode::Type() const {
-        return NodeType::Return;
-    }
-
-    const Node *ReturnNode::Value() const {
-        return _value.get();
-    }
-
-    bool ReturnNode::HasValue() const {
-        return _value != nullptr;
-    }
-
-    std::unique_ptr<Node> ReturnNode::Clone() const {
-        if (_value) {
-            return std::make_unique<ReturnNode>(_value->Clone());
-        }
-        return std::make_unique<ReturnNode>();
-    }
+ReturnNode::ReturnNode(std::unique_ptr<Node> Value) : _value(std::move(Value)) {
 }
+
+NodeType ReturnNode::Type() const {
+	return NodeType::Return;
+}
+
+const Node *ReturnNode::Value() const {
+	return _value.get();
+}
+
+bool ReturnNode::HasValue() const {
+	return _value != nullptr;
+}
+
+std::unique_ptr<Node> ReturnNode::Clone() const {
+	if (_value) {
+		return std::make_unique<ReturnNode>(_value->Clone());
+	}
+	return std::make_unique<ReturnNode>();
+}
+} // namespace GPU::IR::Node
