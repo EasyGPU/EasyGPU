@@ -1177,8 +1177,7 @@ int main() {
 		std::cerr << "Failed to register window class\n";
 		return 1;
 	}
-
-	// 2. 创建窗口
+	
 	HWND hwnd = CreateWindowEx(0,
 							   TEXT("MyWindowClass"),
 							   TEXT("Fragment Kernel Demo"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280,
