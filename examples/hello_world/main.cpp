@@ -18,8 +18,6 @@
 #include <numeric>
 #include <vector>
 
-template <class T1, class T2> Callable<Float(T1, T2)> func = [&](T1 X1, T2 X2) { Return(ToFloat(X1) + ToFloat(X2)); };
-
 int main() {
 	// =========================================================================
 	// Configuration
