@@ -25,11 +25,15 @@ kernel.Dispatch(4, true);
 
 ## Prerequisites
 
-- **Operating System:** Windows (Linux support coming)
+- **Operating System:** Windows or Linux
 - **Compiler:** GCC 11+, Clang 14+, or MSVC 2022+
 - **C++ Standard:** C++20
 - **GPU:** Any GPU supporting OpenGL 4.3+
 - **Build System:** CMake 3.21+ (optional but recommended)
+
+**Platform-Specific Requirements:**
+- **Windows:** Visual Studio 2022 or Build Tools, Windows SDK
+- **Linux:** X11 development libraries (`sudo apt-get install libx11-dev` on Ubuntu/Debian)
 
 ## Installation
 
@@ -115,7 +119,7 @@ cmake --build .
 
 Direct compilation (Linux):
 ```bash
-g++ -std=c++20 first_kernel.cpp -lGL -o first_kernel
+g++ -std=c++20 first_kernel.cpp -lGL -lX11 -o first_kernel
 ./first_kernel
 ```
 

@@ -188,6 +188,8 @@ Kernel1D::FullBarrier();       // Both barriers combined
 
 ## Fragment Kernels
 
+> **Platform Note:** Fragment kernels are currently only available on **Windows**. Linux support is under development. Compute kernels work identically on both platforms.
+
 Fragment kernels use the GPU's rendering pipeline for direct pixel output to windows. Unlike compute kernels that require `Download()` to retrieve results, fragment kernels render directly to the screen with zero CPU-GPU transfer overhead.
 
 ### FragmentKernel2D

@@ -9,7 +9,7 @@ Lightweight C++20 Embedded DSL for GPU Compute
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-orange.svg)](https://en.cppreference.com/w/cpp/20)
 [![OpenGL](https://img.shields.io/badge/OpenGL-4.3+-green.svg)](https://www.opengl.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 
 [Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Examples](#examples) · [API Reference](docs/api-reference.md)
 
@@ -72,6 +72,8 @@ int main() {
 - C++20 compatible compiler (GCC 11+, Clang 14+, MSVC 2022+)
 - OpenGL 4.3+
 - CMake 3.21+ (optional)
+- **Windows:** No additional dependencies
+- **Linux:** X11 development libraries (`libx11-dev` on Ubuntu/Debian)
 
 ---
 
@@ -128,6 +130,23 @@ square.Dispatch(16, true);
 ---
 
 ## Features
+
+### Cross-Platform Support
+
+Runs natively on Windows and Linux with zero code changes. The same kernel code works identically across platforms.
+
+| Platform | Compute Kernels | Fragment Kernels | Backend |
+|:---------|:---------------|:-----------------|:--------|
+| **Windows** | ✅ Full support | ✅ Full support | WGL |
+| **Linux** | ✅ Full support | — | GLX |
+
+```cpp
+// This code runs identically on Windows and Linux
+Kernel1D transform([](Int i) {
+    data[i] = Sqrt(data[i] * 2.0f);
+});
+transform.Dispatch(16, true);
+```
 
 ### Unified Language
 
@@ -469,18 +488,34 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 | Dependency | Required | Size | Purpose |
 |:-----------|:---------|:-----|:--------|
 | OpenGL 4.3+ | Yes | System | Compute backend |
+| X11 (Linux) | Yes | System | Windowing system |
 | GLAD | Yes | ~500KB (bundled) | OpenGL loader |
 | stb_image | No | ~50KB (examples only) | Image I/O |
 
 ### Build Commands
 
-```bash
+**Windows (MSVC):**
+```powershell
 git clone --recursive https://github.com/easygpu/EasyGPU.git
 cd EasyGPU
 
 cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+**Linux (GCC/Clang):**
+```bash
+git clone --recursive https://github.com/easygpu/EasyGPU.git
+cd EasyGPU
+
+# Install dependencies (Ubuntu/Debian)
+sudo apt-get install build-essential cmake libgl1-mesa-dev libx11-dev
+
+# Build
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 
+# Run tests
 cd build && ctest
 ```
 
