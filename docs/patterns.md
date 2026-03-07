@@ -36,6 +36,7 @@ Solutions to frequently encountered tasks in EasyGPU.
 - [Multi-Pass Rendering](#multi-pass-rendering)
 - [Debugging Output](#debugging-output)
 - [Async Data Transfer](#async-data-transfer)
+- [Generic Callables with Templates](#generic-callables-with-templates)
 
 ---
 
@@ -573,6 +574,7 @@ Kernel1D dfs_local([](Int i) {
 - [Working with Indices](#working-with-indices)
 - [Multi-Pass Rendering](#multi-pass-rendering)
 - [Debugging Output](#debugging-output)
+- [Generic Callables with Templates](#generic-callables-with-templates)
 
 ---
 
@@ -1248,3 +1250,216 @@ void ConsumerThread() {
 | 1 | Low | Low | Simple async |
 | 2 | Medium | High | Standard streaming |
 | 3+ | Higher | Max | High-latency tolerance |
+
+
+---
+
+## Generic Callables with Templates
+
+Use C++ templates to write reusable, type-generic GPU functions that work across multiple data types.
+
+### Basic Generic Callable
+
+Create a callable that accepts any GPU type convertible to `Float`:
+
+```cpp
+// Generic weighted sum - works with any two GPU types
+template <class T1, class T2>
+Callable<Float(T1, T2)> WeightedSum = [&](T1 X1, T2 X2) {
+    // Convert both inputs to Float for computation
+    Return(ToFloat(X1) * 0.7f + ToFloat(X2) * 0.3f);
+};
+
+Kernel1D kernel([](Int i) {
+    auto buf = data.Bind();
+    
+    // Mix Int and Float
+    Int count = MakeInt(100);
+    Float intensity = MakeFloat(0.5f);
+    Float mixed = WeightedSum<Int, Float>(count, intensity);
+    
+    // Mix two Floats
+    Float a = MakeFloat(1.0f);
+    Float b = MakeFloat(2.0f);
+    Float blended = WeightedSum<Float, Float>(a, b);
+    
+    buf[i] = mixed + blended;
+});
+```
+
+> **Important:** Template parameters must be **GPU types** (`Int`, `Float`, `Float2`, `Float3`, etc.), not C++ literal types (`int`, `float`, `Vec2`). The DSL operates on `Var<T>` types, not native C++ types.
+
+### Generic Type Conversion Callable
+
+Create utilities that normalize any numeric type to 0-1 range:
+
+```cpp
+// Normalize any GPU integer type to [0, 1] Float
+template <class T>
+Callable<Float(T, T, T)> NormalizeUint = [&](T value, T minVal, T maxVal) {
+    // All operations promoted to Float
+    Float v = ToFloat(value);
+    Float min = ToFloat(minVal);
+    Float max = ToFloat(maxVal);
+    Return((v - min) / (max - min));
+};
+
+Kernel2D processImage([](Int x, Int y) {
+    auto img = image.Bind();
+    
+    // Works with 8-bit values (stored as Int)
+    Int pixelValue = img[y * WIDTH + x];
+    Float normalized = NormalizeUint<Int>(pixelValue, MakeInt(0), MakeInt(255));
+    
+    // Apply curve and convert back
+    Float adjusted = Pow(normalized, 1.0f / 2.2f);  // Gamma correction
+    img[y * WIDTH + x] = ToInt(adjusted * 255.0f);
+});
+```
+
+### Generic Vector Operations
+
+Define operations that work on any vector dimension:
+
+```cpp
+// Component-wise minimum for any Float vector type
+template <class VecType>
+Callable<VecType(VecType, VecType)> ComponentMin = [&](VecType a, VecType b) {
+    // Works with Float2, Float3, Float4
+    Return(Min(a, b));
+};
+
+// Generic lerp that works with Float, Float2, Float3, Float4
+template <class T>
+Callable<T(T, T, Float)> GenericLerp = [&](T a, T b, Float t) {
+    Return(a + (b - a) * t);
+};
+
+Kernel1D interpolate([](Int i) {
+    auto data = buffer.Bind();
+    
+    Float2 start = MakeFloat2(0.0f, 0.0f);
+    Float2 end = MakeFloat2(1.0f, 1.0f);
+    Float t = MakeFloat(0.5f);
+    
+    // Lerp on Float2
+    Float2 mid = GenericLerp<Float2>(start, end, t);
+    
+    // Lerp on Float
+    Float alpha = GenericLerp<Float>(MakeFloat(0.0f), MakeFloat(1.0f), t);
+    
+    data[i] = mid + MakeFloat2(alpha, alpha);
+});
+```
+
+### Generic Clamp Function
+
+```cpp
+// Clamp any comparable GPU type
+template <class T>
+Callable<T(T, T, T)> GenericClamp = [&](T value, T minVal, T maxVal) {
+    If(value < minVal, [&]() { Return(minVal); });
+    If(value > maxVal, [&]() { Return(maxVal); });
+    Return(value);
+};
+
+// Usage examples
+Kernel1D clampDemo([](Int i) {
+    auto buf = buffer.Bind();
+    
+    // Clamp Float to [0, 1]
+    Float f = buf[i];
+    Float clampedF = GenericClamp<Float>(f, MakeFloat(0.0f), MakeFloat(1.0f));
+    
+    // Clamp Int to valid index range
+    Int idx = MakeInt(i * 2);
+    Int safeIdx = GenericClamp<Int>(idx, MakeInt(0), MakeInt(1023));
+    
+    // Clamp Float3 to color range
+    Float3 color = MakeFloat3(1.5f, -0.2f, 0.8f);
+    Float3 clampedColor = GenericClamp<Float3>(
+        color, 
+        MakeFloat3(0.0f, 0.0f, 0.0f), 
+        MakeFloat3(1.0f, 1.0f, 1.0f)
+    );
+});
+```
+
+### Generic Distance Metric
+
+```cpp
+// Manhattan distance for any vector type (L1 norm)
+template <class VecType>
+Callable<Float(VecType, VecType)> ManhattanDistance = [&](VecType a, VecType b) {
+    Return(Sum(Abs(a - b)));
+};
+
+// Chebyshev distance for any vector type (L∞ norm)  
+template <class VecType>
+Callable<Float(VecType, VecType)> ChebyshevDistance = [&](VecType a, VecType b) {
+    Return(Max(Abs(a - b)));
+};
+
+Kernel2D distanceField([](Int x, Int y) {
+    auto output = out.Bind();
+    
+    Float2 point = MakeFloat2(ToFloat(x), ToFloat(y));
+    Float2 center = MakeFloat2(512.0f, 512.0f);
+    
+    // Generic distance works with Float2
+    Float dist = ManhattanDistance<Float2>(point, center);
+    
+    // Convert to intensity
+    Float intensity = MakeFloat(1.0f) - GenericClamp<Float>(dist / 512.0f, 
+                                                             MakeFloat(0.0f), 
+                                                             MakeFloat(1.0f));
+    output[y * WIDTH + x] = intensity;
+});
+```
+
+### When to Use Generic Callables
+
+| Scenario | Use Generic? | Example |
+|:---------|:-------------|:--------|
+| Same logic, different types | **Yes** | Math utilities, clamp, lerp |
+| Type-specific optimizations | No | Specialized SIMD operations |
+| Simple one-off functions | No | Inline in kernel |
+| Library of reusable utilities | **Yes** | Build your own GPU math library |
+
+### Template Parameter Guidelines
+
+```cpp
+// ✅ CORRECT: Use GPU types (Var<T> aliases)
+template <class T> Callable<Float(T)> Convert = [&](T value) {
+    Return(ToFloat(value));
+};
+// T can be: Int, Float, Float2, Float3, Float4, etc.
+
+// ❌ WRONG: C++ literal types don't work in GPU context
+template <class T> Callable<float(T)> Wrong = [&](T value) {
+    Return(value * 2.0f);  // ERROR: T is C++ type, not GPU type
+};
+```
+
+**Available GPU Types for Templates:**
+
+| Category | Types |
+|:---------|:------|
+| Scalar | `Int`, `Float`, `Bool` |
+| Vector | `Float2`, `Float3`, `Float4`, `Int2`, `Int3`, `Int4` |
+| Matrix | `Mat2`, `Mat3`, `Mat4`, etc. |
+
+**Type Conversion in Generic Callables:**
+
+```cpp
+template <class T>
+Callable<Float(T)> Process = [&](T input) {
+    // Always convert to a known type for computation
+    Float f = ToFloat(input);    // Safe: T -> Float
+    Int i = ToInt(input);        // Safe: T -> Int (truncation)
+    
+    // Perform operations in known type space
+    Float result = Sqrt(Abs(f));
+    Return(result);
+};
+```

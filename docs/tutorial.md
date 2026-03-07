@@ -841,6 +841,47 @@ Kernel1D kernel([](Int i) {
 });
 ```
 
+### Generic Callables with Templates
+
+Create reusable functions that work with multiple GPU types using C++ templates:
+
+```cpp
+// Generic callable that works with any GPU type convertible to Float
+template <class T1, class T2>
+Callable<Float(T1, T2)> WeightedSum = [&](T1 X1, T2 X2) {
+    Return(ToFloat(X1) * 0.7f + ToFloat(X2) * 0.3f);
+};
+
+// Generic clamp for any comparable GPU type
+template <class T>
+Callable<T(T, T, T)> GenericClamp = [&](T value, T minVal, T maxVal) {
+    If(value < minVal, [&]() { Return(minVal); });
+    If(value > maxVal, [&]() { Return(maxVal); });
+    Return(value);
+};
+
+// Usage in kernel
+Kernel1D generic_ops([](Int i) {
+    auto buf = data.Bind();
+    
+    // Mix Int and Float
+    Int count = MakeInt(100);
+    Float intensity = MakeFloat(0.5f);
+    Float mixed = WeightedSum<Int, Float>(count, intensity);
+    
+    // Clamp different types
+    Float f = buf[i];
+    Float clampedF = GenericClamp<Float>(f, MakeFloat(0.0f), MakeFloat(1.0f));
+    
+    Int idx = MakeInt(i);
+    Int safeIdx = GenericClamp<Int>(idx, MakeInt(0), MakeInt(1023));
+    
+    buf[i] = mixed * clampedF;
+});
+```
+
+> **Important:** Template parameters must be **GPU types** (`Int`, `Float`, `Float2`, etc.), not C++ literal types (`int`, `float`, `Vec2`). Use `ToFloat()`, `ToInt()` for type conversion within the callable.
+
 ---
 
 ## Debugging and Profiling

@@ -227,6 +227,19 @@ Callable<Float(Float)> square = [](Float x) {
 result = square(input);
 ```
 
+**Generic Callables with Templates:**
+
+```cpp
+// Works with any GPU types (Int, Float, Float2, etc.)
+template <class T1, class T2>
+Callable<Float(T1, T2)> weightedSum = [&](T1 a, T2 b) {
+    Return(ToFloat(a) * 0.7f + ToFloat(b) * 0.3f);
+};
+
+// Mix Int and Float seamlessly
+Float result = weightedSum<Int, Float>(MakeInt(100), MakeFloat(0.5f));
+```
+
 ### Introspection
 
 ```cpp

@@ -1048,6 +1048,59 @@ Float x, y;
 GetComponents(value, x, y);
 ```
 
+**Template Metaprogramming with Callable:**
+
+You can use C++ templates to create generic Callables that work with multiple GPU types:
+
+```cpp
+// Generic callable that works with any two GPU types convertible to Float
+template <class T1, class T2>
+Callable<Float(T1, T2)> WeightedSum = [&](T1 X1, T2 X2) {
+    Return(ToFloat(X1) * 0.7f + ToFloat(X2) * 0.3f);
+};
+
+// Usage with different GPU types
+Kernel1D kernel([](Int i) {
+    auto buf = data.Bind();
+    
+    // Works with (Float, Float)
+    Float a = MakeFloat(1.0f);
+    Float b = MakeFloat(2.0f);
+    Float result1 = WeightedSum<Float, Float>(a, b);
+    
+    // Works with (Int, Float) - Int is automatically converted
+    Int x = MakeInt(10);
+    Float y = MakeFloat(3.14f);
+    Float result2 = WeightedSum<Int, Float>(x, y);
+    
+    // Works with (Float2, Float2) - component-wise conversion
+    Float2 uv = MakeFloat2(0.5f, 0.5f);
+    Float2 coord = MakeFloat2(1.0f, 0.0f);
+    Float2 blended = WeightedSum<Float2, Float2>(uv, coord);
+});
+```
+
+> **Important:** Template parameters `T1` and `T2` **must be GPU types** (`Int`, `Float`, `Float2`, etc.), not C++ literal types (`int`, `float`, `Vec2`). Use `ToFloat()` or `ToInt()` for type conversion within the callable.
+
+**Generic Math Utilities:**
+
+```cpp
+// Clamp any numeric GPU type to a range
+template <class T>
+Callable<T(T, T, T)> GenericClamp = [&](T value, T minVal, T maxVal) {
+    If(value < minVal, [&]() { Return(minVal); });
+    If(value > maxVal, [&]() { Return(maxVal); });
+    Return(value);
+};
+
+// Usage
+Float f = MakeFloat(5.0f);
+Float clampedF = GenericClamp<Float>(f, MakeFloat(0.0f), MakeFloat(1.0f));
+
+Int i = MakeInt(100);
+Int clampedI = GenericClamp<Int>(i, MakeInt(0), MakeInt(50));
+```
+
 **Side-Effect Handling:**
 
 `Callable<void>` automatically handles side-effects when called as a statement:
