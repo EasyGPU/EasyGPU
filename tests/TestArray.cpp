@@ -297,7 +297,7 @@ GPU::Kernel::Kernel1D kernel(
 
 		// Count occurrences in chunk
 		For(0, CHUNK_SIZE, [&](Int &j) {
-			Int val		   = ToInt(in[j]);
+			Int val		   = Unref(in[j]);
 			val			   = Clamp(val, 0, NUM_BINS - 1);
 			localHist[val] = localHist[val] + 1;
 		});
