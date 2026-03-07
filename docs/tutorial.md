@@ -915,168 +915,157 @@ A complete particle system with physics and collision.
 
 ```cpp
 #include <GPU.h>
+#include <cmath>
 #include <iostream>
 #include <vector>
-#include <cmath>
 
 // Particle data structure
-EASYGPU_STRUCT(Particle,
-    (Float3, position),    // Current position
-    (Float3, velocity),    // Current velocity
-    (Float3, acceleration), // Applied forces
-    (float, mass),         // Mass for physics
-    (float, life),         // Remaining life in seconds
-    (float, size)          // Particle size
+EASYGPU_STRUCT(Particle, (Vec3, position), // Current position
+			   (Vec3, velocity),		   // Current velocity
+			   (Vec3, acceleration),	   // Applied forces
+			   (float, mass),			   // Mass for physics
+			   (float, life),			   // Remaining life in seconds
+			   (float, size)			   // Particle size
 );
 
 // Emitter configuration
 struct EmitterConfig {
-    GPU::Math::Vec3 position = {0, 10, 0};
-    GPU::Math::Vec3 direction = {0, 1, 0};
-    float spread = 0.5f;
-    float min_speed = 5.0f;
-    float max_speed = 10.0f;
-    float min_life = 2.0f;
-    float max_life = 5.0f;
+	GPU::Math::Vec3 position  = {0, 10, 0};
+	GPU::Math::Vec3 direction = {0, 1, 0};
+	float			spread	  = 0.5f;
+	float			min_speed = 5.0f;
+	float			max_speed = 10.0f;
+	float			min_life  = 2.0f;
+	float			max_life  = 5.0f;
 };
 
 int main() {
-    // Configuration
-    constexpr int MAX_PARTICLES = 100000;
-    constexpr int NEW_PER_FRAME = 100;
-    constexpr int FRAMES = 300;  // Simulate 5 seconds at 60 FPS
-    
-    // Initialize particles
-    std::vector<Particle> particle_data(MAX_PARTICLES);
-    for (auto& p : particle_data) {
-        p.life = 0;  // All particles start dead
-    }
-    
-    // Create GPU buffers
-    Buffer<Particle> particles(particle_data);
-    Buffer<int> rng_states(MAX_PARTICLES);
-    
-    // Initialize RNG seeds
-    std::vector<int> seeds(MAX_PARTICLES);
-    for (int i = 0; i < MAX_PARTICLES; i++) {
-        seeds[i] = i + 1;
-    }
-    rng_states.Upload(seeds);
-    
-    // Random number generator
-    Callable<Float(Int&)> Random = [](Int& state) {
-        state = (state * 747796405 + 2891336453) & 0x7FFFFFFF;
-        Int result = Abs(state);
-        Return(ToFloat(result) / 2147483647.0f);
-    };
-    
-    Callable<Float(Int&, Float, Float)> RandomRange = 
-    [](Int& state, Float& min, Float& max) {
-        Return(min + Random(state) * (max - min));
-    };
-    
-    // Emitter position (captured by value)
-    Float3 emitter_pos = MakeFloat3(0.0f, 10.0f, 0.0f);
-    
-    // Physics kernel
-    Kernel1D update_particles([&, emitter_pos](Int i) {
-        auto p = particles.Bind();
-        auto rng = rng_states.Bind();
-        
-        Float dt = MakeFloat(1.0f / 60.0f);  // 60 FPS
-        Float3 gravity = MakeFloat3(0.0f, -9.8f, 0.0f);
-        
-        // Read particle state
-        Float3 pos = p[i].position();
-        Float3 vel = p[i].velocity();
-        Float life = p[i].life();
-        Float mass = p[i].mass();
-        
-        // Update or respawn
-        If(life > 0.0f, [&]() {
-            // Alive: apply physics
-            
-            // Acceleration from forces
-            Float3 acc = gravity + p[i].acceleration();
-            
-            // Update velocity and position
-            vel = vel + acc * dt;
-            pos = pos + vel * dt;
-            
-            // Decrease life
-            life = life - dt;
-            
-            // Floor collision
-            If(pos.y() < 0.0f, [&]() {
-                pos.y() = 0.0f;
-                vel.y() = -vel.y() * 0.8f;  // Bounce with damping
-                vel.x() = vel.x() * 0.9f;   // Friction
-                vel.z() = vel.z() * 0.9f;
-            });
-            
-        }).Else([&]() {
-            // Dead: check if we should respawn
-            // Use RNG to stagger respawns
-            Int state = rng[i];
-            Float spawn_chance = Random(state);
-            rng[i] = state;
-            
-            If(spawn_chance < 0.01f, [&]() {
-                // Respawn this particle
-                Int rng_state = rng[i];
-                
-                // Random position in sphere around emitter
-                Float angle = RandomRange(rng_state, 
-                    MakeFloat(0.0f), MakeFloat(6.28318f));
-                Float speed = RandomRange(rng_state, 
-                    MakeFloat(5.0f), MakeFloat(10.0f));
-                Float life_span = RandomRange(rng_state, 
-                    MakeFloat(2.0f), MakeFloat(5.0f));
-                
-                pos = emitter_pos;
-                vel = MakeFloat3(
-                    Cos(angle) * speed,
-                    speed,
-                    Sin(angle) * speed
-                );
-                life = life_span;
-                mass = MakeFloat(1.0f);
-                
-                rng[i] = rng_state;
-            });
-        });
-        
-        // Write back
-        p[i].position() = pos;
-        p[i].velocity() = vel;
-        p[i].life() = life;
-    });
-    
-    // Simulate
-    std::cout << "Simulating " << FRAMES << " frames with " 
-              << MAX_PARTICLES << " particles...\n";
-    
-    for (int frame = 0; frame < FRAMES; frame++) {
-        // Dispatch enough groups for all particles
-        update_particles.Dispatch((MAX_PARTICLES + 255) / 256, true);
-        
-        if (frame % 60 == 0) {
-            std::cout << "Frame " << frame << "/" << FRAMES << "\n";
-        }
-    }
-    
-    // Get final state
-    particles.Download(particle_data);
-    
-    // Report
-    int alive = 0;
-    for (const auto& p : particle_data) {
-        if (p.life > 0) alive++;
-    }
-    std::cout << "Simulation complete. " << alive 
-              << " particles alive.\n";
-    
-    return 0;
+	// Configuration
+	constexpr int		  MAX_PARTICLES = 100000;
+	constexpr int		  NEW_PER_FRAME = 100;
+	constexpr int		  FRAMES		= 300; // Simulate 5 seconds at 60 FPS
+
+	// Initialize particles
+	std::vector<Particle> particle_data(MAX_PARTICLES);
+	for (auto &p : particle_data) {
+		p.life = 0; // All particles start dead
+	}
+
+	// Create GPU buffers
+	Buffer<Particle> particles(particle_data);
+	Buffer<int>		 rng_states(MAX_PARTICLES);
+
+	// Initialize RNG seeds
+	std::vector<int> seeds(MAX_PARTICLES);
+	for (int i = 0; i < MAX_PARTICLES; i++) {
+		seeds[i] = i + 1;
+	}
+	rng_states.Upload(seeds);
+
+	// Random number generator
+	Callable<Float(Int &)> Random = [](Int &state) {
+		state	   = (state * 747796405 + 2891336453) & 0x7FFFFFFF;
+		Int result = Abs(state);
+		Return(ToFloat(result) / 2147483647.0f);
+	};
+
+	Callable<Float(Int &, Float, Float)> RandomRange = [&](Int &state, Float &min, Float &max) {
+		Return(min + Random(state) * (max - min));
+	};
+
+	// Emitter position (captured by value)
+	Vec3	 emitter_pos = Vec3(0.0f, 10.0f, 0.0f);
+
+	// Physics kernel
+	Kernel1D update_particles([&, emitter_pos](Int i) {
+		auto   p	   = particles.Bind();
+		auto   rng	   = rng_states.Bind();
+
+		Float  dt	   = MakeFloat(1.0f / 60.0f); // 60 FPS
+		Float3 gravity = MakeFloat3(0.0f, -9.8f, 0.0f);
+
+		// Read particle state
+		Float3 pos	   = p[i].position();
+		Float3 vel	   = p[i].velocity();
+		Float  life	   = p[i].life();
+		Float  mass	   = p[i].mass();
+
+		// Update or respawn
+		If(life > 0.0f, [&]() {
+			// Alive: apply physics
+
+			// Acceleration from forces
+			Float3 acc = gravity + p[i].acceleration();
+
+			// Update velocity and position
+			vel		   = vel + acc * dt;
+			pos		   = pos + vel * dt;
+
+			// Decrease life
+			life	   = life - dt;
+
+			// Floor collision
+			If(pos.y() < 0.0f, [&]() {
+				pos.y() = 0.0f;
+				vel.y() = -vel.y() * 0.8f; // Bounce with damping
+				vel.x() = vel.x() * 0.9f;  // Friction
+				vel.z() = vel.z() * 0.9f;
+			});
+		}).Else([&]() {
+			// Dead: check if we should respawn
+			// Use RNG to stagger respawns
+			Int	  state		   = rng[i];
+			Float spawn_chance = Random(state);
+			rng[i]			   = Expr<int>(state);
+
+			If(spawn_chance < 0.01f, [&]() {
+				// Respawn this particle
+				Int	  rng_state = rng[i];
+
+				// Random position in sphere around emitter
+				Float angle		= RandomRange(rng_state, MakeFloat(0.0f), MakeFloat(6.28318f));
+				Float speed		= RandomRange(rng_state, MakeFloat(5.0f), MakeFloat(10.0f));
+				Float life_span = RandomRange(rng_state, MakeFloat(2.0f), MakeFloat(5.0f));
+
+				pos				= emitter_pos;
+				vel				= MakeFloat3(Cos(angle) * speed, speed, Sin(angle) * speed);
+				life			= Expr<float>(life_span);
+				mass			= MakeFloat(1.0f);
+
+				rng[i]			= Expr<int>(rng_state);
+			});
+		});
+
+		// Write back
+		p[i].position() = pos;
+		p[i].velocity() = vel;
+		p[i].life()		= Expr<float>(life);
+	});
+
+	// Simulate
+	std::cout << "Simulating " << FRAMES << " frames with " << MAX_PARTICLES << " particles...\n";
+
+	for (int frame = 0; frame < FRAMES; frame++) {
+		// Dispatch enough groups for all particles
+		update_particles.Dispatch((MAX_PARTICLES + 255) / 256, true);
+
+		if (frame % 60 == 0) {
+			std::cout << "Frame " << frame << "/" << FRAMES << "\n";
+		}
+	}
+
+	// Get final state
+	particles.Download(particle_data);
+
+	// Report
+	int alive = 0;
+	for (const auto &p : particle_data) {
+		if (p.life > 0)
+			alive++;
+	}
+	std::cout << "Simulation complete. " << alive << " particles alive.\n";
+
+	return 0;
 }
 ```
 
@@ -1161,54 +1150,84 @@ while (running) {
 
 ```cpp
 #include <GPU.h>
+#include <iostream>
 #include <windows.h>
 
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+	switch (msg) {
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		return 0;
+	case WM_CLOSE:
+		DestroyWindow(hwnd);
+		return 0;
+	}
+	return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
 int main() {
-    // Create a window
-    HWND hwnd = CreateWindowEx(
-        0, L"Static", L"Fragment Kernel Demo",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        1280, 720,
-        nullptr, nullptr, nullptr, nullptr
-    );
-    ShowWindow(hwnd, SW_SHOW);
-    
-    // Create fragment kernel
-    FragmentKernel2D kernel("Gradient",
-        [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
-            // fragCoord: fragment coordinates in pixels
-            // resolution: viewport resolution in pixels
-            
-            Float2 uv = fragCoord / resolution;
-            
-            // Simple gradient
-            Float3 color = MakeFloat3(uv.x(), uv.y(), 0.5f);
-            fragColor = MakeFloat4(color, 1.0f);
-        },
-        1280, 720
-    );
-    
-    // Attach to window
-    if (!kernel.Attach(hwnd)) {
-        std::cerr << "Failed to attach\n";
-        return 1;
-    }
-    
-    // Render loop
-    MSG msg;
-    bool running = true;
-    while (running) {
-        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            if (msg.message == WM_QUIT) running = false;
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        
-        kernel.Flush();  // Render frame
-    }
-    
-    return 0;
+	WNDCLASSEX wc	 = {};
+	wc.cbSize		 = sizeof(WNDCLASSEX);
+	wc.lpfnWndProc	 = WndProc;
+	wc.hInstance	 = GetModuleHandle(nullptr);
+	wc.lpszClassName = TEXT("MyWindowClass");
+	wc.hCursor		 = LoadCursor(nullptr, IDC_ARROW);
+
+	if (!RegisterClassEx(&wc)) {
+		std::cerr << "Failed to register window class\n";
+		return 1;
+	}
+
+	// 2. 创建窗口
+	HWND hwnd = CreateWindowEx(0,
+							   TEXT("MyWindowClass"),
+							   TEXT("Fragment Kernel Demo"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280,
+							   720, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
+
+	if (!hwnd) {
+		std::cerr << "Failed to create window\n";
+		return 1;
+	}
+
+	ShowWindow(hwnd, SW_SHOW);
+
+	// Create fragment kernel
+	FragmentKernel2D kernel(
+		"Gradient",
+		[&](Float2 fragCoord, Float2 resolution, Var<Vec4> &fragColor) {
+			// fragCoord: fragment coordinates in pixels
+			// resolution: viewport resolution in pixels
+
+			Float2 uv	 = fragCoord / resolution;
+
+			// Simple gradient
+			Float3 color = MakeFloat3(uv.x(), uv.y(), 0.5f);
+			fragColor	 = MakeFloat4(color, 1.0f);
+		},
+		1280, 720);
+
+	// Attach to window
+	if (!kernel.Attach(hwnd)) {
+		std::cerr << "Failed to attach\n";
+		return 1;
+	}
+
+	// Render loop
+	MSG	 msg;
+	bool running = true;
+	while (running) {
+		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+			if (msg.message == WM_QUIT) {
+				running = false;
+				break;
+			}
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		kernel.Flush(); // Render frame
+	}
+
+	return 0;
 }
 ```
 
@@ -1331,81 +1350,87 @@ render.Flush();  // Direct to screen, zero copy!
 
 ```cpp
 #include <GPU.h>
-#include <windows.h>
 #include <cmath>
+#include <windows.h>
 
-Uniform<float> uTime;
-Uniform<Vec2> uMouse;
+Uniform<float>					uTime;
+Uniform<Vec2>					uMouse;
 
 // Callable for rotation
-Callable<Float2(Float2, Float)> Rotate = [](Float2& uv, Float& angle) {
-    Float cosA = Cos(angle);
-    Float sinA = Sin(angle);
-    Float2 center = MakeFloat2(0.5f, 0.5f);
-    Float2 delta = uv - center;
-    Float x = delta.x() * cosA - delta.y() * sinA;
-    Float y = delta.x() * sinA + delta.y() * cosA;
-    Return(MakeFloat2(x, y) + center);
+Callable<Float2(Float2, Float)> Rotate = [](Float2 &uv, Float &angle) {
+	Float  cosA	  = Cos(angle);
+	Float  sinA	  = Sin(angle);
+	Float2 center = MakeFloat2(0.5f, 0.5f);
+	Float2 delta  = uv - center;
+	Float  x	  = delta.x() * cosA - delta.y() * sinA;
+	Float  y	  = delta.x() * sinA + delta.y() * cosA;
+	Return(MakeFloat2(x, y) + center);
 };
 
 int main() {
-    HWND hwnd = CreateWindowEx(0, L"Static", L"Demo",
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-        1280, 720, nullptr, nullptr, nullptr, nullptr);
-    ShowWindow(hwnd, SW_SHOW);
-    
-    FragmentKernel2D kernel("Art",
-        [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
-            Float time = uTime.Load();
-            Float2 mouse = uMouse.Load();
-            Float2 uv = fragCoord / resolution;
-            
-            // Mouse influence
-            Float2 mouseInfluence = mouse / resolution;
-            Float distToMouse = Length(uv - mouseInfluence);
-            
-            // Animated rotation
-            Float2 rotated = Rotate(uv, time * 0.3f);
-            
-            // Pattern
-            Float pattern = Sin(rotated.x() * 20.0f) * 
-                           Sin(rotated.y() * 20.0f) *
-                           Sin(time);
-            
-            // Color
-            Float3 color = MakeFloat3(
-                pattern * 0.5f + distToMouse,
-                pattern * 0.3f + 0.2f,
-                pattern * 0.8f + 0.5f
-            );
-            
-            fragColor = MakeFloat4(color, 1.0f);
-        },
-        1280, 720
-    );
-    
-    kernel.Attach(hwnd);
-    
-    auto start = std::chrono::steady_clock::now();
-    
-    MSG msg;
-    while (true) {
-        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            if (msg.message == WM_QUIT) return 0;
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        
-        auto now = std::chrono::steady_clock::now();
-        uTime = std::chrono::duration<float>(now - start).count();
-        
-        POINT pt;
-        GetCursorPos(&pt);
-        ScreenToClient(hwnd, &pt);
-        uMouse = Vec2((float)pt.x, (float)pt.y);
-        
-        kernel.Flush();
-    }
+	WNDCLASSEX wc	 = {};
+	wc.cbSize		 = sizeof(WNDCLASSEX);
+	wc.lpfnWndProc	 = DefWindowProc;
+	wc.hInstance	 = GetModuleHandle(nullptr);
+	wc.lpszClassName = TEXT("MyWindowClass");
+	wc.hCursor		 = LoadCursor(nullptr, IDC_ARROW);
+
+	if (!RegisterClassEx(&wc)) {
+		std::cerr << "Failed to register window class\n";
+		return 1;
+	}
+
+	HWND hwnd = CreateWindowEx(0, TEXT("MyWindowClass"), TEXT("Demo"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720,
+							   nullptr, nullptr, nullptr, nullptr);
+	ShowWindow(hwnd, SW_SHOW);
+
+	FragmentKernel2D kernel(
+		"Art",
+		[&](Float2 fragCoord, Float2 resolution, Var<Vec4> &fragColor) {
+			Float  time			  = uTime.Load();
+			Float2 mouse		  = uMouse.Load();
+			Float2 uv			  = fragCoord / resolution;
+
+			// Mouse influence
+			Float2 mouseInfluence = mouse / resolution;
+			Float  distToMouse	  = Length(uv - mouseInfluence);
+
+			// Animated rotation
+			Float2 rotated		  = Rotate(uv, time * 0.3f);
+
+			// Pattern
+			Float  pattern		  = Sin(rotated.x() * 20.0f) * Sin(rotated.y() * 20.0f) * Sin(time);
+
+			// Color
+			Float3 color = MakeFloat3(pattern * 0.5f + distToMouse, pattern * 0.3f + 0.2f, pattern * 0.8f + 0.5f);
+
+			fragColor	 = MakeFloat4(color, 1.0f);
+		},
+		1280, 720);
+
+	kernel.Attach(hwnd);
+
+	auto start = std::chrono::steady_clock::now();
+
+	MSG	 msg;
+	while (true) {
+		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+			if (msg.message == WM_QUIT)
+				return 0;
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+
+		auto now = std::chrono::steady_clock::now();
+		uTime	 = std::chrono::duration<float>(now - start).count();
+
+		POINT pt;
+		GetCursorPos(&pt);
+		ScreenToClient(hwnd, &pt);
+		uMouse = Vec2((float)pt.x, (float)pt.y);
+
+		kernel.Flush();
+	}
 }
 ```
 
