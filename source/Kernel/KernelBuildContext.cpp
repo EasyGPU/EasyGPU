@@ -308,6 +308,31 @@ void KernelBuildContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat 
 }
 
 /**
+ * Get the GLSL image type name based on pixel format
+ * @param format The pixel format
+ * @return The GLSL image type name (image2D, iimage2D, or uimage2D)
+ */
+static std::string GetGLSLImageTypeName(Runtime::PixelFormat format) {
+	switch (format) {
+		// Signed integer formats -> iimage2D
+		case Runtime::PixelFormat::R32I:
+		case Runtime::PixelFormat::RG32I:
+		case Runtime::PixelFormat::RGBA32I:
+			return "iimage2D";
+		
+		// Unsigned integer formats -> uimage2D
+		case Runtime::PixelFormat::R32UI:
+		case Runtime::PixelFormat::RG32UI:
+		case Runtime::PixelFormat::RGBA32UI:
+			return "uimage2D";
+		
+		// Float and normalized formats -> image2D
+		default:
+			return "image2D";
+	}
+}
+
+/**
  * Get the texture declarations for GLSL
  * @return The texture declaration string
  */
@@ -315,8 +340,9 @@ std::string KernelBuildContext::GetTextureDeclarations() const {
 	std::ostringstream oss;
 	for (const auto &tex : _textures) {
 		std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
-		oss << std::format("layout({}, binding={}) uniform image2D {};\n", formatQualifier, tex.binding,
-						   tex.textureName);
+		std::string imageType = GetGLSLImageTypeName(tex.format);
+		oss << std::format("layout({}, binding={}) uniform {} {};\n", formatQualifier, tex.binding,
+						   imageType, tex.textureName);
 	}
 	return oss.str();
 }
