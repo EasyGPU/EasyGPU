@@ -15,11 +15,6 @@
 #include <Runtime/ShaderException.h>
 
 #include <IR/Value/Var.h>
-#include <IR/Value/VarVector.h>
-
-#include <IR/Value/ExprIVector.h>
-#include <IR/Value/ExprMatrix.h>
-#include <IR/Value/ExprVector.h>
 
 #include <Utility/Meta/StructMeta.h>
 

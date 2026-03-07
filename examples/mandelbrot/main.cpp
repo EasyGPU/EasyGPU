@@ -11,7 +11,6 @@
 #include <Flow/IfFlow.h>
 #include <Flow/ReturnFlow.h>
 #include <IR/Value/BufferRef.h>
-#include <IR/Value/ExprMatrix.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>

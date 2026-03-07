@@ -13,6 +13,7 @@
 // Do not include Var.h here to avoid circular inclusion
 #include <IR/Value/Expr.h>
 #include <IR/Value/ExprMatrix.h>
+#include <IR/Value/VarVector.h>
 
 #include <Utility/Matrix.h>
 

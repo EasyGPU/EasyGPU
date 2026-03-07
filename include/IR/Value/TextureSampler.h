@@ -19,8 +19,6 @@
 #define EASYGPU_TEXTURE_SAMPLER_H
 
 #include <IR/Builder/Builder.h>
-#include <IR/Value/Expr.h>
-#include <IR/Value/ExprVector.h>
 #include <IR/Value/Var.h>
 #include <Runtime/PixelFormat.h>
 

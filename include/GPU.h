@@ -44,10 +44,10 @@
 #include <IR/Value/TextureRef.h>
 #include <IR/Value/Value.h>
 // Include vector/matrix expression specializations BEFORE Expr.h
-#include <IR/Value/Expr.h>
+// These headers include Expr.h and define specializations immediately after
+#include <IR/Value/ExprVector.h>
 #include <IR/Value/ExprIVector.h>
 #include <IR/Value/ExprMatrix.h>
-#include <IR/Value/ExprVector.h>
 // Var.h includes VarVector, VarIVector, VarMatrix at end
 #include <IR/Value/Var.h>
 #include <IR/Value/VarArray.h>

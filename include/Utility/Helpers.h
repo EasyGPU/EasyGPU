@@ -18,10 +18,6 @@
 #include <IR/Builder/Builder.h>
 #include <IR/Node/CallInst.h>
 #include <IR/Node/LoadUniform.h>
-#include <IR/Value/Expr.h>
-#include <IR/Value/ExprIVector.h>
-#include <IR/Value/ExprMatrix.h>
-#include <IR/Value/ExprVector.h>
 #include <IR/Value/Var.h>
 #include <Utility/Math.h>
 

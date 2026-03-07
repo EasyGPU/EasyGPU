@@ -32,7 +32,6 @@
 
 #include <IR/Builder/Builder.h>
 #include <IR/Value/Var.h>
-#include <IR/Value/VarVector.h>
 
 #include <functional>
 #include <string>

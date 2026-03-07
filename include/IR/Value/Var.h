@@ -27,23 +27,6 @@
 #include <type_traits>
 
 namespace GPU::IR::Value {
-// Forward declarations for Var specializations (defined in separate headers)
-template <> class Var<Math::Vec2>;
-template <> class Var<Math::Vec3>;
-template <> class Var<Math::Vec4>;
-template <> class Var<Math::IVec2>;
-template <> class Var<Math::IVec3>;
-template <> class Var<Math::IVec4>;
-template <> class Var<Math::Mat2>;
-template <> class Var<Math::Mat3>;
-template <> class Var<Math::Mat4>;
-template <> class Var<Math::Mat2x3>;
-template <> class Var<Math::Mat2x4>;
-template <> class Var<Math::Mat3x2>;
-template <> class Var<Math::Mat3x4>;
-template <> class Var<Math::Mat4x2>;
-template <> class Var<Math::Mat4x3>;
-
 template <typename Type> constexpr const char *TypeShaderName() {
 	if constexpr (std::same_as<Type, float>)
 		return "float";
@@ -738,6 +721,24 @@ protected:
 	template <ScalarType U> friend class Var;
 };
 
+// Forward declarations of Var specializations (must be before primary template)
+// This prevents instantiation of primary template for vector/matrix types
+template <> class Var<Math::Vec2>;
+template <> class Var<Math::Vec3>;
+template <> class Var<Math::Vec4>;
+template <> class Var<Math::IVec2>;
+template <> class Var<Math::IVec3>;
+template <> class Var<Math::IVec4>;
+template <> class Var<Math::Mat2>;
+template <> class Var<Math::Mat3>;
+template <> class Var<Math::Mat4>;
+template <> class Var<Math::Mat2x3>;
+template <> class Var<Math::Mat2x4>;
+template <> class Var<Math::Mat3x2>;
+template <> class Var<Math::Mat3x4>;
+template <> class Var<Math::Mat4x2>;
+template <> class Var<Math::Mat4x3>;
+
 // Primary template for scalar types (includes registered structs)
 template <ScalarType Type> class Var : public VarBase<Type> {
 public:
@@ -1419,8 +1420,8 @@ template <ScalarType T> Expr<T>::Expr(const Var<T> &var) : ExprBase(var.Load()) 
 // Include Var specializations for vector and matrix types (after main template definition)
 // Order matters: VarVector must come before VarMatrix (VarMatrix uses Var<Vec2/3/4>)
 #include <IR/Value/VarIVector.h>
-#include <IR/Value/VarMatrix.h>
 #include <IR/Value/VarVector.h>
+#include <IR/Value/VarMatrix.h>
 
 // Expr constructor implementations for vector types (after specializations)
 namespace GPU::IR::Value {
