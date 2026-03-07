@@ -10,6 +10,7 @@ Complete reference for all EasyGPU classes and functions.
 - [Buffers](#buffers)
 - [Uniforms](#uniforms)
 - [Variables and Expressions](#variables-and-expressions)
+- [Unref](#unref)
 - [Control Flow](#control-flow)
 - [Math Functions](#math-functions)
 - [Vector Types](#vector-types)
@@ -20,6 +21,52 @@ Complete reference for all EasyGPU classes and functions.
 - [Texture Samplers](#texture-samplers)
 - [PBO Async Transfer](#pbo-async-transfer)
 - [OpenGL State Cache](#opengl-state-cache)
+
+---
+
+## Unref
+
+Creates an independent copy of a GPU variable, ensuring value semantics instead of reference semantics.
+
+```cpp
+template <typename T>
+[[nodiscard]] Var<T> Unref(const Var<T>& var);
+
+template <typename T>
+[[nodiscard]] Var<T> Unref(Var<T>&& var);
+```
+
+**Purpose:**
+When initializing a `Var` from a buffer element (`buf[i]`), the default behavior uses move semantics, which may create an alias to the buffer element instead of an independent copy. `Unref()` forces the copy constructor to create a truly independent variable.
+
+**Parameters:**
+- `var` - The source variable, typically from buffer access
+
+**Returns:**
+A new `Var<T>` with its own storage in the generated GLSL
+
+**Example:**
+```cpp
+Kernel1D kernel([](Int i) {
+    auto buf = buffer.Bind();
+    
+    // Without Unref - creates alias
+    Int alias = buf[i];
+    alias = 5;  // May modify buf[i]!
+    
+    // With Unref - creates independent copy
+    Int copy = Unref(buf[i]);
+    copy = 5;   // Only modifies copy, NOT buf[i]
+});
+```
+
+**When to Use:**
+- Always when storing buffer elements to named variables
+- When you need to modify a copy without affecting the original
+- Before passing buffer elements to Callables that modify their arguments
+
+**See Also:**
+- [Unref Documentation](unref.md) - Complete guide
 
 ---
 
@@ -501,16 +548,16 @@ Int i = otherVar;              // Copy
 
 > ⚠️ **CRITICAL: `Var` Initialization May Accidentally Create a Reference**
 > 
-> When initializing a `Var` from a buffer element, **always** use `Make*()` to ensure value semantics:
+> When initializing a `Var` from a buffer element, **always** use `Unref()` to ensure value semantics:
 > 
 > ```cpp
 > auto buf = buffer.Bind();
 > 
-> // �?CORRECT: Explicitly create a new variable with a copy of the value
-> Int val = MakeInt(buf[i]);
+> // ✅ CORRECT: Explicitly create a new variable with a copy of the value
+> Int val = Unref(buf[i]);
 > val = 5;  // Only modifies val, NOT buf[i]
 > 
-> // �?DANGEROUS: Direct initialization may create a reference
+> // ❌ DANGEROUS: Direct initialization may create a reference
 > Int val = buf[i];
 > val = 5;  // May unexpectedly modify buf[i] in the generated GLSL!
 > ```
@@ -521,12 +568,14 @@ Int i = otherVar;              // Copy
 > - The move transfers ownership of the underlying variable name (e.g., `"buffer[i]"`)
 > - Result: `val` becomes an alias to `buffer[i]` in the generated shader
 > 
-> **Always use `Make*()`** to force creation of a new independent variable:
+> **Always use `Unref()`** to force creation of a new independent variable:
 > ```cpp
-> Int    val = MakeInt(buf[i]);
-> Float  f   = MakeFloat(buf[i]);
-> Float3 v   = MakeFloat3(buf[i]);
+> Int    val = Unref(buf[i]);
+> Float  f   = Unref(buf[i]);
+> Float3 v   = Unref(buf[i]);
 > ```
+> 
+> See [Unref Documentation](unref.md) for complete details.
 
 **Assignment:**
 

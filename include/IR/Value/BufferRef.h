@@ -54,7 +54,7 @@ public:
 	}
 
 	/**
-	 * Array access - returns a BufferElement that can be read/written
+	 * Array access - returns a Var<T> that can be read/written
 	 */
 	[[nodiscard]] Var<T> operator[](const Var<int> &index) const;
 	[[nodiscard]] Var<T> operator[](const Expr<int> &index) const;

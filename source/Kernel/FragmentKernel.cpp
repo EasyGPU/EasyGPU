@@ -19,7 +19,7 @@
 #include <Runtime/GLStateCache.h>
 #include <Runtime/ShaderUtils.h>
 
-#include <glad/glad.h>
+#include <GLAD/glad.h>
 
 #include <iostream>
 #include <stdexcept>

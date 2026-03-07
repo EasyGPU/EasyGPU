@@ -11,8 +11,8 @@
 #include <Kernel/KernelProfiler.h>
 #include <Runtime/Context.h>
 
+#include <GLAD/glad.h>
 #include <algorithm>
-#include <glad/glad.h>
 #include <iomanip>
 #include <iostream>
 

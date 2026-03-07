@@ -503,6 +503,11 @@ private:
 #undef EXPR_SWZ3
 #undef EXPR_SWZ4
 
+// Type aliases for vector expressions (defined after specializations)
+using Vec2Expr = Expr<Math::Vec2>;
+using Vec3Expr = Expr<Math::Vec3>;
+using Vec4Expr = Expr<Math::Vec4>;
+
 } // namespace GPU::IR::Value
 
 #endif // EASYGPU_EXPRVECTOR_H

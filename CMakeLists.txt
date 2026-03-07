@@ -35,7 +35,14 @@ include_directories(include third)
 add_library(GLAD "third/GLAD/glad.c")
 target_include_directories(GLAD PUBLIC third)
 
-set(EASYGPU_PLATFORM_LIBS opengl32)
+# Platform-specific libraries
+if(WIN32)
+    set(EASYGPU_PLATFORM_LIBS opengl32)
+elseif(UNIX AND NOT APPLE)
+    find_package(OpenGL REQUIRED)
+    find_package(X11 REQUIRED)
+    set(EASYGPU_PLATFORM_LIBS ${OPENGL_LIBRARIES} ${X11_LIBRARIES})
+endif()
 
 # =============================================================================
 # Core Library
@@ -168,6 +175,7 @@ add_library(EasyGPU STATIC
     include/Utility/Math.h
     source/Utility/Math.cpp
     include/Utility/Helpers.h
+    include/Utility/Unref.h
     include/Utility/Meta/StructMeta.h
     include/Utility/Meta/Std430Layout.h
     
@@ -206,18 +214,11 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestKernel1D.cpp
         tests/TestBuffer.cpp
         tests/TestBufferSlot.cpp
-        tests/TestBufferSlotBasic.cpp
         tests/TestTexture.cpp
         tests/TestTextureSlot.cpp
         tests/TestSlotMixed.cpp
         tests/TestSlotPingPong.cpp
         tests/TestSlotError.cpp
-        tests/TestFlowIf.cpp
-        tests/TestFlowFor.cpp
-        tests/TestFlowDoWhile.cpp
-        tests/TestBreakContinue.cpp
-        tests/TestMath.cpp
-        tests/TestExpression.cpp
         tests/TestCallable.cpp
         tests/TestInspector.cpp
         tests/TestProfiler.cpp

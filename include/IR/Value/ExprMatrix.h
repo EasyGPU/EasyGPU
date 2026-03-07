@@ -818,6 +818,18 @@ public:
 [[nodiscard]] inline Expr<Math::Mat4> operator/(const VarBase<Math::Mat4> &lhs, const Var<float> &rhs) {
 	return Expr<Math::Mat4>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, lhs.Load(), rhs.Load()));
 }
+
+// Type aliases for matrix expressions (defined after specializations)
+using Mat2Expr	 = Expr<Math::Mat2>;
+using Mat3Expr	 = Expr<Math::Mat3>;
+using Mat4Expr	 = Expr<Math::Mat4>;
+using Mat2x3Expr = Expr<Math::Mat2x3>;
+using Mat2x4Expr = Expr<Math::Mat2x4>;
+using Mat3x2Expr = Expr<Math::Mat3x2>;
+using Mat3x4Expr = Expr<Math::Mat3x4>;
+using Mat4x2Expr = Expr<Math::Mat4x2>;
+using Mat4x3Expr = Expr<Math::Mat4x3>;
+
 } // namespace GPU::IR::Value
 
 #endif // EASYGPU_EXPRMATRIX_H

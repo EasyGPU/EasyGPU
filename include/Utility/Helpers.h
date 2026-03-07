@@ -10,6 +10,11 @@
 #ifndef EASYGPU_HELPERS_H
 #define EASYGPU_HELPERS_H
 
+// X11 defines Bool as typedef int Bool, which conflicts with our Bool alias
+#ifdef Bool
+#undef Bool
+#endif
+
 #include <IR/Builder/Builder.h>
 #include <IR/Node/CallInst.h>
 #include <IR/Node/LoadUniform.h>
@@ -104,6 +109,22 @@ template <typename T>
 concept Vec4Component =
 	std::same_as<std::remove_cvref_t<T>, Math::Vec4> || IsVarOf<std::remove_cvref_t<T>, Math::Vec4>::value ||
 	IsExprOf<std::remove_cvref_t<T>, Math::Vec4>::value;
+
+// Integer vector component concepts
+template <typename T>
+concept IVec2Component =
+	std::same_as<std::remove_cvref_t<T>, Math::IVec2> || IsVarOf<std::remove_cvref_t<T>, Math::IVec2>::value ||
+	IsExprOf<std::remove_cvref_t<T>, Math::IVec2>::value;
+
+template <typename T>
+concept IVec3Component =
+	std::same_as<std::remove_cvref_t<T>, Math::IVec3> || IsVarOf<std::remove_cvref_t<T>, Math::IVec3>::value ||
+	IsExprOf<std::remove_cvref_t<T>, Math::IVec3>::value;
+
+template <typename T>
+concept IVec4Component =
+	std::same_as<std::remove_cvref_t<T>, Math::IVec4> || IsVarOf<std::remove_cvref_t<T>, Math::IVec4>::value ||
+	IsExprOf<std::remove_cvref_t<T>, Math::IVec4>::value;
 
 // Helper to convert value to GLSL string representation
 template <typename T> [[nodiscard]] inline std::string ToGLSLString(T &&val) {
@@ -347,6 +368,49 @@ template <typename XYZ, typename W>
 	std::string wStr   = Detail::ToGLSLString(std::forward<W>(w));
 	return IR::Value::Expr<Math::Vec4>(
 		std::make_unique<IR::Node::LoadUniformNode>(std::format("vec4(({}).xyz, {})", xyzStr, wStr)));
+}
+
+// MakeFloat4 from Vec2 + scalar + scalar
+template <typename XY, typename Z, typename W>
+	requires Detail::Vec2Component<XY> && Detail::FloatComponent<Z> && Detail::FloatComponent<W>
+[[nodiscard]] inline auto MakeFloat4(XY &&xy, Z &&z, W &&w) {
+	std::string xyStr = Detail::ToGLSLString(std::forward<XY>(xy));
+	std::string zStr  = Detail::ToGLSLString(std::forward<Z>(z));
+	std::string wStr  = Detail::ToGLSLString(std::forward<W>(w));
+	return IR::Value::Expr<Math::Vec4>(
+		std::make_unique<IR::Node::LoadUniformNode>(std::format("vec4(({}).xy, {}, {})", xyStr, zStr, wStr)));
+}
+
+// Int broadcast versions
+// MakeInt3 from IVec2 + scalar
+template <typename XY, typename Z>
+	requires Detail::IVec2Component<XY> && Detail::IntComponent<Z>
+[[nodiscard]] inline auto MakeInt3(XY &&xy, Z &&z) {
+	std::string xyStr = Detail::ToGLSLString(std::forward<XY>(xy));
+	std::string zStr  = Detail::ToGLSLString(std::forward<Z>(z));
+	return IR::Value::Expr<Math::IVec3>(
+		std::make_unique<IR::Node::LoadUniformNode>(std::format("ivec3(({}).xy, {})", xyStr, zStr)));
+}
+
+// MakeInt4 from IVec3 + scalar
+template <typename XYZ, typename W>
+	requires Detail::IVec3Component<XYZ> && Detail::IntComponent<W>
+[[nodiscard]] inline auto MakeInt4(XYZ &&xyz, W &&w) {
+	std::string xyzStr = Detail::ToGLSLString(std::forward<XYZ>(xyz));
+	std::string wStr   = Detail::ToGLSLString(std::forward<W>(w));
+	return IR::Value::Expr<Math::IVec4>(
+		std::make_unique<IR::Node::LoadUniformNode>(std::format("ivec4(({}).xyz, {})", xyzStr, wStr)));
+}
+
+// MakeInt4 from IVec2 + scalar + scalar
+template <typename XY, typename Z, typename W>
+	requires Detail::IVec2Component<XY> && Detail::IntComponent<Z> && Detail::IntComponent<W>
+[[nodiscard]] inline auto MakeInt4(XY &&xy, Z &&z, W &&w) {
+	std::string xyStr = Detail::ToGLSLString(std::forward<XY>(xy));
+	std::string zStr  = Detail::ToGLSLString(std::forward<Z>(z));
+	std::string wStr  = Detail::ToGLSLString(std::forward<W>(w));
+	return IR::Value::Expr<Math::IVec4>(
+		std::make_unique<IR::Node::LoadUniformNode>(std::format("ivec4(({}).xy, {}, {})", xyStr, zStr, wStr)));
 }
 
 // ============================================================================

@@ -24,6 +24,7 @@
 #include <Utility/Meta/StructMeta.h>
 
 #include <Utility/Helpers.h>
+#include <Utility/Unref.h>
 #include <Utility/Vec.h>
 
 using namespace GPU::IR::Value;
@@ -865,11 +866,293 @@ EASYGPU_STRUCT(ObjectTransform, (GPU::Math::Vec3, position), // 12 bytes C++ -> 
 
 // Complex flat struct: many Vec3/Vec4 fields to stress test layout conversion
 // Complex nested struct: GameObject contains ObjectTransform and Material
-EASYGPU_STRUCT(GameObject, (ObjectTransform, transform), // Nested ObjectTransform struct
-			   (Material, material),					 // Nested Material struct
-			   (int, objectId),							 // Object identifier
-			   (float, visibility)						 // Visibility factor
-);
+struct alignas(16) GameObject {
+	ObjectTransform transform;
+	Material		material;
+	int				objectId;
+	float			visibility;
+};
+namespace GPU::Meta {
+template <> struct StructMeta<GameObject> {
+	static constexpr bool		 isRegistered = true;
+	static constexpr const char *glslTypeName = "GameObject";
+	using _EasyGPU_CurrentStruct			  = GameObject;
+	static std::string ExpandedDefinition() {
+		std::string result = "struct "
+							 "GameObject"
+							 " {\n";
+		{
+			std::ostringstream oss_;
+			oss_ << "    " << GPU::Meta::GetGLSLTypeName<ObjectTransform>() << " " << "transform" << ";\n";
+			result += oss_.str();
+		}
+		{
+			std::ostringstream oss_;
+			oss_ << "    " << GPU::Meta::GetGLSLTypeName<Material>() << " " << "material" << ";\n";
+			result += oss_.str();
+		}
+		{
+			std::ostringstream oss_;
+			oss_ << "    " << GPU::Meta::GetGLSLTypeName<int>() << " " << "objectId" << ";\n";
+			result += oss_.str();
+		}
+		{
+			std::ostringstream oss_;
+			oss_ << "    " << GPU::Meta::GetGLSLTypeName<float>() << " " << "visibility" << ";\n";
+			result += oss_.str();
+		}
+		result += "};\n";
+		return result;
+	}
+	static std::string GetStd430Definition() {
+		return ExpandedDefinition();
+	}
+	static std::string ToGLSLInit(const GameObject &value) {
+		std::ostringstream oss;
+		oss << "GameObject" << "(";
+		oss << GPU::Meta::ValueToString(value.transform) << ", ";
+		oss << GPU::Meta::ValueToString(value.material) << ", ";
+		oss << GPU::Meta::ValueToString(value.objectId) << ", ";
+		oss << GPU::Meta::ValueToString(value.visibility) << ", ";
+		std::string result = oss.str();
+		if (result.length() >= 2)
+			result = result.substr(0, result.length() - 2);
+		result += ")";
+		return result;
+	}
+	static size_t GetCPPLayoutSize() {
+		return sizeof(GameObject);
+	}
+	static size_t GetGPULayoutSize() {
+		size_t size		= 0;
+		size_t maxAlign = 1;
+		{
+			size_t align  = GPU::Meta::GetStd430Alignment<ObjectTransform>();
+			size		  = (size + align - 1) & ~(align - 1);
+			size		 += GPU::Meta::GetFieldGPULayoutSize<ObjectTransform>();
+			if (align > maxAlign)
+				maxAlign = align;
+		}
+		{
+			size_t align  = GPU::Meta::GetStd430Alignment<Material>();
+			size		  = (size + align - 1) & ~(align - 1);
+			size		 += GPU::Meta::GetFieldGPULayoutSize<Material>();
+			if (align > maxAlign)
+				maxAlign = align;
+		}
+		{
+			size_t align  = GPU::Meta::GetStd430Alignment<int>();
+			size		  = (size + align - 1) & ~(align - 1);
+			size		 += GPU::Meta::GetFieldGPULayoutSize<int>();
+			if (align > maxAlign)
+				maxAlign = align;
+		}
+		{
+			size_t align  = GPU::Meta::GetStd430Alignment<float>();
+			size		  = (size + align - 1) & ~(align - 1);
+			size		 += GPU::Meta::GetFieldGPULayoutSize<float>();
+			if (align > maxAlign)
+				maxAlign = align;
+		}
+		return (size + maxAlign - 1) & ~(maxAlign - 1);
+	}
+	static bool NeedsLayoutConversion() {
+		return true;
+	}
+	static void UploadUniform(uint32_t program, const std::string &uniformName, const GameObject &value) {
+		GPU::Meta::UploadUniformDispatch<ObjectTransform>(program, uniformName, value.transform, "transform");
+		GPU::Meta::UploadUniformDispatch<Material>(program, uniformName, value.material, "material");
+		GPU::Meta::UploadUniformDispatch<int>(program, uniformName, value.objectId, "objectId");
+		GPU::Meta::UploadUniformDispatch<float>(program, uniformName, value.visibility, "visibility");
+	}
+	static void ConvertToGPUImpl(const char *src, char *dst, size_t srcStride, size_t dstStride, size_t count) {
+		for (size_t i = 0; i < count; i++) {
+			const char *srcElem	  = src + i * srcStride;
+			char	   *dstElem	  = dst + i * dstStride;
+			size_t		gpuOffset = 0;
+			{
+				GPU::Meta::CopyMemberToGPU<_EasyGPU_CurrentStruct, ObjectTransform>(srcElem, dstElem, gpuOffset,
+																					&_EasyGPU_CurrentStruct::transform);
+			}
+			{
+				GPU::Meta::CopyMemberToGPU<_EasyGPU_CurrentStruct, Material>(srcElem, dstElem, gpuOffset,
+																			 &_EasyGPU_CurrentStruct::material);
+			}
+			{
+				GPU::Meta::CopyMemberToGPU<_EasyGPU_CurrentStruct, int>(srcElem, dstElem, gpuOffset,
+																		&_EasyGPU_CurrentStruct::objectId);
+			}
+			{
+				GPU::Meta::CopyMemberToGPU<_EasyGPU_CurrentStruct, float>(srcElem, dstElem, gpuOffset,
+																		  &_EasyGPU_CurrentStruct::visibility);
+			}
+		}
+	}
+	static void ConvertFromGPUImpl(const char *src, char *dst, size_t srcStride, size_t dstStride, size_t count) {
+		for (size_t i = 0; i < count; i++) {
+			const char *srcElem	  = src + i * srcStride;
+			char	   *dstElem	  = dst + i * dstStride;
+			size_t		gpuOffset = 0;
+			{
+				GPU::Meta::CopyMemberFromGPU<_EasyGPU_CurrentStruct, ObjectTransform>(
+					srcElem, dstElem, gpuOffset, &_EasyGPU_CurrentStruct::transform);
+			}
+			{
+				GPU::Meta::CopyMemberFromGPU<_EasyGPU_CurrentStruct, Material>(srcElem, dstElem, gpuOffset,
+																			   &_EasyGPU_CurrentStruct::material);
+			}
+			{
+				GPU::Meta::CopyMemberFromGPU<_EasyGPU_CurrentStruct, int>(srcElem, dstElem, gpuOffset,
+																		  &_EasyGPU_CurrentStruct::objectId);
+			}
+			{
+				GPU::Meta::CopyMemberFromGPU<_EasyGPU_CurrentStruct, float>(srcElem, dstElem, gpuOffset,
+																			&_EasyGPU_CurrentStruct::visibility);
+			}
+		}
+	}
+	static GPU::Meta::ToGPUConverter GetToGPUConverter() {
+		return ConvertToGPUImpl;
+	}
+	static GPU::Meta::FromGPUConverter GetFromGPUConverter() {
+		return ConvertFromGPUImpl;
+	}
+};
+template <> inline void RegisterStructWithDependencies<GameObject>() {
+	auto	   &ctx = *GPU::IR::Builder::Builder::Get().Context();
+	std::string typeName(GPU::Meta::StructMeta<GameObject>::glslTypeName);
+	if (!ctx.HasStructDefinition(typeName)) {
+		GPU::Meta::RegisterStructWithDependencies<ObjectTransform>();
+		GPU::Meta::RegisterStructWithDependencies<Material>();
+		GPU::Meta::RegisterStructWithDependencies<int>();
+		GPU::Meta::RegisterStructWithDependencies<float>();
+		ctx.AddStructDefinition(typeName, GPU::Meta::StructMeta<GameObject>::ExpandedDefinition());
+	}
+}
+} // namespace GPU::Meta
+namespace GPU::IR::Value {
+template <> class Var<GameObject>;
+}
+namespace GPU::IR::Value {
+template <> class Expr<GameObject> : public ExprBase {
+public:
+	Expr() = default;
+	explicit Expr(std::unique_ptr<Node::Node> node) : ExprBase(std::move(node)) {
+	}
+	Expr(const Expr &)			  = delete;
+	Expr &operator=(const Expr &) = delete;
+	Expr(Expr &&)				  = default;
+	Expr &operator=(Expr &&)	  = default;
+	~Expr()						  = default;
+	explicit Expr(const Var<GameObject> &var);
+	explicit Expr(Var<GameObject> &&var);
+};
+} // namespace GPU::IR::Value
+namespace GPU::IR::Value {
+template <> class Var<GameObject> : public Value {
+public:
+	Var() {
+		GPU::Meta::RegisterStructWithDependencies<GameObject>();
+		auto name = Builder::Builder::Get().Context()->AssignVarName();
+		_node	  = std::make_unique<Node::LocalVariableNode>(name,
+															  std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
+		_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+		Builder::Builder::Get().Build(*_varNode, true);
+	}
+	explicit Var(const std::string &varName) {
+		GPU::Meta::RegisterStructWithDependencies<GameObject>();
+		_node	 = std::make_unique<Node::LocalVariableNode>(varName,
+															 std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
+		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+	}
+	Var(const std::string &varName, bool IsExternal) {
+		GPU::Meta::RegisterStructWithDependencies<GameObject>();
+		_node = std::make_unique<Node::LocalVariableNode>(
+			varName, std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName), IsExternal);
+		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+	}
+	Var(const Var &Other) {
+		if (Other._varNode && Other._varNode->IsExternal()) {
+			_node = std::make_unique<Node::LocalVariableNode>(
+				Other._varNode->VarName(), std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName), true);
+			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+		} else {
+			GPU::Meta::RegisterStructWithDependencies<GameObject>();
+			auto name = Builder::Builder::Get().Context()->AssignVarName();
+			_node	  = std::make_unique<Node::LocalVariableNode>(
+				name, std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
+			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+			Builder::Builder::Get().Build(*_varNode, true);
+			auto rhs   = Other.Load();
+			auto lhs   = Load();
+			auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
+			Builder::Builder::Get().Build(*store, true);
+		}
+	}
+	Var(const GameObject &value) {
+		GPU::Meta::RegisterStructWithDependencies<GameObject>();
+		auto name = Builder::Builder::Get().Context()->AssignVarName();
+		_node	  = std::make_unique<Node::LocalVariableNode>(name,
+															  std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
+		_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+		Builder::Builder::Get().Build(*_varNode, true);
+		std::ostringstream initCodeOss_;
+		initCodeOss_ << name << "=" << GPU::Meta::StructMeta<GameObject>::ToGLSLInit(value) << ";";
+		auto initCode = initCodeOss_.str();
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+	[[nodiscard]] GPU::IR::Value::Var<ObjectTransform> transform() {
+		std::ostringstream oss_;
+		oss_ << _varNode->VarName() << "." << "transform";
+		return GPU::IR::Value::Var<ObjectTransform>(oss_.str());
+	}
+	[[nodiscard]] GPU::IR::Value::Var<Material> material() {
+		std::ostringstream oss_;
+		oss_ << _varNode->VarName() << "." << "material";
+		return GPU::IR::Value::Var<Material>(oss_.str());
+	}
+	[[nodiscard]] GPU::IR::Value::Var<int> objectId() {
+		std::ostringstream oss_;
+		oss_ << _varNode->VarName() << "." << "objectId";
+		return GPU::IR::Value::Var<int>(oss_.str());
+	}
+	[[nodiscard]] GPU::IR::Value::Var<float> visibility() {
+		std::ostringstream oss_;
+		oss_ << _varNode->VarName() << "." << "visibility";
+		return GPU::IR::Value::Var<float>(oss_.str());
+	}
+	Var &operator=(const Var &other) {
+		if (this != &other) {
+			auto store = std::make_unique<Node::StoreNode>(Load(), other.Load());
+			Builder::Builder::Get().Build(*store, true);
+		}
+		return *this;
+	}
+	Var &operator=(const GameObject &value) {
+		std::ostringstream initCodeOss_;
+		initCodeOss_ << _varNode->VarName() << "=" << GPU::Meta::StructMeta<GameObject>::ToGLSLInit(value) << ";";
+		auto initCode = initCodeOss_.str();
+		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+		return *this;
+	}
+	operator Expr<GameObject>() const {
+		return Expr<GameObject>(Load());
+	}
+	[[nodiscard]] std::unique_ptr<Node::LoadLocalVariableNode> Load() const {
+		return std::make_unique<Node::LoadLocalVariableNode>(_varNode->VarName());
+	}
+
+private:
+	Node::LocalVariableNode *_varNode = nullptr;
+	friend class Expr<GameObject>;
+};
+} // namespace GPU::IR::Value
+namespace GPU::IR::Value {
+inline Expr<GameObject>::Expr(const Var<GameObject> &var) : ExprBase(var.Load()) {
+}
+inline Expr<GameObject>::Expr(Var<GameObject> &&var) : ExprBase(var.Load()) {
+}
+}; // namespace GPU::IR::Value
 
 // =============================================================================
 // Test: Nested struct (Transform) with automatic layout conversion
@@ -961,7 +1244,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto			data	   = buffer.Bind();
 
-		Var<GameObject> obj		   = data[id];
+		Var<GameObject> obj		   = GPU::Utility::Unref(data[id]);
 
 		// Update nested transform
 		obj.transform().position() = obj.transform().position() + GPU::MakeFloat3(10.0f, 0.0f, 0.0f);

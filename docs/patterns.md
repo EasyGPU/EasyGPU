@@ -3,19 +3,27 @@
 Solutions to frequently encountered tasks in EasyGPU.
 
 > **Note:** Throughout these patterns, remember:
+> - `Unref(var)` - Create **independent copy** from buffer elements (avoids aliasing)
 > - `MakeFloat(value)` / `MakeInt(value)` - Wrap **literals** into GPU variables (no type conversion)
 > - `ToFloat(var)` / `ToInt(var)` - **Convert** between `Var` types (with type conversion)
 > 
 > Example:
 > ```cpp
+> // From buffer - use Unref to avoid aliasing
+> Float val = Unref(buf[i]);               // Independent copy
+> 
+> // From literal - use Make
 > Float f = MakeFloat(3.14f);              // Wrap float literal
 > Int i = MakeInt(42);                     // Wrap int literal  
+> 
+> // Type conversion - use To
 > Float f2 = ToFloat(MakeInt(42));         // Convert Var<int> to Var<float>
 > Int i2 = ToInt(MakeFloat(3.9f));         // Convert and truncate to 3
 > ```
 
 ## Table of Contents
 
+- [Unref - Independent Variable Copies](#unref---independent-variable-copies)
 - [Resource Slots - Dynamic Resource Switching](#resource-slots---dynamic-resource-switching)
 - [Local Array Patterns](#local-array-patterns)
 - [Parallel Reduction (Sum/Max)](#parallel-reduction-summax)
@@ -28,6 +36,72 @@ Solutions to frequently encountered tasks in EasyGPU.
 - [Multi-Pass Rendering](#multi-pass-rendering)
 - [Debugging Output](#debugging-output)
 - [Async Data Transfer](#async-data-transfer)
+
+---
+
+## Unref - Independent Variable Copies
+
+When reading from buffers, always use `Unref()` to create independent copies. Without it, you may accidentally create aliases.
+
+### Basic Usage
+
+```cpp
+Kernel1D process([](Int i) {
+    auto buf = buffer.Bind();
+    
+    // ❌ DANGEROUS: val aliases buf[i]
+    Int val = buf[i];
+    val = 5;  // May modify buf[i]!
+    
+    // ✅ CORRECT: Independent copy
+    Int val = Unref(buf[i]);
+    val = 5;  // Only modifies val
+});
+```
+
+### In Arithmetic Expressions
+
+For expressions, use `Unref` when storing to named variables:
+
+```cpp
+// Store intermediate results
+Float a = Unref(buf[i]);
+Float b = Unref(buf[i + 1]);
+Float result = (a + b) * 0.5f;
+buf[i] = result;
+```
+
+### With Callables
+
+Use `Unref` when passing buffer elements to Callables that modify arguments:
+
+```cpp
+Callable<void(Float&)> ClampToZero = [](Float& x) {
+    If(x < 0.0f, [&]() { x = 0.0f; });
+};
+
+Kernel1D process([](Int i) {
+    auto buf = buffer.Bind();
+    
+    // Create independent copy before modifying
+    Float val = Unref(buf[i]);
+    ClampToZero(val);
+    
+    // Write back if needed
+    buf[i] = val;
+});
+```
+
+### Key Principle
+
+| Scenario | Use Unref? |
+|:---------|:-----------|
+| `buf[i] = value` | No - direct assignment |
+| `Float x = buf[i]` | **Yes** - avoid alias |
+| `SomeFunc(buf[i])` | Depends - use if func modifies argument |
+| `buf[i] * 2.0f` | No - temporary in expression |
+
+See [Unref Documentation](unref.md) for complete details.
 
 ---
 

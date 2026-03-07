@@ -30,14 +30,10 @@
 
 #include <IR/Builder/Builder.h>
 #include <IR/Value/BufferRef.h>
+#include <Runtime/Buffer.h>
 
 #include <stdexcept>
 #include <string>
-
-// Forward declaration
-namespace GPU::Runtime {
-template <typename T> class Buffer;
-}
 
 namespace GPU::Runtime {
 // Forward declaration for friend access

@@ -12,7 +12,7 @@
 #include <Runtime/Context.h>
 #include <Runtime/GLStateCache.h>
 
-#include <glad/glad.h>
+#include <GLAD/glad.h>
 
 #include <stdexcept>
 

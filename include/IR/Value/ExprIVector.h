@@ -1060,6 +1060,11 @@ public:
 		std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
 }
 
+// Type aliases for integer vector expressions (defined after specializations)
+using IVec2Expr = Expr<Math::IVec2>;
+using IVec3Expr = Expr<Math::IVec3>;
+using IVec4Expr = Expr<Math::IVec4>;
+
 } // namespace GPU::IR::Value
 
 #endif // EASYGPU_EXPRIVECTOR_H

@@ -9,9 +9,6 @@
 #include <iostream>
 #include <sstream>
 
-// GLAD
-#include <GLAD/glad.h>
-
 namespace GPU::Runtime {
 // Static members
 Context *Context::_instance	 = nullptr;
@@ -63,6 +60,10 @@ void Context::MakeCurrent() {
 	if (!wglMakeCurrent(_hdc, _hglrc)) {
 		throw std::runtime_error("Failed to make OpenGL context current");
 	}
+#elif defined(__linux__)
+	if (!glXMakeCurrent(_display, _window, _glxContext)) {
+		throw std::runtime_error("Failed to make OpenGL context current");
+	}
 #endif
 	// Invalidate state cache when context becomes current
 	// This ensures we re-bind state after any context switch
@@ -72,6 +73,8 @@ void Context::MakeCurrent() {
 void Context::MakeNoneCurrent() {
 #ifdef _WIN32
 	wglMakeCurrent(nullptr, nullptr);
+#elif defined(__linux__)
+	glXMakeCurrent(_display, None, nullptr);
 #endif
 }
 
@@ -255,21 +258,192 @@ void Context::CleanupPlatform() {
 	// UnregisterClassW(s_windowClassName, _hInstance);
 }
 
-#else
-// Linux/X11 implementation would go here
+#elif defined(__linux__)
+
+// Linux/X11 implementation using GLX
+
 void Context::InitializePlatform() {
-	throw std::runtime_error("Non-Windows platforms not yet implemented");
+	CreateHiddenWindow();
+	SetupGLContext();
+	LoadGLAD();
 }
-void Context::CleanupPlatform() {
-}
+
 void Context::CreateHiddenWindow() {
+	// Open X11 display
+	_display = XOpenDisplay(nullptr);
+	if (!_display) {
+		throw std::runtime_error("Failed to open X11 display");
+	}
+
+	int			screen = DefaultScreen(_display);
+	Window		root   = RootWindow(_display, screen);
+
+	// Choose a simple visual
+	XVisualInfo visualInfo;
+	if (!XMatchVisualInfo(_display, screen, 24, TrueColor, &visualInfo)) {
+		if (!XMatchVisualInfo(_display, screen, 32, TrueColor, &visualInfo)) {
+			// Try any depth
+			visualInfo.visual = DefaultVisual(_display, screen);
+			visualInfo.depth  = DefaultDepth(_display, screen);
+		}
+	}
+
+	// Set window attributes
+	XSetWindowAttributes attrs;
+	attrs.colormap	 = XCreateColormap(_display, root, visualInfo.visual, AllocNone);
+	attrs.event_mask = StructureNotifyMask;
+
+	// Create hidden window (1x1 pixel)
+	_window			 = XCreateWindow(_display, root, 0, 0, 1, 1, // x, y, width, height
+									 0,							 // border width
+									 visualInfo.depth, InputOutput, visualInfo.visual, CWColormap | CWEventMask, &attrs);
+
+	if (!_window) {
+		throw std::runtime_error("Failed to create X11 window");
+	}
+
+	// Don't map the window (keep it hidden)
+	// XMapWindow(_display, _window);
+
+	// Flush to ensure window is created
+	XFlush(_display);
 }
-void Context::DestroyHiddenWindow() {
-}
+
 void Context::SetupGLContext() {
+	// Check for GLX extension
+	int glxMajor, glxMinor;
+	if (!glXQueryVersion(_display, &glxMajor, &glxMinor)) {
+		throw std::runtime_error("GLX not available");
+	}
+
+	// Choose FB config with OpenGL support
+	int			 visualAttribs[] = {GLX_X_RENDERABLE,
+									True,
+									GLX_DRAWABLE_TYPE,
+									GLX_WINDOW_BIT,
+									GLX_RENDER_TYPE,
+									GLX_RGBA_BIT,
+									GLX_X_VISUAL_TYPE,
+									GLX_TRUE_COLOR,
+									GLX_RED_SIZE,
+									8,
+									GLX_GREEN_SIZE,
+									8,
+									GLX_BLUE_SIZE,
+									8,
+									GLX_ALPHA_SIZE,
+									8,
+									GLX_DEPTH_SIZE,
+									24,
+									GLX_STENCIL_SIZE,
+									8,
+									None};
+
+	int			 fbCount;
+	GLXFBConfig *fbc = glXChooseFBConfig(_display, DefaultScreen(_display), visualAttribs, &fbCount);
+	if (!fbc || fbCount == 0) {
+		// Try with minimal attributes
+		int minimalAttribs[] = {GLX_X_RENDERABLE, True, GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT, None};
+		fbc					 = glXChooseFBConfig(_display, DefaultScreen(_display), minimalAttribs, &fbCount);
+		if (!fbc || fbCount == 0) {
+			throw std::runtime_error("Failed to choose GLX framebuffer config");
+		}
+	}
+
+	// Use the first FB config
+	GLXFBConfig bestFbc = fbc[0];
+	XFree(fbc);
+
+	// Get the visual from FB config
+	XVisualInfo *vi = glXGetVisualFromFBConfig(_display, bestFbc);
+	if (!vi) {
+		throw std::runtime_error("Failed to get visual from FB config");
+	}
+
+	// Check if we can use glXCreateContextAttribsARB (OpenGL 3.0+)
+	GLXContext (*glXCreateContextAttribsARB)(Display *, GLXFBConfig, GLXContext, Bool, const int *) =
+		(GLXContext (*)(Display *, GLXFBConfig, GLXContext, Bool, const int *))glXGetProcAddressARB(
+			(const GLubyte *)"glXCreateContextAttribsARB");
+
+	if (glXCreateContextAttribsARB) {
+		// Try to create modern context
+		int contextAttribs[] = {
+			GLX_CONTEXT_MAJOR_VERSION_ARB,	  4,   GLX_CONTEXT_MINOR_VERSION_ARB, 3, GLX_CONTEXT_PROFILE_MASK_ARB,
+			GLX_CONTEXT_CORE_PROFILE_BIT_ARB, None};
+
+		_glxContext = glXCreateContextAttribsARB(_display, bestFbc, 0, True, contextAttribs);
+
+		// If 4.3 fails, try 3.3
+		if (!_glxContext) {
+			contextAttribs[1] = 3;
+			contextAttribs[3] = 3;
+			_glxContext		  = glXCreateContextAttribsARB(_display, bestFbc, 0, True, contextAttribs);
+		}
+	}
+
+	// Fallback to legacy context creation
+	if (!_glxContext) {
+		_glxContext = glXCreateContext(_display, vi, nullptr, GL_TRUE);
+	}
+
+	XFree(vi);
+
+	if (!_glxContext) {
+		throw std::runtime_error("Failed to create GLX context");
+	}
+
+	// Make context current
+	if (!glXMakeCurrent(_display, _window, _glxContext)) {
+		glXDestroyContext(_display, _glxContext);
+		_glxContext = nullptr;
+		throw std::runtime_error("Failed to make GLX context current");
+	}
 }
+
 void Context::LoadGLAD() {
+	if (!gladLoadGL()) {
+		throw std::runtime_error("Failed to initialize GLAD");
+	}
+
+	// Check version
+	GLint major = 0, minor = 0;
+	glGetIntegerv(GL_MAJOR_VERSION, &major);
+	glGetIntegerv(GL_MINOR_VERSION, &minor);
+
+	if (major < 4 || (major == 4 && minor < 3)) {
+		std::cerr << "Warning: OpenGL " << major << "." << minor << " detected. Compute shaders require 4.3+."
+				  << std::endl;
+	}
 }
+
+void Context::DestroyHiddenWindow() {
+	if (_window) {
+		XDestroyWindow(_display, _window);
+		_window = 0;
+	}
+	if (_display) {
+		XCloseDisplay(_display);
+		_display = nullptr;
+	}
+}
+
+void Context::CleanupPlatform() {
+	// Make sure context is not current
+	if (_display) {
+		glXMakeCurrent(_display, None, nullptr);
+	}
+
+	// Destroy context
+	if (_glxContext && _display) {
+		glXDestroyContext(_display, _glxContext);
+		_glxContext = nullptr;
+	}
+
+	DestroyHiddenWindow();
+}
+
+#else
+#error "Unsupported platform"
 #endif
 
 } // namespace GPU::Runtime

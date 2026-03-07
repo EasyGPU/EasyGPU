@@ -142,7 +142,7 @@ void TestMultipleUniforms() {
 		   auto thresh = threshold.Load();
 
 		   Int	val	   = in[i] + off;
-		   If(val > thresh, [&]() { out[i] = ToInt(ToFloat(val) * s); }).Else([&]() { out[i] = val; });
+		   If(val > thresh, [&]() { out[i] = ToInt(ToFloat(val) * s); }).Else([&]() { out[i] = Expr<int>(val); });
 	   });
 
 	kernel.Dispatch(1, true);
@@ -291,7 +291,7 @@ void TestUniformBool() {
 		   auto in	 = gpuInput.Bind();
 		   auto out	 = gpuOutput.Bind();
 		   auto cond = condition.Load();
-		   If(cond, [&]() { out[i] = in[i] * 2; }).Else([&]() { out[i] = in[i]; });
+		   If(cond, [&]() { out[i] = in[i] * 2; }).Else([&]() { out[i] = Expr<int>(in[i]); });
 	   });
 
 	// First dispatch with condition = true

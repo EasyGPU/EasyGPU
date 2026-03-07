@@ -4,7 +4,7 @@
  *      @Date           :   2/12/2026
  */
 // glad.h must be included first to avoid APIENTRY redefinition with Windows SDK
-#include <glad/glad.h>
+#include <GLAD/glad.h>
 
 #include <Kernel/KernelBuildContext.h>
 

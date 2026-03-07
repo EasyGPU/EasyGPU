@@ -293,14 +293,14 @@ private:
  */
 template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 /**
-     * NOTE: Texture3D support has been removed due to OpenGL driver compatibility issues.
-     * Only Texture2D is
+ * NOTE: Texture3D support has been removed due to OpenGL driver compatibility issues.
+ * Only Texture2D is
  * supported.
-     */
+ */
 
 /**
-     * Type alias for convenience
-     */
+ * Type alias for convenience
+ */
 template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 
 } // namespace GPU::IR::Value

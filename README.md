@@ -310,17 +310,17 @@ int main() {
 
 > ⚠️ **Important: Variable Initialization**
 > 
-> Always use `Make*()` functions when initializing variables from buffer elements:
+> Always use `Unref()` when initializing variables from buffer elements:
 > ```cpp
 > // ✅ CORRECT: Creates a new independent variable
-> Int val = MakeInt(input[i]);
+> Int val = Unref(input[i]);
 > val = 5;  // Only modifies val
 > 
 > // ❌ DANGEROUS: May create a reference to input[i]
 > Int val = input[i];
 > val = 5;  // May unexpectedly modify input[i]!
 > ```
-> See [Tutorial](docs/tutorial.md) for details.
+> See [Unref Documentation](docs/unref.md) for details.
 
 Build:
 
@@ -393,14 +393,14 @@ Signed distance field path tracer with support for complex lighting and material
 
 ### Variable Initialization
 
-**Always use `Make*()` functions** when creating GPU variables from buffer elements or expressions:
+**Always use `Unref()`** when creating GPU variables from buffer elements:
 
 ```cpp
 auto buf = buffer.Bind();
 
 // ✅ CORRECT: Explicitly create a new independent variable
-Int val = MakeInt(buf[i]);
-Float f = MakeFloat(buf[i] * 2.0f);
+Int val = Unref(buf[i]);
+Float f = Unref(buf[i]);
 val = 5;  // Only modifies val, NOT buf[i]
 
 // ❌ DANGEROUS: Direct initialization may create a reference
@@ -408,7 +408,7 @@ Int val = buf[i];  // val may become an alias to buf[i]!
 val = 5;  // May unexpectedly modify buf[i] in the generated shader
 ```
 
-**Why this matters:** Due to move constructor optimizations, `Int val = buf[i]` transfers ownership of the underlying variable name, causing `val` to reference `buffer[i]` directly. Use `Make*()` to ensure value semantics and create truly independent variables.
+**Why this matters:** Due to move constructor optimizations, `Int val = buf[i]` selects the move constructor, transferring ownership of the underlying variable name. This causes `val` to reference `buffer[i]` directly in the generated GLSL. Use `Unref()` to force the copy constructor and create truly independent variables. See [Unref Documentation](docs/unref.md) for details.
 
 ### Var-Var Assignment
 
@@ -457,6 +457,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [Tutorial](docs/tutorial.md)
 - [API Reference](docs/api-reference.md)
 - [Common Patterns](docs/patterns.md)
+- [Unref - Independent Variable Copies](docs/unref.md)
 - [FAQ](docs/faq.md)
 
 ---

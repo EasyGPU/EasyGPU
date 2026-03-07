@@ -1,5 +1,11 @@
 #pragma once
 
+// X11 defines Bool as typedef int Bool, which conflicts with our Bool alias
+// Must be done before any X11 headers are included
+#ifdef Bool
+#undef Bool
+#endif
+
 /**
  * @file GPU.h
  * @brief EasyGPU lazy header - includes everything with all namespaces
@@ -18,8 +24,6 @@
  *   }
  */
 
-#pragma once
-
 // =============================================================================
 // Core Kernel
 // =============================================================================
@@ -34,21 +38,20 @@
 #include <Callable/Callable.h>
 
 // =============================================================================
-// IR Value Types
+// IR Value Types - Order matters for template specializations
 // =============================================================================
 #include <IR/Value/BufferRef.h>
+#include <IR/Value/TextureRef.h>
+#include <IR/Value/Value.h>
+// Include vector/matrix expression specializations BEFORE Expr.h
 #include <IR/Value/Expr.h>
 #include <IR/Value/ExprIVector.h>
 #include <IR/Value/ExprMatrix.h>
 #include <IR/Value/ExprVector.h>
-#include <IR/Value/TextureRef.h>
-#include <IR/Value/Value.h>
+// Var.h includes VarVector, VarIVector, VarMatrix at end
 #include <IR/Value/Var.h>
 #include <IR/Value/VarArray.h>
-#include <IR/Value/VarIVector.h>
-#include <IR/Value/VarMatrix.h>
 #include <IR/Value/VarStruct.h>
-#include <IR/Value/VarVector.h>
 
 // =============================================================================
 // IR Nodes (advanced usage)
@@ -90,6 +93,7 @@
 #include <Utility/Matrix.h>
 #include <Utility/Meta/Std430Layout.h>
 #include <Utility/Meta/StructMeta.h>
+#include <Utility/Unref.h>
 #include <Utility/Vec.h>
 
 // =============================================================================
@@ -113,6 +117,9 @@ using namespace GPU::Callables;
 
 /// Control flow: If, For, While, Break, Continue, Return
 using namespace GPU::Flow;
+
+/// Utility functions: Unref
+using namespace GPU::Utility;
 
 // =============================================================================
 // Convenience Type Aliases
@@ -138,5 +145,7 @@ using InspectorKernel2D = Kernel::InspectorKernel2D;
 /// Alias for InspectorKernel3D
 using InspectorKernel3D = Kernel::InspectorKernel3D;
 
-using FragmentKernel2D	= Kernel::FragmentKernel2D;
+#ifdef _WIN32
+using FragmentKernel2D = Kernel::FragmentKernel2D;
+#endif
 } // namespace GPU

@@ -482,7 +482,7 @@ Kernel1D example([](Int i) {
 > auto buf = buffer.Bind();
 > 
 > // ✅ CORRECT: Explicitly create a new variable with the value
-> Int val = MakeInt(buf[i]);
+> Int val = Unref(buf[i]);
 > val = 5;  // Only modifies val, NOT buf[i]
 > 
 > // ❌ DANGEROUS: val may become a reference to buf[i]
@@ -495,12 +495,14 @@ Kernel1D example([](Int i) {
 > - `Int val = buf[i]` selects the **move constructor** `VarBase(VarBase&&)`, which transfers ownership of the underlying variable name
 > - Result: `val` directly references `buffer[i]` in the generated GLSL
 > 
-> **Always use `Make*()`** when initializing from buffer elements to ensure value semantics:
+> **Always use `Unref()`** when initializing from buffer elements to ensure value semantics:
 > ```cpp
-> Int    val = MakeInt(buf[i]);      // Value copy
-> Float  f   = MakeFloat(buf[i]);    // Value copy  
-> Float3 v   = MakeFloat3(buf[i]);   // Value copy
+> Int    val = Unref(buf[i]);      // Value copy
+> Float  f   = Unref(buf[i]);      // Value copy  
+> Float3 v   = Unref(buf[i]);      // Value copy
 > ```
+> 
+> See [Unref Documentation](unref.md) for complete details.
 
 **Critical: Make vs Cast**
 

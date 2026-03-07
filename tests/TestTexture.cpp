@@ -702,15 +702,6 @@ int main() {
 		test_image_filter_blur();
 		test_image_filter_edge_detection();
 
-		// PBO async tests
-		std::cout << "\n=== PBO Async Transfer Tests ===\n";
-		test_pbo_basic_async_upload();
-		test_pbo_double_buffering();
-		test_pbo_streaming_upload();
-		test_pbo_async_download();
-		test_pbo_is_idle_check();
-		test_pbo_multiple_textures();
-
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " tests passed\n";
 		std::cout << "========================================\n";

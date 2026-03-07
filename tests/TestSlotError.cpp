@@ -87,7 +87,7 @@ int main() {
 		Kernel1D		   kernel([&](Int i) {
 			  auto a = slotA.Bind();
 			  auto b = slotB.Bind();
-			  b[i]	 = a[i];
+			  b[i]	 = Expr<float>(a[i]);
 		  });
 
 		// Only attach slotA
@@ -177,7 +177,7 @@ int main() {
 		// Now attach and retry
 		slot.Attach(buf);
 		kernel.Dispatch(1, true);
-		buf.Download(result.data());
+		buf.Download(result);
 
 		bool pass = firstFailed && (result[0] == 15.0f);
 

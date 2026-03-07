@@ -75,7 +75,7 @@ buffer.Upload(data);
 Kernel::Kernel2D kernel([&](Var<int> &x, Var<int> &y) {
 	auto	 buf = buffer.Bind();
 	Var<int> idx = y * 16 + x;
-	buf[idx]	 = idx;
+	buf[idx]	 = Expr<int>(idx);
 });
 
 kernel.Dispatch(1, 1, true);

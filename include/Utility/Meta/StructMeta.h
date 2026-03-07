@@ -21,7 +21,7 @@
 #include <Utility/Vec.h>
 
 // Include GLAD for OpenGL function declarations used in uniform upload
-#include <glad/glad.h>
+#include <GLAD/glad.h>
 
 // ============================================================================
 // Part 1: GPU::Meta namespace - defined FIRST

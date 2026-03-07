@@ -696,25 +696,11 @@ public:
 // Legacy alias for backward compatibility
 using ExprBase_t = ExprBase;
 
-// Common type aliases
+// Common type aliases for scalar types
+// Vector/matrix expression aliases are defined in ExprVector.h/ExprMatrix.h after specializations
 using BoolExpr	 = Expr<bool>;
 using FloatExpr	 = Expr<float>;
 using IntExpr	 = Expr<int>;
-using Vec2Expr	 = Expr<Math::Vec2>;
-using Vec3Expr	 = Expr<Math::Vec3>;
-using Vec4Expr	 = Expr<Math::Vec4>;
-using IVec2Expr	 = Expr<Math::IVec2>;
-using IVec3Expr	 = Expr<Math::IVec3>;
-using IVec4Expr	 = Expr<Math::IVec4>;
-using Mat2Expr	 = Expr<Math::Mat2>;
-using Mat3Expr	 = Expr<Math::Mat3>;
-using Mat4Expr	 = Expr<Math::Mat4>;
-using Mat2x3Expr = Expr<Math::Mat2x3>;
-using Mat2x4Expr = Expr<Math::Mat2x4>;
-using Mat3x2Expr = Expr<Math::Mat3x2>;
-using Mat3x4Expr = Expr<Math::Mat3x4>;
-using Mat4x2Expr = Expr<Math::Mat4x2>;
-using Mat4x3Expr = Expr<Math::Mat4x3>;
 } // namespace GPU::IR::Value
 
 #endif // EASYGPU_EXPR_H

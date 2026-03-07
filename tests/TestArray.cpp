@@ -65,7 +65,7 @@ GPU::Kernel::Kernel1D kernel(
 
 		// Write to output buffer
 		auto out = output.Bind();
-		out[id]	 = localArr[id];
+		out[id]	 = Expr<float>(localArr[id]);
 	},
 	10);
 
@@ -108,9 +108,9 @@ GPU::Kernel::Kernel1D kernel(
 		auto			   out	 = output.Bind();
 
 		// Lookup value from table
-		Int				   index = MakeInt(idx[id]);
+		Int				   index = Expr<int>(idx[id]);
 		index					 = Clamp(index, 0, 4);
-		out[id]					 = table[index];
+		out[id]					 = Expr<float>(table[index]);
 	},
 	5);
 
@@ -154,7 +154,7 @@ GPU::Kernel::Kernel1D kernel(
 		For(0, 5, [&](Int &i) { sum = sum + arr[i]; });
 
 		auto out = output.Bind();
-		out[id]	 = sum; // Each thread writes the same sum
+		out[id]	 = Expr<float>(sum); // Each thread writes the same sum
 	},
 	5);
 
@@ -192,14 +192,14 @@ GPU::Kernel::Kernel1D kernel(
 
 		For(0, 3, [&](Int &j) {
 			Int srcIdx = id + j - 1; // -1, 0, +1 offset
-			If(srcIdx >= 0 && srcIdx < N, [&]() { window[j] = in[srcIdx]; }).Else([&]() {
+			If(srcIdx >= 0 && srcIdx < N, [&]() { window[j] = Expr<float>(in[srcIdx]); }).Else([&]() {
 				window[j] = MakeFloat(0.0f); // Zero padding
 			});
 		});
 
 		// Apply 1D blur kernel: [0.25, 0.5, 0.25]
 		Float blurred = window[0] * 0.25f + window[1] * 0.5f + window[2] * 0.25f;
-		out[id]		  = blurred;
+		out[id]		  = Expr<float>(blurred);
 	},
 	8);
 
@@ -248,7 +248,7 @@ GPU::Kernel::Kernel1D kernel(
 		For(2, 10, [&](Int &i) { intArr[i] = intArr[i - 1] + intArr[i - 2]; });
 
 		auto out = output.Bind();
-		out[id]	 = intArr[id];
+		out[id]	 = Expr<int>(intArr[id]);
 	},
 	10);
 
@@ -297,13 +297,13 @@ GPU::Kernel::Kernel1D kernel(
 
 		// Count occurrences in chunk
 		For(0, CHUNK_SIZE, [&](Int &j) {
-			Int val		   = MakeInt(in[j]);
+			Int val		   = ToInt(in[j]);
 			val			   = Clamp(val, 0, NUM_BINS - 1);
 			localHist[val] = localHist[val] + 1;
 		});
 
 		// Write to global histogram (only thread 0)
-		If(id == 0, [&]() { For(0, NUM_BINS, [&](Int &j) { hist[j] = localHist[j]; }); });
+		If(id == 0, [&]() { For(0, NUM_BINS, [&](Int &j) { hist[j] = Expr<int>(localHist[j]); }); });
 	},
 	10);
 
@@ -394,7 +394,7 @@ GPU::Kernel::Kernel1D kernel(
 		});
 
 		auto out = output.Bind();
-		out[id]	 = arr2[id];
+		out[id]	 = Expr<float>(arr2[id]);
 	},
 	5);
 

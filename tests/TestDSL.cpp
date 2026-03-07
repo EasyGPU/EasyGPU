@@ -433,7 +433,7 @@ GPU::Kernel::InspectorKernel kernel([](Var<int> &id) {
 	// Assignment from Var to Var
 	Var<int> a = MakeInt(10);
 	Var<int> b;
-	b = a;
+	b = Expr<int>(a);
 
 	// Assignment from scalar
 	Var<float> f;
