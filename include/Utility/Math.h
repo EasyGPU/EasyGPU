@@ -16,6 +16,8 @@
 #include <IR/Node/LoadUniform.h>
 #include <IR/Node/Node.h>
 
+#include <Utility/Helpers.h>
+
 #include <concepts>
 #include <memory>
 #include <string>
@@ -1196,10 +1198,10 @@ inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, const IR::
 	return Abs(x) * Sign(y);
 }
 inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<float> &y) {
-	return Abs(x) * Sign(Vec2(y));
+	return Abs(x) * Sign(MakeFloat2(y, y));
 }
 inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, float y) {
-	return Abs(x) * Sign(Vec2(y));
+	return Abs(x) * Sign(MakeFloat2(y, y));
 }
 
 // For Vec3
@@ -1207,10 +1209,10 @@ inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, const IR::
 	return Abs(x) * Sign(y);
 }
 inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, const IR::Value::Expr<float> &y) {
-	return Abs(x) * Sign(Vec3(y));
+	return Abs(x) * Sign(MakeFloat3(y, y, y));
 }
 inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, float y) {
-	return Abs(x) * Sign(Vec3(y));
+	return Abs(x) * Sign(MakeFloat3(y, y, y));
 }
 
 // For Vec4
@@ -1218,10 +1220,10 @@ inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, const IR::
 	return Abs(x) * Sign(y);
 }
 inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, const IR::Value::Expr<float> &y) {
-	return Abs(x) * Sign(Vec4(y));
+	return Abs(x) * Sign(MakeFloat4(y, y, y, y));
 }
 inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, float y) {
-	return Abs(x) * Sign(Vec4(y));
+	return Abs(x) * Sign(MakeFloat4(y, y, y, y));
 }
 
 // CopySign - Generic template versions
