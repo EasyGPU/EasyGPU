@@ -315,7 +315,7 @@ public:
 	/**
 	 * Construct from same-type Var (explicit type check to prevent implicit conversion from wrong types)
 	 */
-	Expr(const Var<T> &var);
+	explicit Expr(const Var<T> &var);
 
 	explicit Expr(const T &Value) {
 		_node = std::make_unique<Node::LoadUniformNode>(ValueToString(Value));

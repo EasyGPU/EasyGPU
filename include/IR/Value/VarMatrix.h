@@ -26,6 +26,10 @@ public:
 	using VarBase<Math::Mat2>::Load;
 	using VarBase<Math::Mat2>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat2> m(col0, col1)
 	template <typename C0, typename C1>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec2>> ||
@@ -37,6 +41,33 @@ public:
 		std::string c1Str	 = ColumnToString(std::forward<C1>(col1));
 		auto		initCode = std::format("{}=mat2({}, {});\n", _varNode->VarName(), c0Str, c1Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		// Use Load() to construct Expr since Expr lacks Var constructor
+		VarBase<Math::Mat2>::operator=(Expr<Math::Mat2>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat2>::operator=(Expr<Math::Mat2>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -74,6 +105,10 @@ public:
 	using VarBase<Math::Mat3>::Load;
 	using VarBase<Math::Mat3>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat3> m(col0, col1, col2)
 	template <typename C0, typename C1, typename C2>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec3>> ||
@@ -88,6 +123,32 @@ public:
 		std::string c2Str	 = ColumnToString(std::forward<C2>(col2));
 		auto		initCode = std::format("{}=mat3({}, {}, {});\n", _varNode->VarName(), c0Str, c1Str, c2Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat3>::operator=(Expr<Math::Mat3>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat3>::operator=(Expr<Math::Mat3>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -124,6 +185,10 @@ public:
 	using VarBase<Math::Mat4>::Load;
 	using VarBase<Math::Mat4>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat4> m(col0, col1, col2, col3)
 	template <typename C0, typename C1, typename C2, typename C3>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec4>> ||
@@ -141,6 +206,32 @@ public:
 		std::string c3Str = ColumnToString(std::forward<C3>(col3));
 		auto initCode	  = std::format("{}=mat4({}, {}, {}, {});\n", _varNode->VarName(), c0Str, c1Str, c2Str, c3Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat4>::operator=(Expr<Math::Mat4>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat4>::operator=(Expr<Math::Mat4>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -179,6 +270,10 @@ public:
 	using VarBase<Math::Mat2x3>::Load;
 	using VarBase<Math::Mat2x3>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat2x3> m(col0, col1) - 2 columns of vec3
 	template <typename C0, typename C1>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec3>> ||
@@ -190,6 +285,32 @@ public:
 		std::string c1Str	 = Vec3ToString(std::forward<C1>(col1));
 		auto		initCode = std::format("{}=mat2x3({}, {});\n", _varNode->VarName(), c0Str, c1Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat2x3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat2x3>::operator=(Expr<Math::Mat2x3>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat2x3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat2x3>::operator=(Expr<Math::Mat2x3>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -226,6 +347,10 @@ public:
 	using VarBase<Math::Mat2x4>::Load;
 	using VarBase<Math::Mat2x4>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat2x4> m(col0, col1) - 2 columns of vec4
 	template <typename C0, typename C1>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec4>> ||
@@ -237,6 +362,32 @@ public:
 		std::string c1Str	 = Vec4ToString(std::forward<C1>(col1));
 		auto		initCode = std::format("{}=mat2x4({}, {});\n", _varNode->VarName(), c0Str, c1Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat2x4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat2x4>::operator=(Expr<Math::Mat2x4>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat2x4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat2x4>::operator=(Expr<Math::Mat2x4>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -273,6 +424,10 @@ public:
 	using VarBase<Math::Mat3x2>::Load;
 	using VarBase<Math::Mat3x2>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat3x2> m(col0, col1, col2) - 3 columns of vec2
 	template <typename C0, typename C1, typename C2>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec2>> ||
@@ -287,6 +442,32 @@ public:
 		std::string c2Str	 = Vec2ToString(std::forward<C2>(col2));
 		auto		initCode = std::format("{}=mat3x2({}, {}, {});\n", _varNode->VarName(), c0Str, c1Str, c2Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat3x2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat3x2>::operator=(Expr<Math::Mat3x2>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat3x2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat3x2>::operator=(Expr<Math::Mat3x2>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -323,6 +504,10 @@ public:
 	using VarBase<Math::Mat3x4>::Load;
 	using VarBase<Math::Mat3x4>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat3x4> m(col0, col1, col2) - 3 columns of vec4
 	template <typename C0, typename C1, typename C2>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec4>> ||
@@ -337,6 +522,32 @@ public:
 		std::string c2Str	 = Vec4ToString(std::forward<C2>(col2));
 		auto		initCode = std::format("{}=mat3x4({}, {}, {});\n", _varNode->VarName(), c0Str, c1Str, c2Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat3x4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat3x4>::operator=(Expr<Math::Mat3x4>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat3x4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat3x4>::operator=(Expr<Math::Mat3x4>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -373,6 +584,10 @@ public:
 	using VarBase<Math::Mat4x2>::Load;
 	using VarBase<Math::Mat4x2>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat4x2> m(col0, col1, col2, col3) - 4 columns of vec2
 	template <typename C0, typename C1, typename C2, typename C3>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec2>> ||
@@ -390,6 +605,32 @@ public:
 		std::string c3Str = Vec2ToString(std::forward<C3>(col3));
 		auto initCode = std::format("{}=mat4x2({}, {}, {}, {});\n", _varNode->VarName(), c0Str, c1Str, c2Str, c3Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat4x2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat4x2>::operator=(Expr<Math::Mat4x2>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat4x2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat4x2>::operator=(Expr<Math::Mat4x2>(Other.Load()));
+		return *this;
 	}
 
 public:
@@ -426,6 +667,10 @@ public:
 	using VarBase<Math::Mat4x3>::Load;
 	using VarBase<Math::Mat4x3>::operator=;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Column constructor: Var<Mat4x3> m(col0, col1, col2, col3) - 4 columns of vec3
 	template <typename C0, typename C1, typename C2, typename C3>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec3>> ||
@@ -443,6 +688,32 @@ public:
 		std::string c3Str = Vec3ToString(std::forward<C3>(col3));
 		auto initCode = std::format("{}=mat4x3({}, {}, {}, {});\n", _varNode->VarName(), c0Str, c1Str, c2Str, c3Str);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<Mat4x3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat4x3>::operator=(Expr<Math::Mat4x3>(Other.Load()));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<Mat4x3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::Mat4x3>::operator=(Expr<Math::Mat4x3>(Other.Load()));
+		return *this;
 	}
 
 public:

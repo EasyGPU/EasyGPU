@@ -46,6 +46,10 @@ public:
 	using VarBase<Math::IVec2>::operator=;
 	using VarBase<Math::IVec2>::operator Expr<Math::IVec2>;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Component constructor: Var<IVec2> v(x, y)
 	template <typename X, typename Y>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> ||
@@ -57,6 +61,32 @@ public:
 		std::string yStr	 = ComponentToString(std::forward<Y>(y));
 		auto		initCode = std::format("{}=ivec2({}, {});\n", _varNode->VarName(), xStr, yStr);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<IVec2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::IVec2>::operator=(Expr<Math::IVec2>(Other));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<IVec2> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::IVec2>::operator=(Expr<Math::IVec2>(Other));
+		return *this;
 	}
 
 public:
@@ -107,6 +137,10 @@ public:
 	using VarBase<Math::IVec3>::operator=;
 	using VarBase<Math::IVec3>::operator Expr<Math::IVec3>;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Component constructor: Var<IVec3> v(x, y, z)
 	template <typename X, typename Y, typename Z>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> ||
@@ -121,6 +155,32 @@ public:
 		std::string zStr	 = ComponentToString(std::forward<Z>(z));
 		auto		initCode = std::format("{}=ivec3({}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<IVec3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::IVec3>::operator=(Expr<Math::IVec3>(Other));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<IVec3> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::IVec3>::operator=(Expr<Math::IVec3>(Other));
+		return *this;
 	}
 
 public:
@@ -186,6 +246,10 @@ public:
 	using VarBase<Math::IVec4>::operator=;
 	using VarBase<Math::IVec4>::operator Expr<Math::IVec4>;
 
+	Var() = default;
+	Var(const Var &) = default;
+	Var(Var &&) = default;
+
 	// Component constructor: Var<IVec4> v(x, y, z, w)
 	template <typename X, typename Y, typename Z, typename W>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<int>> || std::same_as<std::remove_cvref_t<X>, Expr<int>> ||
@@ -203,6 +267,32 @@ public:
 		std::string wStr	 = ComponentToString(std::forward<W>(w));
 		auto		initCode = std::format("{}=ivec4({}, {}, {}, {});\n", _varNode->VarName(), xStr, yStr, zStr, wStr);
 		Builder::Builder::Get().Context()->PushTranslatedCode(initCode);
+	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var<IVec4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::IVec4>::operator=(Expr<Math::IVec4>(Other));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var<IVec4> - routes through Expr path to ensure correct IR
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		VarBase<Math::IVec4>::operator=(Expr<Math::IVec4>(Other));
+		return *this;
 	}
 
 public:

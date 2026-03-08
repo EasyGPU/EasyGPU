@@ -1180,10 +1180,19 @@ inline void DispatchUploadUniformField(uint32_t program, const std::string &unif
 		/* Member access functions */                                                                                  \
 		EASYGPU_DO_ACCESS(EASYGPU_ARG_COUNT(__VA_ARGS__), __VA_ARGS__)                                                 \
                                                                                                                        \
-		/* Assignment from another Var<StructType> */                                                                  \
+		/* Assignment from another Var<StructType> - through Expr path for correct IR */                              \
 		Var &operator=(const Var &other) {                                                                             \
 			if (this != &other) {                                                                                      \
-				auto store = std::make_unique<Node::StoreNode>(Load(), other.Load());                                  \
+				auto store = std::make_unique<Node::StoreNode>(Load(), Expr<StructType>(other).Release());               \
+				Builder::Builder::Get().Build(*store, true);                                                           \
+			}                                                                                                          \
+			return *this;                                                                                              \
+		}                                                                                                              \
+		                                                                                                               \
+		/* Move assignment from another Var<StructType> - through Expr path for correct IR */                         \
+		Var &operator=(Var &&other) noexcept {                                                                         \
+			if (this != &other) {                                                                                      \
+				auto store = std::make_unique<Node::StoreNode>(Load(), Expr<StructType>(other).Release());               \
 				Builder::Builder::Get().Build(*store, true);                                                           \
 			}                                                                                                          \
 			return *this;                                                                                              \

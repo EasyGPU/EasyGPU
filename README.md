@@ -444,16 +444,16 @@ val = 5;  // May unexpectedly modify buf[i] in the generated shader
 
 ### Var-Var Assignment
 
-**Always explicitly convert the right-hand side to `Expr<T>`** when assigning one `Var` to another:
+**Var-Var assignment now works correctly** and generates proper IR automatically:
 
 ```cpp
 Int A;
 Int B = MakeInt(10);
 
-// ❌ WRONG: Direct Var-Var assignment may not generate correct IR
+// ✅ CORRECT: Direct Var-Var assignment now generates correct IR
 A = B;
 
-// ✅ CORRECT: Explicitly convert right-hand side to Expr
+// Also works with explicit conversion if needed
 A = Expr<int>(B);
 ```
 

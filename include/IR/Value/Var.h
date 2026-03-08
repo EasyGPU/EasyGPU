@@ -759,6 +759,39 @@ public:
 	}
 	Var(Expr<Type> &Value) : VarBase<Type>(Value) {
 	}
+
+	// ========================================
+	// Var-Var Assignment (through Expr path for correct IR generation)
+	// ========================================
+
+	/**
+	 * Copy assignment from another Var - routes through Expr path to ensure correct IR
+	 * @param Other The other Var to copy from
+	 * @return Reference to this Var
+	 */
+	Var &operator=(const Var &Other) {
+		if (&Other == this) {
+			return *this;
+		}
+		// Route through Expr path to ensure correct IR generation
+		// Use explicit construction since Expr(const Var&) is now explicit
+		VarBase<Type>::operator=(Expr<Type>(Other));
+		return *this;
+	}
+
+	/**
+	 * Move assignment from another Var - routes through Expr path to ensure correct IR
+	 * @param Other The other Var to move from
+	 * @return Reference to this Var
+	 */
+	Var &operator=(Var &&Other) noexcept {
+		if (&Other == this) {
+			return *this;
+		}
+		// Route through Expr path to ensure correct IR generation
+		VarBase<Type>::operator=(Expr<Type>(Other));
+		return *this;
+	}
 };
 
 // ==================== VarBase op VarBase ====================

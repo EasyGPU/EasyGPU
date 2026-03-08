@@ -95,7 +95,7 @@ Callable<Bool(Float3, Float3, Var<Ray> &, Float, Float &, Var<HitRec> &, Var<Mat
 		If(t > tmin && t < tc, [&]() {
 			Float3 p = RayAt(r, t);
 			If(p.y() > bmin.y() && p.y() < bmax.y() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-				tc	= Expr<float>(t);
+				tc	= t;
 				n	= Vec3(-1.0f, 0.0f, 0.0f);
 				hit = true;
 			});
@@ -104,7 +104,7 @@ Callable<Bool(Float3, Float3, Var<Ray> &, Float, Float &, Var<HitRec> &, Var<Mat
 		If(t > tmin && t < tc, [&]() {
 			Float3 p = RayAt(r, t);
 			If(p.y() > bmin.y() && p.y() < bmax.y() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-				tc	= Expr<float>(t);
+				tc	= t;
 				n	= Vec3(1.0f, 0.0f, 0.0f);
 				hit = true;
 			});
@@ -115,7 +115,7 @@ Callable<Bool(Float3, Float3, Var<Ray> &, Float, Float &, Var<HitRec> &, Var<Mat
 		If(t > tmin && t < tc, [&]() {
 			Float3 p = RayAt(r, t);
 			If(p.x() > bmin.x() && p.x() < bmax.x() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-				tc	= Expr<float>(t);
+				tc	= t;
 				n	= Vec3(0.0f, -1.0f, 0.0f);
 				hit = true;
 			});
@@ -124,7 +124,7 @@ Callable<Bool(Float3, Float3, Var<Ray> &, Float, Float &, Var<HitRec> &, Var<Mat
 		If(t > tmin && t < tc, [&]() {
 			Float3 p = RayAt(r, t);
 			If(p.x() > bmin.x() && p.x() < bmax.x() && p.z() > bmin.z() && p.z() < bmax.z(), [&]() {
-				tc	= Expr<float>(t);
+				tc	= t;
 				n	= Vec3(0.0f, 1.0f, 0.0f);
 				hit = true;
 			});
@@ -135,7 +135,7 @@ Callable<Bool(Float3, Float3, Var<Ray> &, Float, Float &, Var<HitRec> &, Var<Mat
 		If(t > tmin && t < tc, [&]() {
 			Float3 p = RayAt(r, t);
 			If(p.x() > bmin.x() && p.x() < bmax.x() && p.y() > bmin.y() && p.y() < bmax.y(), [&]() {
-				tc	= Expr<float>(t);
+				tc	= t;
 				n	= Vec3(0.0f, 0.0f, -1.0f);
 				hit = true;
 			});
@@ -144,18 +144,18 @@ Callable<Bool(Float3, Float3, Var<Ray> &, Float, Float &, Var<HitRec> &, Var<Mat
 		If(t > tmin && t < tc, [&]() {
 			Float3 p = RayAt(r, t);
 			If(p.x() > bmin.x() && p.x() < bmax.x() && p.y() > bmin.y() && p.y() < bmax.y(), [&]() {
-				tc	= Expr<float>(t);
+				tc	= t;
 				n	= Vec3(0.0f, 0.0f, 1.0f);
 				hit = true;
 			});
 		});
 
 		If(hit, [&]() {
-			rec.t()		 = Expr<float>(tc);
+			rec.t()		 = tc;
 			rec.p()		 = RayAt(r, tc);
 			rec.normal() = n;
 			rec.mat()	 = mat;
-			closest		 = Expr<float>(tc);
+			closest		 = tc;
 		});
 
 		Return(hit);
@@ -342,8 +342,8 @@ int main() {
 		Float3 col		= MakeFloat3(0.0f);
 
 		For(0, SAMPLES_PER_PIXEL, [&](Int &) {
-			Float	 u = (Expr<float>(px) + Random(rngState)) / IMAGE_WIDTH;
-			Float	 v = (Expr<float>(py) + Random(rngState)) / IMAGE_HEIGHT;
+			Float	 u = (ToFloat(px) + Random(rngState)) / IMAGE_WIDTH;
+			Float	 v = (ToFloat(py) + Random(rngState)) / IMAGE_HEIGHT;
 			Var<Ray> r;
 			CameraRay(u, v, r);
 			col = col + Trace(r, rngState);
@@ -352,7 +352,7 @@ int main() {
 		Float scale = MakeFloat(1.0f / SAMPLES_PER_PIXEL);
 		img[idx]	= MakeFloat4(Sqrt(Clamp(col.x() * scale, 0.0f, 1.0f)), Sqrt(Clamp(col.y() * scale, 0.0f, 1.0f)),
 								 Sqrt(Clamp(col.z() * scale, 0.0f, 1.0f)), 1.f);
-		state[idx]	= Expr<int>(rngState);
+		state[idx]	= rngState;
 	});
 
 	kernel.Dispatch((IMAGE_WIDTH + 15) / 16, (IMAGE_HEIGHT + 15) / 16, true);
