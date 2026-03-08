@@ -11,6 +11,7 @@ Complete reference for all EasyGPU classes and functions.
 - [Uniforms](#uniforms)
 - [Variables and Expressions](#variables-and-expressions)
 - [Unref](#unref)
+- [Select (Ternary Operator)](#select-ternary-operator)
 - [Control Flow](#control-flow)
 - [Math Functions](#math-functions)
 - [Vector Types](#vector-types)
@@ -692,6 +693,206 @@ Float f = ToFloat(i);         // OK: Var<int> -> Var<float> with conversion
 Var<int> accepts: Var<int>, int, Expr<int>
 Expr<int> accepts: Expr<int>, Var<int>, int
 ```
+
+---
+
+## Select (Ternary Operator)
+
+The ternary conditional operator - selects between two expressions based on a boolean condition. This is the expression-level equivalent of if-else, returning a value that can be used in larger expressions.
+
+```cpp
+template <ScalarType T>
+[[nodiscard]] Expr<T> Select(Expr<bool> condition, Expr<T> trueExpr, Expr<T> falseExpr);
+
+template <ScalarType T>
+[[nodiscard]] Expr<T> Select(Expr<bool> condition, const Var<T>& trueExpr, const Var<T>& falseExpr);
+
+template <ScalarType T>
+[[nodiscard]] Expr<T> Select(Expr<bool> condition, Expr<T> trueExpr, const Var<T>& falseExpr);
+
+template <ScalarType T>
+[[nodiscard]] Expr<T> Select(Expr<bool> condition, const Var<T>& trueExpr, Expr<T> falseExpr);
+```
+
+**Purpose:**
+Unlike `If` which is a statement for control flow, `Select` is an expression that returns a value. It generates the GLSL ternary operator `condition ? trueExpr : falseExpr`.
+
+**Parameters:**
+- `condition` - Boolean expression that determines which branch to evaluate
+- `trueExpr` - Expression evaluated when condition is true
+- `falseExpr` - Expression evaluated when condition is false
+
+**Returns:**
+An `Expr<T>` representing the selected value.
+
+**Type Support:**
+- Scalar types: `float`, `int`, `bool`
+- Vector types: `Vec2`, `Vec3`, `Vec4`, `IVec2`, `IVec3`, `IVec4`
+- Matrix types: `Mat2`, `Mat3`, `Mat4`, etc.
+- Custom structs registered with `EASYGPU_STRUCT`
+
+**Example - Basic Usage:**
+
+```cpp
+Kernel1D kernel([](Int i) {
+    auto buf = buffer.Bind();
+    Float x = buf[i];
+    
+    // Absolute value using Select
+    Float absX = Select(x < 0.0f, -x, x);
+    
+    // Max of two values
+    Float y = buf[i + 1];
+    Float maxVal = Select(x > y, x, y);
+    
+    // Clamp to [0, 1] range using nested Select
+    Float clamped = Select(x < 0.0f, 0.0f,
+                          Select(x > 1.0f, 1.0f, x));
+    
+    buf[i] = absX;
+});
+```
+
+**Example - With Vector Types:**
+
+```cpp
+Kernel1D kernel([](Int i) {
+    auto colors = palette.Bind();
+    auto output = output.Bind();
+    
+    Vec3 colorA = colors[i * 2];
+    Vec3 colorB = colors[i * 2 + 1];
+    Bool useA = colors[i * 2].x() > 0.5f;
+    
+    // Select between two colors
+    Vec3 selected = Select(useA, colorA, colorB);
+    
+    // Conditional blend
+    Vec3 result = Select(useA, colorA * 0.8f + colorB * 0.2f, 
+                                colorB * 0.8f + colorA * 0.2f);
+    
+    output[i] = result;
+});
+```
+
+**Example - Nested Ternary:**
+
+```cpp
+Kernel1D grade_calculator([](Int i) {
+    auto scores = scoresBuf.Bind();
+    auto grades = gradesBuf.Bind();
+    
+    Int score = scores[i];
+    
+    // Grade mapping: A=4, B=3, C=2, D=1, F=0
+    Int grade = Select(score >= 90, 4,
+                      Select(score >= 80, 3,
+                            Select(score >= 70, 2,
+                                  Select(score >= 60, 1, 0))));
+    
+    grades[i] = grade;
+});
+```
+
+**Example - In Expressions:**
+
+```cpp
+Kernel1D process([](Int i) {
+    auto buf = buffer.Bind();
+    Float a = buf[i];
+    Float b = buf[i + 1];
+    
+    // Select can be used within larger expressions
+    Float result = Select(a > b, a, b) * 2.0f + 1.0f;
+    
+    // Multiple selects in one expression
+    Float mixed = Select(a > 0.0f, a, 0.0f) + 
+                  Select(b > 0.0f, b, 0.0f);
+    
+    buf[i] = result;
+});
+```
+
+**Select vs If:**
+
+| Feature | Select | If |
+|:--------|:-------|:---|
+| **Type** | Expression (returns value) | Statement (control flow) |
+| **Use Case** | Value selection | Side effects, multiple statements |
+| **Chaining** | Can nest and compose | Method chaining with `.Elif().Else()` |
+| **GLSL** | `cond ? a : b` | `if (cond) { ... }` |
+| **Performance** | Both branches may be evaluated | Only one branch executes |
+
+**Common Patterns:**
+
+```cpp
+// Absolute value
+Float absX = Select(x < 0.0f, -x, x);
+
+// Min/Max
+Float maxVal = Select(a > b, a, b);
+Float minVal = Select(a < b, a, b);
+
+// Clamp (ensure value is in range)
+Float clamped = Select(x < minVal, minVal,
+                      Select(x > maxVal, maxVal, x));
+
+// Sign function
+Float sign = Select(x > 0.0f, 1.0f,
+                   Select(x < 0.0f, -1.0f, 0.0f));
+
+// Step function
+Float step = Select(x >= threshold, 1.0f, 0.0f);
+
+// Conditional assignment without if-statement
+vec = Select(shouldBlend, blended, original);
+```
+
+**Notes:**
+
+**⚠️ Performance Warning - Warp Divergence:**
+
+`Select` generates the GLSL ternary operator `?:` which **evaluates both branches before selecting the result**. This has important performance implications:
+
+1. **Both branches execute**: Unlike CPU `?:` or `If` statements, both `trueExpr` and `falseExpr` are fully evaluated. This means expensive operations in either branch always run.
+
+2. **Warp Divergence**: When threads in the same warp (work group) take different paths, the GPU must serialize execution:
+   ```cpp
+   // BAD: High divergence - threads in warp take different paths
+   Kernel1D bad([](Int i) {
+       Float result = Select(i % 2 == 0, ExpensiveEven(i), ExpensiveOdd(i));
+   });
+   
+   // BETTER: Group threads to reduce divergence
+   Kernel1D better([](Int i) {
+       // Process all even indices first, then odd
+       If(i < N/2, [&]() {
+           Float result = ExpensiveEven(i * 2);
+       }).Else([&]() {
+           Float result = ExpensiveOdd((i - N/2) * 2 + 1);
+       });
+   });
+   ```
+
+3. **When to use `If` instead**: For expensive computations or when divergence is a concern:
+   ```cpp
+   // Expensive operations - use If to avoid evaluating both
+   Float result;
+   If(condition, [&]() {
+       result = ExpensiveComputationA();
+   }).Else([&]() {
+       result = ExpensiveComputationB();
+   });
+   ```
+
+**Summary:**
+- Both `trueExpr` and `falseExpr` are always evaluated (no short-circuiting)
+- All arguments must be of compatible types; use explicit constructors if needed
+- `Var<T>` arguments are automatically converted to `Expr<T>`
+
+**See Also:**
+- [Control Flow](#control-flow) - For statement-level conditionals
+- [Common Patterns](patterns.md) - Select patterns like clamp, min/max, etc.
 
 ---
 

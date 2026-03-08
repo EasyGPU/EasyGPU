@@ -59,6 +59,7 @@
 #include <IR/Builder/Builder.h>
 #include <IR/Builder/BuilderContext.h>
 #include <IR/Node/Node.h>
+#include <IR/Node/Ternary.h>
 
 // =============================================================================
 // Control Flow

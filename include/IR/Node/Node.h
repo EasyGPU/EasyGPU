@@ -34,7 +34,8 @@ enum class NodeType {
 	Break,
 	Continue,
 	Return,
-	Call
+	Call,
+	Ternary
 };
 
 /**

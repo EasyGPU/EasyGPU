@@ -297,6 +297,38 @@ For(0, 100, [&](Int& i) {
 });
 ```
 
+### Ternary Operator (Select)
+
+For expression-level conditionals that return a value, use `Select`:
+
+```cpp
+// Syntax: Select(condition, trueValue, falseValue)
+Float absX = Select(x < 0.0f, -x, x);     // Absolute value
+Float maxVal = Select(a > b, a, b);       // Maximum
+Float minVal = Select(a < b, a, b);       // Minimum
+
+// Clamp to [0, 1] range
+Float clamped = Select(x < 0.0f, 0.0f,
+                      Select(x > 1.0f, 1.0f, x));
+
+// Use in expressions
+Float result = Select(a > b, a, b) * 2.0f + 1.0f;
+```
+
+**Select vs If:**
+- Use `Select` for simple value selection within expressions
+- Use `If` for multiple statements or side effects
+
+```cpp
+// GOOD: Select for value selection
+Float m = Select(a > b, a, b);
+
+// GOOD: If for side effects
+If(x < 0, [&]() { x = -x; });  // Modify variable
+```
+
+> ⚠️ **Performance Note**: `Select` always evaluates **both branches**. For expensive operations (like `Sin`, texture reads), use `If` instead. Also be aware of **warp divergence**: when threads in a warp (32/64 threads) take different paths, performance drops. See [Tutorial](tutorial.md) for details.
+
 ### Make vs Cast: Critical Distinction
 
 **`Make*` functions** wrap C++ literals into GPU variables. They do **NOT** perform type conversion.

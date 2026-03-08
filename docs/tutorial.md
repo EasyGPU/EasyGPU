@@ -399,26 +399,60 @@ If(condition, [&]() {
 });
 ```
 
-**Performance Note:** Divergent branches (threads taking different paths) can hurt performance.
+**⚠️ Performance Warning - Warp Divergence:**
+
+GPUs execute threads in **warps** (groups of typically 32 or 64 threads). When threads within a warp take different code paths (divergence), the GPU must execute each path sequentially, masking out threads that don't take that path. This serializes execution and can halve (or worse) your performance.
 
 ```cpp
-// BAD: Divergent within work group
+// BAD: High divergence - adjacent threads take different paths
 Kernel1D bad([](Int i) {
-    If(i % 2 == 0, [&]() {  // Half threads take different path
-        // Path A
-    }).Else([&]() {
-        // Path B
+    If(i % 2 == 0, [&]() {  // Even threads
+        PathA();
+    }).Else([&]() {         // Odd threads
+        PathB();
     });
+    // Execution: Warp runs PathA (32 threads, 16 masked)
+    //            Then runs PathB (32 threads, 16 masked)
+    // Result: 2x instructions executed!
 });
 
-// BETTER: Group threads by path
+// BETTER: Group threads by path to minimize divergence
 Kernel1D better([](Int i) {
-    // Process all even indices first
+    // First N/2 threads: all even indices
+    // Last N/2 threads: all odd indices
     If(i < N / 2, [&]() {
-        // All threads in work group take same path
+        PathA();  // Entire warps execute this together
+    }).Else([&]() {
+        PathB();  // Entire warps execute this together
     });
+    // Execution: Warps 0-k run PathA, Warps k+1-n run PathB
+    // Result: Minimal divergence, full parallelism
 });
 ```
+
+**Understanding Warp Divergence:**
+
+```
+Warp: 32 threads (e.g., thread IDs 0-31)
+
+Divergent case (i % 2 == 0):
+  Warp executes PathA: threads 0,2,4...30 active; 1,3,5...31 masked
+  Warp executes PathB: threads 1,3,5...31 active; 0,2,4...30 masked
+  Total: 2x the work, 1/2 the performance
+
+Non-divergent case (i < N/2):
+  Warp 0 (threads 0-31): All take PathA, no masking needed
+  Warp 1 (threads 32-63): All take PathA
+  ...
+  Warp k (threads ...): All take PathB
+  Total: No extra work, full performance
+```
+
+**Guidelines:**
+- Avoid data-dependent branching within warps when possible
+- Structure data so threads in a warp follow the same path
+- For `Select`, both paths always execute (no divergence issue, but 2x work)
+- For `If`, only one path executes, but divergence causes serialization
 
 ### Loops
 
@@ -454,6 +488,115 @@ For(0, 100, [&](Int& i) {
     });
 });
 ```
+
+### Ternary Conditional (Select)
+
+For expression-level conditionals that return a value, use `Select`. Unlike `If` which is a statement, `Select` is an expression that can be used inside larger expressions.
+
+```cpp
+// Basic syntax: Select(condition, trueValue, falseValue)
+Float absX = Select(x < 0.0f, -x, x);
+
+// Equivalent to GLSL: (x < 0.0f) ? (-x) : (x)
+```
+
+**Common Use Cases:**
+
+```cpp
+// Absolute value
+Float absX = Select(x < 0.0f, -x, x);
+
+// Min/Max
+Float maxVal = Select(a > b, a, b);
+Float minVal = Select(a < b, a, b);
+
+// Clamp to range
+Float clamped = Select(x < 0.0f, 0.0f,
+                      Select(x > 1.0f, 1.0f, x));
+
+// Sign function
+Float sign = Select(x > 0.0f, 1.0f,
+                   Select(x < 0.0f, -1.0f, 0.0f));
+
+// Conditional color blending
+Vec3 color = Select(isValid, litColor, shadowColor);
+```
+
+**Nested Ternary:**
+
+```cpp
+// Grade calculation
+Int grade = Select(score >= 90, 4,      // A
+                  Select(score >= 80, 3,  // B
+                        Select(score >= 70, 2,  // C
+                              Select(score >= 60, 1, 0))));  // D : F
+```
+
+**In Expressions:**
+
+```cpp
+// Select can be used inside arithmetic expressions
+Float result = Select(a > b, a, b) * 2.0f + 1.0f;
+
+// Multiple selects
+Float sum = Select(a > 0.0f, a, 0.0f) + Select(b > 0.0f, b, 0.0f);
+```
+
+**Select vs If:**
+
+| Use | Use This | Example |
+|:----|:---------|:--------|
+| Return a value | `Select` | `Float m = Select(a > b, a, b);` |
+| Multiple statements | `If` | `If(c, [&](){ x=1; y=2; });` |
+| Side effects | `If` | `If(c, [&](){ buf[i] = 0; });` |
+| Complex logic | `If` | `If(c1, ...).Elif(c2, ...).Else(...);` |
+
+**Important Note:** Both branches of `Select` are evaluated (no short-circuiting). For expensive computations, use `If` instead.
+
+```cpp
+// Both Sqrt(a) and Sqrt(b) are computed!
+Float result = Select(condition, Sqrt(a), Sqrt(b));
+
+// Better: Only one Sqrt is computed
+Float result;
+If(condition, [&]() {
+    result = Sqrt(a);
+}).Else([&]() {
+    result = Sqrt(b);
+});
+```
+
+**⚠️ Warp Divergence Warning:**
+
+GPU executes threads in groups called **warps** (or wavefronts), typically 32 or 64 threads. When threads in the same warp take different execution paths, the GPU must serialize them - this is called **warp divergence** and severely hurts performance.
+
+```cpp
+// BAD: High divergence - adjacent threads take different paths
+Kernel1D bad([](Int i) {
+    // Even threads do A, odd threads do B
+    Float result = Select(i % 2 == 0, PathA(i), PathB(i));
+    // Warp executes PathA for all threads (masking odd), 
+    // then PathB for all threads (masking even)
+    // Total: 2x the work!
+});
+
+// BETTER: Group threads by path to minimize divergence
+Kernel1D better([](Int i) {
+    // All even indices first, then odd
+    If(i < N/2, [&]() {
+        // All threads in warp likely take this path together
+        Float result = PathA(i * 2);
+    }).Else([&]() {
+        Float result = PathB((i - N/2) * 2 + 1);
+    });
+});
+```
+
+**Key Points:**
+- `Select` always evaluates both branches (like GLSL `?:`)
+- `If` can cause warp divergence but only executes one branch
+- For simple operations (min, max, abs), `Select` is fine
+- For expensive operations, use `If` and try to group threads
 
 ### Variable Declaration
 

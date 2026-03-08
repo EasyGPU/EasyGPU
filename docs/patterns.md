@@ -24,6 +24,7 @@ Solutions to frequently encountered tasks in EasyGPU.
 ## Table of Contents
 
 - [Unref - Independent Variable Copies](#unref---independent-variable-copies)
+- [Select Patterns (Ternary Operator)](#select-patterns-ternary-operator)
 - [Resource Slots - Dynamic Resource Switching](#resource-slots---dynamic-resource-switching)
 - [Local Array Patterns](#local-array-patterns)
 - [Parallel Reduction (Sum/Max)](#parallel-reduction-summax)
@@ -103,6 +104,298 @@ Kernel1D process([](Int i) {
 | `buf[i] * 2.0f` | No - temporary in expression |
 
 See [Unref Documentation](unref.md) for complete details.
+
+---
+
+## Select Patterns (Ternary Operator)
+
+The `Select` function provides expression-level conditionals, useful for concise value selection without the verbosity of `If` statements.
+
+```cpp
+// Basic syntax
+ResultType result = Select(condition, trueValue, falseValue);
+```
+
+> ⚠️ **Performance Warning**: `Select` evaluates **both branches** before selecting the result. For simple operations this is fine, but for expensive computations this wastes work. Additionally, both `Select` and `If` can cause **warp divergence** when threads in a warp take different paths. See [When to Use Select vs If](#when-to-use-select-vs-if) for details.
+
+### Pattern 1: Absolute Value
+
+Compute the absolute value of a number:
+
+```cpp
+Float x = buf[i];
+Float absX = Select(x < 0.0f, -x, x);
+
+// For vectors (component-wise)
+Vec3 v = positions[i];
+Vec3 absV = Select(v < 0.0f, -v, v);
+```
+
+### Pattern 2: Min / Max
+
+Find minimum or maximum of two values:
+
+```cpp
+Float a = buf[i];
+Float b = buf[i + 1];
+
+Float maxVal = Select(a > b, a, b);
+Float minVal = Select(a < b, a, b);
+
+// Clamp a value to range [min, max]
+Float clamped = Select(x < minVal, minVal,
+                      Select(x > maxVal, maxVal, x));
+
+// Simplified clamp using helper
+Callable<Float(Float, Float, Float)> Clamp = [](Float& val, Float& min, Float& max) {
+    Return(Select(val < min, min, Select(val > max, max, val)));
+};
+
+Float clamped = Clamp(x, 0.0f, 1.0f);
+```
+
+### Pattern 3: Step and Sign Functions
+
+```cpp
+// Step function (Heaviside)
+Float step = Select(x >= threshold, 1.0f, 0.0f);
+
+// Sign function (-1, 0, or 1)
+Float sign = Select(x > 0.0f, 1.0f,
+                   Select(x < 0.0f, -1.0f, 0.0f));
+```
+
+### Pattern 4: Conditional Blending
+
+Blend between values based on a condition:
+
+```cpp
+// Simple selection
+Vec3 color = Select(isLit, litColor, shadowColor);
+
+// Blend factor
+Vec3 blended = Select(factor > 0.5f, colorA, colorB);
+
+// Smooth blend (mix based on factor)
+Float t = smoothness;  // 0.0 to 1.0
+Vec3 mixed = colorA * t + colorB * (1.0f - t);
+```
+
+### Pattern 5: Grade/Level Classification
+
+Classify values into discrete levels:
+
+```cpp
+// Grade calculation
+Int grade = Select(score >= 90, 4,      // A
+                  Select(score >= 80, 3,  // B
+                        Select(score >= 70, 2,  // C
+                              Select(score >= 60, 1, 0))));  // D : F
+
+// Level of detail selection
+Int lod = Select(distance < 10.0f, 3,   // High detail
+                Select(distance < 50.0f, 2,  // Medium
+                      Select(distance < 100.0f, 1, 0)));  // Low : None
+```
+
+### Pattern 6: Saturate (Clamp to [0, 1])
+
+Common in graphics programming:
+
+```cpp
+// Saturate: clamp to [0, 1] range
+Float saturate(Float x) {
+    Return(Select(x < 0.0f, 0.0f, Select(x > 1.0f, 1.0f, x)));
+}
+
+// Usage
+Float intensity = saturate(rawIntensity);
+Vec3 color = MakeFloat3(saturate(r), saturate(g), saturate(b));
+```
+
+### Pattern 7: Safe Division
+
+Avoid division by zero:
+
+```cpp
+// Safe division with epsilon check
+Float safeDiv(Float a, Float b) {
+    Return(Select(Abs(b) < 0.0001f, 0.0f, a / b));
+}
+
+// Or return a default value
+Float ratio = Select(divisor != 0.0f, dividend / divisor, 0.0f);
+```
+
+### Pattern 8: Select with Vector Types
+
+All vector types work with Select:
+
+```cpp
+// Vec2
+Vec2 a = MakeFloat2(1.0f, 2.0f);
+Vec2 b = MakeFloat2(3.0f, 4.0f);
+Vec2 selected = Select(condition, a, b);
+
+// Vec3 - common in graphics
+Vec3 normal = Select(flipNormal, -originalNormal, originalNormal);
+
+// Vec4
+Vec4 rgba = Select(hasAlpha, original, MakeFloat4(rgb, 1.0f));
+
+// Integer vectors
+IVec2 gridPos = Select(isEven, posA, posB);
+```
+
+### Pattern 9: Combining with Other Operations
+
+```cpp
+// In arithmetic expressions
+Float result = Select(a > b, a, b) * 2.0f + offset;
+
+// Chained operations
+Float final = Sqrt(Select(x > 0.0f, x, 0.0f));  // Sqrt only of positive values
+
+// Multiple selects
+Vec3 color = Select(isDay, dayColor, nightColor) * 
+             Select(isWet, wetnessFactor, 1.0f);
+```
+
+### When to Use Select vs If
+
+| Scenario | Use | Reason |
+|:---------|:----|:-------|
+| Simple value selection | `Select` | Cleaner, expression-level |
+| Min/Max/Clamp/Abs | `Select` | One-liner patterns |
+| Multiple statements | `If` | Side effects, multiple operations |
+| Expensive computation | `If` | Avoid evaluating unused branch |
+| Complex branching | `If` | Readability with `.Elif().Else()` |
+
+```cpp
+// GOOD: Select for simple selection
+Float maxVal = Select(a > b, a, b);
+
+// GOOD: If for side effects
+If(shouldClear, [&]() {
+    buf[i] = 0.0f;
+    count[i] = 0;
+    flags[i] = FLAG_NONE;
+});
+
+// BAD: Select when computation is expensive
+// (Both branches are evaluated!)
+Float result = Select(c, ExpensiveFunc(a), ExpensiveFunc(b));  // Don't do this!
+
+// GOOD: If for expensive computations
+Float result;
+If(c, [&]() {
+    result = ExpensiveFunc(a);
+}).Else([&]() {
+    result = ExpensiveFunc(b);
+});
+```
+
+### Performance Considerations
+
+**⚠️ Warp Divergence and Branch Execution:**
+
+Understanding how GPUs execute branches is critical for performance:
+
+```
+GPU Execution Model:
+- Threads are executed in warps (groups of 32 or 64)
+- All threads in a warp execute the same instruction
+- When threads diverge, the warp executes each path with masking
+```
+
+**Select vs If - Execution Model:**
+
+```cpp
+// Select: Both branches execute, then select
+Float result = Select(condition, branchA, branchB);
+// GLSL: result = condition ? branchA : branchB
+// Both branchA and branchB are computed first!
+
+// If: Only one branch executes, but may cause divergence
+If(condition, [&]() {
+    result = branchA;  // Only executed if condition is true
+}).Else([&]() {
+    result = branchB;  // Only executed if condition is false
+});
+```
+
+**Warp Divergence Example:**
+
+```cpp
+// Problem: High divergence with data-dependent branching
+Kernel1D process([](Int i) {
+    // Threads 0,2,4... take PathA; threads 1,3,5... take PathB
+    Float result = Select(i % 2 == 0, PathA(i), PathB(i));
+    
+    // What happens in a warp (threads 0-31):
+    // 1. Execute PathA for all 32 threads (16 masked)
+    // 2. Execute PathB for all 32 threads (16 masked)
+    // Result: 2x work, but no serialization stalls
+});
+
+// Alternative with If - same divergence issue
+Kernel1D process_if([](Int i) {
+    Float result;
+    If(i % 2 == 0, [&]() {
+        result = PathA(i);
+    }).Else([&]() {
+        result = PathB(i);
+    });
+    
+    // Warp execution:
+    // 1. Execute PathA for threads where condition=true (others wait)
+    // 2. Execute PathB for threads where condition=false (others wait)
+    // Result: 2x work + serialization overhead
+});
+
+// Solution: Group threads to minimize divergence
+Kernel1D process_grouped([](Int i) {
+    // Process all evens first, then all odds
+    If(i < N/2, [&]() {
+        // Threads 0 to N/2-1: all execute PathA together
+        Float result = PathA(i * 2);
+    }).Else([&]() {
+        // Threads N/2 to N-1: all execute PathB together
+        Float result = PathB((i - N/2) * 2 + 1);
+    });
+    // Warps are homogeneous: each warp executes only one path
+});
+```
+
+**Guidelines:**
+
+1. **Simple operations**: Use `Select` (min, max, abs, clamp)
+   - Both execute, but cheap enough that it doesn't matter
+   - No divergence penalty since both paths run regardless
+
+2. **Expensive operations**: Use `If` with thread grouping
+   - Avoid evaluating both expensive branches
+   - Structure data to minimize divergence
+
+3. **Data layout matters**:
+   ```cpp
+   // BAD: Data causes natural divergence
+   struct Particle { bool isActive; float x, y, z; };
+   // Active and inactive particles intermixed in memory
+   
+   // GOOD: Separate arrays for different processing paths
+   Buffer<float> activeParticles, inactiveParticles;
+   // Process each buffer separately - no divergence within warps
+   ```
+
+4. **Count the cost**:
+   ```cpp
+   // Cheap: arithmetic, comparisons, Select
+   Float a = Select(x > 0, x, -x);  // Fine, use Select
+   
+   // Expensive: transcendental functions, texture reads, loops
+   Float b = Select(x > 0, Sin(x), Cos(x));  // Both computed! Use If
+   ```
 
 ---
 

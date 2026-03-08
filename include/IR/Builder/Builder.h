@@ -30,6 +30,7 @@
 #include <IR/Node/RawCode.h>
 #include <IR/Node/Return.h>
 #include <IR/Node/Store.h>
+#include <IR/Node/Ternary.h>
 #include <IR/Node/While.h>
 
 namespace GPU::IR::Builder {
@@ -207,6 +208,13 @@ public:
 	 * @return The built string
 	 */
 	std::string BuildRawCode(const Node::RawCodeNode &Node);
+
+	/**
+	 * Building a ternary conditional node
+	 * @param Node The node to be built
+	 * @return The built string
+	 */
+	std::string BuildTernary(const Node::TernaryNode &Node);
 
 private:
 	Builder() = default;

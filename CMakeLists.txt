@@ -97,6 +97,8 @@ add_library(EasyGPU STATIC
     source/IR/Node/Return.cpp
     include/IR/Node/RawCode.h
     source/IR/Node/RawCode.cpp
+    include/IR/Node/Ternary.h
+    source/IR/Node/Ternary.cpp
     
     # IR Values
     include/IR/Value/Value.h
@@ -225,6 +227,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestDispatch.cpp
         tests/TestArray.cpp
         tests/TestUniform.cpp
+        tests/TestTernary.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})

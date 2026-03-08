@@ -14,6 +14,7 @@
 #include <IR/Node/ArrayAccess.h>
 #include <IR/Node/LoadUniform.h>
 #include <IR/Node/Operation.h>
+#include <IR/Node/Ternary.h>
 
 #include <IR/Builder/Builder.h>
 
@@ -692,6 +693,43 @@ public:
 		return Expr<T>(std::make_unique<Node::OperationNode>(Node::OperationCode::Neg, CloneNode(val)));
 	}
 };
+
+/**
+ * Ternary conditional operator - Selects between two expressions based on a condition
+ * Generates GLSL: (condition) ? (trueExpr) : (falseExpr)
+ * @tparam T The value type of the expressions
+ * @param condition The boolean condition expression
+ * @param trueExpr The expression to evaluate when condition is true
+ * @param falseExpr The expression to evaluate when condition is false
+ * @return An expression representing the ternary operation
+ */
+template <ScalarType T>
+[[nodiscard]] inline Expr<T> Select(Expr<bool> condition, Expr<T> trueExpr, Expr<T> falseExpr) {
+	return Expr<T>(std::make_unique<Node::TernaryNode>(condition.Release(), trueExpr.Release(), falseExpr.Release()));
+}
+
+/**
+ * Ternary conditional operator with Var arguments (implicit conversion to Expr)
+ * @tparam T The value type of the expressions
+ * @param condition The boolean condition expression
+ * @param trueExpr The expression to evaluate when condition is true (Var or Expr)
+ * @param falseExpr The expression to evaluate when condition is false (Var or Expr)
+ * @return An expression representing the ternary operation
+ */
+template <ScalarType T>
+[[nodiscard]] inline Expr<T> Select(Expr<bool> condition, const Var<T> &trueExpr, const Var<T> &falseExpr) {
+	return Expr<T>(std::make_unique<Node::TernaryNode>(condition.Release(), trueExpr.Load(), falseExpr.Load()));
+}
+
+template <ScalarType T>
+[[nodiscard]] inline Expr<T> Select(Expr<bool> condition, Expr<T> trueExpr, const Var<T> &falseExpr) {
+	return Expr<T>(std::make_unique<Node::TernaryNode>(condition.Release(), trueExpr.Release(), falseExpr.Load()));
+}
+
+template <ScalarType T>
+[[nodiscard]] inline Expr<T> Select(Expr<bool> condition, const Var<T> &trueExpr, Expr<T> falseExpr) {
+	return Expr<T>(std::make_unique<Node::TernaryNode>(condition.Release(), trueExpr.Load(), falseExpr.Release()));
+}
 
 // Legacy alias for backward compatibility
 using ExprBase_t = ExprBase;

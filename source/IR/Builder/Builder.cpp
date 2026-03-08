@@ -97,6 +97,9 @@ std::string Builder::BuildNode(const Node::Node &Node) {
 	case Node::NodeType::RawCode: {
 		return BuildRawCode(dynamic_cast<const Node::RawCodeNode &>(Node));
 	}
+	case Node::NodeType::Ternary: {
+		return BuildTernary(dynamic_cast<const Node::TernaryNode &>(Node));
+	}
 	default: {
 		return "";
 	}
@@ -369,5 +372,10 @@ std::string Builder::BuildCall(const Node::CallNode &Node) {
 
 std::string Builder::BuildRawCode(const Node::RawCodeNode &Node) {
 	return Node.Code();
+}
+
+std::string Builder::BuildTernary(const Node::TernaryNode &Node) {
+	return std::format("({})?({}):({})", BuildNode(*Node.Condition()), BuildNode(*Node.TrueExpr()),
+					   BuildNode(*Node.FalseExpr()));
 }
 } // namespace GPU::IR::Builder
