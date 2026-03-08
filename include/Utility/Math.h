@@ -1175,6 +1175,62 @@ inline IR::Value::Expr<bool> NotEqual(const IR::Value::Expr<IVec4> &x, const IR:
 }
 
 // ============================================================================
+// Sign Manipulation Functions
+// ============================================================================
+
+// CopySign - Returns a value with the magnitude of x and the sign of y
+// Implemented as: abs(x) * sign(y)
+// For float
+inline IR::Value::Expr<float> CopySign(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y) {
+	return Abs(x) * Sign(y);
+}
+inline IR::Value::Expr<float> CopySign(const IR::Value::Expr<float> &x, float y) {
+	return Abs(x) * Sign(IR::Value::Expr<float>(y));
+}
+inline IR::Value::Expr<float> CopySign(float x, const IR::Value::Expr<float> &y) {
+	return Abs(IR::Value::Expr<float>(x)) * Sign(y);
+}
+
+// For Vec2
+inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
+	return Abs(x) * Sign(y);
+}
+inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<float> &y) {
+	return Abs(x) * Sign(Vec2(y));
+}
+inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, float y) {
+	return Abs(x) * Sign(Vec2(y));
+}
+
+// For Vec3
+inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, const IR::Value::Expr<Vec3> &y) {
+	return Abs(x) * Sign(y);
+}
+inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, const IR::Value::Expr<float> &y) {
+	return Abs(x) * Sign(Vec3(y));
+}
+inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, float y) {
+	return Abs(x) * Sign(Vec3(y));
+}
+
+// For Vec4
+inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, const IR::Value::Expr<Vec4> &y) {
+	return Abs(x) * Sign(y);
+}
+inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, const IR::Value::Expr<float> &y) {
+	return Abs(x) * Sign(Vec4(y));
+}
+inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, float y) {
+	return Abs(x) * Sign(Vec4(y));
+}
+
+// CopySign - Generic template versions
+template <typename X, typename Y> [[nodiscard]] inline auto CopySign(X &&x, Y &&y) {
+	using T = Detail::ValueTypeOf_t<X>;
+	return Abs(Detail::ToExpr(std::forward<X>(x))) * Sign(Detail::ToExpr(std::forward<Y>(y)));
+}
+
+// ============================================================================
 // Type Cast Functions (Explicit conversion between types)
 // ============================================================================
 

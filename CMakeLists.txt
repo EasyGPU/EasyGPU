@@ -228,6 +228,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestArray.cpp
         tests/TestUniform.cpp
         tests/TestTernary.cpp
+        tests/TestCopySign.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})

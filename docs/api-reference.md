@@ -1021,9 +1021,39 @@ Callable<Float(Float)> Square = [](Float& x) {
 // Built-in logical: &&, ||, !
 
 Expr<T> Abs(Expr<T> x);           // Absolute value
+Expr<T> Sign(Expr<T> x);          // Sign (-1, 0, or 1)
 Expr<T> Min(Expr<T> a, Expr<T> b); // Minimum
 Expr<T> Max(Expr<T> a, Expr<T> b); // Maximum
 Expr<T> Clamp(Expr<T> x, Expr<T> min, Expr<T> max); // Clamp to range
+
+// CopySign - Returns value with magnitude of x and sign of y
+Expr<float> CopySign(Expr<float> x, Expr<float> y);
+Expr<float> CopySign(Expr<float> x, float y);
+Expr<float> CopySign(float x, Expr<float> y);
+Expr<Vec2> CopySign(Expr<Vec2> x, Expr<Vec2> y);
+Expr<Vec2> CopySign(Expr<Vec2> x, float y);  // Broadcast scalar sign
+Expr<Vec3> CopySign(Expr<Vec3> x, Expr<Vec3> y);
+Expr<Vec3> CopySign(Expr<Vec3> x, float y);
+Expr<Vec4> CopySign(Expr<Vec4> x, Expr<Vec4> y);
+Expr<Vec4> CopySign(Expr<Vec4> x, float y);
+```
+
+**CopySign Examples:**
+
+```cpp
+// Basic usage - transfer sign from one value to another
+Float x = MakeFloat(5.0f);   // positive magnitude
+Float y = MakeFloat(-3.0f);  // negative sign
+Float result = CopySign(x, y);  // Returns -5.0f
+
+// With vectors
+Vec3 v = MakeFloat3(1.0f, 2.0f, 3.0f);
+Vec3 signSource = MakeFloat3(-1.0f, 1.0f, -1.0f);
+Vec3 result = CopySign(v, signSource);  // (-1.0f, 2.0f, -3.0f)
+
+// Broadcast scalar sign to all vector components
+Vec3 v2 = MakeFloat3(1.0f, 2.0f, 3.0f);
+Vec3 negative = CopySign(v2, -1.0f);  // All components become negative
 ```
 
 ### Power and Roots

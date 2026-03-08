@@ -518,6 +518,11 @@ Float clamped = Select(x < 0.0f, 0.0f,
 Float sign = Select(x > 0.0f, 1.0f,
                    Select(x < 0.0f, -1.0f, 0.0f));
 
+// CopySign - transfer sign from one value to another
+Float magnitude = MakeFloat(5.0f);
+Float signSource = MakeFloat(-3.0f);
+Float result = CopySign(magnitude, signSource);  // Returns -5.0f
+
 // Conditional color blending
 Vec3 color = Select(isValid, litColor, shadowColor);
 ```

@@ -163,6 +163,33 @@ Float step = Select(x >= threshold, 1.0f, 0.0f);
 // Sign function (-1, 0, or 1)
 Float sign = Select(x > 0.0f, 1.0f,
                    Select(x < 0.0f, -1.0f, 0.0f));
+
+// CopySign - Transfer sign from one value to another
+Float magnitude = MakeFloat(5.0f);
+Float signSource = MakeFloat(-3.0f);
+Float result = CopySign(magnitude, signSource);  // Returns -5.0f
+```
+
+### Pattern 3b: CopySign Patterns
+
+CopySign is useful when you need to preserve the magnitude of one value but use the sign from another:
+
+```cpp
+// Mirror reflection - flip direction based on surface normal
+Vec3 incident = rayDirection;
+Vec3 normal = surfaceNormal;
+Vec3 reflected = CopySign(incident, -normal);  // Reflect across axis
+
+// Ensure vector points in same direction as reference
+Vec3 velocity = ...;
+Vec3 targetDir = ...;
+Vec3 alignedVel = CopySign(velocity, Dot(velocity, targetDir));
+
+// Create symmetric values
+Float offset = MakeFloat(2.5f);
+Float center = MakeFloat(0.0f);
+Float left = CopySign(offset, -1.0f);   // -2.5f
+Float right = CopySign(offset, 1.0f);   // +2.5f
 ```
 
 ### Pattern 4: Conditional Blending

@@ -463,6 +463,12 @@ For(start, end, [&](Int& i) { ... });
 While(cond, [&]() { ... });
 Break(); Continue();
 
+// Math functions
+Float absX = Abs(x);                               // Absolute value
+Float signed = CopySign(x, y);                     // |x| with sign of y
+Float clamped = Clamp(x, 0.0f, 1.0f);              // Clamp to range
+Float lerped = Mix(a, b, t);                       // Linear interpolation
+
 // Values
 Float f = MakeFloat(3.14f);                        // From literal
 Int i = MakeInt(42);
