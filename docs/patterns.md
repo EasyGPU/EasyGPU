@@ -180,14 +180,17 @@ Vec3 incident = rayDirection;
 Vec3 normal = surfaceNormal;
 Vec3 reflected = CopySign(incident, -normal);  // Reflect across axis
 
+// Broadcast scalar sign to all vector components
+Vec3 v = MakeFloat3(1.0f, 2.0f, 3.0f);
+Vec3 negative = CopySign(v, -1.0f);  // All components become negative
+
 // Ensure vector points in same direction as reference
 Vec3 velocity = ...;
 Vec3 targetDir = ...;
-Vec3 alignedVel = CopySign(velocity, Dot(velocity, targetDir));
+Vec3 alignedVel = CopySign(velocity, Sign(Dot(velocity, targetDir)));
 
 // Create symmetric values
 Float offset = MakeFloat(2.5f);
-Float center = MakeFloat(0.0f);
 Float left = CopySign(offset, -1.0f);   // -2.5f
 Float right = CopySign(offset, 1.0f);   // +2.5f
 ```

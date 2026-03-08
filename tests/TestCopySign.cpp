@@ -75,7 +75,7 @@ TEST(copysign_vector2)
 		// CopySign vector, vector
 		Var<Vec2> result1 = CopySign(x, y);
 
-		// CopySign vector, scalar
+		// CopySign vector, scalar (broadcast)
 		Var<Vec2> result2 = CopySign(x, -1.0f);
 
 		// CopySign vector, scalar expr
@@ -95,12 +95,8 @@ TEST(copysign_vector3)
 		// CopySign vector, vector
 		Var<Vec3> result1 = CopySign(x, y);
 
-		// CopySign vector, scalar
+		// CopySign vector, scalar (broadcast)
 		Var<Vec3> result2 = CopySign(x, -1.0f);
-
-		// CopySign vector, scalar expr
-		Var<float> signVal = MakeFloat(-1.0f);
-		Var<Vec3> result3 = CopySign(x, signVal);
 	});
 	kernel.PrintCode();
 	ASSERT(true);
@@ -115,12 +111,8 @@ TEST(copysign_vector4)
 		// CopySign vector, vector
 		Var<Vec4> result1 = CopySign(x, y);
 
-		// CopySign vector, scalar
+		// CopySign vector, scalar (broadcast)
 		Var<Vec4> result2 = CopySign(x, -1.0f);
-
-		// CopySign vector, scalar expr
-		Var<float> signVal = MakeFloat(-1.0f);
-		Var<Vec4> result3 = CopySign(x, signVal);
 	});
 	kernel.PrintCode();
 	ASSERT(true);

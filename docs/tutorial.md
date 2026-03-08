@@ -523,6 +523,11 @@ Float magnitude = MakeFloat(5.0f);
 Float signSource = MakeFloat(-3.0f);
 Float result = CopySign(magnitude, signSource);  // Returns -5.0f
 
+// With vectors
+Vec3 v = MakeFloat3(1.0f, 2.0f, 3.0f);
+Vec3 signs = MakeFloat3(-1.0f, 1.0f, -1.0f);
+Vec3 result = CopySign(v, signs);  // (-1.0f, 2.0f, -3.0f)
+
 // Conditional color blending
 Vec3 color = Select(isValid, litColor, shadowColor);
 ```

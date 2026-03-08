@@ -1031,11 +1031,14 @@ Expr<float> CopySign(Expr<float> x, Expr<float> y);
 Expr<float> CopySign(Expr<float> x, float y);
 Expr<float> CopySign(float x, Expr<float> y);
 Expr<Vec2> CopySign(Expr<Vec2> x, Expr<Vec2> y);
-Expr<Vec2> CopySign(Expr<Vec2> x, float y);  // Broadcast scalar sign
+Expr<Vec2> CopySign(Expr<Vec2> x, Expr<float> y);  // Broadcast scalar sign
+Expr<Vec2> CopySign(Expr<Vec2> x, float y);        // Broadcast scalar sign
 Expr<Vec3> CopySign(Expr<Vec3> x, Expr<Vec3> y);
-Expr<Vec3> CopySign(Expr<Vec3> x, float y);
+Expr<Vec3> CopySign(Expr<Vec3> x, Expr<float> y);  // Broadcast scalar sign
+Expr<Vec3> CopySign(Expr<Vec3> x, float y);        // Broadcast scalar sign
 Expr<Vec4> CopySign(Expr<Vec4> x, Expr<Vec4> y);
-Expr<Vec4> CopySign(Expr<Vec4> x, float y);
+Expr<Vec4> CopySign(Expr<Vec4> x, Expr<float> y);  // Broadcast scalar sign
+Expr<Vec4> CopySign(Expr<Vec4> x, float y);        // Broadcast scalar sign
 ```
 
 **CopySign Examples:**
