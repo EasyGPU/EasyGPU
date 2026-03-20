@@ -1,16 +1,15 @@
-﻿#pragma once
+#pragma once
 
 /**
- * KernelBuildContext.h:
- *      @Descripiton    :   Ther build context for the kernel function class
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file KernelBuildContext.h
+ * @brief Kernel build context with backend integration
  */
+
 #ifndef EASYGPU_KERNELBUILDCONTEXT_H
 #define EASYGPU_KERNELBUILDCONTEXT_H
 
+#include <Backend/Backend.h>
 #include <IR/Builder/BuilderContext.h>
-
 #include <Runtime/Buffer.h>
 #include <Runtime/PixelFormat.h>
 
@@ -18,14 +17,16 @@
 #include <stack>
 #include <stdexcept>
 #include <unordered_map>
+#include <vector>
 
 namespace GPU::Kernel {
+
 /**
  * The exception for dimension out of range
  */
 class KernelDimensionOutOfRange : public std::out_of_range {
 public:
-	KernelDimensionOutOfRange();
+    KernelDimensionOutOfRange();
 };
 
 /**
@@ -33,378 +34,245 @@ public:
  */
 class KernelBuildContext : public IR::Builder::BuilderContext {
 public:
-	/**
-	 * This constructor will construct the work size in default
-	 * When it is 1 dimension, the local_size_x = 256 while others=1
-	 * When it is 2 dimension, the local_size_x = 16 and local_size_y = 16 while others = 1
-	 * When it is 3 dimension, the local_size_x = 8 and local_size_y = 8 and local_size_z = 4
-	 * @param Dimension The dimension of the kernel
-	 */
-	KernelBuildContext(int Dimension);
+    /**
+     * This constructor will construct the work size in default
+     * @param Dimension The dimension of the kernel
+     */
+    KernelBuildContext(int Dimension);
 
-	/**
-	 * Destructor - cleans up cached OpenGL program if any
-	 */
-	~KernelBuildContext();
+    /**
+     * Destructor - cleans up cached pipeline if any
+     */
+    ~KernelBuildContext();
 
 public:
-	void				PushTranslatedCode(std::string Code) override;
+    void PushTranslatedCode(std::string Code) override;
 
-	std::string			AssignVarName() override;
+    std::string AssignVarName() override;
 
-	/**
-	 * Get the complete kernel code including struct definitions
-	 * @return The complete GLSL code
-	 */
-	virtual std::string GetCompleteCode();
-
-public:
-	/**
-	 * Check if a struct type is already defined
-	 * @param TypeName The struct type name
-	 * @return True if already defined
-	 */
-	bool HasStructDefinition(const std::string &TypeName) const override;
-
-	/**
-	 * Add a struct type definition
-	 * @param TypeName The struct type name
-	 * @param Definition The GLSL struct definition code
-	 */
-	void AddStructDefinition(const std::string &TypeName, const std::string &Definition) override;
-
-	/**
-	 * Get all struct definitions
-	 * @return Vector of struct definitions in order of registration
-	 */
-	const std::vector<std::string> &GetStructDefinitions() const override;
+    /**
+     * Get the complete kernel code including struct definitions
+     * @return The complete GLSL code
+     */
+    virtual std::string GetCompleteCode();
 
 public:
-	/**
-	 * Allocate a binding slot for buffer/image
-	 * @return The allocated binding slot index
-	 */
-	uint32_t	AllocateBindingSlot() override;
-
-	/**
-	 * Register a buffer for the kernel
-	 * @param binding The binding slot
-	 * @param typeName The element type name in GLSL
-	 * @param bufferName The buffer variable name
-	 * @param mode The buffer access mode
-	 */
-	void		RegisterBuffer(uint32_t binding, const std::string &typeName, const std::string &bufferName,
-							   int mode) override;
-
-	/**
-	 * Get the buffer declarations for GLSL
-	 * @return The buffer declaration string
-	 */
-	std::string GetBufferDeclarations() const override;
-
-	/**
-	 * Get all registered buffer bindings
-	 * @return Vector of binding slots
-	 */
-	const std::vector<uint32_t> &GetBufferBindings() const override {
-		return _bufferBindings;
-	}
+    bool HasStructDefinition(const std::string& TypeName) const override;
+    void AddStructDefinition(const std::string& TypeName, const std::string& Definition) override;
+    const std::vector<std::string>& GetStructDefinitions() const override;
 
 public:
-	/**
-	 * Bind a runtime GPU buffer to a binding slot
-	 * This is called by Buffer::Bind() to associate the actual GL buffer with the binding
-	 * @param binding The binding slot
-	 * @param bufferHandle The OpenGL buffer handle
-	 */
-	void BindRuntimeBuffer(uint32_t binding, uint32_t bufferHandle) override {
-		_runtimeBuffers[binding] = bufferHandle;
-	}
+    uint32_t AllocateBindingSlot() override;
+    void RegisterBuffer(uint32_t binding, const std::string& typeName, const std::string& bufferName,
+                        int mode) override;
+    std::string GetBufferDeclarations() const override;
+    const std::vector<uint32_t>& GetBufferBindings() const override {
+        return _bufferBindings;
+    }
 
-	/**
-	 * Get all runtime buffer bindings for dispatch
-	 * @return Map of binding slot -> OpenGL buffer handle
-	 */
-	const std::unordered_map<uint32_t, uint32_t> &GetRuntimeBufferBindings() const override {
-		return _runtimeBuffers;
-	}
+    /**
+     * Bind a runtime GPU buffer to a binding slot
+     * This is called by Buffer::Bind() to associate the actual backend buffer with the binding
+     * @param binding The binding slot
+     * @param bufferHandle The backend buffer handle
+     */
+    void BindRuntimeBuffer(uint32_t binding, uint32_t bufferHandle) override {
+        _runtimeBuffers[binding] = bufferHandle;
+    }
 
-public:
-	// ===================================================================
-	// Texture Support (2D)
-	// ===================================================================
-
-	/**
-	 * Allocate a binding slot for texture/image
-	 * @return The allocated binding slot index
-	 */
-	uint32_t AllocateTextureBinding() override;
-
-	/**
-	 * Register a 2D texture for the kernel
-	 * @param binding The binding slot
-	 * @param format The pixel format
-	 * @param textureName The texture variable name in GLSL
-	 * @param width Texture width
-	 * @param height Texture height
-	 */
-	void RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName, uint32_t width,
-						 uint32_t height) override;
-
-	/**
-	 * Get the texture declarations for GLSL
-	 * @return The texture declaration string
-	 */
-	std::string					 GetTextureDeclarations() const override;
-
-	/**
-	 * Get all registered texture bindings
-	 * @return Vector of binding slots
-	 */
-	const std::vector<uint32_t> &GetTextureBindings() const override {
-		return _textureBindings;
-	}
-
-	/**
-	 * Bind a runtime GPU texture to a binding slot
-	 * This is called by Texture2D::Bind() to associate the actual GL texture with the binding
-	 * @param binding The binding slot
-	 * @param textureHandle The OpenGL texture handle
-	 */
-	void BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) override {
-		_runtimeTextures[binding] = textureHandle;
-	}
-
-	/**
-	 * Get all runtime texture bindings for dispatch
-	 * @return Map of binding slot -> OpenGL texture handle
-	 */
-	const std::unordered_map<uint32_t, uint32_t> &GetRuntimeTextureBindings() const override {
-		return _runtimeTextures;
-	}
+    const std::unordered_map<uint32_t, uint32_t>& GetRuntimeBufferBindings() const override {
+        return _runtimeBuffers;
+    }
 
 public:
-	// ===================================================================
-	// Uniform Support
-	// ===================================================================
+    // ===================================================================
+    // Texture Support (2D)
+    // ===================================================================
 
-	/**
-	 * Register a uniform variable for the kernel
-	 * @param typeName The GLSL type name
-	 * @param uniformPtr Pointer to the Uniform object (as void* for type erasure)
-	 * @param uploadFunc Function to upload the uniform value to GPU
-	 * @return The assigned uniform variable name in GLSL
-	 */
-	std::string RegisterUniform(
-		const std::string &typeName, void *uniformPtr,
-		std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc) override;
+    uint32_t AllocateTextureBinding() override;
+    void RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string& textureName, uint32_t width,
+                         uint32_t height) override;
+    std::string GetTextureDeclarations() const override;
+    const std::vector<uint32_t>& GetTextureBindings() const override {
+        return _textureBindings;
+    }
 
-	/**
-	 * Get the uniform declarations for GLSL
-	 * @return The uniform declaration string
-	 */
-	std::string GetUniformDeclarations() const override;
+    /**
+     * Bind a runtime GPU texture to a binding slot
+     * This is called by Texture2D::Bind() to associate the actual backend texture with the binding
+     * @param binding The binding slot
+     * @param textureHandle The backend texture handle
+     */
+    void BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) override {
+        _runtimeTextures[binding] = textureHandle;
+    }
 
-	/**
-	 * Set uniform values using glUniform functions
-	 * This is called during dispatch to upload uniform values to GPU
-	 * @param program The OpenGL shader program handle
-	 */
-	void		UploadUniformValues(uint32_t program) const;
+    const std::unordered_map<uint32_t, uint32_t>& GetRuntimeTextureBindings() const override {
+        return _runtimeTextures;
+    }
 
 public:
-	// ===================================================================
-	// Buffer/Texture Slot Support (Dynamic Resource Switching)
-	// ===================================================================
+    // ===================================================================
+    // Uniform Support
+    // ===================================================================
 
-	/**
-	 * Register a buffer slot for dynamic binding at dispatch time
-	 * This is called by BufferSlot::Bind() to register the slot.
-	 * The actual buffer binding happens at dispatch time.
-	 * @param slot Pointer to the BufferSlotBase
-	 */
-	void										  RegisterBufferSlot(Runtime::BufferSlotBase *slot) override;
+    std::string RegisterUniform(
+        const std::string& typeName, void* uniformPtr,
+        std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) override;
 
-	/**
-	 * Register a texture slot for dynamic binding at dispatch time
-	 * This is called by TextureSlot::Bind() to register the slot.
-	 * The actual texture binding happens at dispatch time.
-	 * @param slot Pointer to the TextureSlotBase
-	 */
-	void										  RegisterTextureSlot(Runtime::TextureSlotBase *slot) override;
+    std::string GetUniformDeclarations() const override;
 
-	/**
-	 * Get all registered buffer slots
-	 * @return Vector of buffer slot pointers
-	 */
-	const std::vector<Runtime::BufferSlotBase *> &GetBufferSlots() const {
-		return _bufferSlots;
-	}
+    /**
+     * Set uniform values using backend uniform functions
+     * This is called during dispatch to upload uniform values to GPU
+     * @param pipeline The backend pipeline handle
+     */
+    void UploadUniformValues(Backend::PipelineHandle pipeline) const;
 
-	/**
-	 * Get all registered texture slots
-	 * @return Vector of texture slot pointers
-	 */
-	const std::vector<Runtime::TextureSlotBase *> &GetTextureSlots() const {
-		return _textureSlots;
-	}
+    /**
+     * Get the uniform upload functions for dispatch
+     * @return Vector of uniform entries
+     */
+    struct UniformEntry {
+        std::string name;
+        std::string typeName;
+        void* uniformPtr;
+        std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc;
+    };
+
+    const std::vector<UniformEntry>& GetUniformEntries() const {
+        return _uniforms;
+    }
 
 public:
-	// ===================================================================
-	// Callable Function Support
-	// ===================================================================
+    // ===================================================================
+    // Buffer/Texture Slot Support (Dynamic Resource Switching)
+    // ===================================================================
 
-	/**
-	 * Add a callable function declaration (forward declaration)
-	 * @param declaration The function prototype string
-	 */
-	void					 AddCallableDeclaration(const std::string &declaration) override;
+    void RegisterBufferSlot(Runtime::BufferSlotBase* slot) override;
+    void RegisterTextureSlot(Runtime::TextureSlotBase* slot) override;
 
-	/**
-	 * Register a callable body generator function
-	 * @param generator The function that generates the callable body
-	 */
-	void					 AddCallableBodyGenerator(std::function<void()> generator) override;
+    const std::vector<Runtime::BufferSlotBase*>& GetBufferSlots() const {
+        return _bufferSlots;
+    }
 
-	/**
-	 * Enter callable body generation mode
-	 */
-	void					 PushCallableBody() override;
-
-	/**
-	 * Exit callable body generation mode
-	 */
-	void					 PopCallableBody() override;
-
-	/**
-	 * Get all callable function declarations
-	 * @return Vector of function declarations
-	 */
-	std::vector<std::string> GetCallableDeclarations() const override;
-
-	/**
-	 * Generate all callable function bodies
-	 * @return The complete callable function definitions string
-	 */
-	std::string				 GenerateCallableBodies() override;
+    const std::vector<Runtime::TextureSlotBase*>& GetTextureSlots() const {
+        return _textureSlots;
+    }
 
 public:
-	int WorkSizeX;
-	int WorkSizeY;
-	int WorkSizeZ;
+    // ===================================================================
+    // Callable Function Support
+    // ===================================================================
+
+    void AddCallableDeclaration(const std::string& declaration) override;
+    void AddCallableBodyGenerator(std::function<void()> generator) override;
+    void PushCallableBody() override;
+    void PopCallableBody() override;
+    std::vector<std::string> GetCallableDeclarations() const override;
+    std::string GenerateCallableBodies() override;
+
+public:
+    int WorkSizeX;
+    int WorkSizeY;
+    int WorkSizeZ;
 
 protected:
-	// ===================================================================
-	// Protected Members for Subclass Access
-	// ===================================================================
+    // Callable support
+    std::vector<std::string> _callableDeclarations;
+    std::vector<std::function<void()>> _callableBodyGenerators;
+    std::vector<std::string> _callableBodies;
+    std::stack<std::string> _callableBodyStack;
+    std::string _currentCallableBody;
+    bool _inCallableBody = false;
 
-	// Callable support
-	std::vector<std::string>		   _callableDeclarations;
-	std::vector<std::function<void()>> _callableBodyGenerators;
-	std::vector<std::string>		   _callableBodies;
-	std::stack<std::string>			   _callableBodyStack;
-	std::string						   _currentCallableBody;
-	bool							   _inCallableBody = false;
+    /**
+     * Buffer registration info
+     */
+    struct BufferInfo {
+        uint32_t binding;
+        std::string typeName;
+        std::string bufferName;
+        int mode; // Backend::BufferMode
+    };
 
-	/**
-	 * Buffer registration info
-	 */
-	struct BufferInfo {
-		uint32_t	binding;
-		std::string typeName;
-		std::string bufferName;
-		int			mode; // GL_READ_ONLY, GL_WRITE_ONLY, GL_READ_WRITE
-	};
+    /**
+     * Texture registration info (2D)
+     */
+    struct TextureInfo {
+        uint32_t binding;
+        Runtime::PixelFormat format;
+        std::string textureName;
+        uint32_t width;
+        uint32_t height;
+    };
 
-	/**
-	 * Texture registration info (2D)
-	 */
-	struct TextureInfo {
-		uint32_t			 binding;
-		Runtime::PixelFormat format;
-		std::string			 textureName;
-		uint32_t			 width;
-		uint32_t			 height;
-	};
+    uint32_t _nextBinding = 0;
+    std::vector<BufferInfo> _buffers;
+    std::vector<uint32_t> _bufferBindings;
+    std::unordered_map<uint32_t, uint32_t> _runtimeBuffers; // binding -> backend buffer handle
 
-	uint32_t							   _nextBinding = 0;
-	std::vector<BufferInfo>				   _buffers;
-	std::vector<uint32_t>				   _bufferBindings;
-	std::unordered_map<uint32_t, uint32_t> _runtimeBuffers; // binding -> GL buffer handle
+    std::vector<TextureInfo> _textures;
+    std::vector<uint32_t> _textureBindings;
+    std::unordered_map<uint32_t, uint32_t> _runtimeTextures; // binding -> backend texture handle
 
-	std::vector<TextureInfo>			   _textures;
-	std::vector<uint32_t>				   _textureBindings;
-	std::unordered_map<uint32_t, uint32_t> _runtimeTextures; // binding -> GL texture handle
+    std::vector<UniformEntry> _uniforms;
+    int _nextUniformIndex = 0;
 
-	/**
-	 * Uniform registration info
-	 */
-	struct UniformEntry {
-		std::string																  name;
-		std::string																  typeName;
-		void																	 *uniformPtr;
-		std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc;
-	};
-
-	std::vector<UniformEntry>				_uniforms;
-	int										_nextUniformIndex = 0;
-
-	// Slot support for dynamic resource switching
-	std::vector<Runtime::BufferSlotBase *>	_bufferSlots;  // Buffer slots registered via Bind()
-	std::vector<Runtime::TextureSlotBase *> _textureSlots; // Texture slots registered via Bind()
+    // Slot support for dynamic resource switching
+    std::vector<Runtime::BufferSlotBase*> _bufferSlots;
+    std::vector<Runtime::TextureSlotBase*> _textureSlots;
 
 public:
-	// ===================================================================
-	// Shader Program Cache
-	// ===================================================================
+    // ===================================================================
+    // Pipeline Cache (replaces program cache)
+    // ===================================================================
 
-	/**
-	 * Get the cached OpenGL program handle
-	 * @return The cached program handle, or 0 if not cached
-	 */
-	uint32_t GetCachedProgram() const {
-		return _cachedProgram;
-	}
+    /**
+     * Get the cached backend pipeline handle
+     * @return The cached pipeline handle, or INVALID_PIPELINE_HANDLE if not cached
+     */
+    Backend::PipelineHandle GetCachedPipeline() const {
+        return _cachedPipeline;
+    }
 
-	/**
-	 * Set the cached OpenGL program handle
-	 * @param program The program handle to cache
-	 */
-	void SetCachedProgram(uint32_t program) {
-		_cachedProgram = program;
-	}
+    /**
+     * Set the cached backend pipeline handle
+     * @param pipeline The pipeline handle to cache
+     */
+    void SetCachedPipeline(Backend::PipelineHandle pipeline) {
+        _cachedPipeline = pipeline;
+    }
 
-	/**
-	 * Check if a program is cached
-	 * @return True if a program is cached
-	 */
-	bool HasCachedProgram() const {
-		return _cachedProgram != 0;
-	}
+    /**
+     * Check if a pipeline is cached
+     * @return True if a pipeline is cached
+     */
+    bool HasCachedPipeline() const {
+        return _cachedPipeline != Backend::INVALID_PIPELINE_HANDLE;
+    }
 
-	/**
-	 * Invalidate the cached program (force recompilation)
-	 */
-	void InvalidateCachedProgram() {
-		_cachedProgram = 0;
-	}
+    /**
+     * Invalidate the cached pipeline (force recompilation)
+     */
+    void InvalidateCachedPipeline() {
+        _cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+    }
 
 protected:
-	uint32_t						_cachedProgram = 0;
+    Backend::PipelineHandle _cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
 
-	/**
-	 * The index for the variable name generation
-	 */
-	int								_variableIndex;
-	int								_dimension;
-	std::string						_code;
-	std::unordered_set<std::string> _definedStructs;
-	std::vector<std::string>		_structNames; // Keep insertion order for forward declarations
-	std::vector<std::string>		_structDefinitions;
+    int _variableIndex;
+    int _dimension;
+    std::string _code;
+    std::unordered_set<std::string> _definedStructs;
+    std::vector<std::string> _structNames;
+    std::vector<std::string> _structDefinitions;
 
-	friend class Kernel;
-	friend class FragmentKernel2D;
+    friend class Kernel;
+    friend class FragmentKernel2D;
 };
+
 } // namespace GPU::Kernel
 
 #endif // EASYGPU_KERNELBUILDCONTEXT_H

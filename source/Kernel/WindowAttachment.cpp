@@ -82,7 +82,7 @@ bool WindowAttachment::Attach(HWND hwnd, ResizeCallback resizeCallback) {
 
 	// Make the OpenGL context current on this window's DC
 	// This is done once during attach; Flush() assumes context stays current
-	HGLRC hglrc = Runtime::Context::GetInstance().GetGLContext();
+	HGLRC hglrc = static_cast<HGLRC>(Runtime::Context::GetInstance().GetNativeGLContext());
 	if (hglrc && !MakeCurrent(hglrc)) {
 		// Failed to make current, clean up
 		SetWindowLongPtrW(_hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(_originalWndProc));

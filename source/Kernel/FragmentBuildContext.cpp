@@ -27,7 +27,7 @@ void FragmentBuildContext::SetResolution(uint32_t width, uint32_t height) {
 	if (_width != width || _height != height) {
 		_width	= width;
 		_height = height;
-		InvalidateCachedProgram();
+		InvalidateCachedPipeline();
 	}
 }
 

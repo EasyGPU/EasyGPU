@@ -48,6 +48,12 @@ endif()
 # Core Library
 # =============================================================================
 add_library(EasyGPU STATIC
+    # Backend
+    include/Backend/Backend.h
+    source/Backend/Backend.cpp
+    include/Backend/OpenGLBackend.h
+    source/Backend/OpenGLBackend.cpp
+    
     # IR Builder
     include/IR/Builder/Builder.h
     source/IR/Builder/Builder.cpp
@@ -183,7 +189,7 @@ add_library(EasyGPU STATIC
     
     # Lazy Header
     include/GPU.h
-        source/IR/Node/Load.cpp
+    source/IR/Node/Load.cpp
 )
 
 target_compile_features(EasyGPU PUBLIC cxx_std_20)

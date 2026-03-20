@@ -177,7 +177,7 @@ void FragmentKernel2D::Flush() {
 
 	// Ensure context is current on this window
 	// This is lightweight if already current - just updates the state cache
-	HGLRC hglrc = Runtime::Context::GetInstance().GetGLContext();
+	HGLRC hglrc = static_cast<HGLRC>(Runtime::Context::GetInstance().GetNativeGLContext());
 	if (hglrc) {
 		_windowAttachment->MakeCurrent(hglrc);
 	}
@@ -308,8 +308,8 @@ void FragmentKernel2D::EnsureShaderCompiled() {
 	}
 
 	// Check if we have a cached program
-	if (_context->HasCachedProgram() && _shaderProgram == 0) {
-		_shaderProgram = _context->GetCachedProgram();
+	if (_context->HasCachedPipeline() && _shaderProgram == 0) {
+		_shaderProgram = static_cast<uint32_t>(_context->GetCachedPipeline());
 	}
 
 	// Check if we need to recompile
@@ -338,7 +338,7 @@ void FragmentKernel2D::EnsureShaderCompiled() {
 		_shaderProgram = Runtime::ShaderCompiler::LinkProgram({vs, fs});
 
 		// Cache the program
-		_context->SetCachedProgram(_shaderProgram);
+		_context->SetCachedPipeline(static_cast<GPU::Backend::PipelineHandle>(_shaderProgram));
 	} catch (const std::exception &e) {
 		std::cerr << "Shader compilation failed: " << e.what() << std::endl;
 		throw;
@@ -405,3 +405,4 @@ bool FragmentKernel2D::IsProfilingEnabled() const {
 } // namespace GPU::Kernel
 
 #endif // _WIN32
+

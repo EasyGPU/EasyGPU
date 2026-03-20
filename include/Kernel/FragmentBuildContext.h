@@ -95,14 +95,14 @@ public:
 	 * Mark that shader needs recompilation
 	 */
 	void InvalidateShader() {
-		InvalidateCachedProgram();
+		InvalidateCachedPipeline();
 	}
 
 	/**
 	 * Check if shader is valid for current state
 	 */
 	bool IsShaderValid() const {
-		return HasCachedProgram();
+		return HasCachedPipeline();
 	}
 
 protected:
