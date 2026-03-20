@@ -34,8 +34,28 @@ public:
  */
 class KernelBuildContext : public IR::Builder::BuilderContext {
 public:
-    struct BufferInfo;
-    struct TextureInfo;
+    /**
+     * Buffer registration info
+     */
+    struct BufferInfo {
+        uint32_t binding;
+        std::string typeName;
+        std::string bufferName;
+        int mode; // Backend::BufferMode
+    };
+
+    /**
+     * Texture registration info (2D)
+     */
+    struct TextureInfo {
+        uint32_t binding;
+        Runtime::PixelFormat format;
+        std::string textureName;
+        uint32_t width;
+        uint32_t height;
+        bool sampled = false;
+    };
+
     struct UniformEntry;
 
     /**
@@ -203,28 +223,6 @@ protected:
     std::stack<std::string> _callableBodyStack;
     std::string _currentCallableBody;
     bool _inCallableBody = false;
-
-    /**
-     * Buffer registration info
-     */
-    struct BufferInfo {
-        uint32_t binding;
-        std::string typeName;
-        std::string bufferName;
-        int mode; // Backend::BufferMode
-    };
-
-    /**
-     * Texture registration info (2D)
-     */
-    struct TextureInfo {
-        uint32_t binding;
-        Runtime::PixelFormat format;
-        std::string textureName;
-        uint32_t width;
-        uint32_t height;
-        bool sampled = false;
-    };
 
     uint32_t _nextBinding = 0;
     std::vector<BufferInfo> _buffers;
