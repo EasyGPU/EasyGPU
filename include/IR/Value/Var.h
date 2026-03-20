@@ -1450,6 +1450,12 @@ template <ScalarType T> Expr<T>::Expr(const Var<T> &var) : ExprBase(var.Load()) 
 }
 } // namespace GPU::IR::Value
 
+// Include Expr specializations BEFORE Var specializations to ensure
+// template specialization order is correct (Expr specializations must come
+// before any use that instantiates the primary template)
+#include <IR/Value/ExprIVector.h>
+#include <IR/Value/ExprVector.h>
+
 // Include Var specializations for vector and matrix types (after main template definition)
 // Order matters: VarVector must come before VarMatrix (VarMatrix uses Var<Vec2/3/4>)
 #include <IR/Value/VarIVector.h>
