@@ -15,6 +15,7 @@
 #include <vector>
 
 // Platform-specific forward declarations
+// We use void* to avoid including platform headers here
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -23,12 +24,6 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
-#else
-// Linux/X11 forward declarations
-using GLXContext = void*;
-using GLXFBConfig = void*;
-using Display = void;
-using Window = unsigned long;
 #endif
 
 namespace GPU::Backend {
@@ -154,9 +149,10 @@ private:
     HDC       _hdc       = nullptr;
     HGLRC     _hglrc     = nullptr;
 #else
-    Display*  _display   = nullptr;
-    Window    _window    = 0;
-    GLXContext _glxContext = nullptr;
+    // Linux: use void* to avoid X11 types in header
+    void*     _display   = nullptr;
+    uint64_t  _window    = 0;
+    void*     _glxContext = nullptr;
 #endif
 
     bool _initialized = false;

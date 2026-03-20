@@ -19,47 +19,10 @@
 #endif
 #include <windows.h>
 #else
+// Linux: Use system X11/GLX headers directly
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-
-typedef XID GLXDrawable;
-typedef XID GLXContextID;
-typedef struct __GLXcontextRec* GLXContext;
-typedef struct __GLXFBConfigRec* GLXFBConfig;
-
-#define GLX_USE_GL 1
-#define GLX_RGBA 4
-#define GLX_DOUBLEBUFFER 5
-#define GLX_RED_SIZE 8
-#define GLX_GREEN_SIZE 9
-#define GLX_BLUE_SIZE 10
-#define GLX_ALPHA_SIZE 11
-#define GLX_DEPTH_SIZE 12
-#define GLX_STENCIL_SIZE 13
-#define GLX_X_RENDERABLE 0x8012
-#define GLX_DRAWABLE_TYPE 0x8010
-#define GLX_RENDER_TYPE 0x8011
-#define GLX_WINDOW_BIT 0x00000001
-#define GLX_RGBA_BIT 0x00000001
-#define GLX_X_VISUAL_TYPE 0x22
-#define GLX_TRUE_COLOR 0x8002
-#define GLX_CONTEXT_MAJOR_VERSION_ARB 0x2091
-#define GLX_CONTEXT_MINOR_VERSION_ARB 0x2092
-#define GLX_CONTEXT_PROFILE_MASK_ARB 0x9126
-#define GLX_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
-
-extern "C" {
-typedef void (*__GLXextFuncPtr)(void);
-extern __GLXextFuncPtr glXGetProcAddressARB(const GLubyte* procName);
-extern XVisualInfo* glXChooseVisual(Display* dpy, int screen, int* attribList);
-extern GLXContext glXCreateContext(Display* dpy, XVisualInfo* vis, GLXContext shareList, Bool direct);
-extern void glXDestroyContext(Display* dpy, GLXContext ctx);
-extern Bool glXMakeCurrent(Display* dpy, GLXDrawable drawable, GLXContext ctx);
-extern Bool glXQueryVersion(Display* dpy, int* maj, int* min);
-extern GLXFBConfig* glXChooseFBConfig(Display* dpy, int screen, const int* attribList, int* nitems);
-extern XVisualInfo* glXGetVisualFromFBConfig(Display* dpy, GLXFBConfig config);
-extern void XFree(void* data);
-}
+#include <GL/glx.h>
 #endif
 
 namespace GPU::Backend {
@@ -148,7 +111,7 @@ void OpenGLBackend::MakeCurrent() {
         throw std::runtime_error("Failed to make OpenGL context current");
     }
 #else
-    if (!glXMakeCurrent(_display, _window, _glxContext)) {
+    if (!glXMakeCurrent(static_cast<Display*>(_display), static_cast<Window>(_window), static_cast<GLXContext>(_glxContext))) {
         throw std::runtime_error("Failed to make OpenGL context current");
     }
 #endif
@@ -725,7 +688,7 @@ uint32_t OpenGLBackend::GetGLImageFormat(PixelFormat format) {
 }
 
 // =============================================================================
-// Platform-specific Implementation
+// Platform-specific Implementation - Windows
 // =============================================================================
 
 #ifdef _WIN32
@@ -840,6 +803,10 @@ void OpenGLBackend::CleanupPlatform() {
 
 #else // Linux
 
+// =============================================================================
+// Platform-specific Implementation - Linux
+// =============================================================================
+
 void OpenGLBackend::InitializePlatform() {
     CreateHiddenWindow();
     SetupGLContext();
@@ -847,40 +814,46 @@ void OpenGLBackend::InitializePlatform() {
 }
 
 void OpenGLBackend::CreateHiddenWindow() {
-    _display = XOpenDisplay(nullptr);
-    if (!_display) {
+    Display* display = XOpenDisplay(nullptr);
+    if (!display) {
         throw std::runtime_error("Failed to open X11 display");
     }
+    _display = display;
 
-    int screen = DefaultScreen(static_cast<Display*>(_display));
-    Window root = RootWindow(static_cast<Display*>(_display), screen);
+    int screen = DefaultScreen(display);
+    Window root = RootWindow(display, screen);
 
     XVisualInfo visualInfo;
-    if (!XMatchVisualInfo(static_cast<Display*>(_display), screen, 24, TrueColor, &visualInfo)) {
-        if (!XMatchVisualInfo(static_cast<Display*>(_display), screen, 32, TrueColor, &visualInfo)) {
-            visualInfo.visual = DefaultVisual(static_cast<Display*>(_display), screen);
-            visualInfo.depth = DefaultDepth(static_cast<Display*>(_display), screen);
+    if (!XMatchVisualInfo(display, screen, 24, TrueColor, &visualInfo)) {
+        if (!XMatchVisualInfo(display, screen, 32, TrueColor, &visualInfo)) {
+            visualInfo.visual = DefaultVisual(display, screen);
+            visualInfo.depth = DefaultDepth(display, screen);
         }
     }
 
     XSetWindowAttributes attrs;
-    attrs.colormap = XCreateColormap(static_cast<Display*>(_display), root, visualInfo.visual, AllocNone);
+    attrs.colormap = XCreateColormap(display, root, visualInfo.visual, AllocNone);
     attrs.event_mask = StructureNotifyMask;
 
-    _window = XCreateWindow(static_cast<Display*>(_display), root, 0, 0, 1, 1, 0,
+    Window window = XCreateWindow(display, root, 0, 0, 1, 1, 0,
                             visualInfo.depth, InputOutput, visualInfo.visual, 
                             CWColormap | CWEventMask, &attrs);
 
-    if (!_window) {
+    if (!window) {
+        XCloseDisplay(display);
+        _display = nullptr;
         throw std::runtime_error("Failed to create X11 window");
     }
+    _window = window;
 
-    XFlush(static_cast<Display*>(_display));
+    XFlush(display);
 }
 
 void OpenGLBackend::SetupGLContext() {
+    Display* display = static_cast<Display*>(_display);
+    
     int glxMajor, glxMinor;
-    if (!glXQueryVersion(static_cast<Display*>(_display), &glxMajor, &glxMinor)) {
+    if (!glXQueryVersion(display, &glxMajor, &glxMinor)) {
         throw std::runtime_error("GLX not available");
     }
 
@@ -899,14 +872,10 @@ void OpenGLBackend::SetupGLContext() {
     };
 
     int fbCount;
-    GLXFBConfig* fbc = glXChooseFBConfig(static_cast<Display*>(_display), 
-                                          DefaultScreen(static_cast<Display*>(_display)), 
-                                          visualAttribs, &fbCount);
+    GLXFBConfig* fbc = glXChooseFBConfig(display, DefaultScreen(display), visualAttribs, &fbCount);
     if (!fbc || fbCount == 0) {
         int minimalAttribs[] = {GLX_X_RENDERABLE, True, GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT, None};
-        fbc = glXChooseFBConfig(static_cast<Display*>(_display), 
-                                DefaultScreen(static_cast<Display*>(_display)), 
-                                minimalAttribs, &fbCount);
+        fbc = glXChooseFBConfig(display, DefaultScreen(display), minimalAttribs, &fbCount);
         if (!fbc || fbCount == 0) {
             throw std::runtime_error("Failed to choose GLX framebuffer config");
         }
@@ -915,14 +884,16 @@ void OpenGLBackend::SetupGLContext() {
     GLXFBConfig bestFbc = fbc[0];
     XFree(fbc);
 
-    XVisualInfo* vi = glXGetVisualFromFBConfig(static_cast<Display*>(_display), bestFbc);
+    XVisualInfo* vi = glXGetVisualFromFBConfig(display, bestFbc);
     if (!vi) {
         throw std::runtime_error("Failed to get visual from FB config");
     }
 
-    auto glXCreateContextAttribsARB = (GLXContext(*)(Display*, GLXFBConfig, GLXContext, Bool, const int*))
-        glXGetProcAddressARB((const GLubyte*)"glXCreateContextAttribsARB");
+    using glXCreateContextAttribsARBProc = GLXContext(*)(Display*, GLXFBConfig, GLXContext, Bool, const int*);
+    glXCreateContextAttribsARBProc glXCreateContextAttribsARB = 
+        (glXCreateContextAttribsARBProc)glXGetProcAddressARB((const GLubyte*)"glXCreateContextAttribsARB");
 
+    GLXContext context = nullptr;
     if (glXCreateContextAttribsARB) {
         int contextAttribs[] = {
             GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
@@ -931,27 +902,28 @@ void OpenGLBackend::SetupGLContext() {
             None
         };
 
-        _glxContext = glXCreateContextAttribsARB(static_cast<Display*>(_display), bestFbc, 0, True, contextAttribs);
+        context = glXCreateContextAttribsARB(display, bestFbc, 0, True, contextAttribs);
 
-        if (!_glxContext) {
+        if (!context) {
             contextAttribs[1] = 3;
             contextAttribs[3] = 3;
-            _glxContext = glXCreateContextAttribsARB(static_cast<Display*>(_display), bestFbc, 0, True, contextAttribs);
+            context = glXCreateContextAttribsARB(display, bestFbc, 0, True, contextAttribs);
         }
     }
 
-    if (!_glxContext) {
-        _glxContext = glXCreateContext(static_cast<Display*>(_display), vi, nullptr, GL_TRUE);
+    if (!context) {
+        context = glXCreateContext(display, vi, nullptr, GL_TRUE);
     }
 
     XFree(vi);
 
-    if (!_glxContext) {
+    if (!context) {
         throw std::runtime_error("Failed to create GLX context");
     }
+    _glxContext = context;
 
-    if (!glXMakeCurrent(static_cast<Display*>(_display), _window, static_cast<GLXContext>(_glxContext))) {
-        glXDestroyContext(static_cast<Display*>(_display), static_cast<GLXContext>(_glxContext));
+    if (!glXMakeCurrent(display, static_cast<Window>(_window), context)) {
+        glXDestroyContext(display, context);
         _glxContext = nullptr;
         throw std::runtime_error("Failed to make GLX context current");
     }
@@ -972,27 +944,29 @@ void OpenGLBackend::LoadGLAD() {
 }
 
 void OpenGLBackend::DestroyHiddenWindow() {
-    if (_window) {
-        XDestroyWindow(static_cast<Display*>(_display), _window);
-        _window = 0;
-    }
     if (_display) {
-        XCloseDisplay(static_cast<Display*>(_display));
+        Display* display = static_cast<Display*>(_display);
+        if (_window) {
+            XDestroyWindow(display, static_cast<Window>(_window));
+            _window = 0;
+        }
+        XCloseDisplay(display);
         _display = nullptr;
     }
 }
 
 void OpenGLBackend::CleanupPlatform() {
     if (_display) {
-        glXMakeCurrent(static_cast<Display*>(_display), None, nullptr);
-    }
+        Display* display = static_cast<Display*>(_display);
+        glXMakeCurrent(display, None, nullptr);
 
-    if (_glxContext && _display) {
-        glXDestroyContext(static_cast<Display*>(_display), static_cast<GLXContext>(_glxContext));
-        _glxContext = nullptr;
-    }
+        if (_glxContext) {
+            glXDestroyContext(display, static_cast<GLXContext>(_glxContext));
+            _glxContext = nullptr;
+        }
 
-    DestroyHiddenWindow();
+        DestroyHiddenWindow();
+    }
 }
 
 #endif
