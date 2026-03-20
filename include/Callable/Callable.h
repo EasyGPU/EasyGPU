@@ -310,7 +310,6 @@ public:
 			std::make_shared<Detail::CallableBodyGenerator<Func, ScalarArg<Args>...>>(std::forward<Func>(def));
 	}
 
-	[[nodiscard]]
 	IR::Value::SideEffectToken operator()(const IR::Value::Expr<ScalarArg<Args>> &...args) const {
 		auto *context = IR::Builder::Builder::Get().Context();
 		if (!context) {
