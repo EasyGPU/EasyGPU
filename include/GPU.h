@@ -1,5 +1,8 @@
 #pragma once
 
+// Mark that GPU.h has been included (used by Window components)
+#define GPU_H_INCLUDED
+
 // X11 defines Bool as typedef int Bool, which conflicts with our Bool alias
 // Must be done before any X11 headers are included
 #ifdef Bool
