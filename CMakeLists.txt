@@ -76,7 +76,28 @@ if(EASYGPU_BUILD_WINDOW)
         list(APPEND MINIFB_SOURCES
             third/minifb/src/x11/X11MiniFB.c
         )
-        set(MINIFB_LIBS X11 Xcursor Xrandr Xinerama Xi pthread)
+        # Core X11 is required
+        find_package(X11 REQUIRED)
+        set(MINIFB_LIBS ${X11_LIBRARIES} pthread)
+        
+        # Optional X11 extensions - only link if available
+        find_library(XCURSOR_LIB Xcursor)
+        find_library(XRANDR_LIB Xrandr)
+        find_library(XINERAMA_LIB Xinerama)
+        find_library(XI_LIB Xi)
+        
+        if(XCURSOR_LIB)
+            list(APPEND MINIFB_LIBS ${XCURSOR_LIB})
+        endif()
+        if(XRANDR_LIB)
+            list(APPEND MINIFB_LIBS ${XRANDR_LIB})
+        endif()
+        if(XINERAMA_LIB)
+            list(APPEND MINIFB_LIBS ${XINERAMA_LIB})
+        endif()
+        if(XI_LIB)
+            list(APPEND MINIFB_LIBS ${XI_LIB})
+        endif()
     endif()
     
     # Create minifb as an object library (linked into EasyGPUWindow)
