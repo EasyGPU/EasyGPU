@@ -138,7 +138,7 @@ int main() {
 		plasmaKernel.Dispatch((WIDTH + 15) / 16, (HEIGHT + 15) / 16);
 
 		// Present GPU texture to window
-		presenter.Present<GPU::Runtime::PixelFormat::RGBA8>(renderTarget);
+		presenter.Present(renderTarget);
 
 		// Calculate FPS
 		frameCount++;
