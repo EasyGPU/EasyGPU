@@ -3,13 +3,16 @@
 /**
  * @file TexturePresenter.inl
  * @brief Template implementation for TexturePresenter
+ * 
+ * NOTE: This file must be included AFTER including GPU.h
+ * to ensure correct header inclusion order.
  */
 
 #ifndef EASYGPU_TEXTURE_PRESENTER_INL
 #define EASYGPU_TEXTURE_PRESENTER_INL
 
 #include <Runtime/Texture.h>
-#include <Runtime/PixelFormat.h>
+#include <Runtime/Buffer.h>
 
 #include <cstring>
 #include <vector>
@@ -49,6 +52,21 @@ void TexturePresenter::Present(Runtime::Texture2D<Format>& texture, PresentMode 
     
     // Present to window
     Present(staging.Data(), width, height);
+}
+
+inline void TexturePresenter::Present(Runtime::Buffer<uint32_t>& buffer, uint32_t width, uint32_t height, PresentMode mode) {
+    (void)mode; // Currently only CopyToCPU is implemented
+    
+    // Ensure staging buffer is large enough
+    if (_impl->_stagingBuffer.Width() != width || _impl->_stagingBuffer.Height() != height) {
+        _impl->_stagingBuffer.Resize(width, height);
+    }
+    
+    // Download from GPU buffer
+    buffer.Download(_impl->_stagingBuffer.Data(), width * height);
+    
+    // Present to window
+    Present(_impl->_stagingBuffer.Data(), width, height);
 }
 
 } // namespace GPU::Window

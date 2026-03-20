@@ -1,6 +1,7 @@
-// Include Runtime headers needed for Buffer operations
-#include <Runtime/Buffer.h>
-#include <Runtime/PixelFormat.h>
+// TexturePresenter.cpp - Implementation
+// Note: This file intentionally does NOT include GPU.h or Runtime headers
+// to avoid template instantiation order issues with EasyGPU core.
+// The Buffer::Download() call is handled in the inline template file.
 
 #include <Window/TexturePresenter.h>
 #include <Window/AppWindow.h>
@@ -10,11 +11,11 @@ namespace GPU::Window {
 // Implementation class to hide details
 class TexturePresenterImpl {
 public:
-	explicit TexturePresenterImpl(AppWindow &window) : _window(window), _stagingBuffer(1, 1) {
-	}
+    explicit TexturePresenterImpl(AppWindow &window) : _window(window), _stagingBuffer(1, 1) {
+    }
 
-	AppWindow  &_window;
-	PixelBuffer _stagingBuffer;
+    AppWindow  &_window;
+    PixelBuffer _stagingBuffer;
 };
 
 TexturePresenter::TexturePresenter(AppWindow &window) : _impl(std::make_unique<TexturePresenterImpl>(window)) {
@@ -22,31 +23,19 @@ TexturePresenter::TexturePresenter(AppWindow &window) : _impl(std::make_unique<T
 
 TexturePresenter::~TexturePresenter() = default;
 
-void TexturePresenter::Present(Runtime::Buffer<uint32_t> &buffer, uint32_t width, uint32_t height, PresentMode mode) {
-	(void)mode; // Currently only CopyToCPU is implemented
-
-	// Ensure staging buffer is large enough
-	if (_impl->_stagingBuffer.Width() != width || _impl->_stagingBuffer.Height() != height) {
-		_impl->_stagingBuffer.Resize(width, height);
-	}
-
-	// Download from GPU buffer
-	buffer.Download(_impl->_stagingBuffer.Data(), width * height);
-
-	// Present to window
-	Present(_impl->_stagingBuffer.Data(), width, height);
-}
+// Buffer presentation is implemented in the header as inline template
+// to avoid linking issues
 
 void TexturePresenter::Present(const uint32_t *pixels, uint32_t width, uint32_t height) {
-	_impl->_window.Present(pixels, width, height);
+    _impl->_window.Present(pixels, width, height);
 }
 
 PixelBuffer &TexturePresenter::StagingBuffer() {
-	return _impl->_stagingBuffer;
+    return _impl->_stagingBuffer;
 }
 
 void TexturePresenter::Present() {
-	Present(_impl->_stagingBuffer.Data(), _impl->_stagingBuffer.Width(), _impl->_stagingBuffer.Height());
+    Present(_impl->_stagingBuffer.Data(), _impl->_stagingBuffer.Width(), _impl->_stagingBuffer.Height());
 }
 
 } // namespace GPU::Window
