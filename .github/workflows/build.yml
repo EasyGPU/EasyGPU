@@ -1,0 +1,173 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  # ============================================================================
+  # Windows Build
+  # ============================================================================
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        backend: [OpenGL, Vulkan]
+        build_type: [Release]
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Configure CMake (Windows)
+      run: |
+        cmake -B build -G "Visual Studio 17 2022" `
+          -DEASYGPU_BACKEND=${{ matrix.backend }} `
+          -DEASYGPU_BUILD_TESTS=ON `
+          -DEASYGPU_BUILD_EXAMPLES=ON `
+          -DEASYGPU_BUILD_WINDOW=ON `
+          -DEASYGPU_BUILD_WINDOW_EXAMPLES=ON
+    
+    - name: Build (Windows)
+      run: cmake --build build --config ${{ matrix.build_type }} --parallel
+    
+    - name: Run Tests (Windows)
+      if: matrix.backend == 'OpenGL'
+      run: |
+        cd build
+        ctest -C ${{ matrix.build_type }} --output-on-failure
+
+  # ============================================================================
+  # Ubuntu Build
+  # ============================================================================
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        backend: [OpenGL, Vulkan]
+        compiler: [gcc, clang]
+        build_type: [Release]
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install Dependencies (Ubuntu)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libgl1-mesa-dev \
+          libx11-dev \
+          xorg-dev
+    
+    - name: Install Vulkan SDK (Ubuntu)
+      if: matrix.backend == 'Vulkan'
+      run: |
+        wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
+        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+        sudo apt-get update
+        sudo apt-get install -y vulkan-sdk
+    
+    - name: Configure CMake (Ubuntu)
+      env:
+        CC: ${{ matrix.cc }}
+        CXX: ${{ matrix.cxx }}
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DEASYGPU_BACKEND=${{ matrix.backend }} \
+          -DEASYGPU_BUILD_TESTS=ON \
+          -DEASYGPU_BUILD_EXAMPLES=ON \
+          -DEASYGPU_BUILD_WINDOW=ON \
+          -DEASYGPU_BUILD_WINDOW_EXAMPLES=ON
+    
+    - name: Build (Ubuntu)
+      run: cmake --build build --parallel $(nproc)
+    
+    - name: Run Tests (Ubuntu)
+      if: matrix.backend == 'OpenGL'
+      run: |
+        cd build
+        ctest --output-on-failure
+
+  # ============================================================================
+  # Ubuntu Build (No Window - Headless)
+  # ============================================================================
+  build-ubuntu-headless:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        backend: [OpenGL, Vulkan]
+        build_type: [Release]
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install Dependencies (Ubuntu - Headless)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libgl1-mesa-dev \
+          libx11-dev
+    
+    - name: Install Vulkan SDK (Ubuntu)
+      if: matrix.backend == 'Vulkan'
+      run: |
+        wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
+        sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+        sudo apt-get update
+        sudo apt-get install -y vulkan-sdk
+    
+    - name: Configure CMake (Headless)
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DEASYGPU_BACKEND=${{ matrix.backend }} \
+          -DEASYGPU_BUILD_TESTS=ON \
+          -DEASYGPU_BUILD_EXAMPLES=ON \
+          -DEASYGPU_BUILD_WINDOW=OFF
+    
+    - name: Build (Headless)
+      run: cmake --build build --parallel $(nproc)
+    
+    - name: Run Tests (Headless)
+      run: |
+        cd build
+        ctest --output-on-failure
+
+  # ============================================================================
+  # Code Formatting Check
+  # ============================================================================
+  format-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install clang-format
+      run: sudo apt-get update && sudo apt-get install -y clang-format
+    
+    - name: Check Formatting
+      run: |
+        find include source -name "*.cpp" -o -name "*.h" | xargs clang-format --dry-run --Werror
+      continue-on-error: true
