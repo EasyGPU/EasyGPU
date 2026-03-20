@@ -13,6 +13,7 @@
 #include <IR/Builder/Builder.h>
 #include <IR/Value/Var.h>
 #include <Runtime/Context.h>
+#include <Utility/Meta/Std430Layout.h>
 
 #include <format>
 #include <string>
@@ -175,9 +176,23 @@ public:
             }
         };
 
+        auto packFunc = [](void* dst, void* ptr) {
+            Uniform<T>* uniform = static_cast<Uniform<T>*>(ptr);
+            T value = uniform->GetValue();
+
+            GPU::Meta::Std430Converter<T> converter;
+            converter.ConvertToGPU(&value, dst, 1);
+        };
+
         // Register this uniform with the context
         // This will allocate a uniform name and record this uniform for dispatch
-        std::string uniformName = context->RegisterUniform(GetUniformGLSLTypeName<T>(), this, uploadFunc);
+        std::string uniformName = context->RegisterUniform(
+            GetUniformGLSLTypeName<T>(),
+            this,
+            GPU::Meta::GetStd430Size<T>(),
+            GPU::Meta::GetStd430Alignment<T>(),
+            uploadFunc,
+            packFunc);
 
         // Return a Var<T> using the string constructor with IsExternal=true
         // This creates a Var that references the uniform without declaring it in main()

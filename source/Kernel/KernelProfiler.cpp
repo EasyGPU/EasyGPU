@@ -11,7 +11,11 @@
 #include <Kernel/KernelProfiler.h>
 #include <Runtime/Context.h>
 
+// Only include GLAD for OpenGL backend
+#if !defined(EASYGPU_BACKEND_VULKAN)
 #include <GLAD/glad.h>
+#endif
+
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -36,6 +40,10 @@ KernelProfiler::~KernelProfiler() {
 // ===================================================================================
 
 void KernelProfiler::InitializeQueries() {
+#if defined(EASYGPU_BACKEND_VULKAN)
+	// Vulkan manages timer queries inside the backend.
+	return;
+#else
 	if (!_queryPool.empty())
 		return;
 
@@ -45,17 +53,23 @@ void KernelProfiler::InitializeQueries() {
 	for (auto query : _queryPool) {
 		_availableQueries.push_back(query);
 	}
+#endif
 }
 
 void KernelProfiler::CleanupQueries() {
+#if !defined(EASYGPU_BACKEND_VULKAN)
 	if (!_queryPool.empty()) {
 		glDeleteQueries(static_cast<GLsizei>(_queryPool.size()), _queryPool.data());
 		_queryPool.clear();
 		_availableQueries.clear();
 	}
+#endif
 }
 
 unsigned int KernelProfiler::AcquireQuery() {
+#if defined(EASYGPU_BACKEND_VULKAN)
+	return 0;  // Vulkan does not use the OpenGL-side query pool.
+#else
 	if (_queryPool.empty()) {
 		InitializeQueries();
 	}
@@ -79,11 +93,38 @@ unsigned int KernelProfiler::AcquireQuery() {
 	unsigned int query = _availableQueries.back();
 	_availableQueries.pop_back();
 	return query;
+#endif
 }
 
 void KernelProfiler::ReleaseQuery(unsigned int query) {
 	if (query != 0) {
 		_availableQueries.push_back(query);
+	}
+}
+
+void KernelProfiler::RecordExecution(const std::string &kernelName, int groupX, int groupY, int groupZ, double elapsedMs) {
+	KernelProfileRecord record;
+	record.kernelName	 = kernelName;
+	record.elapsedTimeMs = elapsedMs;
+	record.groupX		 = groupX;
+	record.groupY		 = groupY;
+	record.groupZ		 = groupZ;
+	record.timestamp	 = std::chrono::system_clock::now();
+	_records.push_back(record);
+
+	auto &stat		= _stats[kernelName];
+	stat.kernelName = kernelName;
+	stat.counter++;
+	stat.totalTimeMs += elapsedMs;
+
+	if (stat.counter == 1) {
+		stat.minTimeMs = elapsedMs;
+		stat.maxTimeMs = elapsedMs;
+		stat.avgTimeMs = elapsedMs;
+	} else {
+		stat.minTimeMs = std::min(stat.minTimeMs, elapsedMs);
+		stat.maxTimeMs = std::max(stat.maxTimeMs, elapsedMs);
+		stat.avgTimeMs = stat.totalTimeMs / stat.counter;
 	}
 }
 
@@ -98,7 +139,7 @@ void KernelProfiler::SetEnabled(bool enabled) {
 	_enabled = enabled;
 
 	if (_enabled) {
-		// Ensure OpenGL context is initialized
+		// Ensure context is initialized
 		Runtime::AutoInitContext();
 		InitializeQueries();
 	}
@@ -124,11 +165,19 @@ unsigned int KernelProfiler::BeginQuery() {
 
 	Runtime::ContextGuard guard(Runtime::Context::GetInstance());
 
-	unsigned int		  query = AcquireQuery();
+#if defined(EASYGPU_BACKEND_VULKAN)
+	auto *backend = Runtime::Context::GetBackend();
+	if (backend == nullptr)
+		return 0;
+
+	return backend->BeginQuery();
+#else
+	unsigned int query = AcquireQuery();
 	if (query != 0) {
 		glBeginQuery(GL_TIME_ELAPSED, query);
 	}
 	return query;
+#endif
 }
 
 void KernelProfiler::EndQuery(unsigned int queryId, const std::string &kernelName, int groupX, int groupY, int groupZ) {
@@ -137,53 +186,46 @@ void KernelProfiler::EndQuery(unsigned int queryId, const std::string &kernelNam
 
 	Runtime::ContextGuard guard(Runtime::Context::GetInstance());
 
+#if defined(EASYGPU_BACKEND_VULKAN)
+	auto *backend = Runtime::Context::GetBackend();
+	if (backend == nullptr)
+		return;
+
+	uint64_t elapsedNanos = backend->EndQuery(queryId);
+	double	 elapsedMs	 = static_cast<double>(elapsedNanos) / 1'000'000.0;
+	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
+#else
 	glEndQuery(GL_TIME_ELAPSED);
 
 	// Get the query result
 	GLuint64 elapsedNanos = 0;
 	glGetQueryObjectui64v(queryId, GL_QUERY_RESULT, &elapsedNanos);
 
-	double				elapsedMs = static_cast<double>(elapsedNanos) / 1'000'000.0;
-
-	// Record the execution
-	KernelProfileRecord record;
-	record.kernelName	 = kernelName;
-	record.elapsedTimeMs = elapsedMs;
-	record.groupX		 = groupX;
-	record.groupY		 = groupY;
-	record.groupZ		 = groupZ;
-	record.timestamp	 = std::chrono::system_clock::now();
-	_records.push_back(record);
-
-	// Update statistics
-	auto &stat		= _stats[kernelName];
-	stat.kernelName = kernelName;
-	stat.counter++;
-	stat.totalTimeMs += elapsedMs;
-
-	if (stat.counter == 1) {
-		stat.minTimeMs = elapsedMs;
-		stat.maxTimeMs = elapsedMs;
-		stat.avgTimeMs = elapsedMs;
-	} else {
-		stat.minTimeMs = std::min(stat.minTimeMs, elapsedMs);
-		stat.maxTimeMs = std::max(stat.maxTimeMs, elapsedMs);
-		stat.avgTimeMs = stat.totalTimeMs / stat.counter;
-	}
+	double elapsedMs = static_cast<double>(elapsedNanos) / 1'000'000.0;
+	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
 
 	ReleaseQuery(queryId);
+#endif
 }
 
 unsigned int KernelProfiler::BeginQueryOnCurrentContext() {
 	if (!_enabled)
 		return 0;
 
+#if defined(EASYGPU_BACKEND_VULKAN)
+	auto *backend = Runtime::Context::GetBackend();
+	if (backend == nullptr)
+		return 0;
+
+	return backend->BeginQuery();
+#else
 	// No context switch - use current context
 	unsigned int query = AcquireQuery();
 	if (query != 0) {
 		glBeginQuery(GL_TIME_ELAPSED, query);
 	}
 	return query;
+#endif
 }
 
 void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::string &kernelName, int groupX,
@@ -191,6 +233,15 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 	if (!_enabled || queryId == 0)
 		return;
 
+#if defined(EASYGPU_BACKEND_VULKAN)
+	auto *backend = Runtime::Context::GetBackend();
+	if (backend == nullptr)
+		return;
+
+	uint64_t elapsedNanos = backend->EndQuery(queryId);
+	double	 elapsedMs	 = static_cast<double>(elapsedNanos) / 1'000'000.0;
+	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
+#else
 	// No context switch - use current context
 	glEndQuery(GL_TIME_ELAPSED);
 
@@ -198,35 +249,11 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 	GLuint64 elapsedNanos = 0;
 	glGetQueryObjectui64v(queryId, GL_QUERY_RESULT, &elapsedNanos);
 
-	double				elapsedMs = static_cast<double>(elapsedNanos) / 1'000'000.0;
-
-	// Record the execution
-	KernelProfileRecord record;
-	record.kernelName	 = kernelName;
-	record.elapsedTimeMs = elapsedMs;
-	record.groupX		 = groupX;
-	record.groupY		 = groupY;
-	record.groupZ		 = groupZ;
-	record.timestamp	 = std::chrono::system_clock::now();
-	_records.push_back(record);
-
-	// Update statistics
-	auto &stat		= _stats[kernelName];
-	stat.kernelName = kernelName;
-	stat.counter++;
-	stat.totalTimeMs += elapsedMs;
-
-	if (stat.counter == 1) {
-		stat.minTimeMs = elapsedMs;
-		stat.maxTimeMs = elapsedMs;
-		stat.avgTimeMs = elapsedMs;
-	} else {
-		stat.minTimeMs = std::min(stat.minTimeMs, elapsedMs);
-		stat.maxTimeMs = std::max(stat.maxTimeMs, elapsedMs);
-		stat.avgTimeMs = stat.totalTimeMs / stat.counter;
-	}
+	double elapsedMs = static_cast<double>(elapsedNanos) / 1'000'000.0;
+	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
 
 	ReleaseQuery(queryId);
+#endif
 }
 
 // ===================================================================================

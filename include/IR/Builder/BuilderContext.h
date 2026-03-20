@@ -139,7 +139,7 @@ public:
 	 * @param height Texture height
 	 */
 	virtual void RegisterTexture(uint32_t binding, PixelFormat format, const std::string &textureName, uint32_t width,
-								 uint32_t height)													  = 0;
+								 uint32_t height, bool sampled = false)							  = 0;
 
 	/**
 	 * Get the texture declarations for GLSL
@@ -181,7 +181,9 @@ public:
 	 */
 	virtual std::string RegisterUniform(
 		const std::string &typeName, void *uniformPtr,
-		std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc) = 0;
+		size_t gpuSize, size_t gpuAlignment,
+		std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc,
+		std::function<void(void *dst, void *ptr)> packFunc) = 0;
 
 	/**
 	 * Get the uniform declarations for GLSL

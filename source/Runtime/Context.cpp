@@ -5,7 +5,6 @@
 
 #include <Runtime/Context.h>
 
-#include <iostream>
 #include <sstream>
 
 namespace GPU::Runtime {
@@ -106,19 +105,13 @@ void* Context::GetNativeGLContext() const {
 void Context::CreateBackend() {
     // Create the default backend (OpenGL for now)
     Backend::BackendType backendType = Backend::GetDefaultBackendType();
-    
-    std::cout << "Initializing EasyGPU with " << Backend::GetBackendTypeName(backendType) << " backend..." << std::endl;
-    
+
     _backend.reset(Backend::CreateBackend(backendType));
     if (!_backend) {
         throw std::runtime_error("Failed to create backend");
     }
 
     _backend->Initialize();
-
-    auto caps = _backend->GetCaps();
-    std::cout << "Backend initialized: " << caps.versionString << std::endl;
-    std::cout << "Compute shaders: " << (caps.supportsComputeShaders ? "supported" : "not supported") << std::endl;
 }
 
 void Context::DestroyBackend() {

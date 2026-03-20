@@ -43,7 +43,7 @@ public:
 
 	uint32_t									  AllocateTextureBinding() override;
 	void RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName, uint32_t width,
-						 uint32_t height) override;
+						 uint32_t height, bool sampled = false) override;
 	std::string									  GetTextureDeclarations() const override;
 	const std::vector<uint32_t>					 &GetTextureBindings() const override;
 	void										  BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) override;
@@ -52,8 +52,10 @@ public:
 	// Callable Function Support
 	// Uniform Support
 	std::string									  RegisterUniform(
-										  const std::string &typeName, void *uniformPtr,
-										  std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc) override;
+		const std::string &typeName, void *uniformPtr,
+		size_t gpuSize, size_t gpuAlignment,
+		std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc,
+		std::function<void(void *dst, void *ptr)> packFunc) override;
 	std::string				 GetUniformDeclarations() const override;
 
 	void					 AddCallableDeclaration(const std::string &declaration) override;

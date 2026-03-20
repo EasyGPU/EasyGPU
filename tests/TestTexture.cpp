@@ -196,6 +196,88 @@ ASSERT(true);
 END_TEST
 
 // =============================================================================
+// Test 5.5: Sampled texture BindSampler API in compute kernels
+// =============================================================================
+TEST(texture_sampler_compute)
+const int W = 2, H = 2;
+
+std::vector<uint8_t> pixels = {
+	255, 0, 0, 255,
+	0, 255, 0, 255,
+	0, 0, 255, 255,
+	255, 255, 255, 255,
+};
+
+Texture2D<PixelFormat::RGBA8> tex(W, H, pixels.data());
+Buffer<Vec4> output(4, BufferMode::Write);
+
+GPU::Kernel::Kernel1D kernel(
+	[&](Var<int>& id) {
+		auto sampler = tex.BindSampler();
+		auto out = output.Bind();
+
+		Var<float> u = Expr<float>(id % 2) * 0.5f + 0.25f;
+		Var<float> v = Expr<float>(id / 2) * 0.5f + 0.25f;
+		out[id] = sampler.Sample(u, v);
+	},
+	4);
+
+kernel.Dispatch(1, true);
+
+std::vector<Vec4> sampled(4);
+output.Download(sampled);
+
+auto approx = [](float actual, float expected) {
+	return std::abs(actual - expected) <= 0.05f;
+};
+
+ASSERT(approx(sampled[0].x, 1.0f) && approx(sampled[0].y, 0.0f) && approx(sampled[0].z, 0.0f));
+ASSERT(approx(sampled[1].x, 0.0f) && approx(sampled[1].y, 1.0f) && approx(sampled[1].z, 0.0f));
+ASSERT(approx(sampled[2].x, 0.0f) && approx(sampled[2].y, 0.0f) && approx(sampled[2].z, 1.0f));
+ASSERT(approx(sampled[3].x, 1.0f) && approx(sampled[3].y, 1.0f) && approx(sampled[3].z, 1.0f));
+std::cout << "Compute sampler path verified with nearest sampling";
+END_TEST
+
+// =============================================================================
+// Test 5.6: Signed integer sampled texture support
+// =============================================================================
+TEST(texture_sampler_integer_compute)
+const int W = 2, H = 2;
+
+std::vector<int> pixels = {
+	1, 2, 3, 4,
+	5, 6, 7, 8,
+	9, 10, 11, 12,
+	13, 14, 15, 16,
+};
+
+Texture2D<PixelFormat::RGBA32I> tex(W, H, pixels.data());
+Buffer<IVec4> output(4, BufferMode::Write);
+
+GPU::Kernel::Kernel1D kernel(
+	[&](Var<int>& id) {
+		auto sampler = tex.BindSampler();
+		auto out = output.Bind();
+
+		Var<float> u = Expr<float>(id % 2) * 0.5f + 0.25f;
+		Var<float> v = Expr<float>(id / 2) * 0.5f + 0.25f;
+		out[id] = sampler.Sample(u, v);
+	},
+	4);
+
+kernel.Dispatch(1, true);
+
+std::vector<IVec4> sampled(4);
+output.Download(sampled);
+
+ASSERT(sampled[0].x == 1 && sampled[0].y == 2 && sampled[0].z == 3 && sampled[0].w == 4);
+ASSERT(sampled[1].x == 5 && sampled[1].y == 6 && sampled[1].z == 7 && sampled[1].w == 8);
+ASSERT(sampled[2].x == 9 && sampled[2].y == 10 && sampled[2].z == 11 && sampled[2].w == 12);
+ASSERT(sampled[3].x == 13 && sampled[3].y == 14 && sampled[3].z == 15 && sampled[3].w == 16);
+std::cout << "Signed integer compute sampler path verified";
+END_TEST
+
+// =============================================================================
 // Test 6: End-to-end GPU texture operation - Invert colors
 // =============================================================================
 TEST(gpu_texture_invert)
@@ -687,9 +769,11 @@ int main() {
 		test_texture_create_empty();
 		test_texture_create_from_buffer();
 		test_texture_upload_download();
-		test_texture_move();
-		test_texture_bind_api_inspector();
-		test_gpu_texture_invert();
+	test_texture_move();
+	test_texture_bind_api_inspector();
+	test_texture_sampler_compute();
+	test_texture_sampler_integer_compute();
+	test_gpu_texture_invert();
 		test_gpu_texture_multiple();
 		test_texture_rgba32f_format();
 		test_texture_with_buffer();

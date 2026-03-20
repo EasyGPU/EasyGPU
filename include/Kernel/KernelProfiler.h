@@ -173,6 +173,7 @@ private:
 	void		 CleanupQueries();
 	unsigned int AcquireQuery();
 	void		 ReleaseQuery(unsigned int query);
+	void		 RecordExecution(const std::string &kernelName, int groupX, int groupY, int groupZ, double elapsedMs);
 
 private:
 	bool													   _enabled = false;

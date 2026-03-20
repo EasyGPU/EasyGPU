@@ -2,6 +2,25 @@
 
 Complete reference for all EasyGPU classes and functions.
 
+## Backend Selection
+
+EasyGPU supports both an OpenGL compute backend and a Vulkan compute backend.
+
+Select the backend at CMake configure time:
+
+```bash
+cmake -S . -B build_gl -DEASYGPU_BACKEND=OpenGL
+cmake -S . -B build_vk -DEASYGPU_BACKEND=Vulkan
+```
+
+In an embedding project that uses `FetchContent`, set the cache variable before `FetchContent_MakeAvailable`:
+
+```cmake
+set(EASYGPU_BACKEND Vulkan CACHE STRING "EasyGPU backend" FORCE)
+```
+
+The DSL API is the same on both backends. Buffer, texture, sampler, and uniform usage does not change at the call site.
+
 ## Table of Contents
 
 - [Core Types](#core-types)

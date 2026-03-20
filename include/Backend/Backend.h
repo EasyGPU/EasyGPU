@@ -101,6 +101,34 @@ struct ShaderDesc {
 };
 
 // ============================================================================
+// Resource Binding
+// ============================================================================
+
+enum class BindingType {
+    Buffer,
+    Texture,
+    Sampler
+};
+
+struct ResourceLayoutEntry {
+    uint32_t    binding  = 0;
+    BindingType type     = BindingType::Buffer;
+    PixelFormat format   = PixelFormat::RGBA8;
+    bool        readOnly = false;
+};
+
+inline bool operator==(const ResourceLayoutEntry& a, const ResourceLayoutEntry& b) {
+    return a.binding == b.binding && a.type == b.type && a.format == b.format && a.readOnly == b.readOnly;
+}
+
+inline bool operator<(const ResourceLayoutEntry& a, const ResourceLayoutEntry& b) {
+    if (a.binding != b.binding) return a.binding < b.binding;
+    if (a.type != b.type) return a.type < b.type;
+    if (a.format != b.format) return a.format < b.format;
+    return a.readOnly < b.readOnly;
+}
+
+// ============================================================================
 // Pipeline Description
 // ============================================================================
 
@@ -109,16 +137,8 @@ struct PipelineDesc {
     uint32_t     workGroupSizeX = 1;
     uint32_t     workGroupSizeY = 1;
     uint32_t     workGroupSizeZ = 1;
-};
-
-// ============================================================================
-// Resource Binding
-// ============================================================================
-
-enum class BindingType {
-    Buffer,
-    Texture,
-    Sampler
+    std::vector<ResourceLayoutEntry> resources;
+    uint32_t     pushConstantSize = 0;
 };
 
 struct ResourceBinding {
@@ -211,6 +231,11 @@ public:
     virtual void BindResources(const ResourceBinding* bindings, uint32_t count) = 0;
     virtual void SetUniform(PipelineHandle pipeline, const std::string& name, 
                             const std::string& type, const void* data) = 0;
+    virtual void SetUniformData(PipelineHandle pipeline, const void* data, size_t size) {
+        (void)pipeline;
+        (void)data;
+        (void)size;
+    }
     virtual void Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) = 0;
     virtual void MemoryBarrier(BarrierType barrierType) = 0;
     virtual void Finish() = 0;

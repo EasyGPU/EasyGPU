@@ -474,6 +474,12 @@ void OpenGLBackend::BindResources(const ResourceBinding* bindings, uint32_t coun
                 BindImageTexture(binding.binding, it->second.glHandle, 
                                  GetGLImageFormat(binding.format), binding.readOnly);
             }
+        } else if (binding.type == BindingType::Sampler) {
+            auto it = _textures.find(binding.texture);
+            if (it != _textures.end()) {
+                glActiveTexture(GL_TEXTURE0 + binding.binding);
+                glBindTexture(GL_TEXTURE_2D, it->second.glHandle);
+            }
         }
     }
 }
@@ -773,10 +779,6 @@ void OpenGLBackend::LoadGLAD() {
     GLint major = 0, minor = 0;
     glGetIntegerv(GL_MAJOR_VERSION, &major);
     glGetIntegerv(GL_MINOR_VERSION, &minor);
-
-    if (major < 4 || (major == 4 && minor < 3)) {
-        std::cerr << "Warning: OpenGL " << major << "." << minor << " detected. Compute shaders require 4.3+." << std::endl;
-    }
 }
 
 void OpenGLBackend::DestroyHiddenWindow() {
@@ -937,10 +939,6 @@ void OpenGLBackend::LoadGLAD() {
     GLint major = 0, minor = 0;
     glGetIntegerv(GL_MAJOR_VERSION, &major);
     glGetIntegerv(GL_MINOR_VERSION, &minor);
-
-    if (major < 4 || (major == 4 && minor < 3)) {
-        std::cerr << "Warning: OpenGL " << major << "." << minor << " detected. Compute shaders require 4.3+." << std::endl;
-    }
 }
 
 void OpenGLBackend::DestroyHiddenWindow() {

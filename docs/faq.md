@@ -4,7 +4,7 @@
 
 ### What is EasyGPU?
 
-EasyGPU is an embedded domain-specific language (eDSL) that lets you write GPU compute kernels using standard C++ syntax. It compiles to GLSL compute shaders and executes via OpenGL.
+EasyGPU is an embedded domain-specific language (eDSL) that lets you write GPU compute kernels using standard C++ syntax. It compiles to GLSL compute shaders and executes via OpenGL or Vulkan.
 
 ### Why not just use CUDA or Vulkan?
 
@@ -13,7 +13,7 @@ EasyGPU is an embedded domain-specific language (eDSL) that lets you write GPU c
 | Setup | Minutes | Hours | Days |
 | Dependencies | ~500KB GLAD | 2GB+ SDK | Complex setup |
 | Code verbosity | Low | Medium | High |
-| Cross-platform | Yes (OpenGL) | NVIDIA only | Yes |
+| Cross-platform | Yes (OpenGL/Vulkan) | NVIDIA only | Yes |
 | Learning curve | Low | Medium | High |
 
 EasyGPU trades some performance for extreme ease of use and minimal setup.
@@ -26,7 +26,7 @@ EasyGPU is suitable for:
 - Small to medium compute workloads
 - Educational purposes
 
-For maximum performance in production, consider CUDA, ROCm, or optimized Vulkan.
+For maximum performance in production, consider CUDA, ROCm, or hand-tuned Vulkan. EasyGPU now offers a Vulkan backend as well, which closes much of the integration gap while preserving the DSL workflow.
 
 ---
 
@@ -46,6 +46,38 @@ FetchContent_MakeAvailable(easygpu)
 target_link_libraries(your_target EasyGPU)
 ```
 
+If you want to force the Vulkan backend:
+
+```cmake
+set(EASYGPU_BACKEND Vulkan CACHE STRING "EasyGPU backend" FORCE)
+set(EASYGPU_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(EASYGPU_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(EASYGPU_BUILD_FRAGMENT_TESTER OFF CACHE BOOL "" FORCE)
+```
+
+If you want to force OpenGL instead:
+
+```cmake
+set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
+```
+
+### CMake can't find Vulkan / glslang
+
+For the Vulkan backend, EasyGPU expects the Vulkan SDK to be visible to CMake.
+
+Checklist:
+
+1. Install the Vulkan SDK
+2. Make sure `VULKAN_SDK` is set in your environment
+3. Reconfigure CMake after installing the SDK
+4. Verify that CMake can find `Vulkan_INCLUDE_DIR`, `Vulkan_LIBRARY`, `glslang`, `glslang-default-resource-limits`, and `SPIRV-Tools`
+
+Typical configure command:
+
+```bash
+cmake -S . -B build_vulkan -DEASYGPU_BACKEND=Vulkan
+```
+
 ### OpenGL context creation fails
 
 EasyGPU auto-initializes the OpenGL context on first GPU operation. If this fails:
@@ -53,6 +85,8 @@ EasyGPU auto-initializes the OpenGL context on first GPU operation. If this fail
 1. Check OpenGL 4.3+ support: `glxinfo | grep "OpenGL version"`
 2. Update GPU drivers
 3. On headless servers, use EGL or OSMesa for off-screen rendering
+
+If you are using the Vulkan backend, this question usually does not apply because Vulkan does not require the OpenGL context path.
 
 ### Linker errors (undefined references)
 

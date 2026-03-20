@@ -93,9 +93,9 @@ uint32_t CodeCollectContext::AllocateTextureBinding() {
 }
 
 void CodeCollectContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName,
-										 uint32_t width, uint32_t height) {
+										 uint32_t width, uint32_t height, bool sampled) {
 	if (_parentContext) {
-		_parentContext->RegisterTexture(binding, format, textureName, width, height);
+		_parentContext->RegisterTexture(binding, format, textureName, width, height, sampled);
 	}
 }
 
@@ -147,9 +147,11 @@ void CodeCollectContext::Clear() {
 // Uniform Support - delegate to parent
 std::string CodeCollectContext::RegisterUniform(
 	const std::string &typeName, void *uniformPtr,
-	std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc) {
+	size_t gpuSize, size_t gpuAlignment,
+	std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc,
+	std::function<void(void *dst, void *ptr)> packFunc) {
 	if (_parentContext) {
-		return _parentContext->RegisterUniform(typeName, uniformPtr, uploadFunc);
+		return _parentContext->RegisterUniform(typeName, uniformPtr, gpuSize, gpuAlignment, uploadFunc, packFunc);
 	}
 	return "";
 }

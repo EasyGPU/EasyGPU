@@ -32,6 +32,45 @@ template <PixelFormat Format> class Texture2D;
 
 namespace GPU::IR::Value {
 
+namespace Detail {
+
+template <Runtime::PixelFormat Format> struct TextureSamplerValueType {
+	using type = GPU::Math::Vec4;
+	static constexpr bool supported = true;
+};
+
+template <> struct TextureSamplerValueType<Runtime::PixelFormat::R32I> {
+	using type = GPU::Math::IVec4;
+	static constexpr bool supported = true;
+};
+
+template <> struct TextureSamplerValueType<Runtime::PixelFormat::RG32I> {
+	using type = GPU::Math::IVec4;
+	static constexpr bool supported = true;
+};
+
+template <> struct TextureSamplerValueType<Runtime::PixelFormat::RGBA32I> {
+	using type = GPU::Math::IVec4;
+	static constexpr bool supported = true;
+};
+
+template <> struct TextureSamplerValueType<Runtime::PixelFormat::R32UI> {
+	using type = GPU::Math::IVec4;
+	static constexpr bool supported = false;
+};
+
+template <> struct TextureSamplerValueType<Runtime::PixelFormat::RG32UI> {
+	using type = GPU::Math::IVec4;
+	static constexpr bool supported = false;
+};
+
+template <> struct TextureSamplerValueType<Runtime::PixelFormat::RGBA32UI> {
+	using type = GPU::Math::IVec4;
+	static constexpr bool supported = false;
+};
+
+} // namespace Detail
+
 /**
  * Texture sampler for fragment shader DSL access
  * Uses texture() for sampling instead of imageLoad/imageStore
@@ -39,8 +78,12 @@ namespace GPU::IR::Value {
  */
 template <Runtime::PixelFormat Format> class TextureSampler2D {
 public:
+	using SampleType = typename Detail::TextureSamplerValueType<Format>::type;
+
 	TextureSampler2D(std::string textureName, uint32_t binding, uint32_t width, uint32_t height)
 		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height) {
+		static_assert(Detail::TextureSamplerValueType<Format>::supported,
+					  "Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
 	}
 
 	[[nodiscard]] uint32_t GetBinding() const {
@@ -69,83 +112,71 @@ public:
 	 * @param uv UV coordinates (0,0) to (1,1)
 	 * @return Vec4 color value
 	 */
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Var<GPU::Math::Vec2> &uv) const {
+	[[nodiscard]] Var<SampleType> Sample(const Var<GPU::Math::Vec2> &uv) const {
 		std::string uvStr = Builder::Builder::Get().BuildNode(*uv.Load().get());
-		std::string code  = std::format("texture({}, {})", _textureName, uvStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, {})", _textureName, uvStr));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Expr<GPU::Math::Vec2> &uv) const {
+	[[nodiscard]] Var<SampleType> Sample(const Expr<GPU::Math::Vec2> &uv) const {
 		std::string uvStr = Builder::Builder::Get().BuildNode(*uv.Node());
-		std::string code  = std::format("texture({}, {})", _textureName, uvStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, {})", _textureName, uvStr));
 	}
 
 	/**
 	 * Sample texture at explicit float coordinates
 	 */
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Var<float> &u, const Var<float> &v) const {
+	[[nodiscard]] Var<SampleType> Sample(const Var<float> &u, const Var<float> &v) const {
 		std::string uStr = Builder::Builder::Get().BuildNode(*u.Load().get());
 		std::string vStr = Builder::Builder::Get().BuildNode(*v.Load().get());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Expr<float> &u, const Var<float> &v) const {
+	[[nodiscard]] Var<SampleType> Sample(const Expr<float> &u, const Var<float> &v) const {
 		std::string uStr = Builder::Builder::Get().BuildNode(*u.Node());
 		std::string vStr = Builder::Builder::Get().BuildNode(*v.Load().get());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Var<float> &u, const Expr<float> &v) const {
+	[[nodiscard]] Var<SampleType> Sample(const Var<float> &u, const Expr<float> &v) const {
 		std::string uStr = Builder::Builder::Get().BuildNode(*u.Load().get());
 		std::string vStr = Builder::Builder::Get().BuildNode(*v.Node());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Expr<float> &u, const Expr<float> &v) const {
+	[[nodiscard]] Var<SampleType> Sample(const Expr<float> &u, const Expr<float> &v) const {
 		std::string uStr = Builder::Builder::Get().BuildNode(*u.Node());
 		std::string vStr = Builder::Builder::Get().BuildNode(*v.Node());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uStr, vStr));
 	}
 
 	// Literal float versions
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(float u, const Var<float> &v) const {
+	[[nodiscard]] Var<SampleType> Sample(float u, const Var<float> &v) const {
 		std::string vStr = Builder::Builder::Get().BuildNode(*v.Load().get());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, u, vStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, u, vStr));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Var<float> &u, float v) const {
+	[[nodiscard]] Var<SampleType> Sample(const Var<float> &u, float v) const {
 		std::string uStr = Builder::Builder::Get().BuildNode(*u.Load().get());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, uStr, v);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uStr, v));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(float u, float v) const {
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, u, v);
-		return Var<GPU::Math::Vec4>(code);
+	[[nodiscard]] Var<SampleType> Sample(float u, float v) const {
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, u, v));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(float u, const Expr<float> &v) const {
+	[[nodiscard]] Var<SampleType> Sample(float u, const Expr<float> &v) const {
 		std::string vStr = Builder::Builder::Get().BuildNode(*v.Node());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, u, vStr);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, u, vStr));
 	}
 
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const Expr<float> &u, float v) const {
+	[[nodiscard]] Var<SampleType> Sample(const Expr<float> &u, float v) const {
 		std::string uStr = Builder::Builder::Get().BuildNode(*u.Node());
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, uStr, v);
-		return Var<GPU::Math::Vec4>(code);
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uStr, v));
 	}
 
 	// Vec2 literal
-	[[nodiscard]] Var<GPU::Math::Vec4> Sample(const GPU::Math::Vec2 &uv) const {
-		std::string code = std::format("texture({}, vec2({}, {}))", _textureName, uv.x, uv.y);
-		return Var<GPU::Math::Vec4>(code);
+	[[nodiscard]] Var<SampleType> Sample(const GPU::Math::Vec2 &uv) const {
+		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uv.x, uv.y));
 	}
 
 public:
@@ -179,6 +210,10 @@ public:
 	}
 
 private:
+	[[nodiscard]] Var<SampleType> MakeSampleVar(std::string code) const {
+		return Var<SampleType>(code);
+	}
+
 	std::string _textureName;
 	uint32_t	_binding;
 	uint32_t	_width;

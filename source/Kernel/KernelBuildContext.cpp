@@ -65,7 +65,11 @@ std::string KernelBuildContext::GetCompleteCode() {
     std::ostringstream oss;
 
     // Version directive
+#if defined(EASYGPU_BACKEND_VULKAN)
+    oss << "#version 450 core\n\n";
+#else
     oss << "#version 430 core\n\n";
+#endif
 
     // Layout for compute shader
     if (_dimension == 1) {
@@ -235,7 +239,11 @@ std::string KernelBuildContext::GetBufferDeclarations() const {
         }
         // GL_READ_WRITE (0x88BA) has no qualifier
 
+#if defined(EASYGPU_BACKEND_VULKAN)
+        oss << std::format("layout(set=0, std430, binding={}) {}buffer {}_t {{\n", buf.binding, qualifier, buf.bufferName);
+#else
         oss << std::format("layout(std430, binding={}) {}buffer {}_t {{\n", buf.binding, qualifier, buf.bufferName);
+#endif
         oss << std::format("    {} {}[];\n", buf.typeName, buf.bufferName);
         oss << "};\n";
     }
@@ -247,8 +255,8 @@ uint32_t KernelBuildContext::AllocateTextureBinding() {
 }
 
 void KernelBuildContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string& textureName,
-                                         uint32_t width, uint32_t height) {
-    _textures.push_back({binding, format, textureName, width, height});
+                                         uint32_t width, uint32_t height, bool sampled) {
+    _textures.push_back({binding, format, textureName, width, height, sampled});
     _textureBindings.push_back(binding);
 }
 
@@ -279,12 +287,36 @@ static std::string GetGLSLImageTypeName(Runtime::PixelFormat format) {
 std::string KernelBuildContext::GetTextureDeclarations() const {
     std::ostringstream oss;
     for (const auto& tex : _textures) {
+        if (tex.sampled) {
+            const std::string samplerType = GetGLSLSamplerType(tex.format);
+#if defined(EASYGPU_BACKEND_VULKAN)
+            oss << std::format("layout(set=0, binding={}) uniform {} {};\n", tex.binding, samplerType, tex.textureName);
+#else
+            oss << std::format("layout(binding={}) uniform {} {};\n", tex.binding, samplerType, tex.textureName);
+#endif
+            continue;
+        }
+
         std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
         std::string imageType = GetGLSLImageTypeName(tex.format);
+#if defined(EASYGPU_BACKEND_VULKAN)
+        oss << std::format("layout(set=0, {}, binding={}) uniform {} {};\n", formatQualifier, tex.binding,
+                           imageType, tex.textureName);
+#else
         oss << std::format("layout({}, binding={}) uniform {} {};\n", formatQualifier, tex.binding,
                            imageType, tex.textureName);
+#endif
     }
     return oss.str();
+}
+
+const KernelBuildContext::TextureInfo* KernelBuildContext::FindTextureInfo(uint32_t binding) const {
+    for (const auto& texture : _textures) {
+        if (texture.binding == binding) {
+            return &texture;
+        }
+    }
+    return nullptr;
 }
 
 // ===================================================================
@@ -352,7 +384,9 @@ std::string KernelBuildContext::GenerateCallableBodies() {
 
 std::string KernelBuildContext::RegisterUniform(
     const std::string& typeName, void* uniformPtr,
-    std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) {
+    size_t gpuSize, size_t gpuAlignment,
+    std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc,
+    std::function<void(void* dst, void* ptr)> packFunc) {
     for (const auto& entry : _uniforms) {
         if (entry.uniformPtr == uniformPtr) {
             return entry.name;
@@ -360,25 +394,61 @@ std::string KernelBuildContext::RegisterUniform(
     }
 
     std::string uniformName = std::format("u{}", _nextUniformIndex++);
-    _uniforms.push_back({uniformName, typeName, uniformPtr, uploadFunc});
+    size_t alignedOffset = gpuAlignment == 0
+        ? _nextUniformOffset
+        : ((_nextUniformOffset + gpuAlignment - 1) & ~(gpuAlignment - 1));
+    _uniforms.push_back({uniformName, typeName, uniformPtr, gpuSize, gpuAlignment, alignedOffset, uploadFunc, packFunc});
+    _nextUniformOffset = alignedOffset + gpuSize;
 
     return uniformName;
 }
 
 std::string KernelBuildContext::GetUniformDeclarations() const {
     std::ostringstream oss;
+#if defined(EASYGPU_BACKEND_VULKAN)
+    if (_uniforms.empty()) {
+        return {};
+    }
+
+    oss << "layout(push_constant) uniform EasyGPUUniformBlock {\n";
+    for (const auto& entry : _uniforms) {
+        oss << std::format("    {} {};\n", entry.typeName, entry.name);
+    }
+    oss << "};\n";
+#else
     for (const auto& entry : _uniforms) {
         oss << std::format("uniform {} {};\n", entry.typeName, entry.name);
     }
+#endif
     return oss.str();
 }
 
 void KernelBuildContext::UploadUniformValues(Backend::PipelineHandle pipeline) const {
+#if defined(EASYGPU_BACKEND_VULKAN)
+    auto* backend = Runtime::Context::GetBackend();
+    if (!backend || _uniforms.empty()) {
+        return;
+    }
+
+    std::vector<unsigned char> uniformData(GetPushConstantSize(), 0);
+    for (const auto& entry : _uniforms) {
+        if (entry.packFunc) {
+            entry.packFunc(uniformData.data() + entry.gpuOffset, entry.uniformPtr);
+        }
+    }
+
+    backend->SetUniformData(pipeline, uniformData.data(), uniformData.size());
+#else
     for (const auto& entry : _uniforms) {
         if (entry.uploadFunc) {
             entry.uploadFunc(static_cast<uint32_t>(pipeline), entry.name, entry.uniformPtr);
         }
     }
+#endif
+}
+
+uint32_t KernelBuildContext::GetPushConstantSize() const {
+    return static_cast<uint32_t>(_nextUniformOffset);
 }
 
 // ===================================================================
@@ -404,7 +474,7 @@ void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase* slot) {
     uint32_t width = 0, height = 0;
     slot->GetDimensions(width, height);
 
-    RegisterTexture(binding, slot->GetFormat(), textureName, width, height);
+    RegisterTexture(binding, slot->GetFormat(), textureName, width, height, slot->UsesSamplerBinding());
     slot->SetBindingInfo(static_cast<int>(binding), textureName);
     _textureSlots.push_back(slot);
 }

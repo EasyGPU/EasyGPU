@@ -34,6 +34,10 @@ public:
  */
 class KernelBuildContext : public IR::Builder::BuilderContext {
 public:
+    struct BufferInfo;
+    struct TextureInfo;
+    struct UniformEntry;
+
     /**
      * This constructor will construct the work size in default
      * @param Dimension The dimension of the kernel
@@ -69,6 +73,9 @@ public:
     const std::vector<uint32_t>& GetBufferBindings() const override {
         return _bufferBindings;
     }
+    const std::vector<BufferInfo>& GetBufferInfos() const {
+        return _buffers;
+    }
 
     /**
      * Bind a runtime GPU buffer to a binding slot
@@ -91,11 +98,15 @@ public:
 
     uint32_t AllocateTextureBinding() override;
     void RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string& textureName, uint32_t width,
-                         uint32_t height) override;
+                         uint32_t height, bool sampled = false) override;
     std::string GetTextureDeclarations() const override;
     const std::vector<uint32_t>& GetTextureBindings() const override {
         return _textureBindings;
     }
+    const std::vector<TextureInfo>& GetTextureInfos() const {
+        return _textures;
+    }
+    const TextureInfo* FindTextureInfo(uint32_t binding) const;
 
     /**
      * Bind a runtime GPU texture to a binding slot
@@ -118,7 +129,9 @@ public:
 
     std::string RegisterUniform(
         const std::string& typeName, void* uniformPtr,
-        std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc) override;
+        size_t gpuSize, size_t gpuAlignment,
+        std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc,
+        std::function<void(void* dst, void* ptr)> packFunc) override;
 
     std::string GetUniformDeclarations() const override;
 
@@ -128,6 +141,7 @@ public:
      * @param pipeline The backend pipeline handle
      */
     void UploadUniformValues(Backend::PipelineHandle pipeline) const;
+    uint32_t GetPushConstantSize() const;
 
     /**
      * Get the uniform upload functions for dispatch
@@ -137,7 +151,11 @@ public:
         std::string name;
         std::string typeName;
         void* uniformPtr;
+        size_t gpuSize = 0;
+        size_t gpuAlignment = 0;
+        size_t gpuOffset = 0;
         std::function<void(uint32_t program, const std::string& name, void* ptr)> uploadFunc;
+        std::function<void(void* dst, void* ptr)> packFunc;
     };
 
     const std::vector<UniformEntry>& GetUniformEntries() const {
@@ -205,6 +223,7 @@ protected:
         std::string textureName;
         uint32_t width;
         uint32_t height;
+        bool sampled = false;
     };
 
     uint32_t _nextBinding = 0;
@@ -218,6 +237,7 @@ protected:
 
     std::vector<UniformEntry> _uniforms;
     int _nextUniformIndex = 0;
+    size_t _nextUniformOffset = 0;
 
     // Slot support for dynamic resource switching
     std::vector<Runtime::BufferSlotBase*> _bufferSlots;

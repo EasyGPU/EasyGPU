@@ -230,6 +230,53 @@ std::cout << "Upload/Download verified!";
 END_TEST
 
 // =============================================================================
+// Test 6.1: Backend map write path
+// =============================================================================
+TEST(buffer_backend_map_write)
+Buffer<int> buffer(8, BufferMode::ReadWrite);
+auto* backend = GPU::Runtime::Context::GetBackend();
+ASSERT(backend != nullptr);
+
+int* mapped = static_cast<int*>(backend->MapBuffer(buffer.GetHandle(), false, true));
+ASSERT(mapped != nullptr);
+for (int i = 0; i < 8; ++i) {
+	mapped[i] = i * 7;
+}
+backend->UnmapBuffer(buffer.GetHandle());
+
+std::vector<int> downloaded(8, 0);
+buffer.Download(downloaded.data(), downloaded.size());
+for (int i = 0; i < 8; ++i) {
+	ASSERT(downloaded[i] == i * 7);
+}
+END_TEST
+
+// =============================================================================
+// Test 6.2: Backend map read path after GPU execution
+// =============================================================================
+TEST(buffer_backend_map_read_after_dispatch)
+std::vector<int> input(16, 3);
+Buffer<int> buffer(input, BufferMode::ReadWrite);
+
+GPU::Kernel::Kernel1D kernel([&](Var<int>& id) {
+	auto buf = buffer.Bind();
+	buf[id] = buf[id] + 5;
+}, 256);
+
+kernel.Dispatch(1, true);
+
+auto* backend = GPU::Runtime::Context::GetBackend();
+ASSERT(backend != nullptr);
+
+const int* mapped = static_cast<const int*>(backend->MapBuffer(buffer.GetHandle(), true, false));
+ASSERT(mapped != nullptr);
+for (int i = 0; i < 16; ++i) {
+	ASSERT(mapped[i] == 8);
+}
+backend->UnmapBuffer(buffer.GetHandle());
+END_TEST
+
+// =============================================================================
 // Test 7: Integer buffer with Bind()
 // =============================================================================
 TEST(int_buffer_bind)

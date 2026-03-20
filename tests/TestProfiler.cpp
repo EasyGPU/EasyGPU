@@ -105,8 +105,8 @@ Kernel::Kernel1D kernel([&](Var<int> &id) {
 kernel.Dispatch(1, true);
 
 auto &profiler = Kernel::KernelProfiler::GetInstance();
-// Note: OpenGL timer queries may not work on all systems
-// So we just check that profiler doesn't crash
+ASSERT(!profiler.GetRecords().empty());
+ASSERT(profiler.GetTotalTime() >= 0.0);
 
 Kernel::EnableKernelProfiler(false);
 END_TEST
@@ -162,9 +162,12 @@ Kernel::Kernel1D kernel([&](Var<int> &id) {
 
 kernel.Dispatch(1, true);
 
-// Query with empty name (should return empty result)
-auto result = Kernel::QueryKernelProfilerInfo("NonExistent");
-ASSERT(result.counter == 0);
+auto result = Kernel::QueryKernelProfilerInfo("Kernel1D");
+ASSERT(result.counter >= 1);
+ASSERT(result.totalTimeMs >= 0.0);
+
+auto missing = Kernel::QueryKernelProfilerInfo("NonExistent");
+ASSERT(missing.counter == 0);
 
 Kernel::EnableKernelProfiler(false);
 END_TEST
@@ -313,6 +316,7 @@ std::cout << output;
 
 // Verify output is not empty and contains expected content
 ASSERT(!output.empty());
+ASSERT(output.find("Kernel1D") != std::string::npos);
 
 // Check for header (using ASCII version for GetFormattedOutput)
 bool hasHeader = output.find("Kernel Profiling Results") != std::string::npos ||

@@ -75,6 +75,10 @@ public:
         return _name;
     }
 
+    bool UsesSamplerBinding() const {
+        return _sampledBinding;
+    }
+
     /**
      * Set the binding information (called by KernelBuildContext)
      * @param binding The binding slot
@@ -88,6 +92,7 @@ public:
 protected:
     int _binding = -1;  // Assigned by KernelBuildContext during Bind()
     std::string _name;  // GLSL variable name
+    bool _sampledBinding = false;
 };
 
 /**
@@ -196,6 +201,8 @@ public:
             throw std::runtime_error("TextureSlot::Bind() called outside of Kernel definition");
         }
 
+        _sampledBinding = false;
+
         // Register this slot with the context
         context->RegisterTextureSlot(this);
 
@@ -216,6 +223,8 @@ public:
         if (!context) {
             throw std::runtime_error("TextureSlot::BindSampler() called outside of Kernel definition");
         }
+
+        _sampledBinding = true;
 
         // Register this slot with the context
         context->RegisterTextureSlot(this);

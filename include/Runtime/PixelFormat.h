@@ -85,6 +85,25 @@ inline std::string GetGLSLFormatQualifier(PixelFormat fmt) {
 }
 
 /**
+ * Get GLSL sampler type for texture sampling access.
+ * Used in: layout(binding=X) uniform sampler2D tex;
+ */
+inline std::string GetGLSLSamplerType(PixelFormat fmt) {
+    switch (fmt) {
+        case PixelFormat::R32I:
+        case PixelFormat::RG32I:
+        case PixelFormat::RGBA32I:
+            return "isampler2D";
+        case PixelFormat::R32UI:
+        case PixelFormat::RG32UI:
+        case PixelFormat::RGBA32UI:
+            return "usampler2D";
+        default:
+            return "sampler2D";
+    }
+}
+
+/**
  * Get bytes per pixel for a format
  */
 inline size_t GetBytesPerPixel(PixelFormat fmt) {

@@ -9,6 +9,7 @@ Lightweight C++20 Embedded DSL for GPU Compute
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-orange.svg)](https://en.cppreference.com/w/cpp/20)
 [![OpenGL](https://img.shields.io/badge/OpenGL-4.3+-green.svg)](https://www.opengl.org/)
+[![Vulkan](https://img.shields.io/badge/Vulkan-1.1+-red.svg)](https://www.vulkan.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 
 [Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Examples](#examples) · [API Reference](docs/api-reference.md)
@@ -34,6 +35,8 @@ Lightweight C++20 Embedded DSL for GPU Compute
 ## Overview
 
 EasyGPU is an embedded domain-specific language (eDSL) for GPU programming that allows writing compute kernels in standard C++20. No shader language knowledge required.
+
+Today, that simplicity is no longer tied to a single graphics API. EasyGPU now ships with both an OpenGL compute backend and a Vulkan compute backend, so the same kernel code can target a lightweight OpenGL path or a modern Vulkan path without changing the DSL.
 
 ```cpp
 #include <GPU.h>
@@ -63,17 +66,19 @@ int main() {
 - 10 lines of code for your first working GPU kernel
 
 **For experienced developers:**
-- Zero vendor lock-in (OpenGL 4.3+, cross-platform)
+- Zero vendor lock-in (OpenGL 4.3+ or Vulkan 1.1+, cross-platform)
 - Minimal dependencies (only GLAD, ~500KB)
 - Clean C++20 interface without heavy template metaprogramming
+- First-class Vulkan backend for compute workloads, profiling, textures, uniforms, and descriptor-backed resource binding
 
 ### Requirements
 
 - C++20 compatible compiler (GCC 11+, Clang 14+, MSVC 2022+)
-- OpenGL 4.3+
+- OpenGL 4.3+ or Vulkan 1.1+
 - CMake 3.21+ (optional)
 - **Windows:** No additional dependencies
 - **Linux:** X11 development libraries (`libx11-dev` on Ubuntu/Debian)
+- **Vulkan builds:** Vulkan SDK with `glslang` / `SPIRV-Tools` libraries available to CMake
 
 ---
 
@@ -125,7 +130,7 @@ square.Dispatch(16, true);
 1. User writes C++ kernels using EasyGPU types
 2. Library constructs an Intermediate Representation (IR)
 3. IR is compiled to GLSL compute shaders
-4. OpenGL executes on GPU
+4. OpenGL or Vulkan executes on GPU
 
 ---
 
@@ -147,6 +152,22 @@ Kernel1D transform([](Int i) {
 });
 transform.Dispatch(16, true);
 ```
+
+### Dual Backends
+
+EasyGPU now supports two compute backends:
+
+- **OpenGL** — Minimal setup, excellent for teaching, rapid iteration, and existing GL applications
+- **Vulkan** — Modern compute backend with explicit resource binding, push-constant uniforms, storage textures, sampled textures, profiler queries, and stronger long-term scalability
+
+This is one of EasyGPU's biggest practical advantages: you keep the same C++ DSL, the same buffer and texture abstractions, and the same kernel code while switching the backend at CMake configure time.
+
+```cmake
+cmake -S . -B build_gl -DEASYGPU_BACKEND=OpenGL
+cmake -S . -B build_vk -DEASYGPU_BACKEND=Vulkan
+```
+
+For projects that want a simple on-ramp, OpenGL remains a great default. For projects that want a modern compute stack, Vulkan is now a first-class path rather than an experimental branch.
 
 ### Unified Language
 
@@ -308,7 +329,55 @@ FetchContent_MakeAvailable(easygpu)
 target_link_libraries(your_target EasyGPU)
 ```
 
+To build EasyGPU itself with the Vulkan backend:
+
+```cmake
+set(EASYGPU_BACKEND Vulkan CACHE STRING "" FORCE)
+```
+
+Or from the command line:
+
+```bash
+cmake -S . -B build -DEASYGPU_BACKEND=Vulkan
+```
+
+If you want OpenGL explicitly:
+
+```bash
+cmake -S . -B build -DEASYGPU_BACKEND=OpenGL
+```
+
 **Manual:** Copy `include/` to your project and link against OpenGL.
+
+### Using EasyGPU in Your Own CMake Project
+
+If you embed EasyGPU via `FetchContent`, you can select the backend before `FetchContent_MakeAvailable`:
+
+```cmake
+include(FetchContent)
+
+set(EASYGPU_BACKEND Vulkan CACHE STRING "EasyGPU backend" FORCE)
+set(EASYGPU_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(EASYGPU_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(EASYGPU_BUILD_FRAGMENT_TESTER OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    easygpu
+    GIT_REPOSITORY https://github.com/easygpu/EasyGPU.git
+    GIT_TAG v0.1.0
+)
+FetchContent_MakeAvailable(easygpu)
+
+target_link_libraries(your_target PRIVATE EasyGPU)
+```
+
+To switch back to OpenGL in your own project, change only one line:
+
+```cmake
+set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
+```
+
+No kernel rewrite is required.
 
 ### First Program
 
@@ -500,7 +569,8 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 
 | Dependency | Required | Size | Purpose |
 |:-----------|:---------|:-----|:--------|
-| OpenGL 4.3+ | Yes | System | Compute backend |
+| OpenGL 4.3+ | Yes | System | OpenGL compute backend |
+| Vulkan 1.1+ SDK | Vulkan builds | System | Vulkan compute backend |
 | X11 (Linux) | Yes | System | Windowing system |
 | GLAD | Yes | ~500KB (bundled) | OpenGL loader |
 | stb_image | No | ~50KB (examples only) | Image I/O |
@@ -514,6 +584,15 @@ cd EasyGPU
 
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
+```
+
+**Windows (MSVC, Vulkan backend):**
+```powershell
+git clone --recursive https://github.com/easygpu/EasyGPU.git
+cd EasyGPU
+
+cmake -B build_vulkan -DEASYGPU_BACKEND=Vulkan -DEASYGPU_BUILD_FRAGMENT_TESTER=OFF
+cmake --build build_vulkan --config Release
 ```
 
 **Linux (GCC/Clang):**
@@ -532,12 +611,20 @@ cmake --build build -j
 cd build && ctest
 ```
 
+**Linux (Vulkan backend):**
+```bash
+cmake -B build_vulkan -DEASYGPU_BACKEND=Vulkan -DEASYGPU_BUILD_FRAGMENT_TESTER=OFF
+cmake --build build_vulkan -j
+```
+
 ### CMake Options
 
 | Option | Default | Description |
 |:-------|:--------|:------------|
+| `EASYGPU_BACKEND` | `OpenGL` | Backend API: `OpenGL` or `Vulkan` |
 | `EASYGPU_BUILD_EXAMPLES` | `ON` | Build examples |
 | `EASYGPU_BUILD_TESTS` | `ON` | Build tests |
+| `EASYGPU_BUILD_FRAGMENT_TESTER` | `OFF` | Build the Windows FragmentKernel tester |
 
 ---
 

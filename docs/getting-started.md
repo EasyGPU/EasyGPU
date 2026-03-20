@@ -6,6 +6,8 @@ This guide will get you running your first GPU program in under 10 minutes.
 
 EasyGPU is an embedded domain-specific language (eDSL) that lets you write GPU compute kernels using standard C++ syntax. Instead of learning GLSL or dealing with complex graphics APIs, you write GPU code that looks like regular C++.
 
+That same kernel code can now run through either the OpenGL compute backend or the Vulkan compute backend. For simple setup, OpenGL remains a good default. For a modern explicit compute stack, Vulkan is now fully supported as a first-class backend.
+
 **Traditional GPU programming:**
 ```cpp
 // Write C++ code on CPU
@@ -28,12 +30,13 @@ kernel.Dispatch(4, true);
 - **Operating System:** Windows or Linux
 - **Compiler:** GCC 11+, Clang 14+, or MSVC 2022+
 - **C++ Standard:** C++20
-- **GPU:** Any GPU supporting OpenGL 4.3+
+- **GPU:** Any GPU supporting OpenGL 4.3+ or Vulkan 1.1+
 - **Build System:** CMake 3.21+ (optional but recommended)
 
 **Platform-Specific Requirements:**
 - **Windows:** Visual Studio 2022 or Build Tools, Windows SDK
 - **Linux:** X11 development libraries (`sudo apt-get install libx11-dev` on Ubuntu/Debian)
+- **Vulkan backend:** Vulkan SDK with `glslang` and `SPIRV-Tools` libraries discoverable by CMake
 
 ## Installation
 
@@ -51,6 +54,21 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(easygpu)
 
 target_link_libraries(your_target EasyGPU)
+```
+
+To select the Vulkan backend inside your own project:
+
+```cmake
+set(EASYGPU_BACKEND Vulkan CACHE STRING "EasyGPU backend" FORCE)
+set(EASYGPU_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(EASYGPU_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(EASYGPU_BUILD_FRAGMENT_TESTER OFF CACHE BOOL "" FORCE)
+```
+
+To stay on OpenGL:
+
+```cmake
+set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
 ```
 
 ### Method 2: Copy Headers
@@ -117,6 +135,14 @@ cmake --build .
 ./first_kernel
 ```
 
+With CMake and the Vulkan backend:
+```bash
+mkdir build_vulkan && cd build_vulkan
+cmake .. -DEASYGPU_BACKEND=Vulkan -DEASYGPU_BUILD_FRAGMENT_TESTER=OFF
+cmake --build .
+./first_kernel
+```
+
 Direct compilation (Linux):
 ```bash
 g++ -std=c++20 first_kernel.cpp -lGL -lX11 -o first_kernel
@@ -128,6 +154,8 @@ Direct compilation (Windows with MSVC):
 cl /std:c++20 first_kernel.cpp opengl32.lib
 first_kernel.exe
 ```
+
+> **Note:** Direct one-file compilation is suitable for the OpenGL path. The Vulkan backend is intended to be used through CMake so the Vulkan SDK, `glslang`, and `SPIRV-Tools` dependencies can be configured correctly.
 
 ## Understanding the Basics
 

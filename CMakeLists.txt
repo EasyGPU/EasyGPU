@@ -15,6 +15,8 @@ project(EasyGPU
 option(EASYGPU_BUILD_EXAMPLES "Build example programs" ON)
 option(EASYGPU_BUILD_TESTS "Build test suite" ON)
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
+set(EASYGPU_BACKEND "OpenGL" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
+set_property(CACHE EASYGPU_BACKEND PROPERTY STRINGS OpenGL Vulkan)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -24,6 +26,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(MSVC AND EASYGPU_BACKEND STREQUAL "Vulkan")
+    # The Vulkan SDK ships glslang/SPIRV static libraries built against the
+    # release DLL CRT and STL iterator debug level 0. Match that ABI even for
+    # Debug builds, otherwise MSVC reports LNK2038 mismatches.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    add_compile_definitions(_ITERATOR_DEBUG_LEVEL=0)
+endif()
 
 # Include directories for the main library
 include_directories(include third)
@@ -44,6 +54,66 @@ elseif(UNIX AND NOT APPLE)
     set(EASYGPU_PLATFORM_LIBS ${OPENGL_LIBRARIES} ${X11_LIBRARIES})
 endif()
 
+if(EASYGPU_BACKEND STREQUAL "Vulkan")
+    find_package(Vulkan REQUIRED)
+
+    set(EASYGPU_VULKAN_SDK_HINTS)
+    if(DEFINED ENV{VULKAN_SDK})
+        list(APPEND EASYGPU_VULKAN_SDK_HINTS
+            "$ENV{VULKAN_SDK}/Lib"
+            "$ENV{VULKAN_SDK}/Lib32"
+        )
+    endif()
+
+    find_library(GLSLANG_LIBRARY glslang HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+    find_library(GLSLANG_SPIRV_LIBRARY SPIRV HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+    find_library(GLSLANG_RESOURCE_LIMITS_LIBRARY glslang-default-resource-limits HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+    find_library(GLSLANG_MACHINEINDEPENDENT_LIBRARY MachineIndependent HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+    find_library(GLSLANG_OSDEPENDENT_LIBRARY OSDependent HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+    find_library(GLSLANG_GENERICCODEGEN_LIBRARY GenericCodeGen HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+    find_library(SPIRV_TOOLS_LIBRARY SPIRV-Tools HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+    find_library(SPIRV_TOOLS_OPT_LIBRARY SPIRV-Tools-opt HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+
+    foreach(required_lib
+        GLSLANG_LIBRARY
+        GLSLANG_SPIRV_LIBRARY
+        GLSLANG_RESOURCE_LIMITS_LIBRARY
+        GLSLANG_MACHINEINDEPENDENT_LIBRARY
+        GLSLANG_OSDEPENDENT_LIBRARY
+        GLSLANG_GENERICCODEGEN_LIBRARY
+        SPIRV_TOOLS_LIBRARY
+        SPIRV_TOOLS_OPT_LIBRARY
+    )
+        if(NOT ${required_lib})
+            message(FATAL_ERROR "Missing required Vulkan/glslang dependency: ${required_lib}")
+        endif()
+    endforeach()
+
+    set(EASYGPU_VULKAN_LIBS
+        ${Vulkan_LIBRARY}
+        ${GLSLANG_LIBRARY}
+        ${GLSLANG_SPIRV_LIBRARY}
+        ${GLSLANG_RESOURCE_LIMITS_LIBRARY}
+        ${GLSLANG_MACHINEINDEPENDENT_LIBRARY}
+        ${GLSLANG_OSDEPENDENT_LIBRARY}
+        ${GLSLANG_GENERICCODEGEN_LIBRARY}
+        ${SPIRV_TOOLS_LIBRARY}
+        ${SPIRV_TOOLS_OPT_LIBRARY}
+    )
+endif()
+
+set(EASYGPU_BACKEND_SOURCES
+    include/Backend/OpenGLBackend.h
+    source/Backend/OpenGLBackend.cpp
+)
+
+if(EASYGPU_BACKEND STREQUAL "Vulkan")
+    list(APPEND EASYGPU_BACKEND_SOURCES
+        include/Backend/VulkanBackend.h
+        source/Backend/VulkanBackend.cpp
+    )
+endif()
+
 # =============================================================================
 # Core Library
 # =============================================================================
@@ -51,8 +121,7 @@ add_library(EasyGPU STATIC
     # Backend
     include/Backend/Backend.h
     source/Backend/Backend.cpp
-    include/Backend/OpenGLBackend.h
-    source/Backend/OpenGLBackend.cpp
+    ${EASYGPU_BACKEND_SOURCES}
     
     # IR Builder
     include/IR/Builder/Builder.h
@@ -195,6 +264,14 @@ add_library(EasyGPU STATIC
 target_compile_features(EasyGPU PUBLIC cxx_std_20)
 target_link_libraries(EasyGPU PUBLIC GLAD ${EASYGPU_PLATFORM_LIBS})
 
+if(EASYGPU_BACKEND STREQUAL "Vulkan")
+    target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_VULKAN)
+    target_include_directories(EasyGPU PUBLIC ${Vulkan_INCLUDE_DIR})
+    target_link_libraries(EasyGPU PUBLIC ${EASYGPU_VULKAN_LIBS})
+else()
+    target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_OPENGL)
+endif()
+
 # MSVC must use the conforming preprocessor for tuple-style variadic macros
 # used by EASYGPU_STRUCT(..., (type,name), ...).
 if(MSVC)
@@ -283,8 +360,6 @@ if(EASYGPU_BUILD_EXAMPLES)
         endif()
     endforeach()
 endif()
-
-set(EASYGPU_BUILD_FRAGMENT_TESTER TRUE)
 
 # =============================================================================
 # Fragment Kernel Tester (Windows + EasyX)

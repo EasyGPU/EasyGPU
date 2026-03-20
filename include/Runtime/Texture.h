@@ -548,7 +548,7 @@ public:
 
         uint32_t binding = context->AllocateTextureBinding();
         std::string textureName = std::format("tex{}", binding);
-        context->RegisterTexture(binding, _format, textureName, _width, _height);
+        context->RegisterTexture(binding, _format, textureName, _width, _height, true);
         context->BindRuntimeTexture(binding, static_cast<uint32_t>(_textureHandle));
         _boundBinding = static_cast<int>(binding);
 

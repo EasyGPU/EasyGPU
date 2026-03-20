@@ -124,6 +124,24 @@ static void ExecuteComputeDispatch(KernelBuildContext& context, int groupX, int 
         pipelineDesc.workGroupSizeX = context.WorkSizeX;
         pipelineDesc.workGroupSizeY = context.WorkSizeY;
         pipelineDesc.workGroupSizeZ = context.WorkSizeZ;
+        pipelineDesc.pushConstantSize = context.GetPushConstantSize();
+
+        for (const auto& bufferInfo : context.GetBufferInfos()) {
+            Backend::ResourceLayoutEntry entry;
+            entry.binding = bufferInfo.binding;
+            entry.type = Backend::BindingType::Buffer;
+            entry.readOnly = (bufferInfo.mode == 0x88B8);
+            pipelineDesc.resources.push_back(entry);
+        }
+
+        for (const auto& textureInfo : context.GetTextureInfos()) {
+            Backend::ResourceLayoutEntry entry;
+            entry.binding = textureInfo.binding;
+            entry.type = textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+            entry.format = Runtime::ToBackendPixelFormat(textureInfo.format);
+            entry.readOnly = textureInfo.sampled;
+            pipelineDesc.resources.push_back(entry);
+        }
 
         pipeline = backend->CreatePipeline(pipelineDesc);
         if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
@@ -160,13 +178,16 @@ static void ExecuteComputeDispatch(KernelBuildContext& context, int groupX, int 
     // Bind all textures to their specified binding points
     const auto& textureBindings = context.GetRuntimeTextureBindings();
     for (const auto& [binding, handle] : textureBindings) {
+        const auto* textureInfo = context.FindTextureInfo(binding);
+        if (!textureInfo) {
+            throw std::runtime_error("Runtime texture binding missing shader-side texture metadata");
+        }
         Backend::ResourceBinding rb;
         rb.binding = binding;
-        rb.type = Backend::BindingType::Texture;
+        rb.type = textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
         rb.texture = static_cast<Backend::TextureHandle>(handle);
-        // Format and access mode should come from the context
-        rb.format = Backend::PixelFormat::RGBA8; // Default, should be improved
-        rb.readOnly = false;
+        rb.format = Runtime::ToBackendPixelFormat(textureInfo->format);
+        rb.readOnly = textureInfo->sampled;
         bindings.push_back(rb);
     }
 
@@ -189,12 +210,16 @@ static void ExecuteComputeDispatch(KernelBuildContext& context, int groupX, int 
         if (!slot->IsAttached()) {
             throw std::runtime_error("TextureSlot not attached at dispatch time");
         }
+        const auto* textureInfo = context.FindTextureInfo(static_cast<uint32_t>(slot->GetBinding()));
+        if (!textureInfo) {
+            throw std::runtime_error("TextureSlot missing shader-side texture metadata");
+        }
         Backend::ResourceBinding rb;
         rb.binding = static_cast<uint32_t>(slot->GetBinding());
-        rb.type = Backend::BindingType::Texture;
+        rb.type = textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
         rb.texture = slot->GetHandle();
         rb.format = Runtime::ToBackendPixelFormat(slot->GetFormat());
-        rb.readOnly = false;
+        rb.readOnly = textureInfo->sampled;
         bindings.push_back(rb);
     }
 
@@ -209,6 +234,7 @@ static void ExecuteComputeDispatch(KernelBuildContext& context, int groupX, int 
     // Sync if requested
     if (sync) {
         backend->MemoryBarrier(Backend::BarrierType::All);
+        backend->Finish();
     }
 }
 
