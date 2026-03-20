@@ -46,9 +46,9 @@ public:
 	using VarBase<Math::Vec2>::operator=;
 	using VarBase<Math::Vec2>::operator Expr<Math::Vec2>;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Component constructor: Var<Vec2> v(x, y)
 	template <typename X, typename Y>
@@ -137,9 +137,9 @@ public:
 	using VarBase<Math::Vec3>::operator=;
 	using VarBase<Math::Vec3>::operator Expr<Math::Vec3>;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Component constructor: Var<Vec3> v(x, y, z)
 	template <typename X, typename Y, typename Z>
@@ -247,9 +247,9 @@ public:
 	using VarBase<Math::Vec4>::operator=;
 	using VarBase<Math::Vec4>::operator Expr<Math::Vec4>;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Component constructor: Var<Vec4> v(x, y, z, w)
 	template <typename X, typename Y, typename Z, typename W>

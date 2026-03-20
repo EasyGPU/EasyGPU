@@ -17,7 +17,7 @@ option(EASYGPU_BUILD_TESTS "Build test suite" ON)
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
 option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ON)
 option(EASYGPU_BUILD_WINDOW_EXAMPLES "Build window examples" ON)
-set(EASYGPU_BACKEND "Vulkan" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
+set(EASYGPU_BACKEND "OpenGL" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
 set_property(CACHE EASYGPU_BACKEND PROPERTY STRINGS OpenGL Vulkan)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

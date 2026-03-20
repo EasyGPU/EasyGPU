@@ -199,26 +199,23 @@ END_TEST
 // Test 5.5: Sampled texture BindSampler API in compute kernels
 // =============================================================================
 TEST(texture_sampler_compute)
-const int W = 2, H = 2;
+const int			 W = 2, H = 2;
 
 std::vector<uint8_t> pixels = {
-	255, 0, 0, 255,
-	0, 255, 0, 255,
-	0, 0, 255, 255,
-	255, 255, 255, 255,
+	255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
 };
 
 Texture2D<PixelFormat::RGBA8> tex(W, H, pixels.data());
-Buffer<Vec4> output(4, BufferMode::Write);
+Buffer<Vec4>				  output(4, BufferMode::Write);
 
-GPU::Kernel::Kernel1D kernel(
-	[&](Var<int>& id) {
-		auto sampler = tex.BindSampler();
-		auto out = output.Bind();
+GPU::Kernel::Kernel1D		  kernel(
+	[&](Var<int> &id) {
+		auto	   sampler = tex.BindSampler();
+		auto	   out	   = output.Bind();
 
-		Var<float> u = Expr<float>(id % 2) * 0.5f + 0.25f;
-		Var<float> v = Expr<float>(id / 2) * 0.5f + 0.25f;
-		out[id] = sampler.Sample(u, v);
+		Var<float> u	   = Expr<float>(id % 2) * 0.5f + 0.25f;
+		Var<float> v	   = Expr<float>(id / 2) * 0.5f + 0.25f;
+		out[id]			   = sampler.Sample(u, v);
 	},
 	4);
 
@@ -227,9 +224,7 @@ kernel.Dispatch(1, true);
 std::vector<Vec4> sampled(4);
 output.Download(sampled);
 
-auto approx = [](float actual, float expected) {
-	return std::abs(actual - expected) <= 0.05f;
-};
+auto approx = [](float actual, float expected) { return std::abs(actual - expected) <= 0.05f; };
 
 ASSERT(approx(sampled[0].x, 1.0f) && approx(sampled[0].y, 0.0f) && approx(sampled[0].z, 0.0f));
 ASSERT(approx(sampled[1].x, 0.0f) && approx(sampled[1].y, 1.0f) && approx(sampled[1].z, 0.0f));
@@ -242,28 +237,25 @@ END_TEST
 // Test 5.6: Signed integer sampled texture support
 // =============================================================================
 TEST(texture_sampler_integer_compute)
-const int W = 2, H = 2;
+const int		 W = 2, H = 2;
 
 std::vector<int> pixels = {
-	1, 2, 3, 4,
-	5, 6, 7, 8,
-	9, 10, 11, 12,
-	13, 14, 15, 16,
+	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
 };
 
 Texture2D<PixelFormat::RGBA32I> tex(W, H, pixels.data());
-Buffer<IVec4> output(4, BufferMode::Write);
+Buffer<IVec4>					output(4, BufferMode::Write);
 
-GPU::Kernel::Kernel1D kernel(
-	[&](Var<int>& id) {
-		auto sampler = tex.BindSampler();
-		auto out = output.Bind();
+GPU::Kernel::Kernel1D			kernel(
+	  [&](Var<int> &id) {
+		  auto		 sampler = tex.BindSampler();
+		  auto		 out	 = output.Bind();
 
-		Var<float> u = Expr<float>(id % 2) * 0.5f + 0.25f;
-		Var<float> v = Expr<float>(id / 2) * 0.5f + 0.25f;
-		out[id] = sampler.Sample(u, v);
-	},
-	4);
+		  Var<float> u		 = Expr<float>(id % 2) * 0.5f + 0.25f;
+		  Var<float> v		 = Expr<float>(id / 2) * 0.5f + 0.25f;
+		  out[id]			 = sampler.Sample(u, v);
+	  },
+	  4);
 
 kernel.Dispatch(1, true);
 
@@ -769,11 +761,11 @@ int main() {
 		test_texture_create_empty();
 		test_texture_create_from_buffer();
 		test_texture_upload_download();
-	test_texture_move();
-	test_texture_bind_api_inspector();
-	test_texture_sampler_compute();
-	test_texture_sampler_integer_compute();
-	test_gpu_texture_invert();
+		test_texture_move();
+		test_texture_bind_api_inspector();
+		test_texture_sampler_compute();
+		test_texture_sampler_integer_compute();
+		test_gpu_texture_invert();
 		test_gpu_texture_multiple();
 		test_texture_rgba32f_format();
 		test_texture_with_buffer();

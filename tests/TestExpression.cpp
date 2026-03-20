@@ -298,7 +298,7 @@ GPU::Kernel::InspectorKernel kernel([](Var<int> &id) {
 
 	// Use expression (each Expr can only be used once due to move semantics)
 	Var<float>	r1 = v1 + e; // e is moved here, cannot be reused
-	// r2-r4 omitted - would require reusing moved Expr
+							 // r2-r4 omitted - would require reusing moved Expr
 });
 kernel.PrintCode();
 END_TEST
@@ -337,7 +337,7 @@ GPU::Kernel::InspectorKernel kernel([](Var<int> &id) {
 	// Math functions should accept both Var and Expr
 	Var<float>	s  = Sin(v1); // Var argument
 	Var<float>	c  = Cos(e);  // Expr argument (moved)
-	// Note: other uses of 'e' omitted as it was moved above
+							  // Note: other uses of 'e' omitted as it was moved above
 });
 kernel.PrintCode();
 END_TEST

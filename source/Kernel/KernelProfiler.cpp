@@ -68,7 +68,7 @@ void KernelProfiler::CleanupQueries() {
 
 unsigned int KernelProfiler::AcquireQuery() {
 #if defined(EASYGPU_BACKEND_VULKAN)
-	return 0;  // Vulkan does not use the OpenGL-side query pool.
+	return 0; // Vulkan does not use the OpenGL-side query pool.
 #else
 	if (_queryPool.empty()) {
 		InitializeQueries();
@@ -102,7 +102,8 @@ void KernelProfiler::ReleaseQuery(unsigned int query) {
 	}
 }
 
-void KernelProfiler::RecordExecution(const std::string &kernelName, int groupX, int groupY, int groupZ, double elapsedMs) {
+void KernelProfiler::RecordExecution(const std::string &kernelName, int groupX, int groupY, int groupZ,
+									 double elapsedMs) {
 	KernelProfileRecord record;
 	record.kernelName	 = kernelName;
 	record.elapsedTimeMs = elapsedMs;
@@ -192,7 +193,7 @@ void KernelProfiler::EndQuery(unsigned int queryId, const std::string &kernelNam
 		return;
 
 	uint64_t elapsedNanos = backend->EndQuery(queryId);
-	double	 elapsedMs	 = static_cast<double>(elapsedNanos) / 1'000'000.0;
+	double	 elapsedMs	  = static_cast<double>(elapsedNanos) / 1'000'000.0;
 	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
 #else
 	glEndQuery(GL_TIME_ELAPSED);
@@ -239,7 +240,7 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 		return;
 
 	uint64_t elapsedNanos = backend->EndQuery(queryId);
-	double	 elapsedMs	 = static_cast<double>(elapsedNanos) / 1'000'000.0;
+	double	 elapsedMs	  = static_cast<double>(elapsedNanos) / 1'000'000.0;
 	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
 #else
 	// No context switch - use current context

@@ -35,37 +35,37 @@ namespace GPU::IR::Value {
 namespace Detail {
 
 template <Runtime::PixelFormat Format> struct TextureSamplerValueType {
-	using type = GPU::Math::Vec4;
+	using type						= GPU::Math::Vec4;
 	static constexpr bool supported = true;
 };
 
 template <> struct TextureSamplerValueType<Runtime::PixelFormat::R32I> {
-	using type = GPU::Math::IVec4;
+	using type						= GPU::Math::IVec4;
 	static constexpr bool supported = true;
 };
 
 template <> struct TextureSamplerValueType<Runtime::PixelFormat::RG32I> {
-	using type = GPU::Math::IVec4;
+	using type						= GPU::Math::IVec4;
 	static constexpr bool supported = true;
 };
 
 template <> struct TextureSamplerValueType<Runtime::PixelFormat::RGBA32I> {
-	using type = GPU::Math::IVec4;
+	using type						= GPU::Math::IVec4;
 	static constexpr bool supported = true;
 };
 
 template <> struct TextureSamplerValueType<Runtime::PixelFormat::R32UI> {
-	using type = GPU::Math::IVec4;
+	using type						= GPU::Math::IVec4;
 	static constexpr bool supported = false;
 };
 
 template <> struct TextureSamplerValueType<Runtime::PixelFormat::RG32UI> {
-	using type = GPU::Math::IVec4;
+	using type						= GPU::Math::IVec4;
 	static constexpr bool supported = false;
 };
 
 template <> struct TextureSamplerValueType<Runtime::PixelFormat::RGBA32UI> {
-	using type = GPU::Math::IVec4;
+	using type						= GPU::Math::IVec4;
 	static constexpr bool supported = false;
 };
 
@@ -82,8 +82,9 @@ public:
 
 	TextureSampler2D(std::string textureName, uint32_t binding, uint32_t width, uint32_t height)
 		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height) {
-		static_assert(Detail::TextureSamplerValueType<Format>::supported,
-					  "Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+		static_assert(
+			Detail::TextureSamplerValueType<Format>::supported,
+			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
 	}
 
 	[[nodiscard]] uint32_t GetBinding() const {

@@ -11,50 +11,50 @@ namespace GPU::Backend {
 
 // Forward declarations for backend implementations - conditionally compiled
 #if defined(EASYGPU_BACKEND_OPENGL) || !defined(EASYGPU_BACKEND_VULKAN)
-    Backend* CreateOpenGLBackend();
+Backend *CreateOpenGLBackend();
 #endif
 #if defined(EASYGPU_BACKEND_VULKAN)
-    Backend* CreateVulkanBackend();
+Backend *CreateVulkanBackend();
 #endif
 
-Backend* CreateBackend(BackendType type) {
-    switch (type) {
-        case BackendType::OpenGL:
+Backend *CreateBackend(BackendType type) {
+	switch (type) {
+	case BackendType::OpenGL:
 #if defined(EASYGPU_BACKEND_OPENGL) || !defined(EASYGPU_BACKEND_VULKAN)
-            return CreateOpenGLBackend();
+		return CreateOpenGLBackend();
 #else
-            throw std::runtime_error("OpenGL backend not available in this build");
+		throw std::runtime_error("OpenGL backend not available in this build");
 #endif
-        case BackendType::Vulkan:
+	case BackendType::Vulkan:
 #if defined(EASYGPU_BACKEND_VULKAN)
-            return CreateVulkanBackend();
+		return CreateVulkanBackend();
 #else
-            throw std::runtime_error("Vulkan backend not available in this build");
+		throw std::runtime_error("Vulkan backend not available in this build");
 #endif
-        case BackendType::DirectX12:
-        case BackendType::Metal:
-            // TODO: Implement other backends
-            throw std::runtime_error("Backend type not yet implemented");
-        default:
-            throw std::runtime_error("Unknown backend type");
-    }
+	case BackendType::DirectX12:
+	case BackendType::Metal:
+		// TODO: Implement other backends
+		throw std::runtime_error("Backend type not yet implemented");
+	default:
+		throw std::runtime_error("Unknown backend type");
+	}
 }
 
-void DestroyBackend(Backend* backend) {
-    if (backend) {
-        backend->Shutdown();
-        delete backend;
-    }
+void DestroyBackend(Backend *backend) {
+	if (backend) {
+		backend->Shutdown();
+		delete backend;
+	}
 }
 
 BackendType GetDefaultBackendType() {
-    // Select backend based on compile-time definition
-    #if defined(EASYGPU_BACKEND_VULKAN)
-        return BackendType::Vulkan;
-    #else
-        // Default to OpenGL
-        return BackendType::OpenGL;
-    #endif
+// Select backend based on compile-time definition
+#if defined(EASYGPU_BACKEND_VULKAN)
+	return BackendType::Vulkan;
+#else
+	// Default to OpenGL
+	return BackendType::OpenGL;
+#endif
 }
 
 } // namespace GPU::Backend

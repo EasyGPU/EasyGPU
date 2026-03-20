@@ -7,7 +7,8 @@
 #include <IR/Node/Ternary.h>
 
 namespace GPU::IR::Node {
-TernaryNode::TernaryNode(std::unique_ptr<Node> condition, std::unique_ptr<Node> trueExpr, std::unique_ptr<Node> falseExpr)
+TernaryNode::TernaryNode(std::unique_ptr<Node> condition, std::unique_ptr<Node> trueExpr,
+						 std::unique_ptr<Node> falseExpr)
 	: _condition(std::move(condition)), _trueExpr(std::move(trueExpr)), _falseExpr(std::move(falseExpr)) {
 }
 
@@ -29,8 +30,9 @@ const Node *TernaryNode::FalseExpr() const {
 
 std::unique_ptr<Node> TernaryNode::Clone() const {
 	std::unique_ptr<Node> conditionClone = _condition ? _condition->Clone() : nullptr;
-	std::unique_ptr<Node> trueExprClone  = _trueExpr ? _trueExpr->Clone() : nullptr;
+	std::unique_ptr<Node> trueExprClone	 = _trueExpr ? _trueExpr->Clone() : nullptr;
 	std::unique_ptr<Node> falseExprClone = _falseExpr ? _falseExpr->Clone() : nullptr;
-	return std::make_unique<TernaryNode>(std::move(conditionClone), std::move(trueExprClone), std::move(falseExprClone));
+	return std::make_unique<TernaryNode>(std::move(conditionClone), std::move(trueExprClone),
+										 std::move(falseExprClone));
 }
 } // namespace GPU::IR::Node

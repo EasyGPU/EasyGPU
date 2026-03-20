@@ -51,17 +51,15 @@ public:
 
 	// Callable Function Support
 	// Uniform Support
-	std::string									  RegisterUniform(
-		const std::string &typeName, void *uniformPtr,
-		size_t gpuSize, size_t gpuAlignment,
-		std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc,
-		std::function<void(void *dst, void *ptr)> packFunc) override;
-	std::string				 GetUniformDeclarations() const override;
+	std::string RegisterUniform(const std::string &typeName, void *uniformPtr, size_t gpuSize, size_t gpuAlignment,
+								std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc,
+								std::function<void(void *dst, void *ptr)> packFunc) override;
+	std::string GetUniformDeclarations() const override;
 
-	void					 AddCallableDeclaration(const std::string &declaration) override;
-	void					 AddCallableBodyGenerator(std::function<void()> generator) override;
-	void					 PushCallableBody() override;
-	void					 PopCallableBody() override;
+	void		AddCallableDeclaration(const std::string &declaration) override;
+	void		AddCallableBodyGenerator(std::function<void()> generator) override;
+	void		PushCallableBody() override;
+	void		PopCallableBody() override;
 	std::vector<std::string> GetCallableDeclarations() const override;
 	std::string				 GenerateCallableBodies() override;
 

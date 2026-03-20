@@ -26,9 +26,9 @@ public:
 	using VarBase<Math::Mat2>::Load;
 	using VarBase<Math::Mat2>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat2> m(col0, col1)
 	template <typename C0, typename C1>
@@ -105,9 +105,9 @@ public:
 	using VarBase<Math::Mat3>::Load;
 	using VarBase<Math::Mat3>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat3> m(col0, col1, col2)
 	template <typename C0, typename C1, typename C2>
@@ -185,9 +185,9 @@ public:
 	using VarBase<Math::Mat4>::Load;
 	using VarBase<Math::Mat4>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat4> m(col0, col1, col2, col3)
 	template <typename C0, typename C1, typename C2, typename C3>
@@ -270,9 +270,9 @@ public:
 	using VarBase<Math::Mat2x3>::Load;
 	using VarBase<Math::Mat2x3>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat2x3> m(col0, col1) - 2 columns of vec3
 	template <typename C0, typename C1>
@@ -347,9 +347,9 @@ public:
 	using VarBase<Math::Mat2x4>::Load;
 	using VarBase<Math::Mat2x4>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat2x4> m(col0, col1) - 2 columns of vec4
 	template <typename C0, typename C1>
@@ -424,9 +424,9 @@ public:
 	using VarBase<Math::Mat3x2>::Load;
 	using VarBase<Math::Mat3x2>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat3x2> m(col0, col1, col2) - 3 columns of vec2
 	template <typename C0, typename C1, typename C2>
@@ -504,9 +504,9 @@ public:
 	using VarBase<Math::Mat3x4>::Load;
 	using VarBase<Math::Mat3x4>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat3x4> m(col0, col1, col2) - 3 columns of vec4
 	template <typename C0, typename C1, typename C2>
@@ -584,9 +584,9 @@ public:
 	using VarBase<Math::Mat4x2>::Load;
 	using VarBase<Math::Mat4x2>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat4x2> m(col0, col1, col2, col3) - 4 columns of vec2
 	template <typename C0, typename C1, typename C2, typename C3>
@@ -667,9 +667,9 @@ public:
 	using VarBase<Math::Mat4x3>::Load;
 	using VarBase<Math::Mat4x3>::operator=;
 
-	Var() = default;
+	Var()			 = default;
 	Var(const Var &) = default;
-	Var(Var &&) = default;
+	Var(Var &&)		 = default;
 
 	// Column constructor: Var<Mat4x3> m(col0, col1, col2, col3) - 4 columns of vec3
 	template <typename C0, typename C1, typename C2, typename C3>

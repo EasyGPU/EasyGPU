@@ -703,8 +703,7 @@ public:
  * @param falseExpr The expression to evaluate when condition is false
  * @return An expression representing the ternary operation
  */
-template <ScalarType T>
-[[nodiscard]] inline Expr<T> Select(Expr<bool> condition, Expr<T> trueExpr, Expr<T> falseExpr) {
+template <ScalarType T> [[nodiscard]] inline Expr<T> Select(Expr<bool> condition, Expr<T> trueExpr, Expr<T> falseExpr) {
 	return Expr<T>(std::make_unique<Node::TernaryNode>(condition.Release(), trueExpr.Release(), falseExpr.Release()));
 }
 

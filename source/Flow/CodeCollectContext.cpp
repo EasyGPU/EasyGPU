@@ -146,10 +146,9 @@ void CodeCollectContext::Clear() {
 
 // Uniform Support - delegate to parent
 std::string CodeCollectContext::RegisterUniform(
-	const std::string &typeName, void *uniformPtr,
-	size_t gpuSize, size_t gpuAlignment,
+	const std::string &typeName, void *uniformPtr, size_t gpuSize, size_t gpuAlignment,
 	std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc,
-	std::function<void(void *dst, void *ptr)> packFunc) {
+	std::function<void(void *dst, void *ptr)>								  packFunc) {
 	if (_parentContext) {
 		return _parentContext->RegisterUniform(typeName, uniformPtr, gpuSize, gpuAlignment, uploadFunc, packFunc);
 	}

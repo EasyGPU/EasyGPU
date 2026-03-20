@@ -22,7 +22,7 @@
 
 namespace GPU::Runtime {
 
-using BackendPtr = Backend::Backend*;
+using BackendPtr = Backend::Backend *;
 
 /**
  * Singleton GPU context manager with automatic lazy initialization
@@ -31,81 +31,81 @@ using BackendPtr = Backend::Backend*;
  */
 class Context {
 public:
-    ~Context();
+	~Context();
 
-    // Non-copyable, non-movable singleton
-    Context(const Context&) = delete;
-    Context& operator=(const Context&) = delete;
-    Context(Context&&) = delete;
-    Context& operator=(Context&&) = delete;
+	// Non-copyable, non-movable singleton
+	Context(const Context &)						= delete;
+	Context &operator=(const Context &)				= delete;
+	Context(Context &&)								= delete;
+	Context					 &operator=(Context &&) = delete;
 
-    /**
-     * Get the singleton instance, auto-initializing if needed
-     */
-    static Context& GetInstance();
+	/**
+	 * Get the singleton instance, auto-initializing if needed
+	 */
+	static Context			 &GetInstance();
 
-    /**
-     * Get the active backend instance
-     * @return Pointer to the active backend
-     */
-    static Backend::Backend* GetBackend();
+	/**
+	 * Get the active backend instance
+	 * @return Pointer to the active backend
+	 */
+	static Backend::Backend	 *GetBackend();
 
-    /**
-     * Explicitly initialize the context (optional, called automatically)
-     * @throw std::runtime_error if initialization fails
-     */
-    void Initialize();
+	/**
+	 * Explicitly initialize the context (optional, called automatically)
+	 * @throw std::runtime_error if initialization fails
+	 */
+	void					  Initialize();
 
-    /**
-     * Check if context is already initialized
-     */
-    [[nodiscard]] bool IsInitialized() const;
+	/**
+	 * Check if context is already initialized
+	 */
+	[[nodiscard]] bool		  IsInitialized() const;
 
-    /**
-     * Make the backend context current on this thread
-     */
-    void MakeCurrent();
+	/**
+	 * Make the backend context current on this thread
+	 */
+	void					  MakeCurrent();
 
-    /**
-     * Release the context from current thread
-     */
-    void MakeNoneCurrent();
+	/**
+	 * Release the context from current thread
+	 */
+	void					  MakeNoneCurrent();
 
-    /**
-     * Get backend version string
-     */
-    [[nodiscard]] std::string GetVersionString() const;
+	/**
+	 * Get backend version string
+	 */
+	[[nodiscard]] std::string GetVersionString() const;
 
-    /**
-     * Check if compute shaders are supported
-     */
-    [[nodiscard]] bool HasComputeShadersSupport() const;
+	/**
+	 * Check if compute shaders are supported
+	 */
+	[[nodiscard]] bool		  HasComputeShadersSupport() const;
 
-    /**
-     * Get compute shader max work group size
-     */
-    void GetMaxWorkGroupSize(int& x, int& y, int& z) const;
+	/**
+	 * Get compute shader max work group size
+	 */
+	void					  GetMaxWorkGroupSize(int &x, int &y, int &z) const;
 
-    /**
-     * Get the native OpenGL context handle (for FragmentKernel compatibility)
-     * @return The native GL context handle (HGLRC on Windows, GLXContext on Linux)
-     *         Returns nullptr if the current backend is not OpenGL
-     */
-    [[nodiscard]] void* GetNativeGLContext() const;
-
-private:
-    Context() = default;
-
-    void CreateBackend();
-    void DestroyBackend();
+	/**
+	 * Get the native OpenGL context handle (for FragmentKernel compatibility)
+	 * @return The native GL context handle (HGLRC on Windows, GLXContext on Linux)
+	 *         Returns nullptr if the current backend is not OpenGL
+	 */
+	[[nodiscard]] void		 *GetNativeGLContext() const;
 
 private:
-    bool _initialized = false;
-    std::unique_ptr<Backend::Backend> _backend;
+	Context() = default;
 
-    // Reference count for automatic cleanup consideration
-    static Context* _instance;
-    static bool _destroyed;
+	void CreateBackend();
+	void DestroyBackend();
+
+private:
+	bool							  _initialized = false;
+	std::unique_ptr<Backend::Backend> _backend;
+
+	// Reference count for automatic cleanup consideration
+	static Context					 *_instance;
+	static bool						  _destroyed;
 };
 
 /**
@@ -113,26 +113,26 @@ private:
  */
 class ContextGuard {
 public:
-    explicit ContextGuard(Context& ctx) : _ctx(ctx) {
-        _ctx.MakeCurrent();
-    }
+	explicit ContextGuard(Context &ctx) : _ctx(ctx) {
+		_ctx.MakeCurrent();
+	}
 
-    ~ContextGuard() {
-        _ctx.MakeNoneCurrent();
-    }
+	~ContextGuard() {
+		_ctx.MakeNoneCurrent();
+	}
 
-    ContextGuard(const ContextGuard&) = delete;
-    ContextGuard& operator=(const ContextGuard&) = delete;
+	ContextGuard(const ContextGuard &)			  = delete;
+	ContextGuard &operator=(const ContextGuard &) = delete;
 
 private:
-    Context& _ctx;
+	Context &_ctx;
 };
 
 /**
  * Auto-initialization helper - call this in any GPU operation entry point
  */
 inline void AutoInitContext() {
-    Context::GetInstance().Initialize();
+	Context::GetInstance().Initialize();
 }
 
 } // namespace GPU::Runtime

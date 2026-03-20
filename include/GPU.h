@@ -45,9 +45,9 @@
 #include <IR/Value/Value.h>
 // Include vector/matrix expression specializations BEFORE Expr.h
 // These headers include Expr.h and define specializations immediately after
-#include <IR/Value/ExprVector.h>
 #include <IR/Value/ExprIVector.h>
 #include <IR/Value/ExprMatrix.h>
+#include <IR/Value/ExprVector.h>
 // Var.h includes VarVector, VarIVector, VarMatrix at end
 #include <IR/Value/Var.h>
 #include <IR/Value/VarArray.h>
@@ -90,11 +90,11 @@
 // Window (Optional - for interactive visualization)
 // =============================================================================
 #include <Window/AppWindow.h>
+#include <Window/Input.h>
 #include <Window/PixelBuffer.h>
 #include <Window/TexturePresenter.h>
 #include <Window/WindowConfig.h>
 #include <Window/WindowEvents.h>
-#include <Window/Input.h>
 
 // =============================================================================
 // Utilities
@@ -167,22 +167,22 @@ using FragmentKernel2D = Kernel::FragmentKernel2D;
 // =============================================================================
 
 /// Alias for AppWindow
-using Window = GPU::Window::AppWindow;
+using Window		   = GPU::Window::AppWindow;
 
 /// Alias for PixelBuffer
-using PixelBuffer = GPU::Window::PixelBuffer;
+using PixelBuffer	   = GPU::Window::PixelBuffer;
 
 /// Alias for TexturePresenter
 using TexturePresenter = GPU::Window::TexturePresenter;
 
 /// Alias for WindowEvent
-using WindowEvent = GPU::Window::WindowEvent;
+using WindowEvent	   = GPU::Window::WindowEvent;
 
 /// Alias for Key
-using Key = GPU::Window::Key;
+using Key			   = GPU::Window::Key;
 
 /// Alias for MouseButton
-using MouseButton = GPU::Window::MouseButton;
+using MouseButton	   = GPU::Window::MouseButton;
 
 /// Alias for ModifierFlags
-using ModifierFlags = GPU::Window::ModifierFlags;
+using ModifierFlags	   = GPU::Window::ModifierFlags;

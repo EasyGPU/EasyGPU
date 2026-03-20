@@ -405,4 +405,3 @@ bool FragmentKernel2D::IsProfilingEnabled() const {
 } // namespace GPU::Kernel
 
 #endif // _WIN32
-

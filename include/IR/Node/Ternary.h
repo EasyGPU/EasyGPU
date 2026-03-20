@@ -36,19 +36,19 @@ public:
 	 * Getting the condition node
 	 * @return The condition node
 	 */
-	[[nodiscard]] const Node *Condition() const;
+	[[nodiscard]] const Node		   *Condition() const;
 
 	/**
 	 * Getting the true expression node
 	 * @return The true expression node
 	 */
-	[[nodiscard]] const Node *TrueExpr() const;
+	[[nodiscard]] const Node		   *TrueExpr() const;
 
 	/**
 	 * Getting the false expression node
 	 * @return The false expression node
 	 */
-	[[nodiscard]] const Node *FalseExpr() const;
+	[[nodiscard]] const Node		   *FalseExpr() const;
 
 	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 

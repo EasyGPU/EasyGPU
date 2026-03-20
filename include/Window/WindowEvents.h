@@ -19,8 +19,8 @@ namespace GPU::Window {
  * @brief Window resize event
  */
 struct WindowResizeEvent {
-    uint32_t width;
-    uint32_t height;
+	uint32_t width;
+	uint32_t height;
 };
 
 /**
@@ -32,57 +32,57 @@ struct WindowCloseEvent {};
  * @brief Keyboard key event
  */
 struct KeyEvent {
-    Key           key;
-    bool          pressed;
-    ModifierFlags modifiers;
+	Key			  key;
+	bool		  pressed;
+	ModifierFlags modifiers;
 };
 
 /**
  * @brief Character input event (for text entry)
  */
 struct CharInputEvent {
-    uint32_t codepoint;
+	uint32_t codepoint;
 };
 
 /**
  * @brief Mouse button event
  */
 struct MouseButtonEvent {
-    MouseButton   button;
-    bool          pressed;
-    int32_t       x;
-    int32_t       y;
-    ModifierFlags modifiers;
+	MouseButton	  button;
+	bool		  pressed;
+	int32_t		  x;
+	int32_t		  y;
+	ModifierFlags modifiers;
 };
 
 /**
  * @brief Mouse move event
  */
 struct MouseMoveEvent {
-    int32_t x;
-    int32_t y;
-    int32_t dx;
-    int32_t dy;
+	int32_t x;
+	int32_t y;
+	int32_t dx;
+	int32_t dy;
 };
 
 /**
  * @brief Mouse scroll event
  */
 struct MouseScrollEvent {
-    float dx;
-    float dy;
+	float dx;
+	float dy;
 };
 
 /**
  * @brief Window focus event
  */
 struct WindowFocusEvent {
-    bool focused;
+	bool focused;
 };
 
 /**
  * @brief Variant type for all window events
- * 
+ *
  * Usage:
  *   WindowEvent event;
  *   while (window.PollEvent(event)) {
@@ -92,16 +92,8 @@ struct WindowFocusEvent {
  *       }
  *   }
  */
-using WindowEvent = std::variant<
-    WindowResizeEvent,
-    WindowCloseEvent,
-    KeyEvent,
-    CharInputEvent,
-    MouseButtonEvent,
-    MouseMoveEvent,
-    MouseScrollEvent,
-    WindowFocusEvent
->;
+using WindowEvent = std::variant<WindowResizeEvent, WindowCloseEvent, KeyEvent, CharInputEvent, MouseButtonEvent,
+								 MouseMoveEvent, MouseScrollEvent, WindowFocusEvent>;
 
 } // namespace GPU::Window
 

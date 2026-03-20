@@ -25,27 +25,27 @@ namespace GPU::Kernel {
  */
 class KernelBuilderGuard {
 public:
-    KernelBuilderGuard(IR::Builder::Builder& builder, KernelBuildContext& newContext)
-        : _builder(builder), _previousContext(builder.Context()) {
-        _builder.Bind(newContext);
-    }
+	KernelBuilderGuard(IR::Builder::Builder &builder, KernelBuildContext &newContext)
+		: _builder(builder), _previousContext(builder.Context()) {
+		_builder.Bind(newContext);
+	}
 
-    ~KernelBuilderGuard() {
-        if (_previousContext != nullptr) {
-            _builder.Bind(*_previousContext);
-        } else {
-            _builder.Unbind();
-        }
-    }
+	~KernelBuilderGuard() {
+		if (_previousContext != nullptr) {
+			_builder.Bind(*_previousContext);
+		} else {
+			_builder.Unbind();
+		}
+	}
 
-    KernelBuilderGuard(const KernelBuilderGuard&) = delete;
-    KernelBuilderGuard& operator=(const KernelBuilderGuard&) = delete;
-    KernelBuilderGuard(KernelBuilderGuard&&) = delete;
-    KernelBuilderGuard& operator=(KernelBuilderGuard&&) = delete;
+	KernelBuilderGuard(const KernelBuilderGuard &)			  = delete;
+	KernelBuilderGuard &operator=(const KernelBuilderGuard &) = delete;
+	KernelBuilderGuard(KernelBuilderGuard &&)				  = delete;
+	KernelBuilderGuard &operator=(KernelBuilderGuard &&)	  = delete;
 
 private:
-    IR::Builder::Builder& _builder;
-    IR::Builder::BuilderContext* _previousContext;
+	IR::Builder::Builder		&_builder;
+	IR::Builder::BuilderContext *_previousContext;
 };
 
 // ===================================================================================
@@ -53,32 +53,32 @@ private:
 // ===================================================================================
 
 void KernelBase::WorkgroupBarrier() {
-    auto* context = IR::Builder::Builder::Get().Context();
-    if (context != nullptr) {
-        context->PushTranslatedCode("barrier();\n");
-    }
+	auto *context = IR::Builder::Builder::Get().Context();
+	if (context != nullptr) {
+		context->PushTranslatedCode("barrier();\n");
+	}
 }
 
 void KernelBase::MemoryBarrier() {
-    auto* context = IR::Builder::Builder::Get().Context();
-    if (context != nullptr) {
-        context->PushTranslatedCode("memoryBarrier();\n");
-    }
+	auto *context = IR::Builder::Builder::Get().Context();
+	if (context != nullptr) {
+		context->PushTranslatedCode("memoryBarrier();\n");
+	}
 }
 
 void KernelBase::FullBarrier() {
-    auto* context = IR::Builder::Builder::Get().Context();
-    if (context != nullptr) {
-        context->PushTranslatedCode("memoryBarrier();\n");
-        context->PushTranslatedCode("barrier();\n");
-    }
+	auto *context = IR::Builder::Builder::Get().Context();
+	if (context != nullptr) {
+		context->PushTranslatedCode("memoryBarrier();\n");
+		context->PushTranslatedCode("barrier();\n");
+	}
 }
 
 void KernelBase::RuntimeBarrier() {
-    auto* backend = Runtime::Context::GetBackend();
-    if (backend) {
-        backend->MemoryBarrier(Backend::BarrierType::All);
-    }
+	auto *backend = Runtime::Context::GetBackend();
+	if (backend) {
+		backend->MemoryBarrier(Backend::BarrierType::All);
+	}
 }
 
 // ===================================================================================
@@ -88,471 +88,471 @@ void KernelBase::RuntimeBarrier() {
 /**
  * Execute the compute shader dispatch using the backend
  */
-static void ExecuteComputeDispatch(KernelBuildContext& context, int groupX, int groupY, int groupZ, bool sync = false) {
-    // Initialize context
-    Runtime::AutoInitContext();
+static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int groupY, int groupZ, bool sync = false) {
+	// Initialize context
+	Runtime::AutoInitContext();
 
-    // Make context current
-    Runtime::Context::GetInstance().MakeCurrent();
+	// Make context current
+	Runtime::Context::GetInstance().MakeCurrent();
 
-    // Get the backend
-    auto* backend = Runtime::Context::GetBackend();
-    if (!backend) {
-        throw std::runtime_error("Backend not available");
-    }
+	// Get the backend
+	auto *backend = Runtime::Context::GetBackend();
+	if (!backend) {
+		throw std::runtime_error("Backend not available");
+	}
 
-    // Get or create the cached pipeline
-    Backend::PipelineHandle pipeline = context.GetCachedPipeline();
-    if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
-        // Get the complete shader code
-        std::string shaderSource = context.GetCompleteCode();
+	// Get or create the cached pipeline
+	Backend::PipelineHandle pipeline = context.GetCachedPipeline();
+	if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
+		// Get the complete shader code
+		std::string			shaderSource = context.GetCompleteCode();
 
-        // Create compute shader
-        Backend::ShaderDesc shaderDesc;
-        shaderDesc.type = Backend::ShaderType::Compute;
-        shaderDesc.sourceCode = shaderSource;
-        shaderDesc.entryPoint = "main";
+		// Create compute shader
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type				 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode		 = shaderSource;
+		shaderDesc.entryPoint		 = "main";
 
-        Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
-        if (shader == Backend::INVALID_SHADER_HANDLE) {
-            throw std::runtime_error("Failed to create compute shader");
-        }
+		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+		if (shader == Backend::INVALID_SHADER_HANDLE) {
+			throw std::runtime_error("Failed to create compute shader");
+		}
 
-        // Create pipeline
-        Backend::PipelineDesc pipelineDesc;
-        pipelineDesc.computeShader = shader;
-        pipelineDesc.workGroupSizeX = context.WorkSizeX;
-        pipelineDesc.workGroupSizeY = context.WorkSizeY;
-        pipelineDesc.workGroupSizeZ = context.WorkSizeZ;
-        pipelineDesc.pushConstantSize = context.GetPushConstantSize();
+		// Create pipeline
+		Backend::PipelineDesc pipelineDesc;
+		pipelineDesc.computeShader	  = shader;
+		pipelineDesc.workGroupSizeX	  = context.WorkSizeX;
+		pipelineDesc.workGroupSizeY	  = context.WorkSizeY;
+		pipelineDesc.workGroupSizeZ	  = context.WorkSizeZ;
+		pipelineDesc.pushConstantSize = context.GetPushConstantSize();
 
-        for (const auto& bufferInfo : context.GetBufferInfos()) {
-            Backend::ResourceLayoutEntry entry;
-            entry.binding = bufferInfo.binding;
-            entry.type = Backend::BindingType::Buffer;
-            entry.readOnly = (bufferInfo.mode == 0x88B8);
-            pipelineDesc.resources.push_back(entry);
-        }
+		for (const auto &bufferInfo : context.GetBufferInfos()) {
+			Backend::ResourceLayoutEntry entry;
+			entry.binding  = bufferInfo.binding;
+			entry.type	   = Backend::BindingType::Buffer;
+			entry.readOnly = (bufferInfo.mode == 0x88B8);
+			pipelineDesc.resources.push_back(entry);
+		}
 
-        for (const auto& textureInfo : context.GetTextureInfos()) {
-            Backend::ResourceLayoutEntry entry;
-            entry.binding = textureInfo.binding;
-            entry.type = textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
-            entry.format = Runtime::ToBackendPixelFormat(textureInfo.format);
-            entry.readOnly = textureInfo.sampled;
-            pipelineDesc.resources.push_back(entry);
-        }
+		for (const auto &textureInfo : context.GetTextureInfos()) {
+			Backend::ResourceLayoutEntry entry;
+			entry.binding  = textureInfo.binding;
+			entry.type	   = textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+			entry.format   = Runtime::ToBackendPixelFormat(textureInfo.format);
+			entry.readOnly = textureInfo.sampled;
+			pipelineDesc.resources.push_back(entry);
+		}
 
-        pipeline = backend->CreatePipeline(pipelineDesc);
-        if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
-            backend->DestroyShader(shader);
-            throw std::runtime_error("Failed to create compute pipeline");
-        }
+		pipeline = backend->CreatePipeline(pipelineDesc);
+		if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
+			backend->DestroyShader(shader);
+			throw std::runtime_error("Failed to create compute pipeline");
+		}
 
-        // Cache the pipeline for future dispatches
-        context.SetCachedPipeline(pipeline);
+		// Cache the pipeline for future dispatches
+		context.SetCachedPipeline(pipeline);
 
-        // Shader can be destroyed after linking (it's referenced by the pipeline)
-        backend->DestroyShader(shader);
-    }
+		// Shader can be destroyed after linking (it's referenced by the pipeline)
+		backend->DestroyShader(shader);
+	}
 
-    // Bind the pipeline
-    backend->BindPipeline(pipeline);
+	// Bind the pipeline
+	backend->BindPipeline(pipeline);
 
-    // Upload uniform values
-    context.UploadUniformValues(pipeline);
+	// Upload uniform values
+	context.UploadUniformValues(pipeline);
 
-    // Prepare resource bindings
-    std::vector<Backend::ResourceBinding> bindings;
+	// Prepare resource bindings
+	std::vector<Backend::ResourceBinding> bindings;
 
-    // Bind all buffers to their specified binding points
-    const auto& bufferBindings = context.GetRuntimeBufferBindings();
-    for (const auto& [binding, handle] : bufferBindings) {
-        Backend::ResourceBinding rb;
-        rb.binding = binding;
-        rb.type = Backend::BindingType::Buffer;
-        rb.buffer = static_cast<Backend::BufferHandle>(handle);
-        bindings.push_back(rb);
-    }
+	// Bind all buffers to their specified binding points
+	const auto							 &bufferBindings = context.GetRuntimeBufferBindings();
+	for (const auto &[binding, handle] : bufferBindings) {
+		Backend::ResourceBinding rb;
+		rb.binding = binding;
+		rb.type	   = Backend::BindingType::Buffer;
+		rb.buffer  = static_cast<Backend::BufferHandle>(handle);
+		bindings.push_back(rb);
+	}
 
-    // Bind all textures to their specified binding points
-    const auto& textureBindings = context.GetRuntimeTextureBindings();
-    for (const auto& [binding, handle] : textureBindings) {
-        const auto* textureInfo = context.FindTextureInfo(binding);
-        if (!textureInfo) {
-            throw std::runtime_error("Runtime texture binding missing shader-side texture metadata");
-        }
-        Backend::ResourceBinding rb;
-        rb.binding = binding;
-        rb.type = textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
-        rb.texture = static_cast<Backend::TextureHandle>(handle);
-        rb.format = Runtime::ToBackendPixelFormat(textureInfo->format);
-        rb.readOnly = textureInfo->sampled;
-        bindings.push_back(rb);
-    }
+	// Bind all textures to their specified binding points
+	const auto &textureBindings = context.GetRuntimeTextureBindings();
+	for (const auto &[binding, handle] : textureBindings) {
+		const auto *textureInfo = context.FindTextureInfo(binding);
+		if (!textureInfo) {
+			throw std::runtime_error("Runtime texture binding missing shader-side texture metadata");
+		}
+		Backend::ResourceBinding rb;
+		rb.binding	= binding;
+		rb.type		= textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+		rb.texture	= static_cast<Backend::TextureHandle>(handle);
+		rb.format	= Runtime::ToBackendPixelFormat(textureInfo->format);
+		rb.readOnly = textureInfo->sampled;
+		bindings.push_back(rb);
+	}
 
-    // Bind all buffer slots (dynamic resource switching)
-    const auto& bufferSlots = context.GetBufferSlots();
-    for (auto* slot : bufferSlots) {
-        if (!slot->IsAttached()) {
-            throw std::runtime_error("BufferSlot not attached at dispatch time");
-        }
-        Backend::ResourceBinding rb;
-        rb.binding = static_cast<uint32_t>(slot->GetBinding());
-        rb.type = Backend::BindingType::Buffer;
-        rb.buffer = slot->GetHandle();
-        bindings.push_back(rb);
-    }
+	// Bind all buffer slots (dynamic resource switching)
+	const auto &bufferSlots = context.GetBufferSlots();
+	for (auto *slot : bufferSlots) {
+		if (!slot->IsAttached()) {
+			throw std::runtime_error("BufferSlot not attached at dispatch time");
+		}
+		Backend::ResourceBinding rb;
+		rb.binding = static_cast<uint32_t>(slot->GetBinding());
+		rb.type	   = Backend::BindingType::Buffer;
+		rb.buffer  = slot->GetHandle();
+		bindings.push_back(rb);
+	}
 
-    // Bind all texture slots
-    const auto& textureSlots = context.GetTextureSlots();
-    for (auto* slot : textureSlots) {
-        if (!slot->IsAttached()) {
-            throw std::runtime_error("TextureSlot not attached at dispatch time");
-        }
-        const auto* textureInfo = context.FindTextureInfo(static_cast<uint32_t>(slot->GetBinding()));
-        if (!textureInfo) {
-            throw std::runtime_error("TextureSlot missing shader-side texture metadata");
-        }
-        Backend::ResourceBinding rb;
-        rb.binding = static_cast<uint32_t>(slot->GetBinding());
-        rb.type = textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
-        rb.texture = slot->GetHandle();
-        rb.format = Runtime::ToBackendPixelFormat(slot->GetFormat());
-        rb.readOnly = textureInfo->sampled;
-        bindings.push_back(rb);
-    }
+	// Bind all texture slots
+	const auto &textureSlots = context.GetTextureSlots();
+	for (auto *slot : textureSlots) {
+		if (!slot->IsAttached()) {
+			throw std::runtime_error("TextureSlot not attached at dispatch time");
+		}
+		const auto *textureInfo = context.FindTextureInfo(static_cast<uint32_t>(slot->GetBinding()));
+		if (!textureInfo) {
+			throw std::runtime_error("TextureSlot missing shader-side texture metadata");
+		}
+		Backend::ResourceBinding rb;
+		rb.binding	= static_cast<uint32_t>(slot->GetBinding());
+		rb.type		= textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+		rb.texture	= slot->GetHandle();
+		rb.format	= Runtime::ToBackendPixelFormat(slot->GetFormat());
+		rb.readOnly = textureInfo->sampled;
+		bindings.push_back(rb);
+	}
 
-    // Bind all resources
-    if (!bindings.empty()) {
-        backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
-    }
+	// Bind all resources
+	if (!bindings.empty()) {
+		backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
+	}
 
-    // Dispatch the compute shader
-    backend->Dispatch(groupX, groupY, groupZ);
+	// Dispatch the compute shader
+	backend->Dispatch(groupX, groupY, groupZ);
 
-    // Sync if requested
-    if (sync) {
-        backend->MemoryBarrier(Backend::BarrierType::All);
-        backend->Finish();
-    }
+	// Sync if requested
+	if (sync) {
+		backend->MemoryBarrier(Backend::BarrierType::All);
+		backend->Finish();
+	}
 }
 
 // ===================================================================================
 // Inspector Kernels - For debugging
 // ===================================================================================
 
-InspectorKernel1D::InspectorKernel1D(const std::function<void(IR::Value::Var<int>& Id)>& Func, int WorkSizeX)
-    : _context(1) {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+InspectorKernel1D::InspectorKernel1D(const std::function<void(IR::Value::Var<int> &Id)> &Func, int WorkSizeX)
+	: _context(1) {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeX = WorkSizeX;
 
-    IR::Value::Var<int> Id("(int(gl_GlobalInvocationID.x))");
-    Func(Id);
+	IR::Value::Var<int> Id("(int(gl_GlobalInvocationID.x))");
+	Func(Id);
 }
 
 void InspectorKernel1D::PrintCode() {
-    std::cout << _context.GetCompleteCode() << std::endl;
+	std::cout << _context.GetCompleteCode() << std::endl;
 }
 
 std::string InspectorKernel1D::GetCode() {
-    return _context.GetCompleteCode();
+	return _context.GetCompleteCode();
 }
 
 bool InspectorKernel1D::Compile() {
-    std::string unused;
-    return Compile(unused);
+	std::string unused;
+	return Compile(unused);
 }
 
-bool InspectorKernel1D::Compile(std::string& errorMessage) {
-    try {
-        Runtime::AutoInitContext();
-        Runtime::ContextGuard guard(Runtime::Context::GetInstance());
+bool InspectorKernel1D::Compile(std::string &errorMessage) {
+	try {
+		Runtime::AutoInitContext();
+		Runtime::ContextGuard guard(Runtime::Context::GetInstance());
 
-        std::string shaderSource = _context.GetCompleteCode();
-        
-        auto* backend = Runtime::Context::GetBackend();
-        if (!backend) {
-            errorMessage = "Backend not available";
-            return false;
-        }
+		std::string			  shaderSource = _context.GetCompleteCode();
 
-        // Create and compile shader through backend
-        Backend::ShaderDesc shaderDesc;
-        shaderDesc.type = Backend::ShaderType::Compute;
-        shaderDesc.sourceCode = shaderSource;
-        
-        Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
-        if (shader == Backend::INVALID_SHADER_HANDLE) {
-            errorMessage = "Shader compilation failed";
-            return false;
-        }
+		auto				 *backend	   = Runtime::Context::GetBackend();
+		if (!backend) {
+			errorMessage = "Backend not available";
+			return false;
+		}
 
-        backend->DestroyShader(shader);
-        return true;
-    } catch (const std::exception& e) {
-        errorMessage = e.what();
-        return false;
-    }
+		// Create and compile shader through backend
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type				 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode		 = shaderSource;
+
+		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+		if (shader == Backend::INVALID_SHADER_HANDLE) {
+			errorMessage = "Shader compilation failed";
+			return false;
+		}
+
+		backend->DestroyShader(shader);
+		return true;
+	} catch (const std::exception &e) {
+		errorMessage = e.what();
+		return false;
+	}
 }
 
 InspectorKernel2D::InspectorKernel2D(
-    const std::function<void(IR::Value::Var<int>& IdX, IR::Value::Var<int>& IdY)>& Func, int WorkSizeX, int WorkSizeY)
-    : _context(2) {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+	const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY)> &Func, int WorkSizeX, int WorkSizeY)
+	: _context(2) {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
-    _context.WorkSizeY = WorkSizeY;
+	_context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeY = WorkSizeY;
 
-    IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
-    IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
-    Func(IdX, IdY);
+	IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
+	IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
+	Func(IdX, IdY);
 }
 
 void InspectorKernel2D::PrintCode() {
-    std::cout << _context.GetCompleteCode() << std::endl;
+	std::cout << _context.GetCompleteCode() << std::endl;
 }
 
 std::string InspectorKernel2D::GetCode() {
-    return _context.GetCompleteCode();
+	return _context.GetCompleteCode();
 }
 
 bool InspectorKernel2D::Compile() {
-    std::string unused;
-    return Compile(unused);
+	std::string unused;
+	return Compile(unused);
 }
 
-bool InspectorKernel2D::Compile(std::string& errorMessage) {
-    try {
-        Runtime::AutoInitContext();
-        Runtime::ContextGuard guard(Runtime::Context::GetInstance());
+bool InspectorKernel2D::Compile(std::string &errorMessage) {
+	try {
+		Runtime::AutoInitContext();
+		Runtime::ContextGuard guard(Runtime::Context::GetInstance());
 
-        std::string shaderSource = _context.GetCompleteCode();
-        
-        auto* backend = Runtime::Context::GetBackend();
-        if (!backend) {
-            errorMessage = "Backend not available";
-            return false;
-        }
+		std::string			  shaderSource = _context.GetCompleteCode();
 
-        Backend::ShaderDesc shaderDesc;
-        shaderDesc.type = Backend::ShaderType::Compute;
-        shaderDesc.sourceCode = shaderSource;
-        
-        Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
-        if (shader == Backend::INVALID_SHADER_HANDLE) {
-            errorMessage = "Shader compilation failed";
-            return false;
-        }
+		auto				 *backend	   = Runtime::Context::GetBackend();
+		if (!backend) {
+			errorMessage = "Backend not available";
+			return false;
+		}
 
-        backend->DestroyShader(shader);
-        return true;
-    } catch (const std::exception& e) {
-        errorMessage = e.what();
-        return false;
-    }
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type				 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode		 = shaderSource;
+
+		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+		if (shader == Backend::INVALID_SHADER_HANDLE) {
+			errorMessage = "Shader compilation failed";
+			return false;
+		}
+
+		backend->DestroyShader(shader);
+		return true;
+	} catch (const std::exception &e) {
+		errorMessage = e.what();
+		return false;
+	}
 }
 
 InspectorKernel3D::InspectorKernel3D(
-    const std::function<void(IR::Value::Var<int>& IdX, IR::Value::Var<int>& IdY, IR::Value::Var<int>& IdZ)>& Func,
-    int WorkSizeX, int WorkSizeY, int WorkSizeZ)
-    : _context(3) {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+	const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY, IR::Value::Var<int> &IdZ)> &Func,
+	int WorkSizeX, int WorkSizeY, int WorkSizeZ)
+	: _context(3) {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
-    _context.WorkSizeY = WorkSizeY;
-    _context.WorkSizeZ = WorkSizeZ;
+	_context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeY = WorkSizeY;
+	_context.WorkSizeZ = WorkSizeZ;
 
-    IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
-    IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
-    IR::Value::Var<int> IdZ("(int(gl_GlobalInvocationID.z))");
-    Func(IdX, IdY, IdZ);
+	IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
+	IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
+	IR::Value::Var<int> IdZ("(int(gl_GlobalInvocationID.z))");
+	Func(IdX, IdY, IdZ);
 }
 
 void InspectorKernel3D::PrintCode() {
-    std::cout << _context.GetCompleteCode() << std::endl;
+	std::cout << _context.GetCompleteCode() << std::endl;
 }
 
 std::string InspectorKernel3D::GetCode() {
-    return _context.GetCompleteCode();
+	return _context.GetCompleteCode();
 }
 
 bool InspectorKernel3D::Compile() {
-    std::string unused;
-    return Compile(unused);
+	std::string unused;
+	return Compile(unused);
 }
 
-bool InspectorKernel3D::Compile(std::string& errorMessage) {
-    try {
-        Runtime::AutoInitContext();
-        Runtime::ContextGuard guard(Runtime::Context::GetInstance());
+bool InspectorKernel3D::Compile(std::string &errorMessage) {
+	try {
+		Runtime::AutoInitContext();
+		Runtime::ContextGuard guard(Runtime::Context::GetInstance());
 
-        std::string shaderSource = _context.GetCompleteCode();
-        
-        auto* backend = Runtime::Context::GetBackend();
-        if (!backend) {
-            errorMessage = "Backend not available";
-            return false;
-        }
+		std::string			  shaderSource = _context.GetCompleteCode();
 
-        Backend::ShaderDesc shaderDesc;
-        shaderDesc.type = Backend::ShaderType::Compute;
-        shaderDesc.sourceCode = shaderSource;
-        
-        Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
-        if (shader == Backend::INVALID_SHADER_HANDLE) {
-            errorMessage = "Shader compilation failed";
-            return false;
-        }
+		auto				 *backend	   = Runtime::Context::GetBackend();
+		if (!backend) {
+			errorMessage = "Backend not available";
+			return false;
+		}
 
-        backend->DestroyShader(shader);
-        return true;
-    } catch (const std::exception& e) {
-        errorMessage = e.what();
-        return false;
-    }
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type				 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode		 = shaderSource;
+
+		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+		if (shader == Backend::INVALID_SHADER_HANDLE) {
+			errorMessage = "Shader compilation failed";
+			return false;
+		}
+
+		backend->DestroyShader(shader);
+		return true;
+	} catch (const std::exception &e) {
+		errorMessage = e.what();
+		return false;
+	}
 }
 
 // ===================================================================================
 // Executable Kernels
 // ===================================================================================
 
-Kernel1D::Kernel1D(const std::function<void(IR::Value::Var<int>& Id)>& Func, int WorkSizeX)
-    : _context(1), _name("Kernel1D") {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+Kernel1D::Kernel1D(const std::function<void(IR::Value::Var<int> &Id)> &Func, int WorkSizeX)
+	: _context(1), _name("Kernel1D") {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeX = WorkSizeX;
 
-    IR::Value::Var<int> Id("(int(gl_GlobalInvocationID.x))");
-    Func(Id);
+	IR::Value::Var<int> Id("(int(gl_GlobalInvocationID.x))");
+	Func(Id);
 }
 
-Kernel1D::Kernel1D(const std::string& name, const std::function<void(IR::Value::Var<int>& Id)>& Func, int WorkSizeX)
-    : _context(1), _name(name) {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+Kernel1D::Kernel1D(const std::string &name, const std::function<void(IR::Value::Var<int> &Id)> &Func, int WorkSizeX)
+	: _context(1), _name(name) {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeX = WorkSizeX;
 
-    IR::Value::Var<int> Id("(int(gl_GlobalInvocationID.x))");
-    Func(Id);
+	IR::Value::Var<int> Id("(int(gl_GlobalInvocationID.x))");
+	Func(Id);
 }
 
-void Kernel1D::SetName(const std::string& name) {
-    _name = name;
+void Kernel1D::SetName(const std::string &name) {
+	_name = name;
 }
 
 std::string Kernel1D::GetName() const {
-    return _name;
+	return _name;
 }
 
 void Kernel1D::Dispatch(int GroupX, bool sync) {
-    auto& profiler = KernelProfiler::GetInstance();
-    unsigned int queryId = profiler.BeginQuery();
-    ExecuteComputeDispatch(_context, GroupX, 1, 1, sync);
-    profiler.EndQuery(queryId, _name, GroupX, 1, 1);
+	auto		&profiler = KernelProfiler::GetInstance();
+	unsigned int queryId  = profiler.BeginQuery();
+	ExecuteComputeDispatch(_context, GroupX, 1, 1, sync);
+	profiler.EndQuery(queryId, _name, GroupX, 1, 1);
 }
 
 std::string Kernel1D::GetCode() {
-    return _context.GetCompleteCode();
+	return _context.GetCompleteCode();
 }
 
-Kernel2D::Kernel2D(const std::function<void(IR::Value::Var<int>& IdX, IR::Value::Var<int>& IdY)>& Func, int WorkSizeX,
-                   int WorkSizeY)
-    : _context(2), _name("Kernel2D") {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+Kernel2D::Kernel2D(const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY)> &Func, int WorkSizeX,
+				   int WorkSizeY)
+	: _context(2), _name("Kernel2D") {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
-    _context.WorkSizeY = WorkSizeY;
+	_context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeY = WorkSizeY;
 
-    IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
-    IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
-    Func(IdX, IdY);
+	IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
+	IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
+	Func(IdX, IdY);
 }
 
-Kernel2D::Kernel2D(const std::string& name,
-                   const std::function<void(IR::Value::Var<int>& IdX, IR::Value::Var<int>& IdY)>& Func, int WorkSizeX,
-                   int WorkSizeY)
-    : _context(2), _name(name) {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+Kernel2D::Kernel2D(const std::string															 &name,
+				   const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY)> &Func, int WorkSizeX,
+				   int WorkSizeY)
+	: _context(2), _name(name) {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
-    _context.WorkSizeY = WorkSizeY;
+	_context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeY = WorkSizeY;
 
-    IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
-    IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
-    Func(IdX, IdY);
+	IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
+	IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
+	Func(IdX, IdY);
 }
 
-void Kernel2D::SetName(const std::string& name) {
-    _name = name;
+void Kernel2D::SetName(const std::string &name) {
+	_name = name;
 }
 
 std::string Kernel2D::GetName() const {
-    return _name;
+	return _name;
 }
 
 void Kernel2D::Dispatch(int GroupX, int GroupY, bool sync) {
-    auto& profiler = KernelProfiler::GetInstance();
-    unsigned int queryId = profiler.BeginQuery();
-    ExecuteComputeDispatch(_context, GroupX, GroupY, 1, sync);
-    profiler.EndQuery(queryId, _name, GroupX, GroupY, 1);
+	auto		&profiler = KernelProfiler::GetInstance();
+	unsigned int queryId  = profiler.BeginQuery();
+	ExecuteComputeDispatch(_context, GroupX, GroupY, 1, sync);
+	profiler.EndQuery(queryId, _name, GroupX, GroupY, 1);
 }
 
 std::string Kernel2D::GetCode() {
-    return _context.GetCompleteCode();
+	return _context.GetCompleteCode();
 }
 
 Kernel3D::Kernel3D(
-    const std::function<void(IR::Value::Var<int>& IdX, IR::Value::Var<int>& IdY, IR::Value::Var<int>& IdZ)>& Func,
-    int WorkSizeX, int WorkSizeY, int WorkSizeZ)
-    : _context(3), _name("Kernel3D") {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+	const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY, IR::Value::Var<int> &IdZ)> &Func,
+	int WorkSizeX, int WorkSizeY, int WorkSizeZ)
+	: _context(3), _name("Kernel3D") {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
-    _context.WorkSizeY = WorkSizeY;
-    _context.WorkSizeZ = WorkSizeZ;
+	_context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeY = WorkSizeY;
+	_context.WorkSizeZ = WorkSizeZ;
 
-    IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
-    IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
-    IR::Value::Var<int> IdZ("(int(gl_GlobalInvocationID.z))");
-    Func(IdX, IdY, IdZ);
+	IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
+	IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
+	IR::Value::Var<int> IdZ("(int(gl_GlobalInvocationID.z))");
+	Func(IdX, IdY, IdZ);
 }
 
 Kernel3D::Kernel3D(
-    const std::string& name,
-    const std::function<void(IR::Value::Var<int>& IdX, IR::Value::Var<int>& IdY, IR::Value::Var<int>& IdZ)>& Func,
-    int WorkSizeX, int WorkSizeY, int WorkSizeZ)
-    : _context(3), _name(name) {
-    KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
+	const std::string																						&name,
+	const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY, IR::Value::Var<int> &IdZ)> &Func,
+	int WorkSizeX, int WorkSizeY, int WorkSizeZ)
+	: _context(3), _name(name) {
+	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);
 
-    _context.WorkSizeX = WorkSizeX;
-    _context.WorkSizeY = WorkSizeY;
-    _context.WorkSizeZ = WorkSizeZ;
+	_context.WorkSizeX = WorkSizeX;
+	_context.WorkSizeY = WorkSizeY;
+	_context.WorkSizeZ = WorkSizeZ;
 
-    IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
-    IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
-    IR::Value::Var<int> IdZ("(int(gl_GlobalInvocationID.z))");
-    Func(IdX, IdY, IdZ);
+	IR::Value::Var<int> IdX("(int(gl_GlobalInvocationID.x))");
+	IR::Value::Var<int> IdY("(int(gl_GlobalInvocationID.y))");
+	IR::Value::Var<int> IdZ("(int(gl_GlobalInvocationID.z))");
+	Func(IdX, IdY, IdZ);
 }
 
-void Kernel3D::SetName(const std::string& name) {
-    _name = name;
+void Kernel3D::SetName(const std::string &name) {
+	_name = name;
 }
 
 std::string Kernel3D::GetName() const {
-    return _name;
+	return _name;
 }
 
 void Kernel3D::Dispatch(int GroupX, int GroupY, int GroupZ, bool sync) {
-    auto& profiler = KernelProfiler::GetInstance();
-    unsigned int queryId = profiler.BeginQuery();
-    ExecuteComputeDispatch(_context, GroupX, GroupY, GroupZ, sync);
-    profiler.EndQuery(queryId, _name, GroupX, GroupY, GroupZ);
+	auto		&profiler = KernelProfiler::GetInstance();
+	unsigned int queryId  = profiler.BeginQuery();
+	ExecuteComputeDispatch(_context, GroupX, GroupY, GroupZ, sync);
+	profiler.EndQuery(queryId, _name, GroupX, GroupY, GroupZ);
 }
 
 std::string Kernel3D::GetCode() {
-    return _context.GetCompleteCode();
+	return _context.GetCompleteCode();
 }
 
 } // namespace GPU::Kernel
