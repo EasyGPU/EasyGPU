@@ -1,5 +1,9 @@
-#include <GPU.h>
+// Include Runtime headers needed for Buffer operations
+#include <Runtime/Buffer.h>
+#include <Runtime/PixelFormat.h>
+
 #include <Window/TexturePresenter.h>
+#include <Window/AppWindow.h>
 
 namespace GPU::Window {
 

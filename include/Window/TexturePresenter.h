@@ -11,10 +11,17 @@
 #include <Window/AppWindow.h>
 #include <Window/PixelBuffer.h>
 
-// Forward declarations for Runtime types
+// Forward declarations for Runtime types - only include what we need
 namespace GPU::Runtime {
+
 template <typename T> class Buffer;
+
+// Forward declare PixelFormat enum
+enum class PixelFormat : uint8_t;
+
+// Forward declare Texture2D with template parameter
 template <PixelFormat Format> class Texture2D;
+
 } // namespace GPU::Runtime
 
 #include <memory>

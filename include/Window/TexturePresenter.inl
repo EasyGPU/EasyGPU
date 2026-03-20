@@ -8,10 +8,11 @@
 #ifndef EASYGPU_TEXTURE_PRESENTER_INL
 #define EASYGPU_TEXTURE_PRESENTER_INL
 
-// Include GPU.h first to ensure correct header order
-#include <GPU.h>
+#include <Runtime/Texture.h>
+#include <Runtime/PixelFormat.h>
 
-#include <Window/TexturePresenter.h>
+#include <cstring>
+#include <vector>
 
 namespace GPU::Window {
 
