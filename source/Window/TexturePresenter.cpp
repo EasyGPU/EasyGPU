@@ -1,4 +1,4 @@
-#include <Window/AppWindow.h>
+#include <GPU.h>
 #include <Window/TexturePresenter.h>
 
 namespace GPU::Window {
