@@ -87,6 +87,16 @@
 #include <Runtime/Uniform.h>
 
 // =============================================================================
+// Window (Optional - for interactive visualization)
+// =============================================================================
+#include <Window/AppWindow.h>
+#include <Window/PixelBuffer.h>
+#include <Window/TexturePresenter.h>
+#include <Window/WindowConfig.h>
+#include <Window/WindowEvents.h>
+#include <Window/Input.h>
+
+// =============================================================================
 // Utilities
 // =============================================================================
 #include <Utility/Helpers.h>
@@ -149,4 +159,30 @@ using InspectorKernel3D = Kernel::InspectorKernel3D;
 #ifdef _WIN32
 using FragmentKernel2D = Kernel::FragmentKernel2D;
 #endif
+
 } // namespace GPU
+
+// =============================================================================
+// Window Component Aliases (in global namespace for convenience)
+// =============================================================================
+
+/// Alias for AppWindow
+using Window = GPU::Window::AppWindow;
+
+/// Alias for PixelBuffer
+using PixelBuffer = GPU::Window::PixelBuffer;
+
+/// Alias for TexturePresenter
+using TexturePresenter = GPU::Window::TexturePresenter;
+
+/// Alias for WindowEvent
+using WindowEvent = GPU::Window::WindowEvent;
+
+/// Alias for Key
+using Key = GPU::Window::Key;
+
+/// Alias for MouseButton
+using MouseButton = GPU::Window::MouseButton;
+
+/// Alias for ModifierFlags
+using ModifierFlags = GPU::Window::ModifierFlags;

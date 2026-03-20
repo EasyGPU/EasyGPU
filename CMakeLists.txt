@@ -15,7 +15,9 @@ project(EasyGPU
 option(EASYGPU_BUILD_EXAMPLES "Build example programs" ON)
 option(EASYGPU_BUILD_TESTS "Build test suite" ON)
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
-set(EASYGPU_BACKEND "OpenGL" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
+option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ON)
+option(EASYGPU_BUILD_WINDOW_EXAMPLES "Build window examples" ON)
+set(EASYGPU_BACKEND "Vulkan" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
 set_property(CACHE EASYGPU_BACKEND PROPERTY STRINGS OpenGL Vulkan)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -52,6 +54,79 @@ elseif(UNIX AND NOT APPLE)
     find_package(OpenGL REQUIRED)
     find_package(X11 REQUIRED)
     set(EASYGPU_PLATFORM_LIBS ${OPENGL_LIBRARIES} ${X11_LIBRARIES})
+endif()
+
+# =============================================================================
+# Window Component (minifb)
+# =============================================================================
+if(EASYGPU_BUILD_WINDOW)
+    # minifb platform-specific sources
+    set(MINIFB_SOURCES
+        third/minifb/src/MiniFB_common.c
+        third/minifb/src/MiniFB_internal.c
+        third/minifb/src/MiniFB_timer.c
+    )
+    
+    if(WIN32)
+        list(APPEND MINIFB_SOURCES
+            third/minifb/src/windows/WinMiniFB.c
+        )
+        set(MINIFB_LIBS winmm)
+    elseif(UNIX AND NOT APPLE)
+        list(APPEND MINIFB_SOURCES
+            third/minifb/src/x11/X11MiniFB.c
+        )
+        set(MINIFB_LIBS X11 Xcursor Xrandr Xinerama Xi pthread)
+    endif()
+    
+    # Create minifb as an object library (linked into EasyGPUWindow)
+    add_library(minifb STATIC ${MINIFB_SOURCES})
+    target_include_directories(minifb PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src
+    )
+    
+    if(WIN32)
+        target_include_directories(minifb PRIVATE 
+            ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/windows
+        )
+    elseif(UNIX AND NOT APPLE)
+        target_include_directories(minifb PRIVATE 
+            ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/x11
+        )
+    endif()
+    
+    if(MINIFB_LIBS)
+        target_link_libraries(minifb PUBLIC ${MINIFB_LIBS})
+    endif()
+    
+    # Create EasyGPUWindow library
+    add_library(EasyGPUWindow STATIC
+        include/Window/WindowConfig.h
+        include/Window/WindowEvents.h
+        include/Window/Input.h
+        include/Window/PixelBuffer.h
+        include/Window/AppWindow.h
+        include/Window/TexturePresenter.h
+        include/Window/TexturePresenter.inl
+        source/Window/PixelBuffer.cpp
+        source/Window/Window.cpp
+        source/Window/TexturePresenter.cpp
+        source/Window/Platform/MiniFBWindowPlatform.h
+        source/Window/Platform/MiniFBWindowPlatform.cpp
+    )
+    
+    target_compile_features(EasyGPUWindow PUBLIC cxx_std_20)
+    target_link_libraries(EasyGPUWindow PUBLIC minifb)
+    target_include_directories(EasyGPUWindow PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    
+    if(MSVC)
+        target_compile_options(EasyGPUWindow PUBLIC /Zc:preprocessor)
+    endif()
 endif()
 
 if(EASYGPU_BACKEND STREQUAL "Vulkan")
@@ -389,13 +464,43 @@ if(EASYGPU_BUILD_FRAGMENT_TESTER)
 endif()
 
 # =============================================================================
+# Window Examples
+# =============================================================================
+if(EASYGPU_BUILD_WINDOW AND EASYGPU_BUILD_WINDOW_EXAMPLES)
+    add_executable(window_hello examples/window_hello/main.cpp)
+    target_link_libraries(window_hello PRIVATE EasyGPUWindow)
+    
+    add_executable(window_pixels examples/window_pixels/main.cpp)
+    target_link_libraries(window_pixels PRIVATE EasyGPUWindow)
+    
+    if(MSVC)
+        target_compile_options(window_hello PRIVATE /Zc:preprocessor)
+        target_compile_options(window_pixels PRIVATE /Zc:preprocessor)
+    endif()
+    
+    # GPU compute + window example (requires EasyGPU)
+    if(TARGET EasyGPU)
+        add_executable(window_compute examples/window_compute/main.cpp)
+        target_link_libraries(window_compute PRIVATE EasyGPU EasyGPUWindow)
+        if(MSVC)
+            target_compile_options(window_compute PRIVATE /Zc:preprocessor)
+        endif()
+    endif()
+endif()
+
+# =============================================================================
 # Summary
 # =============================================================================
 message(STATUS "")
 message(STATUS "EasyGPU Configuration:")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Backend: ${EASYGPU_BACKEND}")
 message(STATUS "  Build Examples: ${EASYGPU_BUILD_EXAMPLES}")
 message(STATUS "  Build Tests: ${EASYGPU_BUILD_TESTS}")
 message(STATUS "  Build Fragment Kernel Tester: ${EASYGPU_BUILD_FRAGMENT_TESTER}")
+message(STATUS "  Build Window: ${EASYGPU_BUILD_WINDOW}")
+if(EASYGPU_BUILD_WINDOW)
+    message(STATUS "  Build Window Examples: ${EASYGPU_BUILD_WINDOW_EXAMPLES}")
+endif()
 message(STATUS "")

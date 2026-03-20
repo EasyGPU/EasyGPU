@@ -271,6 +271,50 @@ std::cout << kernel.GetGeneratedGLSL() << std::endl;
 KernelProfiler::PrintReport(kernel);
 ```
 
+### Built-in Cross-Platform Window
+
+EasyGPU now includes a lightweight, cross-platform window component for interactive GPU compute visualization. No need to integrate external frameworks like GLFW or SDL.
+
+```cpp
+#include <GPU.h>
+
+int main() {
+    // Create a window
+    Window window({
+        .width = 1024,
+        .height = 768,
+        .title = "EasyGPU Real-time Compute"
+    });
+    
+    // Create GPU texture and presenter
+    Texture2D<PixelFormat::RGBA8> texture(1024, 768);
+    TexturePresenter presenter(window);
+    
+    // Render kernel
+    Kernel2D render([&](Int x, Int y) {
+        auto tex = texture.Bind();
+        tex[Int2(x, y)] = Vec4(Float(x)/1024, Float(y)/768, 0.0f, 1.0f);
+    });
+    
+    // Real-time loop
+    while (window.IsOpen()) {
+        window.PollEvents();
+        render.Dispatch(64, 48);
+        presenter.Present(texture);  // Display GPU result
+    }
+}
+```
+
+**Key Features:**
+- Simple, modern C++20 API
+- Cross-platform: Windows (Win32) and Linux (X11)
+- Event-driven input (keyboard, mouse, resize)
+- CPU `PixelBuffer` for software rendering
+- `TexturePresenter` for direct GPU texture display
+- Optional at build time (`EASYGPU_BUILD_WINDOW`)
+
+[Learn more about Window API →](docs/window.md)
+
 ### Async Data Transfer
 
 Pixel Buffer Objects (PBO) for non-blocking CPU/GPU transfers:
@@ -434,6 +478,8 @@ g++ -std=c++20 hello_gpu.cpp -lEasyGPU -lGL -o hello_gpu
 
 ## Examples
 
+### Compute Examples
+
 | Level | Example | Topics |
 |:------|:--------|:-------|
 | Beginner | [hello_world](examples/hello_world/main.cpp) | Buffers, kernels |
@@ -441,6 +487,14 @@ g++ -std=c++20 hello_gpu.cpp -lEasyGPU -lGL -o hello_gpu
 | Intermediate | [julia_set](examples/julia_set/main.cpp) | Complex numbers |
 | Intermediate | [ray_tracing](examples/ray_tracing/main.cpp) | Structs, RNG, basic ray tracing |
 | Advanced | [sdf_renderer](examples/sdf_renderer/main.cpp) | Callables, SDF, path tracing |
+
+### Window Examples
+
+| Level | Example | Topics |
+|:------|:--------|:-------|
+| Beginner | [window_hello](examples/window_hello/main.cpp) | Window creation, event handling |
+| Beginner | [window_pixels](examples/window_pixels/main.cpp) | CPU pixel buffer, animation |
+| Intermediate | [window_compute](examples/window_compute/main.cpp) | Real-time GPU compute visualization |
 
 ### Mandelbrot Set
 
@@ -557,6 +611,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [Getting Started](docs/getting-started.md)
 - [Tutorial](docs/tutorial.md)
 - [API Reference](docs/api-reference.md)
+- [Window Component](docs/window.md) — Cross-platform window for interactive visualization
 - [Common Patterns](docs/patterns.md)
 - [Unref - Independent Variable Copies](docs/unref.md)
 - [FAQ](docs/faq.md)
@@ -625,6 +680,8 @@ cmake --build build_vulkan -j
 | `EASYGPU_BUILD_EXAMPLES` | `ON` | Build examples |
 | `EASYGPU_BUILD_TESTS` | `ON` | Build tests |
 | `EASYGPU_BUILD_FRAGMENT_TESTER` | `OFF` | Build the Windows FragmentKernel tester |
+| `EASYGPU_BUILD_WINDOW` | `ON` | Build the window component |
+| `EASYGPU_BUILD_WINDOW_EXAMPLES` | `ON` | Build window examples |
 
 ---
 
