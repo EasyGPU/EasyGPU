@@ -11,8 +11,11 @@
 #include <Window/AppWindow.h>
 #include <Window/PixelBuffer.h>
 
-#include <Runtime/Buffer.h>
-#include <Runtime/Texture.h>
+// Forward declarations for Runtime types
+namespace GPU::Runtime {
+template <typename T> class Buffer;
+template <PixelFormat Format> class Texture2D;
+} // namespace GPU::Runtime
 
 #include <memory>
 
