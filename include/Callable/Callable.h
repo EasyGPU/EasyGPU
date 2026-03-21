@@ -3,7 +3,7 @@
 /**
  * Callable.h:
  *      @Descripiton    :   The callable function API for user-defined functions
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
+ *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
  *      @Date           :   2/14/2026
  */
 #ifndef EASYGPU_CALLABLE_H
