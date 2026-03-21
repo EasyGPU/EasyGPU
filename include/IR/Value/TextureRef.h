@@ -363,6 +363,10 @@ public:
 		Builder::Builder::Get().Context()->PushTranslatedCode(code);
 	}
 
+	// ========================================================================
+	// Write operations with Vec4 color (float versions)
+	// ========================================================================
+
 	// Literal integer coordinates
 	void Write(int x, const Var<int> &y, const Var<GPU::Math::Vec4> &color) {
 		std::string yStr	 = Builder::Builder::Get().BuildNode(*y.Load().get());
@@ -443,23 +447,14 @@ private:
  * Type alias for convenience
  */
 template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
-/**
- * NOTE: Texture3D support has been removed due to OpenGL driver compatibility issues.
- * Only Texture2D is
- * supported.
- */
-
-/**
- * Type alias for convenience
- */
-template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 
 } // namespace GPU::IR::Value
 
 // Register TextureRef as a valid ScalarType for Callable support
 namespace GPU::Meta {
 template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureRef<Format>> {
-	static constexpr bool isRegistered = true;
+	static constexpr bool			isRegistered = true;
+	static constexpr const char *glslTypeName  = "image2D";
 };
 } // namespace GPU::Meta
 

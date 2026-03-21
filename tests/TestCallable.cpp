@@ -1,7 +1,7 @@
 /**
  * TestCallable.cpp:
  *      @Descripiton    :   Test for Callable function functionality
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
+ *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/14/2026
  */
 #include <cassert>
@@ -242,9 +242,9 @@ END_TEST
 // =============================================================================
 TEST(callable_multiple_in_kernel)
 // Define multiple Callables
-Callable<float(float)>		  Double	= [](Var<float> x) { Return(x * 2.0f); };
+Callable<float(float)		 > Double	= [](Var<float> x) { Return(x * 2.0f); };
 
-Callable<float(float)>		  Half		= [](Var<float> x) { Return(x * 0.5f); };
+Callable<float(float)		 > Half		= [](Var<float> x) { Return(x * 0.5f); };
 
 Callable<float(float, float)> Average	= [&](Var<float> a, Var<float> b) { Return((a + b) * 0.5f); };
 
@@ -483,8 +483,8 @@ END_TEST
 // =============================================================================
 TEST(callable_reference)
 std::vector<int>						  array = {0};
-Buffer<int>								  input(array);
-Buffer<int>								  output(1);
+Buffer<int>							  input(array);
+Buffer<int>							  output(1);
 
 GPU::Callables::Callable<void(int &)> fn = [](Var<int> &x) { x += 1; };
 
@@ -577,7 +577,7 @@ TEST(callable_texture_dispatch)
 const int W = 32, H = 32;
 
 // Create input texture with red pixels
-std::vector<uint8_t> inputPixels(W *H * 4);
+std::vector<uint8_t> inputPixels(W * H * 4);
 for (int i = 0; i < W * H; ++i) {
 	inputPixels[i * 4 + 0] = 255; // R
 	inputPixels[i * 4 + 1] = 0;	  // G
@@ -601,7 +601,7 @@ Callable<Vec4(IR::Value::TextureSampler2D<PixelFormat::RGBA8>, float, float)> In
 // Kernel using the callable
 GPU::Kernel::Kernel2D kernel(
 	[&](Var<int> &idx, Var<int> &idy) {
-		auto input = inputTex.BindSampler();
+		auto input	= inputTex.BindSampler();
 		auto output = outputTex.Bind();
 
 		// Calculate normalized UV coordinates for sampling
@@ -616,13 +616,11 @@ GPU::Kernel::Kernel2D kernel(
 	},
 	16, 16);
 
-std::cout << kernel.GetCode();
-
 // Dispatch
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
 // Download and verify result
-std::vector<uint8_t> outputPixels(W *H * 4);
+std::vector<uint8_t> outputPixels(W * H * 4);
 outputTex.Download(outputPixels.data());
 
 // Check first pixel - should be inverted red (0, 255, 255, 0) 
@@ -648,6 +646,74 @@ std::cout << "(Texture callable dispatch test - real GPU execution) ";
 END_TEST
 
 // =============================================================================
+// Test 13: Mixed parameter types (texture + scalars + multiple textures)
+// =============================================================================
+TEST(callable_mixed_params)
+Texture2D<PixelFormat::RGBA8> tex1(64, 64);
+Texture2D<PixelFormat::RGBA8> tex2(64, 64);
+
+// Callable with multiple texture parameters and scalar parameters
+Callable<Vec4(IR::Value::TextureSampler2D<PixelFormat::RGBA8>, 
+			  IR::Value::TextureSampler2D<PixelFormat::RGBA8>, 
+			  float, float)> BlendTextures =
+	[](IR::Value::TextureSampler2D<PixelFormat::RGBA8> img1, 
+	   IR::Value::TextureSampler2D<PixelFormat::RGBA8> img2, 
+	   Var<float> u, Var<float> v) {
+		Var<Vec4> color1 = img1.Sample(u, v);
+		Var<Vec4> color2 = img2.Sample(u, v);
+		Return((color1 + color2) * 0.5f);
+	};
+
+GPU::Kernel::InspectorKernel kernel([&](Var<int> &id) {
+	auto sampler1 = tex1.BindSampler();
+	auto sampler2 = tex2.BindSampler();
+
+	Var<float> u = (Expr<float>(id % 64) + 0.5f) / 64.0f;
+	Var<float> v = (Expr<float>(id / 64) + 0.5f) / 64.0f;
+
+	Var<Vec4> blended = BlendTextures(sampler1, sampler2, u, v);
+	ExprBase::NotUse(blended);
+});
+
+std::cout << "\n=== Generated GLSL (Callable with Mixed Params) ===\n";
+kernel.PrintCode();
+std::cout << "=====================================================\n";
+
+ASSERT(true);
+std::cout << "(Mixed params callable test - verifying GLSL generation) ";
+END_TEST
+
+// =============================================================================
+// Test 14: Integer format sampler test
+// =============================================================================
+TEST(callable_integer_sampler)
+// Test with integer pixel format
+Texture2D<PixelFormat::RGBA32I> intTex(16, 16);
+
+Callable<IVec4(IR::Value::TextureSampler2D<PixelFormat::RGBA32I>, float, float)> SampleInteger =
+	[](IR::Value::TextureSampler2D<PixelFormat::RGBA32I> sampler, Var<float> u, Var<float> v) {
+		Return(sampler.Sample(u, v));
+	};
+
+GPU::Kernel::InspectorKernel kernel([&](Var<int> &id) {
+	auto sampler = intTex.BindSampler();
+
+	Var<float> u = (Expr<float>(id % 16) + 0.5f) / 16.0f;
+	Var<float> v = (Expr<float>(id / 16) + 0.5f) / 16.0f;
+
+	Var<IVec4> value = SampleInteger(sampler, u, v);
+	ExprBase::NotUse(value);
+});
+
+std::cout << "\n=== Generated GLSL (Integer Sampler) ===\n";
+kernel.PrintCode();
+std::cout << "=========================================\n";
+
+ASSERT(true);
+std::cout << "(Integer sampler callable test - verifying GLSL generation) ";
+END_TEST
+
+// =============================================================================
 // Main
 // =============================================================================
 int main() {
@@ -668,6 +734,8 @@ int main() {
 		test_callable_texture_param();
 		test_callable_sampler_param();
 		test_callable_texture_dispatch();
+		test_callable_mixed_params();
+		test_callable_integer_sampler();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " passed\n";

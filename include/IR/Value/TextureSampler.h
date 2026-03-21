@@ -243,7 +243,8 @@ template <Runtime::PixelFormat Format> using sampler2D = TextureSampler2D<Format
 // Register TextureSampler2D as a valid ScalarType for Callable support
 namespace GPU::Meta {
 template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureSampler2D<Format>> {
-	static constexpr bool isRegistered = true;
+	static constexpr bool			isRegistered = true;
+	static constexpr const char *glslTypeName  = "sampler2D";
 };
 } // namespace GPU::Meta
 

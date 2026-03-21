@@ -3,7 +3,7 @@
 /**
  * Callable.h:
  *      @Descripiton    :   The callable function API for user-defined functions
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
+ *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/14/2026
  */
 #ifndef EASYGPU_CALLABLE_H
@@ -45,27 +45,75 @@ template <typename T> inline constexpr bool IsRef = std::is_reference_v<T>;
 namespace TypeExtractor {
 // Primary template: assume T is already a scalar type
 template <typename T> struct ExtractScalar {
-	using type							= T;
+	using type						= T;
 	static constexpr bool isGpuType = false;
 };
 
 // Specialization for Var<T>
 template <typename T> struct ExtractScalar<IR::Value::Var<T>> {
-	using type							= T;
+	using type						= T;
 	static constexpr bool isGpuType = true;
 };
 
 // Specialization for Expr<T>
 template <typename T> struct ExtractScalar<IR::Value::Expr<T>> {
-	using type							= T;
+	using type						= T;
 	static constexpr bool isGpuType = true;
 };
 
 // Helper alias
-template <typename T> using ToScalar				  = typename ExtractScalar<RemoveRef<T>>::type;
+template <typename T> using ToScalar					  = typename ExtractScalar<RemoveRef<T>>::type;
 
 template <typename T> inline constexpr bool IsGpuType = ExtractScalar<RemoveRef<T>>::isGpuType;
 } // namespace TypeExtractor
+
+// ============================================================================
+// Texture type detection traits
+// ============================================================================
+
+namespace TextureTraits {
+/**
+ * Helper to check if a type is TextureRef
+ * Uses struct specialization for precise type matching
+ */
+template <typename T> struct IsTextureRef : std::false_type {};
+
+template <Runtime::PixelFormat F>
+struct IsTextureRef<IR::Value::TextureRef<F>> : std::true_type {};
+
+template <typename T> inline constexpr bool IsTextureRefV = IsTextureRef<T>::value;
+
+/**
+ * Helper to check if a type is TextureSampler2D
+ * Uses struct specialization for precise type matching
+ */
+template <typename T> struct IsTextureSampler2D : std::false_type {};
+
+template <Runtime::PixelFormat F>
+struct IsTextureSampler2D<IR::Value::TextureSampler2D<F>> : std::true_type {};
+
+template <typename T> inline constexpr bool IsTextureSampler2DV = IsTextureSampler2D<T>::value;
+
+/**
+ * Helper to check if a type is any texture type (TextureRef or TextureSampler2D)
+ */
+template <typename T>
+inline constexpr bool IsAnyTextureV = IsTextureRefV<T> || IsTextureSampler2DV<T>;
+
+/**
+ * Helper to get the GLSL type name for a texture type
+ * Returns empty string_view if not a texture type
+ */
+template <typename T> constexpr std::string_view GetTextureGLSLTypeName() {
+	if constexpr (IsTextureRefV<T>) {
+		return Runtime::GetGLSLImageType(T::GetFormat());
+	} else if constexpr (IsTextureSampler2DV<T>) {
+		return Runtime::GetGLSLSamplerType(T::GetFormat());
+	} else {
+		return "";
+	}
+}
+} // namespace TextureTraits
 
 /**
  * Helper to get type name as string for GLSL
@@ -109,16 +157,9 @@ template <typename T> constexpr std::string_view GetGLSLTypeName() {
 		return "mat4x2";
 	else if constexpr (std::same_as<CleanT, Math::Mat4x3>)
 		return "mat4x3";
-	// Support for texture/sampler types
-	else if constexpr (requires(const CleanT& t) { { t.GetTextureName() } -> std::convertible_to<std::string>; }) {
-		// Determine if it's TextureRef or TextureSampler2D by checking for Sample method
-		if constexpr (requires(CleanT& t) { t.Sample(0.0f, 0.0f); }) {
-			// TextureSampler2D
-			return Runtime::GetGLSLSamplerType(CleanT::GetFormat());
-		} else {
-			// TextureRef
-			return Runtime::GetGLSLImageType(CleanT::GetFormat());
-		}
+	// Support for texture/sampler types - use precise type traits
+	else if constexpr (TextureTraits::IsAnyTextureV<CleanT>) {
+		return TextureTraits::GetTextureGLSLTypeName<CleanT>();
 	}
 	// Support for registered structs
 	else if constexpr (Meta::StructMeta<CleanT>::isRegistered) {
@@ -173,26 +214,19 @@ public:
 	}
 
 private:
-	// Helper to check if type is TextureRef
-	template <typename T>
-	static constexpr bool IsTextureRef = false;
-	template <Runtime::PixelFormat F>
-	static constexpr bool IsTextureRef<IR::Value::TextureRef<F>> = true;
-
-	// Helper to check if type is TextureSampler2D
-	template <typename T>
-	static constexpr bool IsTextureSampler2D = false;
-	template <Runtime::PixelFormat F>
-	static constexpr bool IsTextureSampler2D<IR::Value::TextureSampler2D<F>> = true;
-
+	/**
+	 * Helper to create parameter object for a given type
+	 * Texture types are created directly, scalar types use Var with isExternal=true
+	 */
 	template <typename ParamType, size_t Index>
 	auto CreateParam() const {
 		std::string paramName = "p" + std::to_string(Index);
-		if constexpr (IsTextureRef<ParamType>) {
-			return ParamType(paramName);
-		} else if constexpr (IsTextureSampler2D<ParamType>) {
+		
+		if constexpr (TextureTraits::IsAnyTextureV<ParamType>) {
+			// For texture types, create directly with the parameter name
 			return ParamType(paramName);
 		} else {
+			// For scalar types, use Var with isExternal=true to reference the GLSL parameter
 			return IR::Value::Var<ParamType>(paramName, true);
 		}
 	}
@@ -231,6 +265,26 @@ private:
 	// Extract scalar types for Args and R (supports both C++ types and GPU types like Float, Float3)
 	using ScalarR							= Detail::TypeExtractor::ToScalar<R>;
 	template <typename Arg> using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
+
+	// Validate that all parameter types are supported
+	// Note: Using a helper trait to work around MSVC fold expression limitations in static_assert
+	template <typename T>
+	static constexpr bool IsValidParamTypeV = 
+		Detail::TextureTraits::IsAnyTextureV<T> || 
+		Meta::StructMeta<T>::isRegistered ||
+		std::same_as<T, float> || std::same_as<T, int> || 
+		std::same_as<T, bool> || std::same_as<T, Math::Vec2> ||
+		std::same_as<T, Math::Vec3> || std::same_as<T, Math::Vec4> ||
+		std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+		std::same_as<T, Math::IVec4> || std::same_as<T, Math::Mat2> ||
+		std::same_as<T, Math::Mat3> || std::same_as<T, Math::Mat4> ||
+		std::same_as<T, Math::Mat2x3> || std::same_as<T, Math::Mat2x4> ||
+		std::same_as<T, Math::Mat3x2> || std::same_as<T, Math::Mat3x4> ||
+		std::same_as<T, Math::Mat4x2> || std::same_as<T, Math::Mat4x3>;
+	
+	static_assert((IsValidParamTypeV<ScalarArg<Args>> && ...),
+				  "All parameter types must be either: scalar types (float, int, bool, Vec*, Mat*), "
+				  "registered structs, or texture types (TextureRef, TextureSampler2D)");
 
 public:
 	/**
@@ -294,7 +348,7 @@ private:
 		result								+= " " + _mangledName + "(";
 
 		// Generate parameter list (use scalar types for type names, but original Args for inout check)
-		std::vector<std::string> paramTypes	 = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
+		std::vector<std::string> paramTypes = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
 		std::vector<bool>		 isInOut	 = {Detail::IsInOutType<Args>()...};
 		for (size_t i = 0; i < paramTypes.size(); ++i) {
 			if (i > 0)
@@ -338,6 +392,26 @@ private:
 
 	// Extract scalar types for Args (supports both C++ types and GPU types)
 	template <typename Arg> using ScalarArg = Detail::TypeExtractor::ToScalar<Arg>;
+
+	// Validate that all parameter types are supported
+	// Note: Using a helper trait to work around MSVC fold expression limitations in static_assert
+	template <typename T>
+	static constexpr bool IsValidParamTypeV = 
+		Detail::TextureTraits::IsAnyTextureV<T> || 
+		Meta::StructMeta<T>::isRegistered ||
+		std::same_as<T, float> || std::same_as<T, int> || 
+		std::same_as<T, bool> || std::same_as<T, Math::Vec2> ||
+		std::same_as<T, Math::Vec3> || std::same_as<T, Math::Vec4> ||
+		std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+		std::same_as<T, Math::IVec4> || std::same_as<T, Math::Mat2> ||
+		std::same_as<T, Math::Mat3> || std::same_as<T, Math::Mat4> ||
+		std::same_as<T, Math::Mat2x3> || std::same_as<T, Math::Mat2x4> ||
+		std::same_as<T, Math::Mat3x2> || std::same_as<T, Math::Mat3x4> ||
+		std::same_as<T, Math::Mat4x2> || std::same_as<T, Math::Mat4x3>;
+	
+	static_assert((IsValidParamTypeV<ScalarArg<Args>> && ...),
+				  "All parameter types must be either: scalar types (float, int, bool, Vec*, Mat*), "
+				  "registered structs, or texture types (TextureRef, TextureSampler2D)");
 
 public:
 	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)) {
