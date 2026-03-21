@@ -1301,6 +1301,91 @@ Float x, y;
 GetComponents(value, x, y);
 ```
 
+**Texture Parameters:**
+
+Callables can accept textures and samplers as parameters, enabling reusable image processing functions:
+
+```cpp
+// Callable that samples from a texture
+Callable<Vec4(TextureRef<PixelFormat::RGBA8>, int, int)> ReadPixel =
+    [](TextureRef<PixelFormat::RGBA8> img, Int x, Int y) {
+        Return(img.Read(x, y));
+    };
+
+// Callable that writes to a texture
+Callable<void(TextureRef<PixelFormat::RGBA8>, int, int, Vec4)> WritePixel =
+    [](TextureRef<PixelFormat::RGBA8> img, Int x, Int y, Vec4 color) {
+        img.Write(x, y, color);
+    };
+
+// Usage in kernel
+Texture2D<PixelFormat::RGBA8> tex(256, 256);
+Kernel1D kernel([&](Int i) {
+    auto img = tex.Bind();
+    
+    Int x = i % 256;
+    Int y = i / 256;
+    
+    // Read using callable
+    Vec4 color = ReadPixel(img, x, y);
+    
+    // Process and write back
+    WritePixel(img, x, y, Vec4(1.0f) - color);
+});
+```
+
+**Sampler Parameters:**
+
+For fragment kernels or when UV sampling is needed:
+
+```cpp
+Callable<Vec4(TextureSampler2D<PixelFormat::RGBA8>, float, float)> SampleUV =
+    [](TextureSampler2D<PixelFormat::RGBA8> sampler, Float u, Float v) {
+        Return(sampler.Sample(u, v));
+    };
+
+// In fragment kernel
+FragmentKernel2D kernel("Textured",
+    [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+        auto sampler = image.BindSampler();
+        
+        Float2 uv = fragCoord / resolution;
+        fragColor = SampleUV(sampler, uv.x(), uv.y());
+    },
+    512, 512
+);
+```
+
+**Supported Texture Types:**
+
+| C++ Type | GLSL Type | Description |
+|:---------|:----------|:------------|
+| `TextureRef<PixelFormat::RGBA8>` | `image2D` | Read-write RGBA8 texture |
+| `TextureRef<PixelFormat::RGBA32F>` | `image2D` | Read-write RGBA32F texture |
+| `TextureRef<PixelFormat::R32F>` | `image2D` | Read-write single-channel float |
+| `TextureRef<PixelFormat::RGBA32I>` | `iimage2D` | Read-write signed integer texture |
+| `TextureRef<PixelFormat::RGBA32UI>` | `uimage2D` | Read-write unsigned integer texture |
+| `TextureSampler2D<PixelFormat::RGBA8>` | `sampler2D` | Sampled RGBA8 texture |
+| `TextureSampler2D<PixelFormat::RGBA32I>` | `isampler2D` | Sampled signed integer texture |
+
+**Important Notes:**
+
+1. **TextureRef vs TextureSampler2D**: Use `TextureRef` for compute kernels (with `Bind()`), and `TextureSampler2D` for fragment kernels (with `BindSampler()`).
+
+2. **Pixel Format Must Match**: The format in the Callable signature must match the format of the texture being passed:
+   ```cpp
+   // Correct
+   Texture2D<PixelFormat::RGBA8> tex(...);
+   Callable<void(TextureRef<PixelFormat::RGBA8>)> func = ...;
+   
+   // Incorrect - format mismatch
+   Callable<void(TextureRef<PixelFormat::R32F>)> func = ...;  // Error!
+   ```
+
+3. **No Copy Overhead**: Textures are passed by name reference in GLSL (not by value), so there's no performance overhead.
+
+4. **Thread Safety**: Each thread can safely read/write different coordinates. Use atomic operations or barriers for coordinating access to the same pixel.
+
 **Template Metaprogramming with Callable:**
 
 You can use C++ templates to create generic Callables that work with multiple GPU types:

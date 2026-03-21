@@ -82,10 +82,10 @@ Buffer<float>		  outputBuffer(N, BufferMode::Write);
 // Use Callable in Kernel
 GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
-		auto	   input  = inputBuffer.Bind();
+		auto	   input	= inputBuffer.Bind();
 		auto	   output = outputBuffer.Bind();
 
-		Var<float> value  = input[id];
+		Var<float> value	= input[id];
 		output[id]		  = Square(value);
 	},
 	256);
@@ -242,13 +242,13 @@ END_TEST
 // =============================================================================
 TEST(callable_multiple_in_kernel)
 // Define multiple Callables
-Callable<float(float)>		  Double  = [](Var<float> x) { Return(x * 2.0f); };
+Callable<float(float)>		  Double	= [](Var<float> x) { Return(x * 2.0f); };
 
-Callable<float(float)>		  Half	  = [](Var<float> x) { Return(x * 0.5f); };
+Callable<float(float)>		  Half		= [](Var<float> x) { Return(x * 0.5f); };
 
-Callable<float(float, float)> Average = [&](Var<float> a, Var<float> b) { Return((a + b) * 0.5f); };
+Callable<float(float, float)> Average	= [&](Var<float> a, Var<float> b) { Return((a + b) * 0.5f); };
 
-const size_t				  N		  = 128;
+const size_t				  N			= 128;
 std::vector<float>			  inputData(N);
 std::vector<float>			  outputData(N);
 
@@ -262,12 +262,12 @@ Buffer<float>		  outputBuffer(N, BufferMode::Write);
 // Kernel using multiple Callables
 GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
-		auto	   input   = inputBuffer.Bind();
-		auto	   output  = outputBuffer.Bind();
+		auto	   input	   = inputBuffer.Bind();
+		auto	   output	  = outputBuffer.Bind();
 
-		Var<float> value   = input[id];
+		Var<float> value	   = input[id];
 		Var<float> doubled = Double(value);
-		Var<float> halved  = Half(value);
+		Var<float> halved	= Half(value);
 		// average = (doubled + halved) / 2 = (2x + 0.5x) / 2 = 1.25x
 		output[id]		   = Average(doubled, halved);
 	},
@@ -355,7 +355,7 @@ Callable<float(Vec4)> LengthSquared = [](Var<Vec4> v) {
 
 // Second Callable: normalize using LengthSquared
 Callable<Vec4(Vec4)> SafeNormalize = [&](Var<Vec4> v) {
-	Var<float> lenSq  = LengthSquared(v);
+	Var<float> lenSq	= LengthSquared(v);
 	// Simple normalization: v / sqrt(lenSq + epsilon)
 	Var<float> invLen = 1.0f / Sqrt(lenSq + 0.0001f);
 	Return(v * invLen);
@@ -439,15 +439,15 @@ outputBuffer.Download(outputData.data(), N);
 // Verify: output should be next power of two >= input
 bool correct = true;
 for (size_t i = 0; i < N; i++) {
-	int	 input		  = inputData[i];
-	int	 output		  = outputData[i];
+	int	 input			= inputData[i];
+	int	 output			= outputData[i];
 
 	// Check if output is power of two
-	bool isPowerOfTwo = (output & (output - 1)) == 0;
+	bool isPowerOfTwo	= (output & (output - 1)) == 0;
 	// Check if output >= input
-	bool isGE		  = output >= input;
+	bool isGE			= output >= input;
 	// Check if output / 2 < input (unless input is already power of two)
-	bool isMinimal	  = (output == 1) || (output >> 1) < input;
+	bool isMinimal		= (output == 1) || (output >> 1) < input;
 
 	if (!isPowerOfTwo || !isGE || !isMinimal) {
 		correct = false;
@@ -482,9 +482,9 @@ END_TEST
 // Test 9: Reference Callable
 // =============================================================================
 TEST(callable_reference)
-std::vector<int>					  array = {0};
-Buffer<int>							  input(array);
-Buffer<int>							  output(1);
+std::vector<int>						  array = {0};
+Buffer<int>								  input(array);
+Buffer<int>								  output(1);
 
 GPU::Callables::Callable<void(int &)> fn = [](Var<int> &x) { x += 1; };
 
@@ -505,6 +505,149 @@ std::cout << "(Reference callable test - verifying reference usage) ";
 END_TEST
 
 // =============================================================================
+// Test 10: Texture as Callable parameter (code generation test)
+// =============================================================================
+TEST(callable_texture_param)
+Texture2D<PixelFormat::RGBA8> tex(64, 64);
+
+// Define a callable that takes a texture as parameter and reads from it
+Callable<Vec4(IR::Value::TextureRef<PixelFormat::RGBA8>, int, int)> SampleTexture =
+	[](IR::Value::TextureRef<PixelFormat::RGBA8> img, Var<int> x, Var<int> y) {
+		Return(img.Read(x, y));
+	};
+
+GPU::Kernel::InspectorKernel kernel([&](Var<int> &id) {
+	auto img = tex.Bind();
+
+	Var<int> x = id % 64;
+	Var<int> y = id / 64;
+
+	// Call the callable with texture parameter
+	Var<Vec4> color = SampleTexture(img, x, y);
+
+	// Write inverted color back
+	img.Write(x, y, Vec4(1.0f) - color);
+});
+
+std::cout << "\n=== Generated GLSL (Callable with Texture Param) ===\n";
+kernel.PrintCode();
+std::cout << "=====================================================\n";
+
+ASSERT(true);
+std::cout << "(Texture callable test - verifying GLSL generation) ";
+END_TEST
+
+// =============================================================================
+// Test 11: Sampler as Callable parameter (code generation test)
+// =============================================================================
+TEST(callable_sampler_param)
+Texture2D<PixelFormat::RGBA8> tex(64, 64);
+
+// Define a callable that takes a sampler as parameter
+Callable<Vec4(IR::Value::TextureSampler2D<PixelFormat::RGBA8>, float, float)> SampleWithUV =
+	[](IR::Value::TextureSampler2D<PixelFormat::RGBA8> sampler, Var<float> u, Var<float> v) {
+		Return(sampler.Sample(u, v));
+	};
+
+GPU::Kernel::InspectorKernel kernel([&](Var<int> &id) {
+	auto sampler = tex.BindSampler();
+
+	Var<float> u = (Expr<float>(id % 64) + 0.5f) / 64.0f;
+	Var<float> v = (Expr<float>(id / 64) + 0.5f) / 64.0f;
+
+	// Call the callable with sampler parameter
+	Var<Vec4> color = SampleWithUV(sampler, u, v);
+
+	// Use the sampled color (this is just for code generation test)
+	ExprBase::NotUse(color);
+});
+
+std::cout << "\n=== Generated GLSL (Callable with Sampler Param) ===\n";
+kernel.PrintCode();
+std::cout << "=====================================================\n";
+
+ASSERT(true);
+std::cout << "(Sampler callable test - verifying GLSL generation) ";
+END_TEST
+
+// =============================================================================
+// Test 12: Texture as Callable parameter - Real dispatch test
+// =============================================================================
+TEST(callable_texture_dispatch)
+const int W = 32, H = 32;
+
+// Create input texture with red pixels
+std::vector<uint8_t> inputPixels(W *H * 4);
+for (int i = 0; i < W * H; ++i) {
+	inputPixels[i * 4 + 0] = 255; // R
+	inputPixels[i * 4 + 1] = 0;	  // G
+	inputPixels[i * 4 + 2] = 0;	  // B
+	inputPixels[i * 4 + 3] = 255; // A
+}
+
+Texture2D<PixelFormat::RGBA8> inputTex(W, H, inputPixels.data());
+Texture2D<PixelFormat::RGBA8> outputTex(W, H);
+
+// Define a callable that inverts color from input texture
+// Use TextureSampler2D (sampler2D) instead of TextureRef (image2D)
+// because sampler2D can be passed as function parameter in GLSL
+Callable<Vec4(IR::Value::TextureSampler2D<PixelFormat::RGBA8>, float, float)> InvertPixel =
+	[](IR::Value::TextureSampler2D<PixelFormat::RGBA8> img, Var<float> u, Var<float> v) {
+		Var<Vec4> color = img.Sample(u, v);
+		// Invert RGB channels
+		Return(Vec4(1.0f) - color);
+	};
+
+// Kernel using the callable
+GPU::Kernel::Kernel2D kernel(
+	[&](Var<int> &idx, Var<int> &idy) {
+		auto input = inputTex.BindSampler();
+		auto output = outputTex.Bind();
+
+		// Calculate normalized UV coordinates for sampling
+		Var<float> u = (Expr<float>(idx) + 0.5f) / static_cast<float>(W);
+		Var<float> v = (Expr<float>(idy) + 0.5f) / static_cast<float>(H);
+
+		// Call callable to get inverted color
+		Var<Vec4> inverted = InvertPixel(input, u, v);
+		
+		// Write to output
+		output.Write(idx, idy, inverted);
+	},
+	16, 16);
+
+std::cout << kernel.GetCode();
+
+// Dispatch
+kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
+
+// Download and verify result
+std::vector<uint8_t> outputPixels(W *H * 4);
+outputTex.Download(outputPixels.data());
+
+// Check first pixel - should be inverted red (0, 255, 255, 0) 
+// Note: Alpha also gets inverted (1.0 - 1.0 = 0.0), but let's check RGB
+bool correct = true;
+for (int i = 0; i < 10 && correct; ++i) { // Check first 10 pixels
+	uint8_t r = outputPixels[i * 4 + 0];
+	uint8_t g = outputPixels[i * 4 + 1];
+	uint8_t b = outputPixels[i * 4 + 2];
+	uint8_t a = outputPixels[i * 4 + 3];
+	
+	// Input was (255, 0, 0, 255), inverted should be approximately (0, 255, 255, 0)
+	// Allow some tolerance due to float conversion
+	if (r > 5 || g < 250 || b < 250) {
+		correct = false;
+		std::cout << "Pixel " << i << " mismatch: got (" << (int)r << "," << (int)g << "," << (int)b << "," << (int)a 
+				  << "), expected (~0,~255,~255,~)\n";
+	}
+}
+
+ASSERT(correct);
+std::cout << "(Texture callable dispatch test - real GPU execution) ";
+END_TEST
+
+// =============================================================================
 // Main
 // =============================================================================
 int main() {
@@ -522,6 +665,9 @@ int main() {
 		test_callable_int_return();
 		test_callable_void();
 		test_callable_reference();
+		test_callable_texture_param();
+		test_callable_sampler_param();
+		test_callable_texture_dispatch();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " passed\n";

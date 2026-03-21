@@ -87,6 +87,18 @@ public:
 			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
 	}
 
+	/**
+	 * Constructor for function parameter references.
+	 * Used when TextureSampler2D is passed as a callable parameter.
+	 * Binding/width/height are not needed in function body since only the name is used.
+	 */
+	explicit TextureSampler2D(std::string textureName)
+		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0) {
+		static_assert(
+			Detail::TextureSamplerValueType<Format>::supported,
+			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+	}
+
 	[[nodiscard]] uint32_t GetBinding() const {
 		return _binding;
 	}
@@ -227,5 +239,12 @@ private:
 template <Runtime::PixelFormat Format> using sampler2D = TextureSampler2D<Format>;
 
 } // namespace GPU::IR::Value
+
+// Register TextureSampler2D as a valid ScalarType for Callable support
+namespace GPU::Meta {
+template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureSampler2D<Format>> {
+	static constexpr bool isRegistered = true;
+};
+} // namespace GPU::Meta
 
 #endif // EASYGPU_TEXTURE_SAMPLER_H

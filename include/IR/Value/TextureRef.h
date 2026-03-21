@@ -45,6 +45,15 @@ public:
 		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height) {
 	}
 
+	/**
+	 * Constructor for function parameter references.
+	 * Used when TextureRef is passed as a callable parameter.
+	 * Binding/width/height are not needed in function body since only the name is used.
+	 */
+	explicit TextureRef(std::string textureName)
+		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0) {
+	}
+
 	[[nodiscard]] uint32_t GetBinding() const {
 		return _binding;
 	}
@@ -446,5 +455,12 @@ template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 
 } // namespace GPU::IR::Value
+
+// Register TextureRef as a valid ScalarType for Callable support
+namespace GPU::Meta {
+template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureRef<Format>> {
+	static constexpr bool isRegistered = true;
+};
+} // namespace GPU::Meta
 
 #endif // EASYGPU_TEXTUREREF_H

@@ -14,7 +14,10 @@
 #include <IR/Node/Call.h>
 #include <IR/Value/Expr.h>
 #include <IR/Value/SideEffectToken.h>
+#include <IR/Value/TextureRef.h>
+#include <IR/Value/TextureSampler.h>
 #include <IR/Value/Var.h>
+#include <Runtime/PixelFormat.h>
 #include <Utility/Meta/StructMeta.h>
 
 #include <atomic>
@@ -42,19 +45,19 @@ template <typename T> inline constexpr bool IsRef = std::is_reference_v<T>;
 namespace TypeExtractor {
 // Primary template: assume T is already a scalar type
 template <typename T> struct ExtractScalar {
-	using type						= T;
+	using type							= T;
 	static constexpr bool isGpuType = false;
 };
 
 // Specialization for Var<T>
 template <typename T> struct ExtractScalar<IR::Value::Var<T>> {
-	using type						= T;
+	using type							= T;
 	static constexpr bool isGpuType = true;
 };
 
 // Specialization for Expr<T>
 template <typename T> struct ExtractScalar<IR::Value::Expr<T>> {
-	using type						= T;
+	using type							= T;
 	static constexpr bool isGpuType = true;
 };
 
@@ -106,6 +109,17 @@ template <typename T> constexpr std::string_view GetGLSLTypeName() {
 		return "mat4x2";
 	else if constexpr (std::same_as<CleanT, Math::Mat4x3>)
 		return "mat4x3";
+	// Support for texture/sampler types
+	else if constexpr (requires(const CleanT& t) { { t.GetTextureName() } -> std::convertible_to<std::string>; }) {
+		// Determine if it's TextureRef or TextureSampler2D by checking for Sample method
+		if constexpr (requires(CleanT& t) { t.Sample(0.0f, 0.0f); }) {
+			// TextureSampler2D
+			return Runtime::GetGLSLSamplerType(CleanT::GetFormat());
+		} else {
+			// TextureRef
+			return Runtime::GetGLSLImageType(CleanT::GetFormat());
+		}
+	}
 	// Support for registered structs
 	else if constexpr (Meta::StructMeta<CleanT>::isRegistered) {
 		return Meta::StructMeta<CleanT>::glslTypeName;
@@ -159,14 +173,36 @@ public:
 	}
 
 private:
-	template <size_t... Indices> void GenerateImpl(std::index_sequence<Indices...>) const {
-		// Create Var objects that reference the GLSL parameter directly
-		// isExternal=true means no local variable declaration is generated
-		auto vars = std::make_tuple(IR::Value::Var<ParamTypes>("p" + std::to_string(Indices),
-															   true // isExternal - use parameter name directly, no copy
-															   )...);
+	// Helper to check if type is TextureRef
+	template <typename T>
+	static constexpr bool IsTextureRef = false;
+	template <Runtime::PixelFormat F>
+	static constexpr bool IsTextureRef<IR::Value::TextureRef<F>> = true;
 
-		// Call the function with Var& that reference parameters directly
+	// Helper to check if type is TextureSampler2D
+	template <typename T>
+	static constexpr bool IsTextureSampler2D = false;
+	template <Runtime::PixelFormat F>
+	static constexpr bool IsTextureSampler2D<IR::Value::TextureSampler2D<F>> = true;
+
+	template <typename ParamType, size_t Index>
+	auto CreateParam() const {
+		std::string paramName = "p" + std::to_string(Index);
+		if constexpr (IsTextureRef<ParamType>) {
+			return ParamType(paramName);
+		} else if constexpr (IsTextureSampler2D<ParamType>) {
+			return ParamType(paramName);
+		} else {
+			return IR::Value::Var<ParamType>(paramName, true);
+		}
+	}
+
+	template <size_t... Indices> void GenerateImpl(std::index_sequence<Indices...>) const {
+		// Create parameter objects that reference the GLSL parameter directly
+		// For texture types, create directly; for scalars, use Var with isExternal=true
+		auto vars = std::make_tuple(CreateParam<ParamTypes, Indices>()...);
+
+		// Call the function with parameter references
 		_func(std::get<Indices>(vars)...);
 	}
 
@@ -189,7 +225,7 @@ template <typename Signature> class Callable;
 template <typename R, typename... Args> class Callable<R(Args...)> {
 private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
-	std::string										   _baseName;	 // Base name for the function
+	std::string									   _baseName;	 // Base name for the function
 	mutable std::string								   _mangledName; // Generated unique name
 
 	// Extract scalar types for Args and R (supports both C++ types and GPU types like Float, Float3)
@@ -297,7 +333,7 @@ private:
 template <typename... Args> class Callable<void(Args...)> {
 private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
-	std::string										   _baseName;
+	std::string									   _baseName;
 	mutable std::string								   _mangledName;
 
 	// Extract scalar types for Args (supports both C++ types and GPU types)

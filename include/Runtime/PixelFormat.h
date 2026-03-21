@@ -85,10 +85,30 @@ inline std::string GetGLSLFormatQualifier(PixelFormat fmt) {
 }
 
 /**
+ * Get GLSL image type for compute shader image access.
+ * Used in: layout(rgba8, binding=X) uniform image2D tex;
+ * Returns: image2D, iimage2D, or uimage2D
+ */
+inline const char* GetGLSLImageType(PixelFormat fmt) {
+	switch (fmt) {
+	case PixelFormat::R32I:
+	case PixelFormat::RG32I:
+	case PixelFormat::RGBA32I:
+		return "iimage2D";
+	case PixelFormat::R32UI:
+	case PixelFormat::RG32UI:
+	case PixelFormat::RGBA32UI:
+		return "uimage2D";
+	default:
+		return "image2D";
+	}
+}
+
+/**
  * Get GLSL sampler type for texture sampling access.
  * Used in: layout(binding=X) uniform sampler2D tex;
  */
-inline std::string GetGLSLSamplerType(PixelFormat fmt) {
+inline const char* GetGLSLSamplerType(PixelFormat fmt) {
 	switch (fmt) {
 	case PixelFormat::R32I:
 	case PixelFormat::RG32I:
