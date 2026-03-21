@@ -272,42 +272,6 @@ inline Callable<Float(Float, Float)> IntensityToColor = [](Float intensity, Floa
 };
 ```
 
-### Math Functions
-
-EasyGPU provides a comprehensive math library including GLSL built-ins and special functions:
-
-```cpp
-// Standard GLSL functions
-Float y = Sin(x);        // Trigonometry: Sin, Cos, Tan, Asin, Acos, Atan
-Float r = Sqrt(x);       // Power/roots: Sqrt, Pow, Exp, Log
-Float c = Clamp(x, 0.0f, 1.0f);  // Common: Clamp, Mix, Step, Smoothstep
-Float d = Dot(a, b);     // Vector: Dot, Cross, Length, Normalize, Reflect
-
-// Special functions (useful for optics and signal processing)
-Float s = Sinc(x);              // sin(x)/x, with proper handling of x=0
-Float j0 = BesselJ0(x);         // Bessel function J0(x) - for circular apertures
-Float j1 = BesselJ1(x);         // Bessel function J1(x)
-Float jinc = Jinc(x);           // 2*J1(x)/x - Airy disk pattern function
-```
-
-**Diffraction Pattern Example:**
-
-```cpp
-Kernel2D diffractionPattern([&](Int x, Int y) {
-    auto tex = texture.Bind();
-    
-    // Convert to normalized coordinates centered at origin
-    Float u = (ToFloat(x) - ToFloat(WIDTH) / 2.0f) * scale;
-    Float v = (ToFloat(y) - ToFloat(HEIGHT) / 2.0f) * scale;
-    Float r = Sqrt(u * u + v * v);
-    
-    // Airy disk pattern for circular aperture
-    Float intensity = Jinc(r) * Jinc(r);
-    
-    tex.Write(x, y, MakeFloat4(intensity, intensity, intensity, 1.0f));
-});
-```
-
 ### Introspection
 
 ```cpp
