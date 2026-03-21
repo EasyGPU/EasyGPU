@@ -135,6 +135,9 @@ using namespace GPU::Flow;
 /// Utility functions: Unref
 using namespace GPU::Utility;
 
+/// Window component: AppWindow, PixelBuffer, TexturePresenter, Input
+using namespace GPU::Window;
+
 // =============================================================================
 // Convenience Type Aliases
 // =============================================================================

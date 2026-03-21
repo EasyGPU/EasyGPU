@@ -273,14 +273,20 @@ KernelProfiler::PrintReport(kernel);
 
 ### Built-in Cross-Platform Window
 
-EasyGPU now includes a lightweight, cross-platform window component for interactive GPU compute visualization. No need to integrate external frameworks like GLFW or SDL.
+EasyGPU includes a lightweight, cross-platform window component for interactive GPU compute visualization. Built on top of [minifb](https://github.com/emoon/minifb), it provides a minimal footprint alternative to heavyweight frameworks like GLFW or SDL — the entire windowing layer adds less than 100KB to your binary.
+
+**Zero external dependencies.** The window component is self-contained and compiles out-of-the-box on both Windows and Linux. No need to hunt for system libraries or deal with complex linker flags.
+
+| Windows | Ubuntu |
+|:-------:|:------:|
+| <img src="docs/image/appwindow_windows.png" width="400"> | <img src="docs/image/appwindow_ubuntu.png" width="400"> |
 
 ```cpp
 #include <GPU.h>
 
 int main() {
-    // Create a window
-    Window window({
+    // Create a lightweight window
+    AppWindow window({
         .width = 1024,
         .height = 768,
         .title = "EasyGPU Real-time Compute"
@@ -293,7 +299,7 @@ int main() {
     // Render kernel
     Kernel2D render([&](Int x, Int y) {
         auto tex = texture.Bind();
-        tex[Int2(x, y)] = Vec4(Float(x)/1024, Float(y)/768, 0.0f, 1.0f);
+        tex.Write(x, y, MakeFloat4(ToFloat(x) / 1024, ToFloat(y) / 768, 0.0f, 1.0f));
     });
     
     // Real-time loop
@@ -306,12 +312,12 @@ int main() {
 ```
 
 **Key Features:**
-- Simple, modern C++20 API
-- Cross-platform: Windows (Win32) and Linux (X11)
-- Event-driven input (keyboard, mouse, resize)
-- CPU `PixelBuffer` for software rendering
-- `TexturePresenter` for direct GPU texture display
-- Optional at build time (`EASYGPU_BUILD_WINDOW`)
+- **Ultra-lightweight** — Based on minifb, minimal overhead (~100KB added)
+- **Truly cross-platform** — Identical API on Windows (Win32) and Linux (X11)
+- **Zero external dependencies** — Self-contained, header-friendly implementation
+- **Event-driven input** — Keyboard, mouse, and resize events
+- **Dual rendering paths** — CPU `PixelBuffer` for software rendering, `TexturePresenter` for direct GPU display
+- **Optional at build time** — Control via `EASYGPU_BUILD_WINDOW` CMake option
 
 [Learn more about Window API →](docs/window.md)
 
@@ -697,6 +703,7 @@ MIT License. See [LICENSE](LICENSE).
 - [Taichi](https://github.com/taichi-dev/taichi) — Algorithms
 - [GLAD](https://glad.dav1d.de/) — OpenGL loader
 - [stb](https://github.com/nothings/stb) — Image utilities
+- [minifb](https://github.com/emoon/minifb) — Lightweight cross-platform windowing
 
 ---
 

@@ -11,7 +11,7 @@ int main() {
     using namespace GPU;
     
     // Create a window
-    Window window({
+    AppWindow window({
         .width = 1024,
         .height = 768,
         .title = "My App",
@@ -53,16 +53,16 @@ int main() {
 
 ## API Reference
 
-### Window
+### AppWindow
 
 The main window class for creating and managing application windows.
 
 ```cpp
-class Window {
+class AppWindow {
 public:
     // Construction
-    explicit Window(const WindowConfig& config = {});
-    ~Window();
+    explicit AppWindow(const WindowConfig& config = {});
+    ~AppWindow();
     
     // Window state
     [[nodiscard]] bool IsOpen() const noexcept;
@@ -150,7 +150,7 @@ Helper class for displaying EasyGPU textures in a window.
 ```cpp
 class TexturePresenter {
 public:
-    explicit TexturePresenter(Window& window);
+    explicit TexturePresenter(AppWindow& window);
     
     // Present GPU texture
     template <Runtime::PixelFormat Format>
@@ -219,7 +219,7 @@ using WindowEvent = std::variant<
 int main() {
     using namespace GPU;
     
-    Window window({.width = 800, .height = 600, .title = "Basic Window"});
+    AppWindow window({.width = 800, .height = 600, .title = "Basic Window"});
     
     while (window.IsOpen()) {
         window.PollEvents();
@@ -247,7 +247,7 @@ int main() {
 int main() {
     using namespace GPU;
     
-    Window window({.width = 800, .height = 600, .title = "Pixel Buffer"});
+    AppWindow window({.width = 800, .height = 600, .title = "Pixel Buffer"});
     PixelBuffer pixels(800, 600);
     
     while (window.IsOpen()) {
@@ -277,7 +277,7 @@ int main() {
     using namespace GPU;
     using namespace GPU::Runtime;
     
-    Window window({.width = 1024, .height = 768, .title = "GPU Compute"});
+    AppWindow window({.width = 1024, .height = 768, .title = "GPU Compute"});
     Texture2D<PixelFormat::RGBA8> texture(1024, 768);
     TexturePresenter presenter(window);
     
@@ -295,7 +295,7 @@ int main() {
         Float g = 0.5f + 0.5f * Sin(v * 10.0f + t * 0.5f);
         Float b = 0.5f + 0.5f * Sin((u + v) * 5.0f + t * 0.3f);
         
-        tex[Int2(x, y)] = Vec4(r, g, b, 1.0f);
+        tex.Write(x, y, MakeFloat4(r, g, b, 1.0f));
     });
     
     while (window.IsOpen()) {
