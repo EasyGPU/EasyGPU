@@ -11,6 +11,8 @@
 
 #include <IR/Builder/BuilderContext.h>
 
+#include <stack>
+
 #include <IR/Node/ArrayAccess.h>
 #include <IR/Node/Break.h>
 #include <IR/Node/Call.h>
@@ -220,7 +222,8 @@ private:
 	Builder() = default;
 
 private:
-	BuilderContext *_context = nullptr;
+	BuilderContext			 *_context = nullptr;
+	std::stack<BuilderContext *> _contextStack; // Stack for nested kernel definitions
 };
 } // namespace GPU::IR::Builder
 

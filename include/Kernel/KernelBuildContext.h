@@ -104,7 +104,7 @@ public:
 	 * @param binding The binding slot
 	 * @param bufferHandle The backend buffer handle
 	 */
-	void BindRuntimeBuffer(uint32_t binding, uint32_t bufferHandle) override {
+	void BindRuntimeBuffer(uint32_t binding, Backend::BufferHandle bufferHandle) override {
 		_runtimeBuffers[binding] = bufferHandle;
 	}
 

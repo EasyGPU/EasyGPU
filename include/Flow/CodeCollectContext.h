@@ -11,6 +11,8 @@
 
 #include <IR/Builder/BuilderContext.h>
 
+#include <Backend/Backend.h>
+
 #include <string>
 #include <unordered_map>
 #include <vector>

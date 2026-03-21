@@ -17,11 +17,21 @@ Builder &Builder::Get() {
 }
 
 void Builder::Bind(BuilderContext &Context) {
+	// Push current context to stack before binding new one (support nested definitions)
+	if (_context != nullptr) {
+		_contextStack.push(_context);
+	}
 	_context = &Context;
 }
 
 void Builder::Unbind() {
-	_context = nullptr;
+	// Restore previous context from stack if available
+	if (!_contextStack.empty()) {
+		_context = _contextStack.top();
+		_contextStack.pop();
+	} else {
+		_context = nullptr;
+	}
 }
 
 BuilderContext *Builder::Context() {

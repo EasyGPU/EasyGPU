@@ -131,11 +131,13 @@ public:
 
 	Buffer(Buffer &&other) noexcept
 		: _bufferHandle(other._bufferHandle), _count(other._count), _elementSize(other._elementSize),
-		  _mode(other._mode), _boundBinding(other._boundBinding), _layoutConverter(std::move(other._layoutConverter)) {
+		  _mode(other._mode), _boundBinding(other._boundBinding), _layoutConverter(std::move(other._layoutConverter)),
+		  _moved(other._moved) {
 		other._bufferHandle = Backend::INVALID_BUFFER_HANDLE;
 		other._count		= 0;
 		other._elementSize	= 0;
 		other._boundBinding = -1;
+		other._moved		= true;
 	}
 
 	Buffer &operator=(Buffer &&other) noexcept {
@@ -147,10 +149,12 @@ public:
 			_mode				= other._mode;
 			_boundBinding		= other._boundBinding;
 			_layoutConverter	= std::move(other._layoutConverter);
+			_moved				= other._moved;
 			other._bufferHandle = Backend::INVALID_BUFFER_HANDLE;
 			other._count		= 0;
 			other._elementSize	= 0;
 			other._boundBinding = -1;
+			other._moved		= true;
 		}
 		return *this;
 	}
@@ -173,6 +177,9 @@ private:
 
 public:
 	[[nodiscard]] IR::Value::BufferRef<T> Bind() {
+		if (_moved) {
+			throw std::runtime_error("Buffer::Bind() called on a moved-from buffer");
+		}
 		auto *context = IR::Builder::Builder::Get().Context();
 		if (!context) {
 			throw std::runtime_error("Buffer::Bind() called outside of Kernel definition");
@@ -183,7 +190,7 @@ public:
 		std::string typeName   = GetGLSLTypeNameForBuffer<T>();
 
 		context->RegisterBuffer(binding, typeName, bufferName, static_cast<int>(_mode));
-		context->BindRuntimeBuffer(binding, static_cast<uint32_t>(_bufferHandle));
+		context->BindRuntimeBuffer(binding, _bufferHandle);
 		_boundBinding = binding;
 
 		return IR::Value::BufferRef<T>(bufferName, binding);
@@ -319,6 +326,7 @@ private:
 	BufferMode							   _mode			= BufferMode::ReadWrite;
 	int									   _boundBinding	= -1;
 	std::unique_ptr<Meta::LayoutConverter> _layoutConverter = nullptr;
+	bool							   _moved			= false; // Track if buffer has been moved from
 };
 
 } // namespace GPU::Runtime

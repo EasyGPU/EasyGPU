@@ -130,7 +130,7 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 			Backend::ResourceLayoutEntry entry;
 			entry.binding  = bufferInfo.binding;
 			entry.type	   = Backend::BindingType::Buffer;
-			entry.readOnly = (bufferInfo.mode == 0x88B8);
+			entry.readOnly = (bufferInfo.mode == GPU::Backend::BUFFER_MODE_READ_ONLY);
 			pipelineDesc.resources.push_back(entry);
 		}
 

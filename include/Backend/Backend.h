@@ -30,6 +30,11 @@ constexpr TextureHandle	 INVALID_TEXTURE_HANDLE	 = 0;
 constexpr ShaderHandle	 INVALID_SHADER_HANDLE	 = 0;
 constexpr PipelineHandle INVALID_PIPELINE_HANDLE = 0;
 
+// OpenGL buffer access mode constants (for internal use)
+constexpr int BUFFER_MODE_READ_ONLY  = 0x88B8;
+constexpr int BUFFER_MODE_WRITE_ONLY = 0x88B9;
+constexpr int BUFFER_MODE_READ_WRITE = 0x88BA;
+
 // ============================================================================
 // Buffer Mode Enum (defined here to avoid forward declaration issues)
 // ============================================================================

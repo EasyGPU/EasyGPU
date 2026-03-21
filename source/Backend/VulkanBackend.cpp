@@ -115,7 +115,12 @@ VulkanBackend::VulkanBackend() = default;
 
 VulkanBackend::~VulkanBackend() {
 	if (_initialized) {
-		Shutdown();
+		try {
+			Shutdown();
+		} catch (...) {
+			// Ignore exceptions during destruction to prevent std::terminate
+			// Destruction should be noexcept
+		}
 	}
 }
 

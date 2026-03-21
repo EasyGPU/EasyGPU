@@ -71,7 +71,7 @@ const std::vector<uint32_t> &CodeCollectContext::GetBufferBindings() const {
 	return empty;
 }
 
-void CodeCollectContext::BindRuntimeBuffer(uint32_t binding, uint32_t bufferHandle) {
+void CodeCollectContext::BindRuntimeBuffer(uint32_t binding, GPU::Backend::BufferHandle bufferHandle) {
 	if (_parentContext) {
 		_parentContext->BindRuntimeBuffer(binding, bufferHandle);
 	}

@@ -521,6 +521,9 @@ void OpenGLBackend::SetUniform(PipelineHandle pipeline, const std::string &name,
 		glProgramUniformMatrix3fv(it->second.glProgram, location, 1, GL_FALSE, static_cast<const float *>(data));
 	} else if (type == "mat4") {
 		glProgramUniformMatrix4fv(it->second.glProgram, location, 1, GL_FALSE, static_cast<const float *>(data));
+	} else {
+		// Unsupported uniform type - this is a development error
+		throw std::runtime_error(std::string("Unsupported uniform type: ") + type);
 	}
 }
 

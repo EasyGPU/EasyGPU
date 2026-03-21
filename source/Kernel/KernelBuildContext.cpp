@@ -232,9 +232,9 @@ std::string KernelBuildContext::GetBufferDeclarations() const {
 	std::ostringstream oss;
 	for (const auto &buf : _buffers) {
 		std::string qualifier;
-		if (buf.mode == 0x88B8) { // GL_READ_ONLY equivalent
+		if (buf.mode == GPU::Backend::BUFFER_MODE_READ_ONLY) {
 			qualifier = "readonly ";
-		} else if (buf.mode == 0x88B9) { // GL_WRITE_ONLY equivalent
+		} else if (buf.mode == GPU::Backend::BUFFER_MODE_WRITE_ONLY) {
 			qualifier = "writeonly ";
 		}
 		// GL_READ_WRITE (0x88BA) has no qualifier

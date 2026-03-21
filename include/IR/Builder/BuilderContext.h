@@ -9,6 +9,8 @@
 #ifndef EASYGPU_BUILDERCONTEXT_H
 #define EASYGPU_BUILDERCONTEXT_H
 
+#include <Backend/Backend.h>
+
 #include <Runtime/PixelFormat.h>
 
 #include <functional>
@@ -111,7 +113,7 @@ public:
 	 * @param binding The binding slot
 	 * @param bufferHandle The OpenGL buffer handle
 	 */
-	virtual void						 BindRuntimeBuffer(uint32_t binding, uint32_t bufferHandle) = 0;
+	virtual void						 BindRuntimeBuffer(uint32_t binding, Backend::BufferHandle bufferHandle) = 0;
 
 	/**
 	 * Get all runtime buffer bindings for dispatch
