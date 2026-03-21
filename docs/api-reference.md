@@ -1274,6 +1274,57 @@ Callable<float(float, float)> Add2 = [](Float& a, Float& b) {
 };
 ```
 
+### Multi-File Projects and Linkage
+
+**Important:** In multi-file projects (when including Callable definitions in headers), you **must** add the `inline` keyword to avoid "multiple definition" linker errors:
+
+```cpp
+// PhysicsKernel.h - Header file
+#pragma once
+#include <GPU.h>
+
+// ❌ WRONG: Will cause "multiple definition" link errors
+// when this header is included in multiple .cpp files
+Callable<Float(Float, Float)> IntensityToColor = [](Float intensity, Float scale) {
+    Return(intensity * scale);
+};
+
+// ✅ CORRECT: Add inline keyword for header-defined Callables
+inline Callable<Float(Float, Float)> IntensityToColor = [](Float intensity, Float scale) {
+    Return(intensity * scale);
+};
+```
+
+**When to use `inline`:**
+
+| Scenario | `inline` Required | Reason |
+|:---------|:------------------|:-------|
+| Callable in header (.h) | **Yes** | Prevents multiple definition errors |
+| Callable in single .cpp file | No | Only one definition exists |
+| Callable as class static member | **Yes** | Same as header inclusion |
+| Callable in anonymous namespace | No | Internal linkage |
+
+**Why this happens:**
+Callable objects are defined as variables (not functions), so they follow C++ variable linkage rules. Without `inline`, each translation unit that includes the header gets its own definition, causing linker errors.
+
+**Template Callables and `inline`:**
+
+Template Callables also need `inline` when defined in headers:
+
+```cpp
+// MathUtils.h
+#pragma once
+#include <GPU.h>
+
+// ✅ CORRECT: Add inline for template Callables in headers
+template <class T>
+inline Callable<T(T, T)> GenericClamp = [&](T value, T minVal, T maxVal) {
+    If(value < minVal, [&]() { Return(minVal); });
+    If(value > maxVal, [&]() { Return(maxVal); });
+    Return(value);
+};
+```
+
 **Type Mapping:**
 - `Float` �?`float`
 - `Int` �?`int`  

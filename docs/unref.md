@@ -113,8 +113,46 @@ Kernel1D interpolate([](Int i) {
 | Copying to another variable | Yes | Ensure independent copy |
 | Passing to Callable by reference | Yes | Prevent unintended modifications |
 | Creating local working copy | Yes | Safe local modifications |
+| Uniform via `LoadRef()` | Yes | `LoadRef()` returns a reference to the uniform |
 | Direct buffer operations | No | `buf[i] = value` is fine |
 | Reading once without storing | No | Direct use is safe |
+| Uniform via `Load()` | No | `Load()` already returns an independent copy |
+
+## Uniform.Load() vs LoadRef()
+
+**`Uniform.Load()` automatically creates an independent copy**, so you typically don't need `Unref()` for uniforms:
+
+```cpp
+Uniform<float> uWavelength(500.0f);
+
+Kernel1D kernel([&](Int i) {
+    // ✅ Load() returns an independent copy - safe to modify
+    Float wl = uWavelength.Load();
+    wl = wl * 2.0f;  // Modifies only 'wl', not the uniform
+    
+    auto buf = data.Bind();
+    buf[i] = Calculate(buf[i], wl);
+});
+```
+
+**`Uniform.LoadRef()` returns a direct reference** to the uniform, which requires `Unref()` if you need to modify it:
+
+```cpp
+Kernel1D kernel([&](Int i) {
+    // LoadRef() returns a reference - use with caution
+    Float wl = uWavelength.LoadRef();  // wl references the uniform
+    // wl = wl * 2.0f;  // ❌ Error: "assignment to uniform"
+    
+    // ✅ Use Unref() if you need to modify
+    Float modifiableWl = Unref(uWavelength.LoadRef());
+    modifiableWl = modifiableWl * 2.0f;  // OK - independent copy
+});
+```
+
+**Recommendation:** Use `Load()` for most cases. Use `LoadRef()` only when:
+- You need the absolute minimum overhead (rarely necessary)
+- You're certain you only need read-only access
+- You're passing to functions that won't modify the value
 
 ## Comparison with Make Functions
 

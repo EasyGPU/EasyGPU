@@ -261,6 +261,53 @@ Callable<Float(T1, T2)> weightedSum = [&](T1 a, T2 b) {
 Float result = weightedSum<Int, Float>(MakeInt(100), MakeFloat(0.5f));
 ```
 
+**Header-Defined Callables (Multi-File Projects):**
+
+When defining Callables in header files, add `inline` to prevent linker errors:
+
+```cpp
+// In header file (.h)
+inline Callable<Float(Float, Float)> IntensityToColor = [](Float intensity, Float scale) {
+    Return(intensity * scale);
+};
+```
+
+### Math Functions
+
+EasyGPU provides a comprehensive math library including GLSL built-ins and special functions:
+
+```cpp
+// Standard GLSL functions
+Float y = Sin(x);        // Trigonometry: Sin, Cos, Tan, Asin, Acos, Atan
+Float r = Sqrt(x);       // Power/roots: Sqrt, Pow, Exp, Log
+Float c = Clamp(x, 0.0f, 1.0f);  // Common: Clamp, Mix, Step, Smoothstep
+Float d = Dot(a, b);     // Vector: Dot, Cross, Length, Normalize, Reflect
+
+// Special functions (useful for optics and signal processing)
+Float s = Sinc(x);              // sin(x)/x, with proper handling of x=0
+Float j0 = BesselJ0(x);         // Bessel function J0(x) - for circular apertures
+Float j1 = BesselJ1(x);         // Bessel function J1(x)
+Float jinc = Jinc(x);           // 2*J1(x)/x - Airy disk pattern function
+```
+
+**Diffraction Pattern Example:**
+
+```cpp
+Kernel2D diffractionPattern([&](Int x, Int y) {
+    auto tex = texture.Bind();
+    
+    // Convert to normalized coordinates centered at origin
+    Float u = (ToFloat(x) - ToFloat(WIDTH) / 2.0f) * scale;
+    Float v = (ToFloat(y) - ToFloat(HEIGHT) / 2.0f) * scale;
+    Float r = Sqrt(u * u + v * v);
+    
+    // Airy disk pattern for circular aperture
+    Float intensity = Jinc(r) * Jinc(r);
+    
+    tex.Write(x, y, MakeFloat4(intensity, intensity, intensity, 1.0f));
+});
+```
+
 ### Introspection
 
 ```cpp
@@ -373,7 +420,7 @@ include(FetchContent)
 FetchContent_Declare(
     easygpu
     GIT_REPOSITORY https://github.com/easygpu/EasyGPU.git
-    GIT_TAG v0.1.0
+    GIT_TAG v1.0.0
 )
 FetchContent_MakeAvailable(easygpu)
 target_link_libraries(your_target EasyGPU)
@@ -570,6 +617,32 @@ val = 5;  // May unexpectedly modify buf[i] in the generated shader
 ```
 
 **Why this matters:** Due to move constructor optimizations, `Int val = buf[i]` selects the move constructor, transferring ownership of the underlying variable name. This causes `val` to reference `buffer[i]` directly in the generated GLSL. Use `Unref()` to force the copy constructor and create truly independent variables. See [Unref Documentation](docs/unref.md) for details.
+
+### Uniform Variables
+
+**`Uniform.Load()` returns an independent copy by default**, so you can safely modify the result:
+
+```cpp
+Uniform<float> uScale(2.0f);
+
+Kernel1D kernel([&](Int i) {
+    auto buf = buffer.Bind();
+    
+    // ✅ Load() returns an independent copy, safe to modify
+    Float scale = uScale.Load();
+    scale = scale * 2.0f;  // Modifies only the local 'scale' variable
+    buf[i] = buf[i] * scale;
+});
+```
+
+**For read-only access** (to avoid the small overhead of copying), use `LoadRef()`:
+
+```cpp
+// Read-only usage - no modification needed
+Float scale = uScale.LoadRef();  // Returns reference to uniform
+buf[i] = buf[i] * scale;         // Safe for reading
+// scale = 5.0f;                 // ❌ DON'T do this - "assignment to uniform" error
+```
 
 ### Var-Var Assignment
 

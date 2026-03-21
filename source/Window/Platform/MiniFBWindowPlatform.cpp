@@ -8,6 +8,7 @@
 #include "MiniFBWindowPlatform.h"
 
 #include <MiniFB.h>
+#include <MiniFB_internal.h>
 
 #include <cstring>
 #include <stdexcept>
@@ -284,6 +285,14 @@ void MiniFBWindowPlatform::PollEvents() {
 	float scrollY = mfb_get_mouse_scroll_y(_window);
 	if (scrollX != 0.0f || scrollY != 0.0f) {
 		HandleMouseScroll(0, scrollX, scrollY);
+		
+		// Reset minifb's scroll values to prevent duplicate events
+		// Scroll values are cumulative and don't auto-reset after reading
+		auto *windowData = static_cast<SWindowData *>(mfb_get_user_data(_window));
+		if (windowData) {
+			windowData->mouse_wheel_x = 0.0f;
+			windowData->mouse_wheel_y = 0.0f;
+		}
 	}
 
 	if (state == STATE_INVALID_WINDOW || state == STATE_INTERNAL_ERROR) {
