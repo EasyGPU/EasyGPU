@@ -506,7 +506,7 @@ Each thread should:
 | Language | C++ | Python/C++ |
 | JIT compilation | No | Yes |
 | Differentiable | No | Yes |
-| Backend | OpenGL | LLVM/CUDA/Vulkan/Metal |
+| Backend | OpenGL or Vulkan | LLVM/CUDA/Vulkan/Metal |
 | Setup | Minimal | Requires Python |
 
 ---
