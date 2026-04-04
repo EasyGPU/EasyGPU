@@ -26,6 +26,7 @@ Makefile
 compile_commands.json
 CTestTestfile.cmake
 _deps/
+CMakeSettings.json
 
 # Compiled Object files
 *.o
