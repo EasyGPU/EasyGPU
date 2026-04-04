@@ -8,6 +8,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 // For SHA256 hash computation - use standard library where possible
 #include <algorithm>
@@ -19,8 +20,8 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <wincrypt.h>
 #include <windows.h>
+#include <wincrypt.h>
 #else
 #include <openssl/evp.h>
 #endif
@@ -31,7 +32,8 @@ namespace GPU::Kernel {
 class SHA256 {
 public:
 	static std::string Hash(const std::string &input) {
-		unsigned char hash[32];
+		unsigned char hash[32] = {};
+		bool          hashComputed = false;
 
 #ifdef _WIN32
 		// Windows Cryptography API
@@ -43,7 +45,9 @@ public:
 			if (CryptCreateHash(hProv, CALG_SHA_256, 0, 0, &hHash)) {
 				CryptHashData(hHash, reinterpret_cast<const BYTE *>(input.c_str()), static_cast<DWORD>(input.size()),
 							  0);
-				CryptGetHashParam(hHash, HP_HASHVAL, hash, &hashLen, 0);
+				if (CryptGetHashParam(hHash, HP_HASHVAL, hash, &hashLen, 0)) {
+					hashComputed = true;
+				}
 				CryptDestroyHash(hHash);
 			}
 			CryptReleaseContext(hProv, 0);
@@ -52,12 +56,18 @@ public:
 		// OpenSSL EVP API
 		EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 		if (ctx) {
-			EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
-			EVP_DigestUpdate(ctx, input.c_str(), input.size());
-			EVP_DigestFinal_ex(ctx, hash, nullptr);
+			if (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) &&
+			    EVP_DigestUpdate(ctx, input.c_str(), input.size()) &&
+			    EVP_DigestFinal_ex(ctx, hash, nullptr)) {
+				hashComputed = true;
+			}
 			EVP_MD_CTX_free(ctx);
 		}
 #endif
+
+		if (!hashComputed) {
+			throw std::runtime_error("SHA256 hash computation failed");
+		}
 
 		// Convert to hex string
 		std::ostringstream oss;
