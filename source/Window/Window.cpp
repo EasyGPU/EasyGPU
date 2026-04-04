@@ -1,8 +1,8 @@
 #include <MiniFB.h> // For mfb_wait_sync
 
 // Include Window headers only - avoid GPU core headers to prevent template instantiation issues
-#include <Window/AppWindow.h>
 #include "Platform/MiniFBWindowPlatform.h"
+#include <Window/AppWindow.h>
 
 namespace GPU::Window {
 

@@ -3,7 +3,7 @@
 /**
  * @file ShaderCache.h
  * @brief In-memory shader binary cache for kernel compilation acceleration
- * 
+ *
  * This module provides runtime caching of compiled GPU programs to avoid
  * recompilation overhead within a single application session. Cache is
  * NOT persisted to disk - it only exists in memory.
@@ -27,17 +27,17 @@ namespace GPU::Kernel {
  * Cache entry metadata for a single cached shader binary
  */
 struct CacheEntry {
-	uint64_t	timestamp;      // When this entry was created
-	uint32_t	dataSize;      // Size of binary data in bytes
-	uint32_t	backendType;   // Backend type identifier (OpenGL/Vulkan)
-	uint32_t	format;        // Backend-specific format identifier
-	std::string shaderHash;  // Source code hash for verification
-	std::vector<uint8_t> data; // Binary data
+	uint64_t			 timestamp;	  // When this entry was created
+	uint32_t			 dataSize;	  // Size of binary data in bytes
+	uint32_t			 backendType; // Backend type identifier (OpenGL/Vulkan)
+	uint32_t			 format;	  // Backend-specific format identifier
+	std::string			 shaderHash;  // Source code hash for verification
+	std::vector<uint8_t> data;		  // Binary data
 };
 
 /**
  * In-memory shader cache manager
- * 
+ *
  * This class manages an in-memory cache of compiled shader binaries.
  * It is thread-safe but NOT persisted to disk.
  */
@@ -47,14 +47,14 @@ public:
 	 * Create an in-memory shader cache
 	 */
 	ShaderCache();
-	
-	~ShaderCache() = default;
+
+	~ShaderCache()										 = default;
 
 	// Non-copyable, movable
-	ShaderCache(const ShaderCache&) = delete;
-	ShaderCache& operator=(const ShaderCache&) = delete;
-	ShaderCache(ShaderCache&&) noexcept = default;
-	ShaderCache& operator=(ShaderCache&&) noexcept = default;
+	ShaderCache(const ShaderCache &)					 = delete;
+	ShaderCache &operator=(const ShaderCache &)			 = delete;
+	ShaderCache(ShaderCache &&) noexcept				 = default;
+	ShaderCache		 &operator=(ShaderCache &&) noexcept = default;
 
 	/**
 	 * Look up a cached binary by shader source hash
@@ -62,7 +62,7 @@ public:
 	 * @param backendType Required backend type
 	 * @return Pointer to entry if found, nullptr otherwise
 	 */
-	const CacheEntry* Lookup(const std::string& shaderHash, uint32_t backendType) const;
+	const CacheEntry *Lookup(const std::string &shaderHash, uint32_t backendType) const;
 
 	/**
 	 * Store a binary in the cache
@@ -72,15 +72,14 @@ public:
 	 * @param data Binary data to store
 	 * @return True if stored successfully
 	 */
-	bool Store(const std::string& shaderHash, uint32_t backendType, uint32_t format, 
-	           const std::vector<uint8_t>& data);
+	bool Store(const std::string &shaderHash, uint32_t backendType, uint32_t format, const std::vector<uint8_t> &data);
 
 	/**
 	 * Get cache statistics
 	 * @param[out] totalEntries Number of entries in cache
 	 * @param[out] totalBytes Total size of cached data
 	 */
-	void GetStats(size_t& totalEntries, size_t& totalBytes) const;
+	void GetStats(size_t &totalEntries, size_t &totalBytes) const;
 
 	/**
 	 * Clear all cached entries
@@ -92,18 +91,18 @@ public:
 	 * @param sourceCode GLSL source code
 	 * @return Hash string suitable for cache lookup
 	 */
-	static std::string ComputeShaderHash(const std::string& sourceCode);
+	static std::string ComputeShaderHash(const std::string &sourceCode);
 
 private:
 	// Key: "backendType:shaderHash"
 	std::unordered_map<std::string, CacheEntry> _entries;
-	
-	mutable std::mutex _mutex;
+
+	mutable std::mutex							_mutex;
 };
 
 /**
  * Global shader cache instance for automatic kernel caching
- * 
+ *
  * This singleton provides a default cache that kernels will use
  * when caching is enabled. Cache is in-memory only.
  */
@@ -112,23 +111,23 @@ public:
 	/**
 	 * Get the global shader cache instance
 	 */
-	static ShaderCache& Get();
+	static ShaderCache &Get();
 
 	/**
 	 * Clear the global cache
 	 */
-	static void Clear();
+	static void			Clear();
 
 	/**
 	 * Check if global cache is initialized
 	 */
-	static bool IsEnabled();
+	static bool			IsEnabled();
 
 private:
 	GlobalShaderCache() = default;
-	
+
 	static std::unique_ptr<ShaderCache> _cache;
-	static std::mutex _mutex;
+	static std::mutex					_mutex;
 };
 
 } // namespace GPU::Kernel

@@ -323,14 +323,18 @@ public:
 	 */
 	template <typename U = T>
 	Expr(const T &Value)
-		requires requires(const T& t) { { t.GetTextureName() } -> std::convertible_to<std::string>; }
+		requires requires(const T &t) {
+			{ t.GetTextureName() } -> std::convertible_to<std::string>;
+		}
 	{
 		_node = std::make_unique<Node::LoadUniformNode>(Value.GetTextureName());
 	}
 
 	explicit Expr(const T &Value) {
 		// For texture/sampler types, use GetTextureName() directly
-		if constexpr (requires(const T& t) { { t.GetTextureName() } -> std::convertible_to<std::string>; }) {
+		if constexpr (requires(const T &t) {
+						  { t.GetTextureName() } -> std::convertible_to<std::string>;
+					  }) {
 			_node = std::make_unique<Node::LoadUniformNode>(Value.GetTextureName());
 		} else {
 			_node = std::make_unique<Node::LoadUniformNode>(ValueToString(Value));

@@ -34,64 +34,64 @@ public:
 	~Context();
 
 	// Non-copyable, non-movable singleton
-	Context(const Context &)						= delete;
-	Context &operator=(const Context &)				= delete;
-	Context(Context &&)								= delete;
-	Context					 &operator=(Context &&) = delete;
+	Context(const Context &)								 = delete;
+	Context &operator=(const Context &)						 = delete;
+	Context(Context &&)										 = delete;
+	Context							  &operator=(Context &&) = delete;
 
 	/**
 	 * Get the singleton instance, auto-initializing if needed
 	 */
-	static Context			 &GetInstance();
+	static Context					  &GetInstance();
 
 	/**
 	 * Get the active backend instance
 	 * @return Pointer to the active backend
 	 */
-	static Backend::Backend	 *GetBackend();
+	static Backend::Backend			  *GetBackend();
 
 	/**
 	 * Explicitly initialize the context (optional, called automatically)
 	 * @throw std::runtime_error if initialization fails
 	 */
-	void					  Initialize();
+	void							   Initialize();
 
 	/**
 	 * Check if context is already initialized
 	 */
-	[[nodiscard]] bool		  IsInitialized() const;
+	[[nodiscard]] bool				   IsInitialized() const;
 
 	/**
 	 * Make the backend context current on this thread
 	 */
-	void					  MakeCurrent();
+	void							   MakeCurrent();
 
 	/**
 	 * Release the context from current thread
 	 */
-	void					  MakeNoneCurrent();
+	void							   MakeNoneCurrent();
 
 	/**
 	 * Get backend version string
 	 */
-	[[nodiscard]] std::string GetVersionString() const;
+	[[nodiscard]] std::string		   GetVersionString() const;
 
 	/**
 	 * Check if compute shaders are supported
 	 */
-	[[nodiscard]] bool		  HasComputeShadersSupport() const;
+	[[nodiscard]] bool				   HasComputeShadersSupport() const;
 
 	/**
 	 * Get compute shader max work group size
 	 */
-	void					  GetMaxWorkGroupSize(int &x, int &y, int &z) const;
+	void							   GetMaxWorkGroupSize(int &x, int &y, int &z) const;
 
 	/**
 	 * Get the native OpenGL context handle (for FragmentKernel compatibility)
 	 * @return The native GL context handle (HGLRC on Windows, GLXContext on Linux)
 	 *         Returns nullptr if the current backend is not OpenGL
 	 */
-	[[nodiscard]] void		 *GetNativeGLContext() const;
+	[[nodiscard]] void				  *GetNativeGLContext() const;
 
 	/**
 	 * Get the current backend type

@@ -104,10 +104,10 @@ public:
 		_varNode		 = dynamic_cast<Node::LocalVariableNode *>(_node.get());
 		assert(_varNode && "Internal error: Failed to create variable node");
 
-		auto lhs		 = Load();
-		auto rhs		 = Value.Release();
+		auto lhs   = Load();
+		auto rhs   = Value.Release();
 
-		auto store		 = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
+		auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
 
 		// The variable definition is truly the statement
 		Builder::Builder::Get().Build(*_varNode, true);
@@ -129,10 +129,10 @@ public:
 			throw std::runtime_error("Internal error: Failed to create variable node");
 		}
 
-		auto lhs		 = Load();
-		auto rhs		 = Value.Release();
+		auto lhs   = Load();
+		auto rhs   = Value.Release();
 
-		auto store		 = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
+		auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
 
 		// The variable definition is truly the statement
 		Builder::Builder::Get().Build(*_varNode, true);

@@ -1002,10 +1002,8 @@ Backend *CreateOpenGLBackend() {
 // Binary Cache Support
 // =============================================================================
 
-PipelineHandle OpenGLBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
-                                                       const void* binaryData,
-                                                       size_t binarySize,
-                                                       uint32_t format) {
+PipelineHandle OpenGLBackend::CreatePipelineFromBinary(const PipelineDesc &desc, const void *binaryData,
+													   size_t binarySize, uint32_t format) {
 	if (!_initialized) {
 		throw std::runtime_error("OpenGL backend not initialized");
 	}
@@ -1034,13 +1032,13 @@ PipelineHandle OpenGLBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
 	info.workGroupSizeX = desc.workGroupSizeX;
 	info.workGroupSizeY = desc.workGroupSizeY;
 	info.workGroupSizeZ = desc.workGroupSizeZ;
-	_pipelines[handle] = info;
+	_pipelines[handle]	= info;
 
 	return handle;
 }
 
-std::vector<uint8_t> OpenGLBackend::GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) {
-	format = 0;
+std::vector<uint8_t> OpenGLBackend::GetPipelineBinary(PipelineHandle pipeline, uint32_t &format) {
+	format	= 0;
 
 	auto it = _pipelines.find(pipeline);
 	if (it == _pipelines.end()) {
@@ -1061,8 +1059,8 @@ std::vector<uint8_t> OpenGLBackend::GetPipelineBinary(PipelineHandle pipeline, u
 
 	// Allocate buffer and retrieve binary
 	std::vector<uint8_t> binary(length);
-	GLenum binaryFormat = 0;
-	GLsizei returnedLength = 0;
+	GLenum				 binaryFormat	= 0;
+	GLsizei				 returnedLength = 0;
 	glGetProgramBinary(program, length, &returnedLength, &binaryFormat, binary.data());
 
 	if (returnedLength <= 0) {

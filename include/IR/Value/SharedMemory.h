@@ -20,15 +20,14 @@ namespace GPU::IR::Value {
  * Shared memory array API for users
  * @tparam Type The scalar type supported by GPU
  * @tparam N The size of the shared memory array
- * 
+ *
  * Example usage:
  *   SharedMemory<float, 256> shared;
  *   shared[localId] = value;
  *   Kernel1D::WorkgroupBarrier();
  *   float val = shared[otherId];
  */
-template <ScalarType Type, int N>
-class SharedMemory {
+template <ScalarType Type, int N> class SharedMemory {
 public:
 	/**
 	 * Create a shared memory array
@@ -38,7 +37,7 @@ public:
 	SharedMemory() {
 		auto name = Builder::Builder::Get().Context()->AssignVarName();
 
-		_node = std::make_unique<Node::SharedMemoryNode>(name, TypeShaderName<Type>(), N);
+		_node	  = std::make_unique<Node::SharedMemoryNode>(name, TypeShaderName<Type>(), N);
 
 		// Declare the shared memory at global scope (outside main)
 		Builder::Builder::Get().Context()->PushSharedMemoryDeclaration(
@@ -51,8 +50,7 @@ public:
 	 * @param Index The index (can be Var<int>, Expr<int>, or int)
 	 * @return Var<Type> that references the shared memory location
 	 */
-	template <CountableType T>
-	Var<Type> operator[](T Index) {
+	template <CountableType T> Var<Type> operator[](T Index) {
 		return Var<Type>(std::format("{}[{}]", _node->VarName(), ValueToString(Index)));
 	}
 
@@ -61,8 +59,7 @@ public:
 		return Var<Type>(std::format("{}[{}]", _node->VarName(), exprStr));
 	}
 
-	template <ScalarType IndexT>
-	Var<Type> operator[](Expr<IndexT> Index) {
+	template <ScalarType IndexT> Var<Type> operator[](Expr<IndexT> Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return Var<Type>(std::format("{}[{}]", _node->VarName(), exprStr));
 	}

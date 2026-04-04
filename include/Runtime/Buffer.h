@@ -326,7 +326,7 @@ private:
 	BufferMode							   _mode			= BufferMode::ReadWrite;
 	int									   _boundBinding	= -1;
 	std::unique_ptr<Meta::LayoutConverter> _layoutConverter = nullptr;
-	bool							   _moved			= false; // Track if buffer has been moved from
+	bool								   _moved			= false; // Track if buffer has been moved from
 };
 
 } // namespace GPU::Runtime

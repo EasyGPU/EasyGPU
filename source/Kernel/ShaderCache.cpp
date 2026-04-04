@@ -13,8 +13,8 @@
 #include <algorithm>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <wincrypt.h>
+#include <windows.h>
 #else
 #include <openssl/evp.h>
 #endif
@@ -24,19 +24,19 @@ namespace GPU::Kernel {
 // Simple SHA256 implementation wrapper
 class SHA256 {
 public:
-	static std::string Hash(const std::string& input) {
+	static std::string Hash(const std::string &input) {
 		unsigned char hash[32];
-		
+
 #ifdef _WIN32
 		// Windows Cryptography API
-		HCRYPTPROV hProv = 0;
-		HCRYPTHASH hHash = 0;
-		DWORD hashLen = 32;
-		
+		HCRYPTPROV hProv   = 0;
+		HCRYPTHASH hHash   = 0;
+		DWORD	   hashLen = 32;
+
 		if (CryptAcquireContext(&hProv, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
 			if (CryptCreateHash(hProv, CALG_SHA_256, 0, 0, &hHash)) {
-				CryptHashData(hHash, reinterpret_cast<const BYTE*>(input.c_str()), 
-				              static_cast<DWORD>(input.size()), 0);
+				CryptHashData(hHash, reinterpret_cast<const BYTE *>(input.c_str()), static_cast<DWORD>(input.size()),
+							  0);
 				CryptGetHashParam(hHash, HP_HASHVAL, hash, &hashLen, 0);
 				CryptDestroyHash(hHash);
 			}
@@ -44,7 +44,7 @@ public:
 		}
 #else
 		// OpenSSL EVP API
-		EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+		EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 		if (ctx) {
 			EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
 			EVP_DigestUpdate(ctx, input.c_str(), input.size());
@@ -52,7 +52,7 @@ public:
 			EVP_MD_CTX_free(ctx);
 		}
 #endif
-		
+
 		// Convert to hex string
 		std::ostringstream oss;
 		for (int i = 0; i < 32; ++i) {
@@ -68,42 +68,42 @@ public:
 
 ShaderCache::ShaderCache() = default;
 
-const CacheEntry* ShaderCache::Lookup(const std::string& shaderHash, uint32_t backendType) const {
+const CacheEntry *ShaderCache::Lookup(const std::string &shaderHash, uint32_t backendType) const {
 	std::lock_guard<std::mutex> lock(_mutex);
-	
-	std::string key = std::to_string(backendType) + ":" + shaderHash;
-	auto it = _entries.find(key);
+
+	std::string					key = std::to_string(backendType) + ":" + shaderHash;
+	auto						it	= _entries.find(key);
 	if (it != _entries.end()) {
 		return &it->second;
 	}
 	return nullptr;
 }
 
-bool ShaderCache::Store(const std::string& shaderHash, uint32_t backendType, uint32_t format,
-                        const std::vector<uint8_t>& data) {
+bool ShaderCache::Store(const std::string &shaderHash, uint32_t backendType, uint32_t format,
+						const std::vector<uint8_t> &data) {
 	std::lock_guard<std::mutex> lock(_mutex);
-	
-	CacheEntry entry;
-	entry.timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-		std::chrono::system_clock::now().time_since_epoch()).count();
-	entry.dataSize = static_cast<uint32_t>(data.size());
+
+	CacheEntry					entry;
+	entry.timestamp =
+		std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	entry.dataSize	  = static_cast<uint32_t>(data.size());
 	entry.backendType = backendType;
-	entry.format = format;
-	entry.shaderHash = shaderHash;
-	entry.data = data;
-	
-	std::string key = std::to_string(backendType) + ":" + shaderHash;
-	_entries[key] = std::move(entry);
-	
+	entry.format	  = format;
+	entry.shaderHash  = shaderHash;
+	entry.data		  = data;
+
+	std::string key	  = std::to_string(backendType) + ":" + shaderHash;
+	_entries[key]	  = std::move(entry);
+
 	return true;
 }
 
-void ShaderCache::GetStats(size_t& totalEntries, size_t& totalBytes) const {
+void ShaderCache::GetStats(size_t &totalEntries, size_t &totalBytes) const {
 	std::lock_guard<std::mutex> lock(_mutex);
-	
+
 	totalEntries = _entries.size();
-	totalBytes = 0;
-	for (const auto& [key, entry] : _entries) {
+	totalBytes	 = 0;
+	for (const auto &[key, entry] : _entries) {
 		totalBytes += entry.data.size();
 	}
 }
@@ -113,7 +113,7 @@ void ShaderCache::Clear() {
 	_entries.clear();
 }
 
-std::string ShaderCache::ComputeShaderHash(const std::string& sourceCode) {
+std::string ShaderCache::ComputeShaderHash(const std::string &sourceCode) {
 	return SHA256::Hash(sourceCode);
 }
 
@@ -122,21 +122,21 @@ std::string ShaderCache::ComputeShaderHash(const std::string& sourceCode) {
 // =============================================================================
 
 std::unique_ptr<ShaderCache> GlobalShaderCache::_cache;
-std::mutex GlobalShaderCache::_mutex;
+std::mutex					 GlobalShaderCache::_mutex;
 
-ShaderCache& GlobalShaderCache::Get() {
+ShaderCache					&GlobalShaderCache::Get() {
 	std::lock_guard<std::mutex> lock(_mutex);
-	
+
 	if (!_cache) {
 		_cache = std::make_unique<ShaderCache>();
 	}
-	
+
 	return *_cache;
 }
 
 void GlobalShaderCache::Clear() {
 	std::lock_guard<std::mutex> lock(_mutex);
-	
+
 	if (_cache) {
 		_cache->Clear();
 	}

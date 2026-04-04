@@ -17,15 +17,15 @@ namespace GPU::IR::Node {
  * The atomic operation code
  */
 enum class AtomicOpCode {
-	Add,	// atomicAdd
-	Sub,	// atomicSub (GLSL 4.6+)
-	Min,	// atomicMin
-	Max,	// atomicMax
-	And,	// atomicAnd
-	Or,		// atomicOr
-	Xor,	// atomicXor
-	Exchange,	// atomicExchange
-	CompSwap	// atomicCompSwap
+	Add,	  // atomicAdd
+	Sub,	  // atomicSub (GLSL 4.6+)
+	Min,	  // atomicMin
+	Max,	  // atomicMax
+	And,	  // atomicAnd
+	Or,		  // atomicOr
+	Xor,	  // atomicXor
+	Exchange, // atomicExchange
+	CompSwap  // atomicCompSwap
 };
 
 /**

@@ -83,7 +83,7 @@ public:
 	 * Allocate a binding slot for buffer/image
 	 * @return The allocated binding slot index
 	 */
-	virtual uint32_t	AllocateBindingSlot()														= 0;
+	virtual uint32_t	AllocateBindingSlot()																	 = 0;
 
 	/**
 	 * Register a buffer for the kernel
@@ -93,19 +93,19 @@ public:
 	 * @param mode The buffer access mode
 	 */
 	virtual void		RegisterBuffer(uint32_t binding, const std::string &typeName, const std::string &bufferName,
-									   int mode)													= 0;
+									   int mode)																 = 0;
 
 	/**
 	 * Get the buffer declarations for GLSL
 	 * @return The buffer declaration string
 	 */
-	virtual std::string GetBufferDeclarations() const												= 0;
+	virtual std::string GetBufferDeclarations() const															 = 0;
 
 	/**
 	 * Get all registered buffer bindings
 	 * @return Vector of binding slots
 	 */
-	virtual const std::vector<uint32_t> &GetBufferBindings() const									= 0;
+	virtual const std::vector<uint32_t> &GetBufferBindings() const												 = 0;
 
 	/**
 	 * Bind a runtime GPU buffer to a binding slot
@@ -119,7 +119,7 @@ public:
 	 * Get all runtime buffer bindings for dispatch
 	 * @return Map of binding slot -> OpenGL buffer handle
 	 */
-	virtual const std::unordered_map<uint32_t, uint32_t> &GetRuntimeBufferBindings() const			= 0;
+	virtual const std::unordered_map<uint32_t, uint32_t> &GetRuntimeBufferBindings() const						 = 0;
 
 public:
 	// ===================================================================

@@ -39,13 +39,13 @@ public:
 		}
 	}
 
-	KernelBuilderGuard(const KernelBuilderGuard &)              = delete;
+	KernelBuilderGuard(const KernelBuilderGuard &)			  = delete;
 	KernelBuilderGuard &operator=(const KernelBuilderGuard &) = delete;
-	KernelBuilderGuard(KernelBuilderGuard &&)                  = delete;
-	KernelBuilderGuard &operator=(KernelBuilderGuard &&)      = delete;
+	KernelBuilderGuard(KernelBuilderGuard &&)				  = delete;
+	KernelBuilderGuard &operator=(KernelBuilderGuard &&)	  = delete;
 
 private:
-	IR::Builder::Builder        &_builder;
+	IR::Builder::Builder		&_builder;
 	IR::Builder::BuilderContext *_previousContext;
 };
 
@@ -111,27 +111,27 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 	Backend::PipelineHandle pipeline = context.GetCachedPipeline();
 	if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
 		// Get the complete shader code
-		std::string			shaderSource = context.GetCompleteCode();
+		std::string shaderSource	= context.GetCompleteCode();
 
 		// Try to load from binary cache first
-		bool loadedFromCache = false;
+		bool		loadedFromCache = false;
 		if (backend->SupportsPipelineCache()) {
-			auto& globalCache = GlobalShaderCache::Get();
-			const CacheEntry* entry = globalCache.Lookup(context.GetShaderHash(), 
-				static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()));
-			
+			auto			 &globalCache = GlobalShaderCache::Get();
+			const CacheEntry *entry		  = globalCache.Lookup(
+				  context.GetShaderHash(), static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()));
+
 			if (entry && entry->dataSize > 0) {
 				// Try to create pipeline from cached binary
 				Backend::PipelineDesc pipelineDesc;
-				pipelineDesc.workGroupSizeX = context.WorkSizeX;
-				pipelineDesc.workGroupSizeY = context.WorkSizeY;
-				pipelineDesc.workGroupSizeZ = context.WorkSizeZ;
+				pipelineDesc.workGroupSizeX	  = context.WorkSizeX;
+				pipelineDesc.workGroupSizeY	  = context.WorkSizeY;
+				pipelineDesc.workGroupSizeZ	  = context.WorkSizeZ;
 				pipelineDesc.pushConstantSize = context.GetPushConstantSize();
 
 				for (const auto &bufferInfo : context.GetBufferInfos()) {
 					Backend::ResourceLayoutEntry entryLayout;
-					entryLayout.binding = bufferInfo.binding;
-					entryLayout.type = Backend::BindingType::Buffer;
+					entryLayout.binding	 = bufferInfo.binding;
+					entryLayout.type	 = Backend::BindingType::Buffer;
 					entryLayout.readOnly = (bufferInfo.mode == GPU::Backend::BUFFER_MODE_READ_ONLY);
 					pipelineDesc.resources.push_back(entryLayout);
 				}
@@ -139,15 +139,16 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 				for (const auto &textureInfo : context.GetTextureInfos()) {
 					Backend::ResourceLayoutEntry entryLayout;
 					entryLayout.binding = textureInfo.binding;
-					entryLayout.type = textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
-					entryLayout.format = Runtime::ToBackendPixelFormat(textureInfo.format);
+					entryLayout.type =
+						textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+					entryLayout.format	 = Runtime::ToBackendPixelFormat(textureInfo.format);
 					entryLayout.readOnly = textureInfo.sampled;
 					pipelineDesc.resources.push_back(entryLayout);
 				}
 
-				pipeline = backend->CreatePipelineFromBinary(pipelineDesc, entry->data.data(), 
-				                                            entry->data.size(), entry->format);
-				
+				pipeline = backend->CreatePipelineFromBinary(pipelineDesc, entry->data.data(), entry->data.size(),
+															 entry->format);
+
 				if (pipeline != Backend::INVALID_PIPELINE_HANDLE) {
 					loadedFromCache = true;
 					context.SetCachedBinaryFormat(entry->format);
@@ -170,10 +171,10 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 
 			// Create pipeline
 			Backend::PipelineDesc pipelineDesc;
-			pipelineDesc.computeShader	 = shader;
-			pipelineDesc.workGroupSizeX	 = context.WorkSizeX;
-			pipelineDesc.workGroupSizeY	 = context.WorkSizeY;
-			pipelineDesc.workGroupSizeZ	 = context.WorkSizeZ;
+			pipelineDesc.computeShader	  = shader;
+			pipelineDesc.workGroupSizeX	  = context.WorkSizeX;
+			pipelineDesc.workGroupSizeY	  = context.WorkSizeY;
+			pipelineDesc.workGroupSizeZ	  = context.WorkSizeZ;
 			pipelineDesc.pushConstantSize = context.GetPushConstantSize();
 
 			for (const auto &bufferInfo : context.GetBufferInfos()) {
@@ -202,12 +203,12 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 			// Cache the binary for future use
 			if (backend->SupportsPipelineCache()) {
 				uint32_t format = 0;
-				auto binary = backend->GetPipelineBinary(pipeline, format);
+				auto	 binary = backend->GetPipelineBinary(pipeline, format);
 				if (!binary.empty()) {
-					auto& globalCache = GlobalShaderCache::Get();
-					globalCache.Store(context.GetShaderHash(), 
-					                  static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()),
-					                  format, binary);
+					auto &globalCache = GlobalShaderCache::Get();
+					globalCache.Store(context.GetShaderHash(),
+									  static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()), format,
+									  binary);
 					context.SetCachedBinaryFormat(format);
 				}
 			}
@@ -534,7 +535,7 @@ Kernel2D::Kernel2D(const std::function<void(IR::Value::Var<int> &IdX, IR::Value:
 	Func(IdX, IdY);
 }
 
-Kernel2D::Kernel2D(const std::string																			 &name,
+Kernel2D::Kernel2D(const std::string															 &name,
 				   const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY)> &Func, int WorkSizeX,
 				   int WorkSizeY)
 	: _context(2), _name(name) {
@@ -584,7 +585,7 @@ Kernel3D::Kernel3D(
 }
 
 Kernel3D::Kernel3D(
-	const std::string																							 &name,
+	const std::string																						&name,
 	const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY, IR::Value::Var<int> &IdZ)> &Func,
 	int WorkSizeX, int WorkSizeY, int WorkSizeZ)
 	: _context(3), _name(name) {

@@ -62,7 +62,7 @@ template <typename T> struct ExtractScalar<IR::Value::Expr<T>> {
 };
 
 // Helper alias
-template <typename T> using ToScalar					  = typename ExtractScalar<RemoveRef<T>>::type;
+template <typename T> using ToScalar				  = typename ExtractScalar<RemoveRef<T>>::type;
 
 template <typename T> inline constexpr bool IsGpuType = ExtractScalar<RemoveRef<T>>::isGpuType;
 } // namespace TypeExtractor
@@ -78,8 +78,7 @@ namespace TextureTraits {
  */
 template <typename T> struct IsTextureRef : std::false_type {};
 
-template <Runtime::PixelFormat F>
-struct IsTextureRef<IR::Value::TextureRef<F>> : std::true_type {};
+template <Runtime::PixelFormat F> struct IsTextureRef<IR::Value::TextureRef<F>> : std::true_type {};
 
 template <typename T> inline constexpr bool IsTextureRefV = IsTextureRef<T>::value;
 
@@ -89,16 +88,14 @@ template <typename T> inline constexpr bool IsTextureRefV = IsTextureRef<T>::val
  */
 template <typename T> struct IsTextureSampler2D : std::false_type {};
 
-template <Runtime::PixelFormat F>
-struct IsTextureSampler2D<IR::Value::TextureSampler2D<F>> : std::true_type {};
+template <Runtime::PixelFormat F> struct IsTextureSampler2D<IR::Value::TextureSampler2D<F>> : std::true_type {};
 
-template <typename T> inline constexpr bool IsTextureSampler2DV = IsTextureSampler2D<T>::value;
+template <typename T> inline constexpr bool		 IsTextureSampler2DV = IsTextureSampler2D<T>::value;
 
 /**
  * Helper to check if a type is any texture type (TextureRef or TextureSampler2D)
  */
-template <typename T>
-inline constexpr bool IsAnyTextureV = IsTextureRefV<T> || IsTextureSampler2DV<T>;
+template <typename T> inline constexpr bool		 IsAnyTextureV		 = IsTextureRefV<T> || IsTextureSampler2DV<T>;
 
 /**
  * Helper to get the GLSL type name for a texture type
@@ -218,10 +215,9 @@ private:
 	 * Helper to create parameter object for a given type
 	 * Texture types are created directly, scalar types use Var with isExternal=true
 	 */
-	template <typename ParamType, size_t Index>
-	auto CreateParam() const {
+	template <typename ParamType, size_t Index> auto CreateParam() const {
 		std::string paramName = "p" + std::to_string(Index);
-		
+
 		if constexpr (TextureTraits::IsAnyTextureV<ParamType>) {
 			// For texture types, create directly with the parameter name
 			return ParamType(paramName);
@@ -259,7 +255,7 @@ template <typename Signature> class Callable;
 template <typename R, typename... Args> class Callable<R(Args...)> {
 private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
-	std::string									   _baseName;	 // Base name for the function
+	std::string										   _baseName;	 // Base name for the function
 	mutable std::string								   _mangledName; // Generated unique name
 
 	// Extract scalar types for Args and R (supports both C++ types and GPU types like Float, Float3)
@@ -269,19 +265,15 @@ private:
 	// Validate that all parameter types are supported
 	// Note: Using a helper trait to work around MSVC fold expression limitations in static_assert
 	template <typename T>
-	static constexpr bool IsValidParamTypeV = 
-		Detail::TextureTraits::IsAnyTextureV<T> || 
-		Meta::StructMeta<T>::isRegistered ||
-		std::same_as<T, float> || std::same_as<T, int> || 
-		std::same_as<T, bool> || std::same_as<T, Math::Vec2> ||
-		std::same_as<T, Math::Vec3> || std::same_as<T, Math::Vec4> ||
-		std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-		std::same_as<T, Math::IVec4> || std::same_as<T, Math::Mat2> ||
-		std::same_as<T, Math::Mat3> || std::same_as<T, Math::Mat4> ||
-		std::same_as<T, Math::Mat2x3> || std::same_as<T, Math::Mat2x4> ||
-		std::same_as<T, Math::Mat3x2> || std::same_as<T, Math::Mat3x4> ||
-		std::same_as<T, Math::Mat4x2> || std::same_as<T, Math::Mat4x3>;
-	
+	static constexpr bool IsValidParamTypeV =
+		Detail::TextureTraits::IsAnyTextureV<T> || Meta::StructMeta<T>::isRegistered || std::same_as<T, float> ||
+		std::same_as<T, int> || std::same_as<T, bool> || std::same_as<T, Math::Vec2> || std::same_as<T, Math::Vec3> ||
+		std::same_as<T, Math::Vec4> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+		std::same_as<T, Math::IVec4> || std::same_as<T, Math::Mat2> || std::same_as<T, Math::Mat3> ||
+		std::same_as<T, Math::Mat4> || std::same_as<T, Math::Mat2x3> || std::same_as<T, Math::Mat2x4> ||
+		std::same_as<T, Math::Mat3x2> || std::same_as<T, Math::Mat3x4> || std::same_as<T, Math::Mat4x2> ||
+		std::same_as<T, Math::Mat4x3>;
+
 	static_assert((IsValidParamTypeV<ScalarArg<Args>> && ...),
 				  "All parameter types must be either: scalar types (float, int, bool, Vec*, Mat*), "
 				  "registered structs, or texture types (TextureRef, TextureSampler2D)");
@@ -348,7 +340,7 @@ private:
 		result								+= " " + _mangledName + "(";
 
 		// Generate parameter list (use scalar types for type names, but original Args for inout check)
-		std::vector<std::string> paramTypes = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
+		std::vector<std::string> paramTypes	 = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
 		std::vector<bool>		 isInOut	 = {Detail::IsInOutType<Args>()...};
 		for (size_t i = 0; i < paramTypes.size(); ++i) {
 			if (i > 0)
@@ -387,7 +379,7 @@ private:
 template <typename... Args> class Callable<void(Args...)> {
 private:
 	std::shared_ptr<Detail::CallableBodyGeneratorBase> _bodyGenerator;
-	std::string									   _baseName;
+	std::string										   _baseName;
 	mutable std::string								   _mangledName;
 
 	// Extract scalar types for Args (supports both C++ types and GPU types)
@@ -396,19 +388,15 @@ private:
 	// Validate that all parameter types are supported
 	// Note: Using a helper trait to work around MSVC fold expression limitations in static_assert
 	template <typename T>
-	static constexpr bool IsValidParamTypeV = 
-		Detail::TextureTraits::IsAnyTextureV<T> || 
-		Meta::StructMeta<T>::isRegistered ||
-		std::same_as<T, float> || std::same_as<T, int> || 
-		std::same_as<T, bool> || std::same_as<T, Math::Vec2> ||
-		std::same_as<T, Math::Vec3> || std::same_as<T, Math::Vec4> ||
-		std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-		std::same_as<T, Math::IVec4> || std::same_as<T, Math::Mat2> ||
-		std::same_as<T, Math::Mat3> || std::same_as<T, Math::Mat4> ||
-		std::same_as<T, Math::Mat2x3> || std::same_as<T, Math::Mat2x4> ||
-		std::same_as<T, Math::Mat3x2> || std::same_as<T, Math::Mat3x4> ||
-		std::same_as<T, Math::Mat4x2> || std::same_as<T, Math::Mat4x3>;
-	
+	static constexpr bool IsValidParamTypeV =
+		Detail::TextureTraits::IsAnyTextureV<T> || Meta::StructMeta<T>::isRegistered || std::same_as<T, float> ||
+		std::same_as<T, int> || std::same_as<T, bool> || std::same_as<T, Math::Vec2> || std::same_as<T, Math::Vec3> ||
+		std::same_as<T, Math::Vec4> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+		std::same_as<T, Math::IVec4> || std::same_as<T, Math::Mat2> || std::same_as<T, Math::Mat3> ||
+		std::same_as<T, Math::Mat4> || std::same_as<T, Math::Mat2x3> || std::same_as<T, Math::Mat2x4> ||
+		std::same_as<T, Math::Mat3x2> || std::same_as<T, Math::Mat3x4> || std::same_as<T, Math::Mat4x2> ||
+		std::same_as<T, Math::Mat4x3>;
+
 	static_assert((IsValidParamTypeV<ScalarArg<Args>> && ...),
 				  "All parameter types must be either: scalar types (float, int, bool, Vec*, Mat*), "
 				  "registered structs, or texture types (TextureRef, TextureSampler2D)");

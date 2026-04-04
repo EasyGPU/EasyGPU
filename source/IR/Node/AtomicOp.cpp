@@ -12,7 +12,8 @@ AtomicOpNode::AtomicOpNode(AtomicOpCode code, std::unique_ptr<Node> target, std:
 }
 
 AtomicOpNode::AtomicOpNode(std::unique_ptr<Node> target, std::unique_ptr<Node> compare, std::unique_ptr<Node> value)
-	: _code(AtomicOpCode::CompSwap), _target(std::move(target)), _compare(std::move(compare)), _value(std::move(value)) {
+	: _code(AtomicOpCode::CompSwap), _target(std::move(target)), _compare(std::move(compare)),
+	  _value(std::move(value)) {
 }
 
 NodeType AtomicOpNode::Type() const {

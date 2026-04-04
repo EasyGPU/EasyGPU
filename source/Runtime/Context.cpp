@@ -114,11 +114,11 @@ Backend::BackendType Context::GetBackendType() const {
 	}
 	// Determine backend type from the backend pointer
 	// This is a bit hacky but works for now
-	if (dynamic_cast<Backend::OpenGLBackend*>(_backend.get()) != nullptr) {
+	if (dynamic_cast<Backend::OpenGLBackend *>(_backend.get()) != nullptr) {
 		return Backend::BackendType::OpenGL;
 	}
 #ifdef EASYGPU_BACKEND_VULKAN
-	if (dynamic_cast<Backend::VulkanBackend*>(_backend.get()) != nullptr) {
+	if (dynamic_cast<Backend::VulkanBackend *>(_backend.get()) != nullptr) {
 		return Backend::BackendType::Vulkan;
 	}
 #endif

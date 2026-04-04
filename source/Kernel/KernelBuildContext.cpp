@@ -506,7 +506,7 @@ std::vector<std::string> KernelBuildContext::GetSharedMemoryDeclarations() const
 
 void KernelBuildContext::ComputeShaderHash() {
 	std::string source = GetCompleteCode();
-	_shaderHash = ShaderCache::ComputeShaderHash(source);
+	_shaderHash		   = ShaderCache::ComputeShaderHash(source);
 }
 
 } // namespace GPU::Kernel

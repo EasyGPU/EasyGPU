@@ -144,10 +144,10 @@ void VulkanBackend::Initialize() {
 		CreateDescriptorPool();
 		CreateDefaultSampler();
 		CreateQueryPool();
-		
+
 		// Create persistent pipeline cache for binary caching
 		VkPipelineCacheCreateInfo cacheCreateInfo = {};
-		cacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		cacheCreateInfo.sType					  = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 		auto result = vkCreatePipelineCache(_device, &cacheCreateInfo, nullptr, &_pipelineCache);
 		if (result != VK_SUCCESS) {
 			_pipelineCache = nullptr; // Pipeline cache is optional
@@ -2217,10 +2217,8 @@ uint64_t VulkanBackend::EndQuery(uint32_t query) {
 // Binary Cache Support
 // =============================================================================
 
-PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
-                                                       const void* binaryData,
-                                                       size_t binarySize,
-                                                       uint32_t format) {
+PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc &desc, const void *binaryData,
+													   size_t binarySize, uint32_t format) {
 	(void)format; // Vulkan doesn't use format parameter
 
 	std::lock_guard<std::mutex> lock(_mutex);
@@ -2235,8 +2233,8 @@ PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
 	cacheCreateInfo.initialDataSize			  = binarySize;
 	cacheCreateInfo.pInitialData			  = binaryData;
 
-	VkPipelineCache tempCache = nullptr;
-	VkResult result = vkCreatePipelineCache(_device, &cacheCreateInfo, nullptr, &tempCache);
+	VkPipelineCache tempCache				  = nullptr;
+	VkResult		result					  = vkCreatePipelineCache(_device, &cacheCreateInfo, nullptr, &tempCache);
 	if (result != VK_SUCCESS) {
 		return INVALID_PIPELINE_HANDLE;
 	}
@@ -2253,7 +2251,7 @@ PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
 	sortedResources.erase(std::unique(sortedResources.begin(), sortedResources.end()), sortedResources.end());
 
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
-	for (const auto& entry : sortedResources) {
+	for (const auto &entry : sortedResources) {
 		VkDescriptorSetLayoutBinding binding = {};
 		binding.binding						 = entry.binding;
 		binding.descriptorType				 = GetVkDescriptorType(entry);
@@ -2281,7 +2279,7 @@ PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
 	pipelineLayoutInfo.setLayoutCount			  = bindings.empty() ? 0u : 1u;
 	pipelineLayoutInfo.pSetLayouts				  = bindings.empty() ? nullptr : &descriptorSetLayout;
 
-	VkPushConstantRange pushConstantRange = {};
+	VkPushConstantRange pushConstantRange		  = {};
 	if (desc.pushConstantSize != 0) {
 		pushConstantRange.stageFlags			  = VK_SHADER_STAGE_COMPUTE_BIT;
 		pushConstantRange.offset				  = 0;
@@ -2291,10 +2289,11 @@ PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
 	}
 
 	VkPipelineLayout pipelineLayout = nullptr;
-	result = vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+	result							= vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
 	if (result != VK_SUCCESS) {
 		vkDestroyPipelineCache(_device, tempCache, nullptr);
-		if (descriptorSetLayout) vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, nullptr);
+		if (descriptorSetLayout)
+			vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, nullptr);
 		CheckVkResult(result, "vkCreatePipelineLayout");
 	}
 
@@ -2305,54 +2304,55 @@ PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
 	shaderStage.module							= shaderIt->second.module;
 	shaderStage.pName							= "main";
 
-	VkComputePipelineCreateInfo pipelineInfo = {};
-	pipelineInfo.sType						 = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	pipelineInfo.stage						 = shaderStage;
-	pipelineInfo.layout						 = pipelineLayout;
+	VkComputePipelineCreateInfo pipelineInfo	= {};
+	pipelineInfo.sType							= VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipelineInfo.stage							= shaderStage;
+	pipelineInfo.layout							= pipelineLayout;
 
-	VkPipeline pipeline = nullptr;
+	VkPipeline pipeline							= nullptr;
 	result = vkCreateComputePipelines(_device, tempCache, 1, &pipelineInfo, nullptr, &pipeline);
-	
+
 	// Destroy temporary cache
 	vkDestroyPipelineCache(_device, tempCache, nullptr);
 
 	if (result != VK_SUCCESS) {
 		vkDestroyPipelineLayout(_device, pipelineLayout, nullptr);
-		if (descriptorSetLayout) vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, nullptr);
+		if (descriptorSetLayout)
+			vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, nullptr);
 		return INVALID_PIPELINE_HANDLE;
 	}
 
 	PipelineHandle handle = _nextPipelineHandle++;
 	PipelineInfo   info;
-	info.pipeline			= pipeline;
-	info.layout				= pipelineLayout;
+	info.pipeline			 = pipeline;
+	info.layout				 = pipelineLayout;
 	info.descriptorSetLayout = descriptorSetLayout;
-	info.workGroupSizeX		= desc.workGroupSizeX;
-	info.workGroupSizeY		= desc.workGroupSizeY;
-	info.workGroupSizeZ		= desc.workGroupSizeZ;
-	info.pushConstantSize	= desc.pushConstantSize;
-	info.resources			= std::move(sortedResources);
-	_pipelines[handle]		= std::move(info);
+	info.workGroupSizeX		 = desc.workGroupSizeX;
+	info.workGroupSizeY		 = desc.workGroupSizeY;
+	info.workGroupSizeZ		 = desc.workGroupSizeZ;
+	info.pushConstantSize	 = desc.pushConstantSize;
+	info.resources			 = std::move(sortedResources);
+	_pipelines[handle]		 = std::move(info);
 
 	return handle;
 }
 
-std::vector<uint8_t> VulkanBackend::GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) {
+std::vector<uint8_t> VulkanBackend::GetPipelineBinary(PipelineHandle pipeline, uint32_t &format) {
 	format = 0;
 
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	auto it = _pipelines.find(pipeline);
+	auto						it = _pipelines.find(pipeline);
 	if (it == _pipelines.end()) {
 		return {};
 	}
 
 	// Get pipeline cache data from our persistent cache
-	// Note: In Vulkan, pipeline binaries are obtained from the pipeline cache, 
+	// Note: In Vulkan, pipeline binaries are obtained from the pipeline cache,
 	// not individual pipelines. We merge pipeline data into our persistent cache
 	// during creation.
-	size_t cacheSize = 0;
-	VkResult result = vkGetPipelineCacheData(_device, _pipelineCache, &cacheSize, nullptr);
+	size_t	 cacheSize = 0;
+	VkResult result	   = vkGetPipelineCacheData(_device, _pipelineCache, &cacheSize, nullptr);
 	if (result != VK_SUCCESS || cacheSize == 0) {
 		return {};
 	}
@@ -2364,12 +2364,12 @@ std::vector<uint8_t> VulkanBackend::GetPipelineBinary(PipelineHandle pipeline, u
 	}
 
 	data.resize(cacheSize);
-	
+
 	// Use Vulkan pipeline cache header UUID as format identifier
 	if (cacheSize >= sizeof(VkPipelineCacheHeaderVersionOne)) {
-		auto* header = reinterpret_cast<const VkPipelineCacheHeaderVersionOne*>(data.data());
+		auto *header = reinterpret_cast<const VkPipelineCacheHeaderVersionOne *>(data.data());
 		// Create a simple hash from the first few bytes of UUID
-		format = *reinterpret_cast<const uint32_t*>(header->pipelineCacheUUID);
+		format		 = *reinterpret_cast<const uint32_t *>(header->pipelineCacheUUID);
 	}
 
 	return data;
@@ -2387,7 +2387,7 @@ uint32_t VulkanBackend::GetPipelineCacheFormat() const {
 	// Use device properties pipelineCacheUUID as format identifier
 	VkPhysicalDeviceProperties props;
 	vkGetPhysicalDeviceProperties(_physicalDevice, &props);
-	return *reinterpret_cast<const uint32_t*>(props.pipelineCacheUUID);
+	return *reinterpret_cast<const uint32_t *>(props.pipelineCacheUUID);
 }
 
 // =============================================================================

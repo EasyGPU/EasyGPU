@@ -21,7 +21,7 @@
 namespace GPU::Backend {
 
 constexpr uint32_t MAX_DESCRIPTOR_SETS = 1024;
-constexpr uint32_t MAX_QUERIES			 = 256;
+constexpr uint32_t MAX_QUERIES		   = 256;
 
 /**
  * @brief Vulkan backend implementation
@@ -34,57 +34,55 @@ public:
 	VulkanBackend();
 	~VulkanBackend() override;
 
-	VulkanBackend(const VulkanBackend &)			= delete;
-	VulkanBackend &operator=(const VulkanBackend &) = delete;
-	VulkanBackend(VulkanBackend &&)					= delete;
-	VulkanBackend &operator=(VulkanBackend &&)		= delete;
+	VulkanBackend(const VulkanBackend &)			 = delete;
+	VulkanBackend &operator=(const VulkanBackend &)	 = delete;
+	VulkanBackend(VulkanBackend &&)					 = delete;
+	VulkanBackend		&operator=(VulkanBackend &&) = delete;
 
-	void		   Initialize() override;
-	void		   Shutdown() override;
-	bool		   IsInitialized() const override;
-	void		   MakeCurrent() override;
-	void		   MakeNoneCurrent() override;
-	BackendCaps	   GetCaps() const override;
+	void				 Initialize() override;
+	void				 Shutdown() override;
+	bool				 IsInitialized() const override;
+	void				 MakeCurrent() override;
+	void				 MakeNoneCurrent() override;
+	BackendCaps			 GetCaps() const override;
 
-	BufferHandle   CreateBuffer(const BufferDesc &desc) override;
-	void		   DestroyBuffer(BufferHandle buffer) override;
-	void		   UploadBuffer(BufferHandle buffer, size_t offset, size_t size, const void *data) override;
-	void		   DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData) override;
-	void		  *MapBuffer(BufferHandle buffer, bool read, bool write) override;
-	void		   UnmapBuffer(BufferHandle buffer) override;
+	BufferHandle		 CreateBuffer(const BufferDesc &desc) override;
+	void				 DestroyBuffer(BufferHandle buffer) override;
+	void				 UploadBuffer(BufferHandle buffer, size_t offset, size_t size, const void *data) override;
+	void				 DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData) override;
+	void				*MapBuffer(BufferHandle buffer, bool read, bool write) override;
+	void				 UnmapBuffer(BufferHandle buffer) override;
 
-	TextureHandle  CreateTexture(const TextureDesc &desc) override;
-	void		   DestroyTexture(TextureHandle texture) override;
-	void		   UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-								 const void *data) override;
-	void		   DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-								   void *outData) override;
+	TextureHandle		 CreateTexture(const TextureDesc &desc) override;
+	void				 DestroyTexture(TextureHandle texture) override;
+	void				 UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+									   const void *data) override;
+	void				 DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+										 void *outData) override;
 
-	ShaderHandle   CreateShader(const ShaderDesc &desc) override;
-	void		   DestroyShader(ShaderHandle shader) override;
+	ShaderHandle		 CreateShader(const ShaderDesc &desc) override;
+	void				 DestroyShader(ShaderHandle shader) override;
 
-	PipelineHandle CreatePipeline(const PipelineDesc &desc) override;
-	void		   DestroyPipeline(PipelineHandle pipeline) override;
+	PipelineHandle		 CreatePipeline(const PipelineDesc &desc) override;
+	void				 DestroyPipeline(PipelineHandle pipeline) override;
 
-	void		   BindPipeline(PipelineHandle pipeline) override;
-	void		   BindResources(const ResourceBinding *bindings, uint32_t count) override;
-	void		   SetUniform(PipelineHandle pipeline, const std::string &name, const std::string &type,
-							  const void *data) override;
-	void		   SetUniformData(PipelineHandle pipeline, const void *data, size_t size) override;
-	void		   Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) override;
-	void		   MemoryBarrier(BarrierType barrierType) override;
-	void		   Finish() override;
+	void				 BindPipeline(PipelineHandle pipeline) override;
+	void				 BindResources(const ResourceBinding *bindings, uint32_t count) override;
+	void				 SetUniform(PipelineHandle pipeline, const std::string &name, const std::string &type,
+									const void *data) override;
+	void				 SetUniformData(PipelineHandle pipeline, const void *data, size_t size) override;
+	void				 Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) override;
+	void				 MemoryBarrier(BarrierType barrierType) override;
+	void				 Finish() override;
 
-	uint32_t	   BeginQuery() override;
-	uint64_t	   EndQuery(uint32_t query) override;
+	uint32_t			 BeginQuery() override;
+	uint64_t			 EndQuery(uint32_t query) override;
 
-	PipelineHandle CreatePipelineFromBinary(const PipelineDesc& desc,
-	                                        const void* binaryData,
-	                                        size_t binarySize,
-	                                        uint32_t format) override;
-	std::vector<uint8_t> GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) override;
-	bool		   SupportsPipelineCache() const override;
-	uint32_t	   GetPipelineCacheFormat() const override;
+	PipelineHandle		 CreatePipelineFromBinary(const PipelineDesc &desc, const void *binaryData, size_t binarySize,
+												  uint32_t format) override;
+	std::vector<uint8_t> GetPipelineBinary(PipelineHandle pipeline, uint32_t &format) override;
+	bool				 SupportsPipelineCache() const override;
+	uint32_t			 GetPipelineCacheFormat() const override;
 
 private:
 	// Vulkan resource info structures

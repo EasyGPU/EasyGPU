@@ -43,7 +43,7 @@ public:
 	 */
 	[[nodiscard]] int					Size() const;
 
-	[[nodiscard]] std::unique_ptr<Node>	Clone() const override;
+	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 
 private:
 	std::string _name;

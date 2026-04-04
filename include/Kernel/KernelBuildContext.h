@@ -35,8 +35,8 @@ public:
 class KernelBuildContext : public IR::Builder::BuilderContext {
 public:
 	/**
-     * Buffer registration info
-     */
+	 * Buffer registration info
+	 */
 	struct BufferInfo {
 		uint32_t	binding;
 		std::string typeName;
@@ -45,8 +45,8 @@ public:
 	};
 
 	/**
-     * Texture registration info (2D)
-     */
+	 * Texture registration info (2D)
+	 */
 	struct TextureInfo {
 		uint32_t			 binding;
 		Runtime::PixelFormat format;
@@ -59,10 +59,10 @@ public:
 	struct UniformEntry;
 
 	/**
-     * This constructor will construct the work size in default
-     * @param Dimension The dimension of the
+	 * This constructor will construct the work size in default
+	 * @param Dimension The dimension of the
 	 * kernel
-     */
+	 */
 	KernelBuildContext(int Dimension);
 
 	/**
@@ -241,7 +241,7 @@ protected:
 	std::vector<Runtime::TextureSlotBase *> _textureSlots;
 
 	// Shared memory declarations
-	std::vector<std::string> _sharedMemoryDeclarations;
+	std::vector<std::string>				_sharedMemoryDeclarations;
 
 public:
 	// ===================================================================
@@ -252,7 +252,7 @@ public:
 	 * Push a shared memory declaration to the context
 	 * @param declaration The shared memory declaration string
 	 */
-	void PushSharedMemoryDeclaration(const std::string &declaration) override;
+	void					 PushSharedMemoryDeclaration(const std::string &declaration) override;
 
 	/**
 	 * Get all shared memory declarations
@@ -260,7 +260,7 @@ public:
 	 */
 	std::vector<std::string> GetSharedMemoryDeclarations() const override;
 
-	public:
+public:
 	// ===================================================================
 	// Pipeline Cache (replaces program cache)
 	// ===================================================================
@@ -305,7 +305,7 @@ public:
 	 * Get the shader source hash for cache lookup
 	 * @return The computed shader hash
 	 */
-	const std::string& GetShaderHash() const {
+	const std::string &GetShaderHash() const {
 		return _shaderHash;
 	}
 
@@ -313,13 +313,13 @@ public:
 	 * Compute and store the shader hash from source code
 	 * This should be called after the complete shader code is generated
 	 */
-	void ComputeShaderHash();
+	void						ComputeShaderHash();
 
 	/**
 	 * Get the cached shader binary data
 	 * @return Reference to cached binary data
 	 */
-	const std::vector<uint8_t>& GetCachedBinary() const {
+	const std::vector<uint8_t> &GetCachedBinary() const {
 		return _cachedBinary;
 	}
 

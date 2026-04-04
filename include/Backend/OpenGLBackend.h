@@ -73,21 +73,19 @@ public:
 #ifdef MemoryBarrier
 #undef MemoryBarrier
 #endif
-	void	 MemoryBarrier(BarrierType barrierType) override;
-	void	 Finish() override;
+	void				 MemoryBarrier(BarrierType barrierType) override;
+	void				 Finish() override;
 
-	uint32_t BeginQuery() override;
-	uint64_t EndQuery(uint32_t query) override;
+	uint32_t			 BeginQuery() override;
+	uint64_t			 EndQuery(uint32_t query) override;
 
-	PipelineHandle CreatePipelineFromBinary(const PipelineDesc& desc,
-	                                        const void* binaryData,
-	                                        size_t binarySize,
-	                                        uint32_t format) override;
-	std::vector<uint8_t> GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) override;
-	bool		 SupportsPipelineCache() const override;
-	uint32_t	 GetPipelineCacheFormat() const override;
+	PipelineHandle		 CreatePipelineFromBinary(const PipelineDesc &desc, const void *binaryData, size_t binarySize,
+												  uint32_t format) override;
+	std::vector<uint8_t> GetPipelineBinary(PipelineHandle pipeline, uint32_t &format) override;
+	bool				 SupportsPipelineCache() const override;
+	uint32_t			 GetPipelineCacheFormat() const override;
 
-	void	*GetNativeHandle() const override {
+	void				*GetNativeHandle() const override {
 #ifdef _WIN32
 		return _hglrc;
 #else

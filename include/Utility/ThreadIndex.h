@@ -160,24 +160,36 @@ namespace GPU {
  * 2D Local thread ID helper
  */
 struct LocalId2DStruct {
-	[[nodiscard]] IR::Value::Var<int> x() const { return LocalThreadIdX(); }
-	[[nodiscard]] IR::Value::Var<int> y() const { return LocalThreadIdY(); }
+	[[nodiscard]] IR::Value::Var<int> x() const {
+		return LocalThreadIdX();
+	}
+	[[nodiscard]] IR::Value::Var<int> y() const {
+		return LocalThreadIdY();
+	}
 };
 
 /**
  * 2D Workgroup ID helper
  */
 struct WorkgroupId2DStruct {
-	[[nodiscard]] IR::Value::Var<int> x() const { return WorkgroupIdX(); }
-	[[nodiscard]] IR::Value::Var<int> y() const { return WorkgroupIdY(); }
+	[[nodiscard]] IR::Value::Var<int> x() const {
+		return WorkgroupIdX();
+	}
+	[[nodiscard]] IR::Value::Var<int> y() const {
+		return WorkgroupIdY();
+	}
 };
 
 /**
  * 2D Global thread ID helper
  */
 struct GlobalId2DStruct {
-	[[nodiscard]] IR::Value::Var<int> x() const { return GlobalThreadIdX(); }
-	[[nodiscard]] IR::Value::Var<int> y() const { return GlobalThreadIdY(); }
+	[[nodiscard]] IR::Value::Var<int> x() const {
+		return GlobalThreadIdX();
+	}
+	[[nodiscard]] IR::Value::Var<int> y() const {
+		return GlobalThreadIdY();
+	}
 };
 
 /**

@@ -14,6 +14,7 @@
 #include <stack>
 
 #include <IR/Node/ArrayAccess.h>
+#include <IR/Node/AtomicOp.h>
 #include <IR/Node/Break.h>
 #include <IR/Node/Call.h>
 #include <IR/Node/CallInst.h>
@@ -32,7 +33,6 @@
 #include <IR/Node/RawCode.h>
 #include <IR/Node/Return.h>
 #include <IR/Node/SharedMemory.h>
-#include <IR/Node/AtomicOp.h>
 #include <IR/Node/Store.h>
 #include <IR/Node/Ternary.h>
 #include <IR/Node/While.h>
@@ -238,7 +238,7 @@ private:
 	Builder() = default;
 
 private:
-	BuilderContext			 *_context = nullptr;
+	BuilderContext				*_context = nullptr;
 	std::stack<BuilderContext *> _contextStack; // Stack for nested kernel definitions
 };
 } // namespace GPU::IR::Builder

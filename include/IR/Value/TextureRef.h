@@ -453,8 +453,8 @@ template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 // Register TextureRef as a valid ScalarType for Callable support
 namespace GPU::Meta {
 template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureRef<Format>> {
-	static constexpr bool			isRegistered = true;
-	static constexpr const char *glslTypeName  = "image2D";
+	static constexpr bool		 isRegistered = true;
+	static constexpr const char *glslTypeName = "image2D";
 };
 } // namespace GPU::Meta
 

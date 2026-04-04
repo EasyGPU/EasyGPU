@@ -129,30 +129,30 @@ public:
 	/**
 	 * Load the uniform in a kernel context.
 	 * This registers the uniform with the kernel and returns an independent Var<T> copy.
-	 * 
+	 *
 	 * The returned Var is a copy of the uniform value, not a reference to it.
-	 * This means you can safely modify the returned Var without causing 
+	 * This means you can safely modify the returned Var without causing
 	 * "assignment to uniform" shader compilation errors.
-	 * 
+	 *
 	 * @return Var<T> representing an independent copy of the uniform value
 	 */
 	[[nodiscard]] IR::Value::Var<T> Load() {
 		// Get the uniform reference (external variable)
 		auto uniformRef = LoadRef();
-		
+
 		// Return an independent copy using Unref to avoid reference semantics
 		// This ensures the returned Var can be safely modified
 		return GPU::Utility::Unref(uniformRef);
 	}
-	
+
 	/**
 	 * Load the uniform as a reference in a kernel context.
-	 * 
+	 *
 	 * WARNING: This returns a Var that directly references the uniform.
-	 * Any assignment to the returned Var will cause "assignment to uniform" 
+	 * Any assignment to the returned Var will cause "assignment to uniform"
 	 * shader compilation errors. Only use this when you need read-only access
 	 * and want to avoid the overhead of copying.
-	 * 
+	 *
 	 * @return Var<T> referencing the uniform directly (read-only)
 	 */
 	[[nodiscard]] IR::Value::Var<T> LoadRef() {
@@ -200,7 +200,7 @@ public:
 
 		auto packFunc = [](void *dst, void *ptr) {
 			Uniform<T>					 *uniform = static_cast<Uniform<T> *>(ptr);
-			T							  value	   = uniform->GetValue();
+			T							  value	  = uniform->GetValue();
 
 			GPU::Meta::Std430Converter<T> converter;
 			converter.ConvertToGPU(&value, dst, 1);
