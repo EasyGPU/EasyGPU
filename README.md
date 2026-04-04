@@ -388,6 +388,30 @@ video.UploadAsync(frameData.data());
 kernel.Dispatch(120, 68, true);  // GPU processes while CPU continues
 ```
 
+### Shader Binary Cache
+
+Automatic in-memory caching of compiled GPU programs for faster kernel execution:
+
+```cpp
+Kernel1D kernel([](Int i) {
+    data[i] = data[i] * 2.0f;
+});
+
+// First dispatch: compiles and caches (~15ms)
+kernel.Dispatch(16, true);
+
+// Subsequent dispatches: uses cached binary (~0.5ms)
+kernel.Dispatch(16, true);
+```
+
+**Key Features:**
+- **Zero configuration** — Works automatically, no code changes needed
+- **Cross-backend** — Supports both OpenGL and Vulkan
+- **In-memory only** — No disk I/O, cache cleared on exit
+- **Thread-safe** — Safe for multi-threaded applications
+
+[Learn more about Shader Cache →](docs/shader-cache.md)
+
 ### Performance Notes — Exclusive OpenGL Context Mode
 
 EasyGPU operates in **exclusive mode** by default, assuming it has sole ownership of the OpenGL context within the current thread. This design choice maximizes performance by:
@@ -709,6 +733,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [Tutorial](docs/tutorial.md)
 - [API Reference](docs/api-reference.md)
 - [Window Component](docs/window.md) — Cross-platform window for interactive visualization
+- [Shader Cache](docs/shader-cache.md) — Automatic kernel compilation caching
 - [Common Patterns](docs/patterns.md)
 - [Unref - Independent Variable Copies](docs/unref.md)
 - [FAQ](docs/faq.md)
