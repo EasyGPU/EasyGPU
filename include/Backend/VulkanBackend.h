@@ -20,10 +20,8 @@
 
 namespace GPU::Backend {
 
-constexpr uint32_t MAX_BUFFER_BINDINGS	= 32;
-constexpr uint32_t MAX_TEXTURE_BINDINGS = 32;
-constexpr uint32_t MAX_DESCRIPTOR_SETS	= 1024;
-constexpr uint32_t MAX_QUERIES			= 256;
+constexpr uint32_t MAX_DESCRIPTOR_SETS = 1024;
+constexpr uint32_t MAX_QUERIES			 = 256;
 
 /**
  * @brief Vulkan backend implementation
@@ -79,6 +77,14 @@ public:
 
 	uint32_t	   BeginQuery() override;
 	uint64_t	   EndQuery(uint32_t query) override;
+
+	PipelineHandle CreatePipelineFromBinary(const PipelineDesc& desc,
+	                                        const void* binaryData,
+	                                        size_t binarySize,
+	                                        uint32_t format) override;
+	std::vector<uint8_t> GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) override;
+	bool		   SupportsPipelineCache() const override;
+	uint32_t	   GetPipelineCacheFormat() const override;
 
 private:
 	// Vulkan resource info structures
@@ -221,6 +227,7 @@ private:
 	// Descriptor resources
 	VkDescriptorPool								 _descriptorPool		  = nullptr;
 	VkSampler										 _defaultSampler		  = nullptr;
+	VkPipelineCache									 _pipelineCache			  = nullptr;
 	std::vector<VkDescriptorSet>					 _inFlightDescriptorSets;
 
 	// Query pool for timing

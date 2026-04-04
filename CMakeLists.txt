@@ -16,6 +16,8 @@ option(EASYGPU_BUILD_EXAMPLES "Build example programs" ON)
 option(EASYGPU_BUILD_TESTS "Build test suite" ON)
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
 option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ON)
+option(EASYGPU_ENABLE_SHADER_CACHE "Enable shader binary caching for faster startup" ON)
+set(EASYGPU_SHADER_CACHE_DIR "" CACHE STRING "Directory for shader cache (empty = use default)")
 option(EASYGPU_BUILD_WINDOW_EXAMPLES "Build window examples" ON)
 set(EASYGPU_BACKEND "OpenGL" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
 set_property(CACHE EASYGPU_BACKEND PROPERTY STRINGS OpenGL Vulkan)
@@ -49,11 +51,12 @@ target_include_directories(GLAD PUBLIC third)
 
 # Platform-specific libraries
 if(WIN32)
-    set(EASYGPU_PLATFORM_LIBS opengl32)
+    set(EASYGPU_PLATFORM_LIBS opengl32 crypt32)
 elseif(UNIX AND NOT APPLE)
     find_package(OpenGL REQUIRED)
     find_package(X11 REQUIRED)
-    set(EASYGPU_PLATFORM_LIBS ${OPENGL_LIBRARIES} ${X11_LIBRARIES})
+    find_package(OpenSSL REQUIRED)
+    set(EASYGPU_PLATFORM_LIBS ${OPENGL_LIBRARIES} ${X11_LIBRARIES} OpenSSL::Crypto)
 endif()
 
 # =============================================================================
@@ -305,6 +308,8 @@ add_library(EasyGPU STATIC
     source/Kernel/KernelBuildContext.cpp
     include/Kernel/KernelProfiler.h
     source/Kernel/KernelProfiler.cpp
+    include/Kernel/ShaderCache.h
+    source/Kernel/ShaderCache.cpp
     
     # Fragment Kernel (Windows only)
     include/Kernel/FragmentKernel.h
@@ -376,6 +381,14 @@ else()
     target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_OPENGL)
 endif()
 
+# Shader cache configuration
+if(EASYGPU_ENABLE_SHADER_CACHE)
+    target_compile_definitions(EasyGPU PUBLIC EASYGPU_SHADER_CACHE_ENABLED)
+    if(NOT EASYGPU_SHADER_CACHE_DIR STREQUAL "")
+        target_compile_definitions(EasyGPU PUBLIC EASYGPU_SHADER_CACHE_DIR="${EASYGPU_SHADER_CACHE_DIR}")
+    endif()
+endif()
+
 # MSVC must use the conforming preprocessor for tuple-style variadic macros
 # used by EASYGPU_STRUCT(..., (type,name), ...).
 if(MSVC)
@@ -417,6 +430,8 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestTernary.cpp
         tests/TestCopySign.cpp
         tests/TestSharedMemory.cpp
+        tests/TestShaderCache.cpp
+        tests/TestKernelCache.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})
@@ -534,6 +549,7 @@ message(STATUS "  Build Examples: ${EASYGPU_BUILD_EXAMPLES}")
 message(STATUS "  Build Tests: ${EASYGPU_BUILD_TESTS}")
 message(STATUS "  Build Fragment Kernel Tester: ${EASYGPU_BUILD_FRAGMENT_TESTER}")
 message(STATUS "  Build Window: ${EASYGPU_BUILD_WINDOW}")
+message(STATUS "  Shader Cache: ${EASYGPU_ENABLE_SHADER_CACHE}")
 if(EASYGPU_BUILD_WINDOW)
     message(STATUS "  Build Window Examples: ${EASYGPU_BUILD_WINDOW_EXAMPLES}")
 endif()

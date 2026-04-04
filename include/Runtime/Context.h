@@ -93,6 +93,12 @@ public:
 	 */
 	[[nodiscard]] void		 *GetNativeGLContext() const;
 
+	/**
+	 * Get the current backend type
+	 * @return The type of backend currently in use
+	 */
+	[[nodiscard]] Backend::BackendType GetBackendType() const;
+
 private:
 	Context() = default;
 

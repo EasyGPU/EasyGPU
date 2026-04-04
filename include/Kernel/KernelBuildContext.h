@@ -296,8 +296,64 @@ public:
 		_cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
 	}
 
+public:
+	// ===================================================================
+	// Shader Cache Support
+	// ===================================================================
+
+	/**
+	 * Get the shader source hash for cache lookup
+	 * @return The computed shader hash
+	 */
+	const std::string& GetShaderHash() const {
+		return _shaderHash;
+	}
+
+	/**
+	 * Compute and store the shader hash from source code
+	 * This should be called after the complete shader code is generated
+	 */
+	void ComputeShaderHash();
+
+	/**
+	 * Get the cached shader binary data
+	 * @return Reference to cached binary data
+	 */
+	const std::vector<uint8_t>& GetCachedBinary() const {
+		return _cachedBinary;
+	}
+
+	/**
+	 * Set the cached shader binary data
+	 * @param data Binary data to cache
+	 */
+	void SetCachedBinary(std::vector<uint8_t> data) {
+		_cachedBinary = std::move(data);
+	}
+
+	/**
+	 * Get the cached binary format identifier
+	 * @return Format identifier from backend
+	 */
+	uint32_t GetCachedBinaryFormat() const {
+		return _cachedBinaryFormat;
+	}
+
+	/**
+	 * Set the cached binary format identifier
+	 * @param format Format identifier
+	 */
+	void SetCachedBinaryFormat(uint32_t format) {
+		_cachedBinaryFormat = format;
+	}
+
 protected:
 	Backend::PipelineHandle			_cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+
+	// Shader cache support
+	std::string						_shaderHash;
+	std::vector<uint8_t>			_cachedBinary;
+	uint32_t						_cachedBinaryFormat = 0;
 
 	int								_variableIndex;
 	int								_dimension;

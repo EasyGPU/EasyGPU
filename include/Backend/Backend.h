@@ -17,6 +17,13 @@
 namespace GPU::Backend {
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+constexpr uint32_t MAX_BUFFER_BINDINGS	= 32;
+constexpr uint32_t MAX_TEXTURE_BINDINGS = 32;
+
+// ============================================================================
 // Handle Types
 // ============================================================================
 
@@ -142,11 +149,11 @@ inline bool operator<(const ResourceLayoutEntry &a, const ResourceLayoutEntry &b
 
 struct PipelineDesc {
 	ShaderHandle					 computeShader	= INVALID_SHADER_HANDLE;
-	uint32_t						 workGroupSizeX = 1;
-	uint32_t						 workGroupSizeY = 1;
-	uint32_t						 workGroupSizeZ = 1;
+	uint32_t					 workGroupSizeX = 1;
+	uint32_t					 workGroupSizeY = 1;
+	uint32_t					 workGroupSizeZ = 1;
 	std::vector<ResourceLayoutEntry> resources;
-	uint32_t						 pushConstantSize = 0;
+	uint32_t					 pushConstantSize = 0;
 };
 
 struct ResourceBinding {
@@ -206,39 +213,39 @@ struct BackendCaps {
 
 class Backend {
 public:
-	virtual ~Backend()																					  = default;
+	virtual ~Backend()																								 = default;
 
-	virtual void		  Initialize()																	  = 0;
-	virtual void		  Shutdown()																	  = 0;
-	virtual bool		  IsInitialized() const															  = 0;
-	virtual void		  MakeCurrent()																	  = 0;
-	virtual void		  MakeNoneCurrent()																  = 0;
-	virtual BackendCaps	  GetCaps() const																  = 0;
+	virtual void		  Initialize()																							 = 0;
+	virtual void		  Shutdown()																							 = 0;
+	virtual bool		  IsInitialized() const																							 = 0;
+	virtual void		  MakeCurrent()																								 = 0;
+	virtual void		  MakeNoneCurrent()																							 = 0;
+	virtual BackendCaps	  GetCaps() const																							 = 0;
 
-	virtual BufferHandle  CreateBuffer(const BufferDesc &desc)											  = 0;
-	virtual void		  DestroyBuffer(BufferHandle buffer)											  = 0;
+	virtual BufferHandle  CreateBuffer(const BufferDesc &desc)																		 = 0;
+	virtual void		  DestroyBuffer(BufferHandle buffer)																		 = 0;
 	virtual void		  UploadBuffer(BufferHandle buffer, size_t offset, size_t size, const void *data) = 0;
 	virtual void		  DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData)  = 0;
-	virtual void		 *MapBuffer(BufferHandle buffer, bool read, bool write)							  = 0;
-	virtual void		  UnmapBuffer(BufferHandle buffer)												  = 0;
+	virtual void		 *MapBuffer(BufferHandle buffer, bool read, bool write)														 = 0;
+	virtual void		  UnmapBuffer(BufferHandle buffer)																			 = 0;
 
-	virtual TextureHandle CreateTexture(const TextureDesc &desc)										  = 0;
-	virtual void		  DestroyTexture(TextureHandle texture)											  = 0;
+	virtual TextureHandle CreateTexture(const TextureDesc &desc)																	 = 0;
+	virtual void		  DestroyTexture(TextureHandle texture)																		 = 0;
 	virtual void		  UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-										const void *data)												  = 0;
+										const void *data)																					 = 0;
 	virtual void		 DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-										 void *outData)													  = 0;
+										 void *outData)																							 = 0;
 
-	virtual ShaderHandle CreateShader(const ShaderDesc &desc)											  = 0;
-	virtual void		 DestroyShader(ShaderHandle shader)												  = 0;
+	virtual ShaderHandle CreateShader(const ShaderDesc &desc)																		 = 0;
+	virtual void		 DestroyShader(ShaderHandle shader)																			 = 0;
 
-	virtual PipelineHandle CreatePipeline(const PipelineDesc &desc)										  = 0;
-	virtual void		   DestroyPipeline(PipelineHandle pipeline)										  = 0;
+	virtual PipelineHandle CreatePipeline(const PipelineDesc &desc)																	 = 0;
+	virtual void		   DestroyPipeline(PipelineHandle pipeline)																		 = 0;
 
-	virtual void		   BindPipeline(PipelineHandle pipeline)										  = 0;
-	virtual void		   BindResources(const ResourceBinding *bindings, uint32_t count)				  = 0;
+	virtual void		   BindPipeline(PipelineHandle pipeline)																		 = 0;
+	virtual void		   BindResources(const ResourceBinding *bindings, uint32_t count)											 = 0;
 	virtual void		   SetUniform(PipelineHandle pipeline, const std::string &name, const std::string &type,
-									  const void *data)													  = 0;
+									  const void *data)																							 = 0;
 	virtual void		   SetUniformData(PipelineHandle pipeline, const void *data, size_t size) {
 		  (void)pipeline;
 		  (void)data;
@@ -246,10 +253,61 @@ public:
 	}
 	virtual void	 Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) = 0;
 	virtual void	 MemoryBarrier(BarrierType barrierType)						 = 0;
-	virtual void	 Finish()													 = 0;
+	virtual void	 Finish()												 = 0;
 
-	virtual uint32_t BeginQuery()												 = 0;
-	virtual uint64_t EndQuery(uint32_t query)									 = 0;
+	virtual uint32_t BeginQuery()																							 = 0;
+	virtual uint64_t EndQuery(uint32_t query)																					 = 0;
+
+	// ========================================================================
+	// Binary Cache Support (for shader compilation acceleration)
+	// ========================================================================
+
+	/**
+	 * Create a pipeline from cached binary data
+	 * @param desc Pipeline description
+	 * @param binaryData Cached binary data from GetPipelineBinary
+	 * @param binarySize Size of binary data in bytes
+	 * @param format Backend-specific format identifier
+	 * @return Pipeline handle, or INVALID_PIPELINE_HANDLE if loading failed
+	 */
+	virtual PipelineHandle CreatePipelineFromBinary(const PipelineDesc& desc,
+	                                                const void* binaryData,
+	                                                size_t binarySize,
+	                                                uint32_t format) {
+		(void)desc;
+		(void)binaryData;
+		(void)binarySize;
+		(void)format;
+		return INVALID_PIPELINE_HANDLE;
+	}
+
+	/**
+	 * Get binary representation of a compiled pipeline for caching
+	 * @param pipeline Pipeline handle
+	 * @param[out] format Backend-specific format identifier
+	 * @return Binary data as byte vector, empty if not supported
+	 */
+	virtual std::vector<uint8_t> GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) {
+		(void)pipeline;
+		format = 0;
+		return {};
+	}
+
+	/**
+	 * Check if this backend supports binary pipeline caching
+	 * @return True if binary caching is supported
+	 */
+	virtual bool SupportsPipelineCache() const {
+		return false;
+	}
+
+	/**
+	 * Get backend-specific cache format identifier
+	 * @return Format version/hash for this backend/driver combination
+	 */
+	virtual uint32_t GetPipelineCacheFormat() const {
+		return 0;
+	}
 
 	// ========================================================================
 	// Native Handle Access (optional, for platform-specific features)

@@ -28,9 +28,6 @@
 
 namespace GPU::Backend {
 
-constexpr uint32_t MAX_BUFFER_BINDINGS	= 16;
-constexpr uint32_t MAX_TEXTURE_BINDINGS = 16;
-
 class OpenGLBackend : public Backend {
 public:
 	OpenGLBackend();
@@ -81,6 +78,14 @@ public:
 
 	uint32_t BeginQuery() override;
 	uint64_t EndQuery(uint32_t query) override;
+
+	PipelineHandle CreatePipelineFromBinary(const PipelineDesc& desc,
+	                                        const void* binaryData,
+	                                        size_t binarySize,
+	                                        uint32_t format) override;
+	std::vector<uint8_t> GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) override;
+	bool		 SupportsPipelineCache() const override;
+	uint32_t	 GetPipelineCacheFormat() const override;
 
 	void	*GetNativeHandle() const override {
 #ifdef _WIN32

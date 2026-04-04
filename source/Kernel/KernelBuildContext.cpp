@@ -4,6 +4,7 @@
  */
 
 #include <Kernel/KernelBuildContext.h>
+#include <Kernel/ShaderCache.h>
 
 #include <IR/Builder/Builder.h>
 #include <Runtime/BufferSlot.h>
@@ -497,6 +498,15 @@ void KernelBuildContext::PushSharedMemoryDeclaration(const std::string &declarat
 
 std::vector<std::string> KernelBuildContext::GetSharedMemoryDeclarations() const {
 	return _sharedMemoryDeclarations;
+}
+
+// ===================================================================
+// Shader Cache Support
+// ===================================================================
+
+void KernelBuildContext::ComputeShaderHash() {
+	std::string source = GetCompleteCode();
+	_shaderHash = ShaderCache::ComputeShaderHash(source);
 }
 
 } // namespace GPU::Kernel

@@ -998,4 +998,120 @@ Backend *CreateOpenGLBackend() {
 	return new OpenGLBackend();
 }
 
+// =============================================================================
+// Binary Cache Support
+// =============================================================================
+
+PipelineHandle OpenGLBackend::CreatePipelineFromBinary(const PipelineDesc& desc,
+                                                       const void* binaryData,
+                                                       size_t binarySize,
+                                                       uint32_t format) {
+	if (!_initialized) {
+		throw std::runtime_error("OpenGL backend not initialized");
+	}
+
+	// Create program from binary
+	uint32_t program = glCreateProgram();
+	if (program == 0) {
+		return INVALID_PIPELINE_HANDLE;
+	}
+
+	// Load program binary
+	glProgramBinary(program, format, binaryData, static_cast<GLsizei>(binarySize));
+
+	// Check if loading succeeded
+	GLint linked = 0;
+	glGetProgramiv(program, GL_LINK_STATUS, &linked);
+	if (!linked) {
+		glDeleteProgram(program);
+		return INVALID_PIPELINE_HANDLE;
+	}
+
+	PipelineHandle handle = _nextPipelineHandle++;
+	PipelineInfo   info;
+	info.glProgram		= program;
+	info.computeShader	= 0; // Unknown from binary
+	info.workGroupSizeX = desc.workGroupSizeX;
+	info.workGroupSizeY = desc.workGroupSizeY;
+	info.workGroupSizeZ = desc.workGroupSizeZ;
+	_pipelines[handle] = info;
+
+	return handle;
+}
+
+std::vector<uint8_t> OpenGLBackend::GetPipelineBinary(PipelineHandle pipeline, uint32_t& format) {
+	format = 0;
+
+	auto it = _pipelines.find(pipeline);
+	if (it == _pipelines.end()) {
+		return {};
+	}
+
+	GLuint program = it->second.glProgram;
+	if (program == 0) {
+		return {};
+	}
+
+	// Get binary length
+	GLint length = 0;
+	glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+	if (length <= 0) {
+		return {};
+	}
+
+	// Allocate buffer and retrieve binary
+	std::vector<uint8_t> binary(length);
+	GLenum binaryFormat = 0;
+	GLsizei returnedLength = 0;
+	glGetProgramBinary(program, length, &returnedLength, &binaryFormat, binary.data());
+
+	if (returnedLength <= 0) {
+		return {};
+	}
+
+	binary.resize(returnedLength);
+	format = static_cast<uint32_t>(binaryFormat);
+	return binary;
+}
+
+bool OpenGLBackend::SupportsPipelineCache() const {
+	if (!_initialized) {
+		return false;
+	}
+
+	// Check if GL_ARB_get_program_binary is available (OpenGL 4.1+)
+	GLint numFormats = 0;
+	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &numFormats);
+	return numFormats > 0;
+}
+
+uint32_t OpenGLBackend::GetPipelineCacheFormat() const {
+	if (!_initialized) {
+		return 0;
+	}
+
+	// Create a test program to determine the preferred format
+	GLuint testProgram = glCreateProgram();
+	if (testProgram == 0) {
+		return 0;
+	}
+
+	// Get available formats
+	GLint numFormats = 0;
+	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &numFormats);
+	if (numFormats <= 0) {
+		glDeleteProgram(testProgram);
+		return 0;
+	}
+
+	std::vector<GLint> formats(numFormats);
+	glGetIntegerv(GL_PROGRAM_BINARY_FORMATS, formats.data());
+
+	glDeleteProgram(testProgram);
+
+	// Use the first available format as the identifier
+	// In practice, most drivers only support one format
+	return static_cast<uint32_t>(formats[0]);
+}
+
 } // namespace GPU::Backend

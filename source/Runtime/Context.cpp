@@ -5,6 +5,12 @@
 
 #include <Runtime/Context.h>
 
+#include <Backend/Backend.h>
+#include <Backend/OpenGLBackend.h>
+#ifdef EASYGPU_BACKEND_VULKAN
+#include <Backend/VulkanBackend.h>
+#endif
+
 #include <sstream>
 
 namespace GPU::Runtime {
@@ -100,6 +106,23 @@ void *Context::GetNativeGLContext() const {
 	// Return the native handle from the backend
 	// This is a specific feature of the OpenGL backend
 	return _backend->GetNativeHandle();
+}
+
+Backend::BackendType Context::GetBackendType() const {
+	if (!_initialized || !_backend) {
+		return Backend::GetDefaultBackendType();
+	}
+	// Determine backend type from the backend pointer
+	// This is a bit hacky but works for now
+	if (dynamic_cast<Backend::OpenGLBackend*>(_backend.get()) != nullptr) {
+		return Backend::BackendType::OpenGL;
+	}
+#ifdef EASYGPU_BACKEND_VULKAN
+	if (dynamic_cast<Backend::VulkanBackend*>(_backend.get()) != nullptr) {
+		return Backend::BackendType::Vulkan;
+	}
+#endif
+	return Backend::GetDefaultBackendType();
 }
 
 void Context::CreateBackend() {

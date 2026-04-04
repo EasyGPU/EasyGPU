@@ -6,6 +6,7 @@
 #include <Kernel/Kernel.h>
 #include <Kernel/KernelBuildContext.h>
 #include <Kernel/KernelProfiler.h>
+#include <Kernel/ShaderCache.h>
 
 #include <IR/Value/Var.h>
 #include <IR/Value/VarArray.h>
@@ -38,13 +39,13 @@ public:
 		}
 	}
 
-	KernelBuilderGuard(const KernelBuilderGuard &)			  = delete;
+	KernelBuilderGuard(const KernelBuilderGuard &)              = delete;
 	KernelBuilderGuard &operator=(const KernelBuilderGuard &) = delete;
-	KernelBuilderGuard(KernelBuilderGuard &&)				  = delete;
-	KernelBuilderGuard &operator=(KernelBuilderGuard &&)	  = delete;
+	KernelBuilderGuard(KernelBuilderGuard &&)                  = delete;
+	KernelBuilderGuard &operator=(KernelBuilderGuard &&)      = delete;
 
 private:
-	IR::Builder::Builder		&_builder;
+	IR::Builder::Builder        &_builder;
 	IR::Builder::BuilderContext *_previousContext;
 };
 
@@ -101,59 +102,122 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 		throw std::runtime_error("Backend not available");
 	}
 
+	// Compute shader hash for cache lookup (if not already computed)
+	if (context.GetShaderHash().empty()) {
+		context.ComputeShaderHash();
+	}
+
 	// Get or create the cached pipeline
 	Backend::PipelineHandle pipeline = context.GetCachedPipeline();
 	if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
 		// Get the complete shader code
 		std::string			shaderSource = context.GetCompleteCode();
 
-		// Create compute shader
-		Backend::ShaderDesc shaderDesc;
-		shaderDesc.type				 = Backend::ShaderType::Compute;
-		shaderDesc.sourceCode		 = shaderSource;
-		shaderDesc.entryPoint		 = "main";
+		// Try to load from binary cache first
+		bool loadedFromCache = false;
+		if (backend->SupportsPipelineCache()) {
+			auto& globalCache = GlobalShaderCache::Get();
+			const CacheEntry* entry = globalCache.Lookup(context.GetShaderHash(), 
+				static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()));
+			
+			if (entry && entry->dataSize > 0) {
+				// Try to create pipeline from cached binary
+				Backend::PipelineDesc pipelineDesc;
+				pipelineDesc.workGroupSizeX = context.WorkSizeX;
+				pipelineDesc.workGroupSizeY = context.WorkSizeY;
+				pipelineDesc.workGroupSizeZ = context.WorkSizeZ;
+				pipelineDesc.pushConstantSize = context.GetPushConstantSize();
 
-		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
-		if (shader == Backend::INVALID_SHADER_HANDLE) {
-			throw std::runtime_error("Failed to create compute shader");
+				for (const auto &bufferInfo : context.GetBufferInfos()) {
+					Backend::ResourceLayoutEntry entryLayout;
+					entryLayout.binding = bufferInfo.binding;
+					entryLayout.type = Backend::BindingType::Buffer;
+					entryLayout.readOnly = (bufferInfo.mode == GPU::Backend::BUFFER_MODE_READ_ONLY);
+					pipelineDesc.resources.push_back(entryLayout);
+				}
+
+				for (const auto &textureInfo : context.GetTextureInfos()) {
+					Backend::ResourceLayoutEntry entryLayout;
+					entryLayout.binding = textureInfo.binding;
+					entryLayout.type = textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+					entryLayout.format = Runtime::ToBackendPixelFormat(textureInfo.format);
+					entryLayout.readOnly = textureInfo.sampled;
+					pipelineDesc.resources.push_back(entryLayout);
+				}
+
+				pipeline = backend->CreatePipelineFromBinary(pipelineDesc, entry->data.data(), 
+				                                            entry->data.size(), entry->format);
+				
+				if (pipeline != Backend::INVALID_PIPELINE_HANDLE) {
+					loadedFromCache = true;
+					context.SetCachedBinaryFormat(entry->format);
+				}
+			}
 		}
 
-		// Create pipeline
-		Backend::PipelineDesc pipelineDesc;
-		pipelineDesc.computeShader	  = shader;
-		pipelineDesc.workGroupSizeX	  = context.WorkSizeX;
-		pipelineDesc.workGroupSizeY	  = context.WorkSizeY;
-		pipelineDesc.workGroupSizeZ	  = context.WorkSizeZ;
-		pipelineDesc.pushConstantSize = context.GetPushConstantSize();
+		// If not loaded from cache, compile from source
+		if (!loadedFromCache) {
+			// Create compute shader
+			Backend::ShaderDesc shaderDesc;
+			shaderDesc.type				 = Backend::ShaderType::Compute;
+			shaderDesc.sourceCode		 = shaderSource;
+			shaderDesc.entryPoint		 = "main";
 
-		for (const auto &bufferInfo : context.GetBufferInfos()) {
-			Backend::ResourceLayoutEntry entry;
-			entry.binding  = bufferInfo.binding;
-			entry.type	   = Backend::BindingType::Buffer;
-			entry.readOnly = (bufferInfo.mode == GPU::Backend::BUFFER_MODE_READ_ONLY);
-			pipelineDesc.resources.push_back(entry);
-		}
+			Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+			if (shader == Backend::INVALID_SHADER_HANDLE) {
+				throw std::runtime_error("Failed to create compute shader");
+			}
 
-		for (const auto &textureInfo : context.GetTextureInfos()) {
-			Backend::ResourceLayoutEntry entry;
-			entry.binding  = textureInfo.binding;
-			entry.type	   = textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
-			entry.format   = Runtime::ToBackendPixelFormat(textureInfo.format);
-			entry.readOnly = textureInfo.sampled;
-			pipelineDesc.resources.push_back(entry);
-		}
+			// Create pipeline
+			Backend::PipelineDesc pipelineDesc;
+			pipelineDesc.computeShader	 = shader;
+			pipelineDesc.workGroupSizeX	 = context.WorkSizeX;
+			pipelineDesc.workGroupSizeY	 = context.WorkSizeY;
+			pipelineDesc.workGroupSizeZ	 = context.WorkSizeZ;
+			pipelineDesc.pushConstantSize = context.GetPushConstantSize();
 
-		pipeline = backend->CreatePipeline(pipelineDesc);
-		if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
+			for (const auto &bufferInfo : context.GetBufferInfos()) {
+				Backend::ResourceLayoutEntry entry;
+				entry.binding  = bufferInfo.binding;
+				entry.type	   = Backend::BindingType::Buffer;
+				entry.readOnly = (bufferInfo.mode == GPU::Backend::BUFFER_MODE_READ_ONLY);
+				pipelineDesc.resources.push_back(entry);
+			}
+
+			for (const auto &textureInfo : context.GetTextureInfos()) {
+				Backend::ResourceLayoutEntry entry;
+				entry.binding  = textureInfo.binding;
+				entry.type	   = textureInfo.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+				entry.format   = Runtime::ToBackendPixelFormat(textureInfo.format);
+				entry.readOnly = textureInfo.sampled;
+				pipelineDesc.resources.push_back(entry);
+			}
+
+			pipeline = backend->CreatePipeline(pipelineDesc);
+			if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
+				backend->DestroyShader(shader);
+				throw std::runtime_error("Failed to create compute pipeline");
+			}
+
+			// Cache the binary for future use
+			if (backend->SupportsPipelineCache()) {
+				uint32_t format = 0;
+				auto binary = backend->GetPipelineBinary(pipeline, format);
+				if (!binary.empty()) {
+					auto& globalCache = GlobalShaderCache::Get();
+					globalCache.Store(context.GetShaderHash(), 
+					                  static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()),
+					                  format, binary);
+					context.SetCachedBinaryFormat(format);
+				}
+			}
+
+			// Shader can be destroyed after linking (it's referenced by the pipeline)
 			backend->DestroyShader(shader);
-			throw std::runtime_error("Failed to create compute pipeline");
 		}
 
-		// Cache the pipeline for future dispatches
+		// Cache the pipeline handle for future dispatches in this session
 		context.SetCachedPipeline(pipeline);
-
-		// Shader can be destroyed after linking (it's referenced by the pipeline)
-		backend->DestroyShader(shader);
 	}
 
 	// Bind the pipeline
@@ -470,7 +534,7 @@ Kernel2D::Kernel2D(const std::function<void(IR::Value::Var<int> &IdX, IR::Value:
 	Func(IdX, IdY);
 }
 
-Kernel2D::Kernel2D(const std::string															 &name,
+Kernel2D::Kernel2D(const std::string																			 &name,
 				   const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY)> &Func, int WorkSizeX,
 				   int WorkSizeY)
 	: _context(2), _name(name) {
@@ -520,7 +584,7 @@ Kernel3D::Kernel3D(
 }
 
 Kernel3D::Kernel3D(
-	const std::string																						&name,
+	const std::string																							 &name,
 	const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY, IR::Value::Var<int> &IdZ)> &Func,
 	int WorkSizeX, int WorkSizeY, int WorkSizeZ)
 	: _context(3), _name(name) {
