@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 /**
  * VarBase.h:
@@ -16,9 +16,12 @@
 
 #include <cassert>
 
+#include <IR/Node/CompoundAssignment.h>
+#include <IR/Node/Increment.h>
 #include <IR/Node/LoadLocalVariable.h>
 #include <IR/Node/LoadUniform.h>
 #include <IR/Node/LocalVariable.h>
+#include <IR/Node/Store.h>
 
 #include <Utility/Meta/StructMeta.h>
 

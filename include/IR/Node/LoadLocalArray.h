@@ -20,7 +20,7 @@ public:
 	LoadLocalArrayNode(std::string Name);
 
 public:
-	[[nodiscard]] std::string			Unwarp() const override;
+	[[nodiscard]] std::string			Unwrap() const override;
 
 	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 

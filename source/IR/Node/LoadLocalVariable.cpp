@@ -12,7 +12,7 @@ namespace GPU::IR::Node {
 LoadLocalVariableNode::LoadLocalVariableNode(std::string Name) : _name(std::move(Name)) {
 }
 
-std::string LoadLocalVariableNode::Unwarp() const {
+std::string LoadLocalVariableNode::Unwrap() const {
 	return _name;
 }
 

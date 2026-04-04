@@ -14,6 +14,7 @@
 #include <Flow/ForFlow.h>
 #include <Flow/IfFlow.h>
 #include <Flow/WhileFlow.h>
+#include <GPU.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>
@@ -59,7 +60,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<float> sum	  = 0.0f;
+		Var<float> sum(0.0f);
 
 		For(0, 10, [&](Var<int> &i) {
 			// Skip even numbers
@@ -90,7 +91,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<float> sum	  = 0.0f;
+		Var<float> sum(0.0f);
 
 		For(0, 100, [&](Var<int> &i) {
 			If(i >= 5, [&]() { Break(); });
@@ -125,14 +126,14 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<float> sum	  = 0.0f;
+		Var<float> sum(0.0f);
 
 		For(0, 20, [&](Var<int> &i) {
 			// Skip even numbers
 			If(i % 2 == 0, [&]() { Continue(); });
 
 			// Check if adding this odd would exceed 50
-			Var<float> nextSum = sum + Expr<float>(i);
+			Var<float> nextSum(sum + Expr<float>(i));
 			If(nextSum > 50.0f, [&]() { Break(); });
 
 			sum = nextSum;
@@ -162,8 +163,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> count	= 0;
-		Var<int> i		= 1;
+		Var<int> count(Expr<int>(0));
+		Var<int> i(Expr<int>(1));
 
 		While(i <= 10, [&]() {
 			// Skip multiples of 3
@@ -200,8 +201,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> result = -1;
-		Var<int> i		= 6;
+		Var<int> result(Expr<int>(-1));
+		Var<int> i(Expr<int>(6));
 
 		While(i < 100, [&]() {
 			If(i % 7 == 0, [&]() {
@@ -235,8 +236,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<float> sum	  = 0.0f;
-		Var<int>   i	  = 1;
+		Var<float> sum(0.0f);
+		Var<int>   i(Expr<int>(1));
 
 		DoWhile(
 			[&]() {
@@ -277,12 +278,12 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<float> sum	  = 0.0f;
-		Var<int>   i	  = 1;
+		Var<float> sum(0.0f);
+		Var<int>   i(Expr<int>(1));
 
 		DoWhile(
 			[&]() {
-				Var<float> nextSum = sum + Expr<float>(i);
+				Var<float> nextSum(sum + Expr<float>(i));
 				If(nextSum > 20.0f, [&]() { Break(); });
 				sum = nextSum;
 				i	= i + 1;
@@ -314,7 +315,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> count	= 0;
+		Var<int> count(Expr<int>(0));
 
 		For(0, 3, [&](Var<int> &i) {
 			For(0, 10, [&](Var<int> &j) {
@@ -349,7 +350,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> count	= 0;
+		Var<int> count(Expr<int>(0));
 
 		For(0, 3, [&](Var<int> &i) {
 			For(0, 5, [&](Var<int> &j) {
@@ -385,23 +386,23 @@ Buffer<float>		  outputBuffer(inputData.size(), BufferMode::Write);
 
 GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
-		auto	  input	  = inputBuffer.Bind();
-		auto	  output  = outputBuffer.Bind();
+		auto	  input	 = inputBuffer.Bind();
+		auto	  output = outputBuffer.Bind();
 
-		Var<int>  n		  = input[id];
-		Var<bool> isPrime = true;
+		Var<int>  n(input[id]);
+		Var<bool> isPrime(true);
 
 		// Numbers less than 2 are not prime
 		If(n < 2, [&]() { isPrime = false; });
 
 		// Check divisibility from 2 to n-1
 		// Using For with Break for early exit
-		Var<bool> foundDivisor = false;
+		Var<bool> foundDivisor(false);
 		For(2, n, [&](Var<int> &d) {
 			If(foundDivisor, [&]() {
 				Break(); // Already found a divisor
 			});
-			If(n % d == 0, [&]() {
+			If(n - (n / d) * d == 0, [&]() {
 				foundDivisor = true;
 				isPrime		 = false;
 				Break(); // No need to check further
@@ -441,7 +442,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> count	= 0;
+		Var<int> count(Expr<int>(0));
 
 		For(1, 21, [&](Var<int> &i) {
 			If(i % 2 == 0, [&]() { Continue(); });

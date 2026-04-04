@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <Flow/IfFlow.h>
+#include <GPU.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>
@@ -53,8 +54,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   idx	  = id;
-		Var<float> value  = 0.0f;
+		Var<int>   idx(id);
+		Var<float> value(0.0f);
 
 		If(idx < 2, [&]() {
 			value = 1.0f; // True branch
@@ -85,8 +86,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   idx	  = id;
-		Var<float> value  = 0.0f;
+		Var<int>   idx(id);
+		Var<float> value(0.0f);
 
 		If(idx < 2, [&]() {
 			value = 1.0f; // True branch
@@ -124,9 +125,9 @@ GPU::Kernel::Kernel1D kernel(
 		auto	   input  = scoreBuffer.Bind();
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   idx	  = id;
-		Var<float> score  = input[idx];
-		Var<float> grade  = 0.0f;
+		Var<int>   idx(id);
+		Var<float> score(input[idx]);
+		Var<float> grade(0.0f);
 
 		If(score >= 90.0f,
 		   [&]() {
@@ -174,8 +175,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   idx	  = id;
-		Var<float> value  = 0.0f;
+		Var<int>   idx(id);
+		Var<float> value(0.0f);
 
 		If(idx == 0, [&]() { value = 10.0f; }).Elif(idx == 1, [&]() { value = 20.0f; }).Elif(idx == 2, [&]() {
 			value = 30.0f;
@@ -208,9 +209,9 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   idx	  = id;
-		Var<Vec3>  pos	  = Vec3(1.0f, 2.0f, 3.0f);
-		Var<float> result = 0.0f;
+		Var<int>   idx(id);
+		Var<Vec3>  pos = MakeFloat3(1.0f, 2.0f, 3.0f);
+		Var<float> result(0.0f);
 
 		// Check if y component > 1.5
 		If(pos.y() > 1.5f, [&]() {
@@ -250,9 +251,9 @@ GPU::Kernel::Kernel1D kernel(
 		auto	   input  = inputBuffer.Bind();
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   idx	  = id;
-		Var<float> val	  = input[idx];
-		Var<float> result = 0.0f;
+		Var<int>   idx(id);
+		Var<float> val(input[idx]);
+		Var<float> result(0.0f);
 
 		// Range check: 10 <= val < 30
 		If((val >= 10.0f) && (val < 30.0f), [&]() {
@@ -287,8 +288,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   myId	  = id;
-		Var<float> value  = 0.0f;
+		Var<int>   myId(id);
+		Var<float> value(0.0f);
 
 		// Even ids get 1.0, odd ids get 2.0
 		If((myId % 2) == 0, [&]() { value = 1.0f; }).Else([&]() { value = 2.0f; });

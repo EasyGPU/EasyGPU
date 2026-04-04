@@ -10,6 +10,7 @@
 
 #include <Flow/ContinueFlow.h>
 #include <Flow/ForFlow.h>
+#include <GPU.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>
@@ -60,8 +61,8 @@ GPU::Kernel::Kernel1D kernel(
 		auto	   input  = inputBuffer.Bind();
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   idx	  = id;
-		Var<float> sum	  = 0.0f;
+		Var<int>   idx(id);
+		Var<float> sum(0.0f);
 
 		For(0, idx + 1, [&](Var<int> i) { sum = sum + input[i]; });
 
@@ -92,7 +93,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> count	= 0;
+		Var<int> count(Expr<int>(0));
 		For(0, 10, 2, [&](Var<int> i) { count = count + 1; });
 
 		output[id] = Expr<float>(count);
@@ -125,9 +126,9 @@ GPU::Kernel::Kernel1D kernel(
 
 		For(0, 4, [&](Var<int> i) {
 			For(0, 4, [&](Var<int> j) {
-				Var<int> srcIdx = i * 4 + j;
-				Var<int> dstIdx = j * 4 + i;
-				output[dstIdx]	= input[srcIdx];
+				Var<int> srcIdx(i * 4 + j);
+				Var<int> dstIdx(j * 4 + i);
+				output[dstIdx] = input[srcIdx];
 			});
 		});
 	},
@@ -157,9 +158,9 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   start  = 2;
-		Var<int>   end	  = 7;
-		Var<float> sum	  = 0.0f;
+		Var<int>   start(Expr<int>(2));
+		Var<int>   end(Expr<int>(7));
+		Var<float> sum(0.0f);
 
 		For(start, end, [&](Var<int> i) { sum = sum + 1.0f; });
 
@@ -185,8 +186,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   base	  = 3;
-		Var<float> sum	  = 0.0f;
+		Var<int>   base(Expr<int>(3));
+		Var<float> sum(0.0f);
 
 		// Loop from 0 to base*2 (6)
 		For(0, base * 2, [&](Var<int> i) { sum = sum + 1.0f; });
@@ -213,8 +214,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   n	  = id;
-		Var<float> result = 1.0f;
+		Var<int>   n(id);
+		Var<float> result(1.0f);
 
 		For(1, n + 1, [&](Var<int> i) { result = result * Expr<float>(i); });
 
@@ -246,8 +247,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   myId	  = id;
-		Var<float> sum	  = 0.0f;
+		Var<int>   myId(id);
+		Var<float> sum(0.0f);
 
 		// Each work item sums up to its own ID + 1
 		For(0, myId + 1, [&](Var<int> i) { sum = sum + 1.0f; });

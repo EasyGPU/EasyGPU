@@ -10,7 +10,7 @@ namespace GPU::IR::Node {
 LoadUniformNode::LoadUniformNode(std::string Uniform) : _uniform(std::move(Uniform)) {
 }
 
-std::string LoadUniformNode::Unwarp() const {
+std::string LoadUniformNode::Unwrap() const {
 	return _uniform;
 }
 

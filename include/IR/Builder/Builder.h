@@ -13,29 +13,31 @@
 
 #include <stack>
 
-#include <IR/Node/ArrayAccess.h>
-#include <IR/Node/AtomicOp.h>
-#include <IR/Node/Break.h>
-#include <IR/Node/Call.h>
-#include <IR/Node/CallInst.h>
-#include <IR/Node/CompoundAssignment.h>
-#include <IR/Node/Continue.h>
-#include <IR/Node/DoWhile.h>
-#include <IR/Node/For.h>
-#include <IR/Node/If.h>
-#include <IR/Node/Increment.h>
-#include <IR/Node/Load.h>
-#include <IR/Node/LocalVariable.h>
-#include <IR/Node/LocalVariableArray.h>
-#include <IR/Node/MemberAccess.h>
-#include <IR/Node/Node.h>
-#include <IR/Node/Operation.h>
-#include <IR/Node/RawCode.h>
-#include <IR/Node/Return.h>
-#include <IR/Node/SharedMemory.h>
-#include <IR/Node/Store.h>
-#include <IR/Node/Ternary.h>
-#include <IR/Node/While.h>
+namespace GPU::IR::Node {
+class Node;
+class IntrinsicCallNode;
+class OperationNode;
+class LocalVariableNode;
+class LocalVariableArrayNode;
+class LoadNode;
+class StoreNode;
+class ArrayAccessNode;
+class CompoundAssignmentNode;
+class IncrementNode;
+class MemberAccessNode;
+class IfNode;
+class WhileNode;
+class DoWhileNode;
+class ForNode;
+class BreakNode;
+class ContinueNode;
+class ReturnNode;
+class CallNode;
+class RawCodeNode;
+class TernaryNode;
+class SharedMemoryNode;
+class AtomicOpNode;
+} // namespace GPU::IR::Node
 
 namespace GPU::IR::Builder {
 /**

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <Flow/DoWhileFlow.h>
+#include <GPU.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>
@@ -53,7 +54,7 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> count	= 0;
+		Var<int> count(Expr<int>(0));
 
 		DoWhile([&]() { count = count + 1; }, count < 5);
 
@@ -79,8 +80,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	  output = outputBuffer.Bind();
 
-		Var<int>  count	 = 0;
-		Var<bool> flag	 = false; // Condition starts as false
+		Var<int>  count(Expr<int>(0));
+		Var<bool> flag(false); // Condition starts as false
 
 		// Body executes once even though flag is false
 		DoWhile([&]() { count = count + 1; }, flag);
@@ -107,8 +108,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	   output = outputBuffer.Bind();
 
-		Var<int>   i	  = 1;
-		Var<float> sum	  = 0.0f;
+		Var<int>   i(Expr<int>(1));
+		Var<float> sum(0.0f);
 
 		DoWhile(
 			[&]() {
@@ -137,10 +138,10 @@ Buffer<float>		  outputBuffer(1, BufferMode::Write);
 
 GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
-		auto	  output	   = outputBuffer.Bind();
+		auto	  output = outputBuffer.Bind();
 
-		Var<int>  count		   = 0;
-		Var<bool> continueLoop = true;
+		Var<int>  count(Expr<int>(0));
+		Var<bool> continueLoop(true);
 
 		DoWhile(
 			[&]() {
@@ -172,8 +173,8 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> myId	= id;
-		Var<int> count	= 0;
+		Var<int> myId(id);
+		Var<int> count(Expr<int>(0));
 
 		// Each work item runs do-while (id + 1) times
 		DoWhile([&]() { count = count + 1; }, count <= myId);
@@ -202,12 +203,12 @@ GPU::Kernel::Kernel1D kernel(
 	[&](Var<int> &id) {
 		auto	 output = outputBuffer.Bind();
 
-		Var<int> outer	= 0;
-		Var<int> total	= 0;
+		Var<int> outer(Expr<int>(0));
+		Var<int> total(Expr<int>(0));
 
 		DoWhile(
 			[&]() {
-				Var<int> inner = 0;
+				Var<int> inner(Expr<int>(0));
 				DoWhile(
 					[&]() {
 						total = total + 1;

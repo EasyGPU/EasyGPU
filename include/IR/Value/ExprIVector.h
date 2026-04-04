@@ -6,8 +6,8 @@
  *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
  *      @Date           :   2/13/2026
  */
-#ifndef EASYGPU_EXPRIVECTOR_H
-#define EASYGPU_EXPRIVECTOR_H
+#ifndef EASYGPU_EXPIVECTOR_H
+#define EASYGPU_EXPIVECTOR_H
 
 #include <IR/Builder/Builder.h>
 #include <IR/Value/Expr.h>
@@ -1067,4 +1067,4 @@ using IVec4Expr = Expr<Math::IVec4>;
 
 } // namespace GPU::IR::Value
 
-#endif // EASYGPU_EXPRIVECTOR_H
+#endif // EASYGPU_EXPIVECTOR_H

@@ -307,6 +307,40 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 // Inspector Kernels - For debugging
 // ===================================================================================
 
+/**
+ * Shared helper for compiling shader code from a build context
+ */
+static bool CompileShaderInternal(KernelBuildContext &context, std::string &errorMessage) {
+	try {
+		Runtime::AutoInitContext();
+		Runtime::ContextGuard guard(Runtime::Context::GetInstance());
+
+		std::string			  shaderSource = context.GetCompleteCode();
+
+		auto				 *backend	   = Runtime::Context::GetBackend();
+		if (!backend) {
+			errorMessage = "Backend not available";
+			return false;
+		}
+
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type				 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode		 = shaderSource;
+
+		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+		if (shader == Backend::INVALID_SHADER_HANDLE) {
+			errorMessage = "Shader compilation failed";
+			return false;
+		}
+
+		backend->DestroyShader(shader);
+		return true;
+	} catch (const std::exception &e) {
+		errorMessage = e.what();
+		return false;
+	}
+}
+
 InspectorKernel1D::InspectorKernel1D(const std::function<void(IR::Value::Var<int> &Id)> &Func, int WorkSizeX)
 	: _context(1) {
 	KernelBuilderGuard guard(IR::Builder::Builder::Get(), _context);

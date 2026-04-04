@@ -6,6 +6,30 @@
 
 #include <IR/Builder/Builder.h>
 
+#include <IR/Node/ArrayAccess.h>
+#include <IR/Node/AtomicOp.h>
+#include <IR/Node/Break.h>
+#include <IR/Node/Call.h>
+#include <IR/Node/CallInst.h>
+#include <IR/Node/CompoundAssignment.h>
+#include <IR/Node/Continue.h>
+#include <IR/Node/DoWhile.h>
+#include <IR/Node/For.h>
+#include <IR/Node/If.h>
+#include <IR/Node/Increment.h>
+#include <IR/Node/Load.h>
+#include <IR/Node/LocalVariable.h>
+#include <IR/Node/LocalVariableArray.h>
+#include <IR/Node/MemberAccess.h>
+#include <IR/Node/Node.h>
+#include <IR/Node/Operation.h>
+#include <IR/Node/RawCode.h>
+#include <IR/Node/Return.h>
+#include <IR/Node/SharedMemory.h>
+#include <IR/Node/Store.h>
+#include <IR/Node/Ternary.h>
+#include <IR/Node/While.h>
+
 #include <format>
 #include <sstream>
 
@@ -220,7 +244,7 @@ std::string Builder::BuildLocalVariableArray(const Node::LocalVariableArrayNode 
 }
 
 std::string Builder::BuildLoad(const Node::LoadNode &Node) {
-	return Node.Unwarp();
+	return Node.Unwrap();
 }
 
 std::string Builder::BuildStore(const Node::StoreNode &Node) {

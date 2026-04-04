@@ -52,7 +52,7 @@ inline void DoWhile(const std::function<void()> &body, GPU::IR::Value::Expr<bool
 	for (const auto &line : collectContext.GetCollectedCode()) {
 		doWhileCode += "    " + line;
 	}
-	doWhileCode += std::format("}} while ({});\n", condStr);
+	doWhileCode += "} while (" + condStr + ");\n";
 
 	originalContext->PushTranslatedCode(doWhileCode);
 }

@@ -35,10 +35,10 @@ public:
 
 public:
 	/**
-	 * Unwarping the address reference the load instruction holding
+	 * Unwraping the address reference the load instruction holding
 	 * @return The unwarped string
 	 */
-	virtual std::string Unwarp() const = 0;
+	virtual std::string Unwrap() const = 0;
 
 protected:
 	size_t _variableId = 0;
