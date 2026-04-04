@@ -30,6 +30,7 @@ Solutions to frequently encountered tasks in EasyGPU.
 - [Parallel Reduction (Sum/Max)](#parallel-reduction-summax)
 - [Uniforms for Dynamic Parameters](#uniforms-for-dynamic-parameters)
 - [Image Processing](#image-processing)
+- [Volume Processing](#volume-processing)
 - [Particle Systems](#particle-systems)
 - [Matrix Operations](#matrix-operations)
 - [Random Number Generation](#random-number-generation)
@@ -891,6 +892,7 @@ Kernel1D dfs_local([](Int i) {
 
 - [Parallel Reduction (Sum/Max)](#parallel-reduction-summax)
 - [Image Processing](#image-processing)
+- [Volume Processing](#volume-processing)
 - [Particle Systems](#particle-systems)
 - [Matrix Operations](#matrix-operations)
 - [Random Number Generation](#random-number-generation)
@@ -1115,6 +1117,86 @@ Callable<Float(BufferRef<Float>&, Int, Int, Int, Int)> Sobel =
     Return(Sqrt(gx * gx + gy * gy));
 };
 ```
+
+---
+
+## Volume Processing
+
+3D texture operations for voxel grids, signed distance fields, and volume data.
+
+### 3D Texture Volume Fill
+
+`cpp
+Texture3D<PixelFormat::RGBA8> volume(32, 32, 32);
+
+Kernel1D fill_kernel([](Int id) {
+    auto vol = volume.Bind();
+
+    Int x = id % 32;
+    Int y = (id / 32) % 32;
+    Int z = id / (32 * 32);
+
+    Float r = Expr<float>(x) / 32.0f;
+    Float g = Expr<float>(y) / 32.0f;
+    Float b = Expr<float>(z) / 32.0f;
+
+    vol.Write(x, y, z, Expr<Vec4>(r, g, b, 1.0f));
+});
+
+fill_kernel.Dispatch((32*32*32 + 255) / 256, true);
+`
+
+### 3D Box Blur
+
+`cpp
+Texture3D<PixelFormat::R32F> input(16, 16, 16);
+Texture3D<PixelFormat::R32F> output(16, 16, 16);
+
+Kernel1D blur3d([](Int id) {
+    auto src = input.Bind();
+    auto dst = output.Bind();
+
+    Int x = id % 16;
+    Int y = (id / 16) % 16;
+    Int z = id / (16 * 16);
+
+    Float sum = MakeFloat(0.0f);
+    For(-1, 2, [&](Int& dz) {
+        For(-1, 2, [&](Int& dy) {
+            For(-1, 2, [&](Int& dx) {
+                Int px = Clamp(x + dx, 0, 15);
+                Int py = Clamp(y + dy, 0, 15);
+                Int pz = Clamp(z + dz, 0, 15);
+                sum = sum + src.Read(px, py, pz).x();
+            });
+        });
+    });
+
+    dst.Write(x, y, z, Vec4(sum / 27.0f));
+});
+
+blur3d.Dispatch((16*16*16 + 255) / 256, true);
+`
+
+### Texture3DSlot for Dynamic Volumes
+
+`cpp
+Texture3DSlot<RGBA8> volumeSlot;
+
+Kernel1D process([](Int id) {
+    auto vol = volumeSlot.Bind();
+    // ...
+});
+
+Texture3D<PixelFormat::RGBA8> lowRes(16, 16, 16);
+Texture3D<PixelFormat::RGBA8> highRes(64, 64, 64);
+
+volumeSlot.Attach(lowRes);
+process.Dispatch(16, true);
+
+volumeSlot.Attach(highRes);  // Same kernel, different resolution
+process.Dispatch(1024, true);
+`
 
 ---
 

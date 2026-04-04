@@ -1772,8 +1772,38 @@ using image2d<Format> = IR::Value::TextureRef<Format>;  // Inside kernel
 
 ### Texture3D
 
-**DEPRECATED**: Texture3D support has been removed due to OpenGL driver compatibility issues.
-Only Texture2D is supported.
+3D texture for volumetric data.
+
+```cpp
+Texture3D<PixelFormat::RGBA8> volume(width, height, depth);
+Texture3D<PixelFormat::RGBA8> volume(width, height, depth, data);
+```
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Upload(const void* data)` | Upload full volume data |
+| `UploadSubRegion(x, y, z, w, h, d, data)` | Upload partial volume |
+| `Download(void* outData)` | Download full volume data |
+| `Download(std::vector<T>& outData)` | Download to vector |
+| `Bind()` | Bind to current kernel (returns TextureRef3D) |
+| `BindSampler()` | Bind as sampler (returns TextureSampler3D) |
+| `GetWidth()` | Get texture width |
+| `GetHeight()` | Get texture height |
+| `GetDepth()` | Get texture depth |
+| `GetSizeInBytes()` | Get total size in bytes |
+
+**Type Aliases:**
+
+```cpp
+using Texture3DRGBA8   = Texture3D<PixelFormat::RGBA8>;
+using Texture3DRGBA32F = Texture3D<PixelFormat::RGBA32F>;
+using Texture3DR32F    = Texture3D<PixelFormat::R32F>;
+using Texture3DRG32F   = Texture3D<PixelFormat::RG32F>;
+using Texture3DR8      = Texture3D<PixelFormat::R8>;
+using image3d<Format>  = IR::Value::TextureRef3D<Format>;
+```
 
 ---
 
@@ -1800,10 +1830,24 @@ img.Write(x, y, color);
 ---
 ---
 
-### Texture3DRef (3D)
+### TextureRef3D (3D)
 
-**DEPRECATED**: Texture3D support has been removed due to OpenGL driver compatibility issues.
-Only Texture2D is supported.
+Reference to a 3D texture inside a kernel, returned by `Texture3D::Bind()`.
+
+**Read Methods:**
+
+```cpp
+// All combinations of Var<int>, Expr<int>, and literal int
+Float4 color = vol.Read(x, y, z);
+```
+
+**Write Methods:**
+
+```cpp
+// All combinations of Var<int>, Expr<int>, literal int for coordinates
+// and Var<Vec4>, Expr<Vec4> for color
+vol.Write(x, y, z, color);
+```
 
 ---
 ## Texture Samplers
@@ -2173,6 +2217,32 @@ State caching provides significant performance benefits:
 | Multi-pass rendering | Re-bind everything | Bind only changes | **4-8x** |
 
 **Best Practice:** Avoid interleaving raw OpenGL with EasyGPU operations. Group raw GL operations and wrap with `Invalidate()` or use a separate context.
+
+---
+
+### TextureSampler3D
+
+Returned by `Texture3D::BindSampler()` for filtered 3D sampling in fragment kernels.
+
+```cpp
+Texture3D<PixelFormat::RGBA8> volume(64, 64, 64);
+
+FragmentKernel2D kernel([&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
+    auto tex = volume.BindSampler();
+    Float3 uvw = MakeFloat3(fragCoord.x() / resolution.x(), fragCoord.y() / resolution.y(), 0.5f);
+    fragColor = tex.Sample(uvw);
+});
+```
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Sample(uvw)` | Sample 3D texture at normalized UVW coordinates |
+| `GetSize()` | Get texture size as `Vec3` |
+| `GetTextureWidth()` | Get width in pixels |
+| `GetTextureHeight()` | Get height in pixels |
+| `GetTextureDepth()` | Get depth in pixels |
 
 ---
 

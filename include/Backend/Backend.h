@@ -233,8 +233,12 @@ public:
 	virtual void		  DestroyTexture(TextureHandle texture)											  = 0;
 	virtual void		  UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 										const void *data)												  = 0;
+	virtual void		  UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+																  uint32_t height, uint32_t depth, const void *data)													  = 0;
 	virtual void		 DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 										 void *outData)													  = 0;
+	virtual void		 DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+																 uint32_t height, uint32_t depth, void *outData)														  = 0;
 
 	virtual ShaderHandle CreateShader(const ShaderDesc &desc)											  = 0;
 	virtual void		 DestroyShader(ShaderHandle shader)												  = 0;

@@ -732,6 +732,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [Getting Started](docs/getting-started.md)
 - [Tutorial](docs/tutorial.md)
 - [API Reference](docs/api-reference.md)
+- [Texture3D Guide](docs/texture3d.md) — Volumetric textures and 3D compute
 - [Window Component](docs/window.md) — Cross-platform window for interactive visualization
 - [Shader Cache](docs/shader-cache.md) — Automatic kernel compilation caching
 - [Common Patterns](docs/patterns.md)

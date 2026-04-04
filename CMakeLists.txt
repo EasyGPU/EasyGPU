@@ -417,6 +417,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestBuffer.cpp
         tests/TestBufferSlot.cpp
         tests/TestTexture.cpp
+        tests/TestTexture3D.cpp
         tests/TestTextureSlot.cpp
         tests/TestSlotMixed.cpp
         tests/TestSlotPingPong.cpp
@@ -428,7 +429,6 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestArray.cpp
         tests/TestUniform.cpp
         tests/TestTernary.cpp
-        tests/TestCopySign.cpp
         tests/TestSharedMemory.cpp
         tests/TestShaderCache.cpp
         tests/TestKernelCache.cpp

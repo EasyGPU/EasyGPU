@@ -649,6 +649,330 @@ using TextureR32F	 = Texture2D<PixelFormat::R32F>;
 using TextureRG32F	 = Texture2D<PixelFormat::RG32F>;
 using TextureR8		 = Texture2D<PixelFormat::R8>;
 
+template <PixelFormat Format> class Texture3D {
+public:
+	Texture3D(uint32_t width, uint32_t height, uint32_t depth)
+		: _width(width), _height(height), _depth(depth), _format(Format) {
+		CreateTexture(nullptr);
+	}
+
+	Texture3D(uint32_t width, uint32_t height, uint32_t depth, const void *data)
+		: _width(width), _height(height), _depth(depth), _format(Format) {
+		CreateTexture(data);
+	}
+
+	Texture3D(Texture3D &&other) noexcept
+		: _textureHandle(other._textureHandle), _width(other._width), _height(other._height), _depth(other._depth),
+		  _format(other._format), _boundBinding(other._boundBinding), _uploadPool(std::move(other._uploadPool)),
+		  _downloadPool(std::move(other._downloadPool)), _currentUploadPBO(other._currentUploadPBO),
+		  _currentDownloadPBO(other._currentDownloadPBO) {
+		other._textureHandle      = Backend::INVALID_TEXTURE_HANDLE;
+		other._width              = 0;
+		other._height             = 0;
+		other._depth              = 0;
+		other._boundBinding       = -1;
+		other._currentUploadPBO   = nullptr;
+		other._currentDownloadPBO = nullptr;
+	}
+
+	Texture3D &operator=(Texture3D &&other) noexcept {
+		if (this != &other) {
+			DestroyTexture();
+			_textureHandle            = other._textureHandle;
+			_width                    = other._width;
+			_height                   = other._height;
+			_depth                    = other._depth;
+			_format                   = other._format;
+			_boundBinding             = other._boundBinding;
+			_uploadPool               = std::move(other._uploadPool);
+			_downloadPool             = std::move(other._downloadPool);
+			_currentUploadPBO         = other._currentUploadPBO;
+			_currentDownloadPBO       = other._currentDownloadPBO;
+			other._textureHandle      = Backend::INVALID_TEXTURE_HANDLE;
+			other._width              = 0;
+			other._height             = 0;
+			other._depth              = 0;
+			other._boundBinding       = -1;
+			other._currentUploadPBO   = nullptr;
+			other._currentDownloadPBO = nullptr;
+		}
+		return *this;
+	}
+
+	~Texture3D() {
+		DestroyTexture();
+	}
+
+	Texture3D(const Texture3D &)            = delete;
+	Texture3D &operator=(const Texture3D &) = delete;
+
+public:
+	void Upload(const void *data) {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
+			return;
+		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		backend->UploadTexture3D(_textureHandle, 0, 0, 0, _width, _height, _depth, data);
+	}
+
+	void UploadSubRegion(uint32_t x, uint32_t y, uint32_t z, uint32_t w, uint32_t h, uint32_t d, const void *data) {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
+			return;
+		}
+		if (x + w > _width || y + h > _height || z + d > _depth) {
+			throw std::out_of_range("Upload region exceeds texture bounds");
+		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		backend->UploadTexture3D(_textureHandle, x, y, z, w, h, d, data);
+	}
+
+	void Download(void *outData) const {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || outData == nullptr) {
+			return;
+		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		backend->DownloadTexture3D(_textureHandle, 0, 0, 0, _width, _height, _depth, outData);
+	}
+
+	template <typename T> void Download(std::vector<T> &outData) const {
+		size_t requiredSize = (_width * _height * _depth * GetBytesPerPixel() + sizeof(T) - 1) / sizeof(T);
+		if (outData.size() < requiredSize) {
+			outData.resize(requiredSize);
+		}
+		Download(outData.data());
+	}
+
+public:
+	void InitUploadPBOPool(uint32_t bufferCount = 2) {
+		if (!_uploadPool) {
+			size_t size = _width * _height * _depth * GetBytesPerPixel();
+			_uploadPool = std::make_unique<PBOPool>(size, bufferCount, false);
+		}
+	}
+
+	void InitDownloadPBOPool(uint32_t bufferCount = 2) {
+		if (!_downloadPool) {
+			size_t size = _width * _height * _depth * GetBytesPerPixel();
+			_downloadPool = std::make_unique<PBOPool>(size, bufferCount, true);
+		}
+	}
+
+	bool UploadAsync(const void *data) {
+		if (!_uploadPool) {
+			InitUploadPBOPool(2);
+		}
+		_uploadPool->UpdateStates();
+		PBOBuffer *pbo = _uploadPool->AcquireIdle();
+		if (!pbo) {
+			return false;
+		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		size_t dataSize = _width * _height * _depth * GetBytesPerPixel();
+		pbo->CopyData(data, dataSize);
+		Upload(data);
+		pbo->SetState(PBOBuffer::State::Uploading);
+		pbo->InsertFence();
+		return true;
+	}
+
+	bool UploadAsyncStream(const void *data, uint32_t timeoutMs = 1000) {
+		if (!_uploadPool) {
+			InitUploadPBOPool(2);
+		}
+		PBOBuffer *pbo = _uploadPool->AcquireIdleBlocking(timeoutMs);
+		if (!pbo) {
+			throw std::runtime_error("UploadAsyncStream timeout - no idle PBO available");
+		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		size_t dataSize = _width * _height * _depth * GetBytesPerPixel();
+		pbo->CopyData(data, dataSize);
+		Upload(data);
+		pbo->SetState(PBOBuffer::State::Uploading);
+		pbo->InsertFence();
+		return true;
+	}
+
+	bool DownloadAsync() {
+		if (!_downloadPool) {
+			InitDownloadPBOPool(2);
+		}
+		_downloadPool->UpdateStates();
+		PBOBuffer *pbo = _downloadPool->AcquireIdle();
+		if (!pbo) {
+			return false;
+		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		pbo->SetState(PBOBuffer::State::Downloading);
+		pbo->InsertFence();
+		return true;
+	}
+
+	bool GetDownloadData(void *outData) {
+		if (!_downloadPool)
+			return false;
+		_downloadPool->UpdateStates();
+		for (auto &pbo : _downloadPool->GetBuffers()) {
+			if (pbo->GetState() == PBOBuffer::State::Ready) {
+				const void *mapped = pbo->MapRead();
+				if (mapped) {
+					std::memcpy(outData, mapped, pbo->GetSize());
+					pbo->Unmap();
+					pbo->SetState(PBOBuffer::State::Idle);
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	void Sync() {
+		if (_uploadPool) {
+			_uploadPool->SyncAll();
+		}
+		if (_downloadPool) {
+			_downloadPool->SyncAll();
+		}
+	}
+
+	bool IsIdle() {
+		if (_uploadPool) {
+			_uploadPool->UpdateStates();
+			for (auto &pbo : _uploadPool->GetBuffers()) {
+				if (pbo->GetState() != PBOBuffer::State::Idle) {
+					return false;
+				}
+			}
+		}
+		if (_downloadPool) {
+			_downloadPool->UpdateStates();
+			for (auto &pbo : _downloadPool->GetBuffers()) {
+				if (pbo->GetState() != PBOBuffer::State::Idle) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+public:
+	[[nodiscard]] IR::Value::TextureRef3D<Format> Bind() {
+		auto *context = IR::Builder::Builder::Get().Context();
+		if (!context) {
+			throw std::runtime_error("Texture3D::Bind() called outside of Kernel definition");
+		}
+		uint32_t    binding     = context->AllocateTextureBinding();
+		std::string textureName = std::format("tex{}", binding);
+		context->RegisterTexture3D(binding, _format, textureName, _width, _height, _depth);
+		context->BindRuntimeTexture(binding, static_cast<uint32_t>(_textureHandle));
+		_boundBinding = static_cast<int>(binding);
+		return IR::Value::TextureRef3D<Format>(textureName, binding, _width, _height, _depth);
+	}
+
+	[[nodiscard]] IR::Value::TextureSampler3D<Format> BindSampler() {
+		auto *context = IR::Builder::Builder::Get().Context();
+		if (!context) {
+			throw std::runtime_error("Texture3D::BindSampler() called outside of Kernel definition");
+		}
+		uint32_t    binding     = context->AllocateTextureBinding();
+		std::string textureName = std::format("tex{}", binding);
+		context->RegisterTexture3D(binding, _format, textureName, _width, _height, _depth, true);
+		context->BindRuntimeTexture(binding, static_cast<uint32_t>(_textureHandle));
+		_boundBinding = static_cast<int>(binding);
+		return IR::Value::TextureSampler3D<Format>(textureName, binding, _width, _height, _depth);
+	}
+
+public:
+	[[nodiscard]] Backend::TextureHandle GetHandle() const {
+		return _textureHandle;
+	}
+	[[nodiscard]] uint32_t GetWidth() const {
+		return _width;
+	}
+	[[nodiscard]] uint32_t GetHeight() const {
+		return _height;
+	}
+	[[nodiscard]] uint32_t GetDepth() const {
+		return _depth;
+	}
+	static constexpr PixelFormat GetFormat() {
+		return Format;
+	}
+	[[nodiscard]] size_t GetBytesPerPixel() const {
+		return Runtime::GetBytesPerPixel(_format);
+	}
+	[[nodiscard]] size_t GetSizeInBytes() const {
+		return _width * _height * _depth * GetBytesPerPixel();
+	}
+	[[nodiscard]] int GetBinding() const {
+		return _boundBinding;
+	}
+
+private:
+	void CreateTexture(const void *initialData) {
+		Runtime::AutoInitContext();
+		Runtime::Context::GetInstance().MakeCurrent();
+		if (_width == 0 || _height == 0 || _depth == 0) {
+			throw std::invalid_argument("Texture dimensions must be non-zero");
+		}
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		Backend::TextureDesc desc;
+		desc.width       = _width;
+		desc.height      = _height;
+		desc.depth       = _depth;
+		desc.format      = ToBackendPixelFormat(_format);
+		desc.initialData = initialData;
+		_textureHandle   = backend->CreateTexture(desc);
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE) {
+			throw std::runtime_error("Failed to create GPU texture");
+		}
+	}
+
+	void DestroyTexture() {
+		Sync();
+		if (_textureHandle != Backend::INVALID_TEXTURE_HANDLE) {
+			auto *backend = Context::GetBackend();
+			if (backend) {
+				backend->DestroyTexture(_textureHandle);
+			}
+			_textureHandle = Backend::INVALID_TEXTURE_HANDLE;
+		}
+	}
+
+private:
+	Backend::TextureHandle   _textureHandle = Backend::INVALID_TEXTURE_HANDLE;
+	uint32_t                 _width         = 0;
+	uint32_t                 _height        = 0;
+	uint32_t                 _depth         = 0;
+	PixelFormat              _format        = Format;
+	int                      _boundBinding  = -1;
+	std::unique_ptr<PBOPool> _uploadPool;
+	std::unique_ptr<PBOPool> _downloadPool;
+	PBOBuffer               *_currentUploadPBO   = nullptr;
+	PBOBuffer               *_currentDownloadPBO = nullptr;
+};
+
+using Texture3DRGBA8   = Texture3D<PixelFormat::RGBA8>;
+using Texture3DRGBA32F = Texture3D<PixelFormat::RGBA32F>;
+using Texture3DR32F    = Texture3D<PixelFormat::R32F>;
+using Texture3DRG32F   = Texture3D<PixelFormat::RG32F>;
+using Texture3DR8      = Texture3D<PixelFormat::R8>;
+
+
 } // namespace GPU::Runtime
 
 #endif // EASYGPU_TEXTURE_H

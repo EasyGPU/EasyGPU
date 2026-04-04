@@ -276,13 +276,25 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 		throw std::runtime_error("Failed to create OpenGL texture");
 	}
 
-	glBindTexture(GL_TEXTURE_2D, glHandle);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, desc.width, desc.height, 0, format, type, desc.initialData);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	bool is3D = desc.depth > 1;
+	if (is3D) {
+		glBindTexture(GL_TEXTURE_3D, glHandle);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTexImage3D(GL_TEXTURE_3D, 0, internalFormat, desc.width, desc.height, desc.depth, 0, format, type, desc.initialData);
+		glBindTexture(GL_TEXTURE_3D, 0);
+	} else {
+		glBindTexture(GL_TEXTURE_2D, glHandle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, desc.width, desc.height, 0, format, type, desc.initialData);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
 
 	TextureHandle handle = _nextTextureHandle++;
 	TextureInfo	  info;
@@ -322,6 +334,18 @@ void OpenGLBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y,
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void OpenGLBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+										uint32_t height, uint32_t depth, const void *data) {
+	auto it = _textures.find(texture);
+	if (it == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+
+	glBindTexture(GL_TEXTURE_3D, it->second.glHandle);
+	glTexSubImage3D(GL_TEXTURE_3D, 0, x, y, z, width, height, depth, it->second.format, it->second.type, data);
+	glBindTexture(GL_TEXTURE_3D, 0);
+}
+
 void OpenGLBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 									void *outData) {
 	auto it = _textures.find(texture);
@@ -337,6 +361,25 @@ void OpenGLBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 	glBindTexture(GL_TEXTURE_2D, it->second.glHandle);
 	glGetTexImage(GL_TEXTURE_2D, 0, it->second.format, it->second.type, outData);
 	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void OpenGLBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+										  uint32_t height, uint32_t depth, void *outData) {
+	auto it = _textures.find(texture);
+	if (it == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+
+	(void)x;
+	(void)y;
+	(void)z;
+	(void)width;
+	(void)height;
+	(void)depth;
+
+	glBindTexture(GL_TEXTURE_3D, it->second.glHandle);
+	glGetTexImage(GL_TEXTURE_3D, 0, it->second.format, it->second.type, outData);
+	glBindTexture(GL_TEXTURE_3D, 0);
 }
 
 ShaderHandle OpenGLBackend::CreateShader(const ShaderDesc &desc) {

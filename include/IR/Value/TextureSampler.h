@@ -28,6 +28,7 @@
 // Forward declaration
 namespace GPU::Runtime {
 template <PixelFormat Format> class Texture2D;
+template <PixelFormat Format> class Texture3D;
 }
 
 namespace GPU::IR::Value {
@@ -238,6 +239,104 @@ private:
  */
 template <Runtime::PixelFormat Format> using sampler2D = TextureSampler2D<Format>;
 
+/**
+ * 3D Texture sampler for fragment shader DSL access
+ * Uses texture() for sampling instead of imageLoad/imageStore
+ * @tparam Format The pixel format of the texture
+ */
+template <Runtime::PixelFormat Format> class TextureSampler3D {
+public:
+	using SampleType = typename Detail::TextureSamplerValueType<Format>::type;
+
+	TextureSampler3D(std::string textureName, uint32_t binding, uint32_t width, uint32_t height, uint32_t depth)
+		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height), _depth(depth) {
+		static_assert(
+			Detail::TextureSamplerValueType<Format>::supported,
+			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+	}
+
+	explicit TextureSampler3D(std::string textureName)
+		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0), _depth(0) {
+		static_assert(
+			Detail::TextureSamplerValueType<Format>::supported,
+			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+	}
+
+	[[nodiscard]] uint32_t GetBinding() const {
+		return _binding;
+	}
+	[[nodiscard]] const std::string &GetTextureName() const {
+		return _textureName;
+	}
+	[[nodiscard]] uint32_t GetTextureWidth() const {
+		return _width;
+	}
+	[[nodiscard]] uint32_t GetTextureHeight() const {
+		return _height;
+	}
+	[[nodiscard]] uint32_t GetTextureDepth() const {
+		return _depth;
+	}
+	static constexpr Runtime::PixelFormat GetFormat() {
+		return Format;
+	}
+
+public:
+	// Sample operations - texture(texture, vec3(uvw))
+	[[nodiscard]] Var<SampleType> Sample(const Var<GPU::Math::Vec3> &uvw) const {
+		std::string uvwStr = Builder::Builder::Get().BuildNode(*uvw.Load().get());
+		return MakeSampleVar(std::format("texture({}, {})", _textureName, uvwStr));
+	}
+
+	[[nodiscard]] Var<SampleType> Sample(const Expr<GPU::Math::Vec3> &uvw) const {
+		std::string uvwStr = Builder::Builder::Get().BuildNode(*uvw.Node());
+		return MakeSampleVar(std::format("texture({}, {})", _textureName, uvwStr));
+	}
+
+	[[nodiscard]] Var<SampleType> Sample(const GPU::Math::Vec3 &uvw) const {
+		return MakeSampleVar(std::format("texture({}, vec3({}, {}, {}))", _textureName, uvw.x, uvw.y, uvw.z));
+	}
+
+public:
+	// Size accessors - textureSize(texture, lod)
+	[[nodiscard]] Var<GPU::Math::Vec3> GetSize() const {
+		std::string code = std::format("vec3(textureSize({}, 0))", _textureName);
+		return Var<GPU::Math::Vec3>(code);
+	}
+
+	[[nodiscard]] Var<int> GetWidth() const {
+		std::string code = std::format("textureSize({}, 0).x", _textureName);
+		return Var<int>(code);
+	}
+
+	[[nodiscard]] Var<int> GetHeight() const {
+		std::string code = std::format("textureSize({}, 0).y", _textureName);
+		return Var<int>(code);
+	}
+
+	[[nodiscard]] Var<int> GetDepth() const {
+		std::string code = std::format("textureSize({}, 0).z", _textureName);
+		return Var<int>(code);
+	}
+
+private:
+	[[nodiscard]] Var<SampleType> MakeSampleVar(std::string code) const {
+		return Var<SampleType>(code);
+	}
+
+	std::string _textureName;
+	uint32_t    _binding;
+	uint32_t    _width;
+	uint32_t    _height;
+	uint32_t    _depth;
+};
+
+/**
+ * Type alias for convenience
+ */
+template <Runtime::PixelFormat Format> using sampler3D = TextureSampler3D<Format>;
+
+
 } // namespace GPU::IR::Value
 
 // Register TextureSampler2D as a valid ScalarType for Callable support
@@ -245,6 +344,11 @@ namespace GPU::Meta {
 template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureSampler2D<Format>> {
 	static constexpr bool		 isRegistered = true;
 	static constexpr const char *glslTypeName = "sampler2D";
+};
+
+template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureSampler3D<Format>> {
+	static constexpr bool		 isRegistered = true;
+	static constexpr const char *glslTypeName = "sampler3D";
 };
 } // namespace GPU::Meta
 

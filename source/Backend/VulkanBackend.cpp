@@ -1046,25 +1046,23 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	if (!_initialized) {
 		throw std::runtime_error("Vulkan backend not initialized");
 	}
-	if (desc.depth != 1) {
-		throw std::runtime_error("Vulkan backend currently supports only 2D textures (depth must be 1)");
-	}
 
 	VkFormat		  format	= GetVkFormat(desc.format);
+	bool				  is3D		= desc.depth > 1;
 
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType				= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType			= VK_IMAGE_TYPE_2D;
+	imageInfo.imageType			= is3D ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
 	imageInfo.extent.width		= desc.width;
 	imageInfo.extent.height		= desc.height;
-	imageInfo.extent.depth		= 1;
+	imageInfo.extent.depth		= desc.depth;
 	imageInfo.mipLevels			= 1;
 	imageInfo.arrayLayers		= 1;
 	imageInfo.format			= format;
 	imageInfo.tiling			= VK_IMAGE_TILING_OPTIMAL;
 	imageInfo.initialLayout		= VK_IMAGE_LAYOUT_UNDEFINED;
 	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-					  VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+						  VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageInfo.samples	  = VK_SAMPLE_COUNT_1_BIT;
 
@@ -1080,18 +1078,18 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 
 	// Create image view
 	VkImageViewCreateInfo viewInfo			 = {};
-	viewInfo.sType							 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewInfo.image							 = image;
-	viewInfo.viewType						 = VK_IMAGE_VIEW_TYPE_2D;
-	viewInfo.format							 = format;
+	viewInfo.sType								 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image								 = image;
+	viewInfo.viewType							 = is3D ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format								 = format;
 	viewInfo.subresourceRange.aspectMask	 = VK_IMAGE_ASPECT_COLOR_BIT;
 	viewInfo.subresourceRange.baseMipLevel	 = 0;
 	viewInfo.subresourceRange.levelCount	 = 1;
 	viewInfo.subresourceRange.baseArrayLayer = 0;
 	viewInfo.subresourceRange.layerCount	 = 1;
 
-	VkImageView view						 = nullptr;
-	result									 = vkCreateImageView(_device, &viewInfo, nullptr, &view);
+	VkImageView view							 = nullptr;
+	result											 = vkCreateImageView(_device, &viewInfo, nullptr, &view);
 	CheckVkResult(result, "vkCreateImageView");
 
 	TextureHandle handle = _nextTextureHandle++;
@@ -1101,7 +1099,7 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	info.view		   = view;
 	info.width		   = desc.width;
 	info.height		   = desc.height;
-	info.depth		   = 1;
+	info.depth		   = desc.depth;
 	info.format		   = desc.format;
 	info.vkFormat	   = format;
 	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1110,7 +1108,7 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 
 	// Upload initial data if provided
 	if (desc.initialData) {
-		UploadTextureInternal(_textures[handle], 0, 0, desc.width, desc.height, desc.initialData);
+		UploadTextureInternal(_textures[handle], 0, 0, 0, desc.width, desc.height, desc.depth, desc.initialData);
 	}
 
 	return handle;
@@ -1138,26 +1136,38 @@ void VulkanBackend::DestroyTexture(TextureHandle texture) {
 }
 
 void VulkanBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-								  const void *data) {
+											  const void *data) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	auto						it = _textures.find(texture);
+	auto							it = _textures.find(texture);
 	if (it == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 
-	UploadTextureInternal(it->second, x, y, width, height, data);
+	UploadTextureInternal(it->second, x, y, 0, width, height, 1, data);
 }
 
-void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-										  const void *data) {
-	if (data == nullptr && (width != 0 || height != 0)) {
+void VulkanBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+												uint32_t height, uint32_t depth, const void *data) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto							it = _textures.find(texture);
+	if (it == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+
+	UploadTextureInternal(it->second, x, y, z, width, height, depth, data);
+}
+
+void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+													  uint32_t height, uint32_t depth, const void *data) {
+	if (data == nullptr && (width != 0 || height != 0 || depth != 0)) {
 		throw std::runtime_error("UploadTexture received null data");
 	}
-	if (x + width > info.width || y + height > info.height) {
+	if (x + width > info.width || y + height > info.height || z + depth > info.depth) {
 		throw std::runtime_error("UploadTexture region exceeds texture bounds");
 	}
-	if (width == 0 || height == 0) {
+	if (width == 0 || height == 0 || depth == 0) {
 		return;
 	}
 
@@ -1211,7 +1221,7 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 		break;
 	}
 
-	size_t			   dataSize	   = width * height * pixelSize;
+	size_t			   dataSize	   = width * height * depth * pixelSize;
 
 	// Create staging buffer
 	VkBufferCreateInfo stagingInfo = {};
@@ -1226,7 +1236,7 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 
 	VkDeviceMemory stagingMemory = nullptr;
 	AllocateBufferMemory(stagingBuffer, stagingMemory,
-						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dataSize);
+							 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dataSize);
 
 	result = vkBindBufferMemory(_device, stagingBuffer, stagingMemory, 0);
 	CheckVkResult(result, "vkBindBufferMemory (staging)");
@@ -1241,7 +1251,7 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 	EnsureCommandBuffer();
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-					  VK_ACCESS_TRANSFER_WRITE_BIT);
+						  VK_ACCESS_TRANSFER_WRITE_BIT);
 
 	// Copy buffer to image
 	VkBufferImageCopy region			   = {};
@@ -1252,13 +1262,13 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 	region.imageSubresource.mipLevel	   = 0;
 	region.imageSubresource.baseArrayLayer = 0;
 	region.imageSubresource.layerCount	   = 1;
-	region.imageOffset					   = {static_cast<int32_t>(x), static_cast<int32_t>(y), 0};
-	region.imageExtent					   = {width, height, 1};
+	region.imageOffset					   = {static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
+	region.imageExtent					   = {width, height, depth};
 
 	vkCmdCopyBufferToImage(_commandBuffer, stagingBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	EndCommandBuffer();
 	SubmitCommandBuffer(true);
@@ -1269,20 +1279,38 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 }
 
 void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-									void *outData) {
+											void *outData) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	auto						it = _textures.find(texture);
+	auto							it = _textures.find(texture);
 	if (it == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
 	}
-	if (outData == nullptr && (width != 0 || height != 0)) {
+
+	DownloadTextureInternal(it->second, x, y, 0, width, height, 1, outData);
+}
+
+void VulkanBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+												  uint32_t height, uint32_t depth, void *outData) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto							it = _textures.find(texture);
+	if (it == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+
+	DownloadTextureInternal(it->second, x, y, z, width, height, depth, outData);
+}
+
+void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+														uint32_t height, uint32_t depth, void *outData) {
+	if (outData == nullptr && (width != 0 || height != 0 || depth != 0)) {
 		throw std::runtime_error("DownloadTexture received null output pointer");
 	}
-	if (x + width > it->second.width || y + height > it->second.height) {
+	if (x + width > info.width || y + height > info.height || z + depth > info.depth) {
 		throw std::runtime_error("DownloadTexture region exceeds texture bounds");
 	}
-	if (width == 0 || height == 0) {
+	if (width == 0 || height == 0 || depth == 0) {
 		return;
 	}
 
@@ -1294,7 +1322,7 @@ void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 
 	// Calculate data size
 	uint32_t pixelSize = 4;
-	switch (it->second.format) {
+	switch (info.format) {
 	case PixelFormat::R8:
 		pixelSize = 1;
 		break;
@@ -1342,7 +1370,7 @@ void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 		break;
 	}
 
-	size_t			   dataSize	   = width * height * pixelSize;
+	size_t			   dataSize	   = width * height * depth * pixelSize;
 
 	// Create staging buffer
 	VkBufferCreateInfo stagingInfo = {};
@@ -1357,15 +1385,15 @@ void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 
 	VkDeviceMemory stagingMemory = nullptr;
 	AllocateBufferMemory(stagingBuffer, stagingMemory,
-						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dataSize);
+							 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dataSize);
 
 	result = vkBindBufferMemory(_device, stagingBuffer, stagingMemory, 0);
 	CheckVkResult(result, "vkBindBufferMemory (staging)");
 
 	EnsureCommandBuffer();
 
-	TransitionTexture(it->second, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-					  VK_ACCESS_TRANSFER_READ_BIT);
+	TransitionTexture(info, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+						  VK_ACCESS_TRANSFER_READ_BIT);
 
 	// Copy image to buffer
 	VkBufferImageCopy region			   = {};
@@ -1376,14 +1404,14 @@ void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 	region.imageSubresource.mipLevel	   = 0;
 	region.imageSubresource.baseArrayLayer = 0;
 	region.imageSubresource.layerCount	   = 1;
-	region.imageOffset					   = {static_cast<int32_t>(x), static_cast<int32_t>(y), 0};
-	region.imageExtent					   = {width, height, 1};
+	region.imageOffset					   = {static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
+	region.imageExtent					   = {width, height, depth};
 
-	vkCmdCopyImageToBuffer(_commandBuffer, it->second.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1,
-						   &region);
+	vkCmdCopyImageToBuffer(_commandBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1,
+							   &region);
 
-	TransitionTexture(it->second, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	EndCommandBuffer();
 	SubmitCommandBuffer(true);

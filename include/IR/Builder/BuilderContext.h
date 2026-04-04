@@ -142,6 +142,9 @@ public:
 	 */
 	virtual void RegisterTexture(uint32_t binding, PixelFormat format, const std::string &textureName, uint32_t width,
 								 uint32_t height, bool sampled = false)								  = 0;
+	virtual void RegisterTexture3D(uint32_t binding, PixelFormat format, const std::string &textureName, uint32_t width,
+															   uint32_t height, uint32_t depth, bool sampled = false) {
+	}
 
 	/**
 	 * Get the texture declarations for GLSL

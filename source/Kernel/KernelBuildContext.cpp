@@ -266,31 +266,37 @@ uint32_t KernelBuildContext::AllocateTextureBinding() {
 
 void KernelBuildContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName,
 										 uint32_t width, uint32_t height, bool sampled) {
-	_textures.push_back({binding, format, textureName, width, height, sampled});
+	_textures.push_back({binding, format, textureName, width, height, 1, sampled});
+	_textureBindings.push_back(binding);
+}
+
+void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName,
+																   uint32_t width, uint32_t height, uint32_t depth, bool sampled) {
+	_textures.push_back({binding, format, textureName, width, height, depth, sampled});
 	_textureBindings.push_back(binding);
 }
 
 /**
  * Get the GLSL image type name based on pixel format
  */
-static std::string GetGLSLImageTypeName(Runtime::PixelFormat format) {
+static std::string GetGLSLImageTypeName(Runtime::PixelFormat format, bool is3D = false) {
 	using Runtime::PixelFormat;
 	switch (format) {
 	// Signed integer formats -> iimage2D
 	case PixelFormat::R32I:
 	case PixelFormat::RG32I:
 	case PixelFormat::RGBA32I:
-		return "iimage2D";
+		return is3D ? "iimage3D" : "iimage2D";
 
 	// Unsigned integer formats -> uimage2D
 	case PixelFormat::R32UI:
 	case PixelFormat::RG32UI:
 	case PixelFormat::RGBA32UI:
-		return "uimage2D";
+		return is3D ? "uimage3D" : "uimage2D";
 
 	// Float and normalized formats -> image2D
 	default:
-		return "image2D";
+		return is3D ? "image3D" : "image2D";
 	}
 }
 
@@ -298,7 +304,11 @@ std::string KernelBuildContext::GetTextureDeclarations() const {
 	std::ostringstream oss;
 	for (const auto &tex : _textures) {
 		if (tex.sampled) {
-			const std::string samplerType = GetGLSLSamplerType(tex.format);
+			std::string samplerType = GetGLSLSamplerType(tex.format);
+			if (tex.depth > 1) {
+				// Replace 2D with 3D in sampler type (e.g. sampler2D -> sampler3D)
+				samplerType = samplerType.substr(0, samplerType.size() - 2) + "3D";
+			}
 #if defined(EASYGPU_BACKEND_VULKAN)
 			oss << std::format("layout(set=0, binding={}) uniform {} {};\n", tex.binding, samplerType, tex.textureName);
 #else
@@ -308,7 +318,7 @@ std::string KernelBuildContext::GetTextureDeclarations() const {
 		}
 
 		std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
-		std::string imageType		= GetGLSLImageTypeName(tex.format);
+		std::string imageType		= GetGLSLImageTypeName(tex.format, tex.depth > 1);
 #if defined(EASYGPU_BACKEND_VULKAN)
 		oss << std::format("layout(set=0, {}, binding={}) uniform {} {};\n", formatQualifier, tex.binding, imageType,
 						   tex.textureName);
@@ -482,8 +492,13 @@ void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
 
 	uint32_t	width = 0, height = 0;
 	slot->GetDimensions(width, height);
+	uint32_t	depth = slot->GetDepth();
 
-	RegisterTexture(binding, slot->GetFormat(), textureName, width, height, slot->UsesSamplerBinding());
+	if (depth > 1) {
+		RegisterTexture3D(binding, slot->GetFormat(), textureName, width, height, depth, slot->UsesSamplerBinding());
+	} else {
+		RegisterTexture(binding, slot->GetFormat(), textureName, width, height, slot->UsesSamplerBinding());
+	}
 	slot->SetBindingInfo(static_cast<int>(binding), textureName);
 	_textureSlots.push_back(slot);
 }

@@ -21,6 +21,7 @@ namespace GPU::Runtime {
 
 // Forward declaration
 template <PixelFormat Format> class Texture2D;
+template <PixelFormat Format> class Texture3D;
 
 // Forward declaration for friend access
 class KernelBuildContext;
@@ -57,6 +58,7 @@ public:
 	 * @param[out] height The texture height
 	 */
 	virtual void				   GetDimensions(uint32_t &width, uint32_t &height) const = 0;
+	virtual uint32_t		   GetDepth() const { return 1; }
 
 	/**
 	 * Get the binding slot assigned by KernelBuildContext
@@ -239,6 +241,99 @@ private:
 	Texture2D<Format> *_texture = nullptr; // Currently attached texture
 
 	// Grant KernelBuildContext access to protected members
+	friend class KernelBuildContext;
+};
+
+/**
+ * 3D Texture slot for dynamic texture switching at runtime
+ * @tparam Format The pixel format of the texture
+ */
+template <PixelFormat Format> class Texture3DSlot : public TextureSlotBase {
+public:
+	Texture3DSlot() = default;
+	~Texture3DSlot() override = default;
+
+	Texture3DSlot(const Texture3DSlot &) = delete;
+	Texture3DSlot &operator=(const Texture3DSlot &) = delete;
+	Texture3DSlot(Texture3DSlot &&) noexcept = default;
+	Texture3DSlot &operator=(Texture3DSlot &&) noexcept = default;
+
+public:
+	// ===================================================================
+	// Runtime API - Called outside kernel definition
+	// ===================================================================
+
+	void Attach(Texture3D<Format> &texture) {
+		_texture = &texture;
+	}
+
+	void Detach() {
+		_texture = nullptr;
+	}
+
+	bool IsAttached() const override {
+		return _texture != nullptr;
+	}
+
+	Texture3D<Format> *GetAttached() const {
+		return _texture;
+	}
+
+	Backend::TextureHandle GetHandle() const override {
+		return _texture ? _texture->GetHandle() : Backend::INVALID_TEXTURE_HANDLE;
+	}
+
+	PixelFormat GetFormat() const override {
+		return Format;
+	}
+
+	void GetDimensions(uint32_t &width, uint32_t &height) const override {
+		if (_texture) {
+			width = _texture->GetWidth();
+			height = _texture->GetHeight();
+		} else {
+			width = height = 0;
+		}
+	}
+
+	uint32_t GetDepth() const override {
+		return _texture ? _texture->GetDepth() : 1;
+	}
+
+public:
+	// ===================================================================
+	// DSL API - Called inside kernel definition
+	// ===================================================================
+
+	[[nodiscard]] IR::Value::TextureRef3D<Format> Bind() {
+		auto *context = IR::Builder::Builder::Get().Context();
+		if (!context) {
+			throw std::runtime_error("Texture3DSlot::Bind() called outside of Kernel definition");
+		}
+
+		_sampledBinding = false;
+		context->RegisterTextureSlot(this);
+		uint32_t width = 0, height = 0;
+		GetDimensions(width, height);
+		return IR::Value::TextureRef3D<Format>(_name, static_cast<uint32_t>(_binding), width, height, GetDepth());
+	}
+
+	[[nodiscard]] IR::Value::TextureSampler3D<Format> BindSampler() {
+		auto *context = IR::Builder::Builder::Get().Context();
+		if (!context) {
+			throw std::runtime_error("Texture3DSlot::BindSampler() called outside of Kernel definition");
+		}
+
+		_sampledBinding = true;
+		context->RegisterTextureSlot(this);
+		uint32_t width = 0, height = 0;
+		GetDimensions(width, height);
+		return IR::Value::TextureSampler3D<Format>(_name, static_cast<uint32_t>(_binding), width, height, GetDepth());
+	}
+
+private:
+	Texture3D<Format> *_texture = nullptr;
+
 	friend class KernelBuildContext;
 };
 

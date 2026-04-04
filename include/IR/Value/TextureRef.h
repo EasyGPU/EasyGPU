@@ -27,6 +27,7 @@
 // Forward declaration
 namespace GPU::Runtime {
 template <PixelFormat Format> class Texture2D;
+template <PixelFormat Format> class Texture3D;
 }
 
 namespace GPU::IR::Value {
@@ -448,6 +449,104 @@ private:
  */
 template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 
+/**
+ * 3D Texture reference class for DSL access
+ * @tparam Format The pixel format of the texture
+ *
+ * Usage:
+ *   auto vol = texture3d.Bind();
+ *   Var<Vec4> color = vol.Read(x, y, z);        // Read
+ *   vol.Write(x, y, z, Vec4(1.0f, 0.0f, 0.0f, 1.0f));  // Write
+ */
+template <Runtime::PixelFormat Format> class TextureRef3D {
+public:
+	TextureRef3D(std::string textureName, uint32_t binding, uint32_t width, uint32_t height, uint32_t depth)
+		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height), _depth(depth) {
+	}
+
+	explicit TextureRef3D(std::string textureName)
+		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0), _depth(0) {
+	}
+
+	[[nodiscard]] uint32_t GetBinding() const {
+		return _binding;
+	}
+	[[nodiscard]] const std::string &GetTextureName() const {
+		return _textureName;
+	}
+	[[nodiscard]] uint32_t GetWidth() const {
+		return _width;
+	}
+	[[nodiscard]] uint32_t GetHeight() const {
+		return _height;
+	}
+	[[nodiscard]] uint32_t GetDepth() const {
+		return _depth;
+	}
+	static constexpr Runtime::PixelFormat GetFormat() {
+		return Format;
+	}
+
+public:
+	// Read operations - imageLoad(texture, ivec3(x, y, z))
+	[[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Var<int> &y, const Var<int> &z) const {
+		std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
+		std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
+		std::string zStr = Builder::Builder::Get().BuildNode(*z.Load().get());
+		std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, xStr, yStr, zStr);
+		return Var<GPU::Math::Vec4>(code);
+	}
+
+	[[nodiscard]] Var<GPU::Math::Vec4> Read(int x, int y, int z) const {
+		std::string code = std::format("imageLoad({}, ivec3({}, {}, {}))", _textureName, x, y, z);
+		return Var<GPU::Math::Vec4>(code);
+	}
+
+	// Write operations - imageStore(texture, ivec3(x, y, z), value)
+	void Write(const Var<int> &x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
+		std::string xStr     = Builder::Builder::Get().BuildNode(*x.Load().get());
+		std::string yStr     = Builder::Builder::Get().BuildNode(*y.Load().get());
+		std::string zStr     = Builder::Builder::Get().BuildNode(*z.Load().get());
+		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(code);
+	}
+
+	void Write(int x, int y, int z, const Var<GPU::Math::Vec4> &color) {
+		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(code);
+	}
+
+	void Write(const Var<int> &x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::IVec4> &color) {
+		std::string xStr     = Builder::Builder::Get().BuildNode(*x.Load().get());
+		std::string yStr     = Builder::Builder::Get().BuildNode(*y.Load().get());
+		std::string zStr     = Builder::Builder::Get().BuildNode(*z.Load().get());
+		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(code);
+	}
+
+	void Write(int x, int y, int z, const Var<GPU::Math::IVec4> &color) {
+		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
+		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
+		Builder::Builder::Get().Context()->PushTranslatedCode(code);
+	}
+
+private:
+	std::string _textureName;
+	uint32_t    _binding;
+	uint32_t    _width;
+	uint32_t    _height;
+	uint32_t    _depth;
+};
+
+/**
+ * Type alias for convenience
+ */
+template <Runtime::PixelFormat Format> using image3d = TextureRef3D<Format>;
+
+
 } // namespace GPU::IR::Value
 
 // Register TextureRef as a valid ScalarType for Callable support
@@ -455,6 +554,11 @@ namespace GPU::Meta {
 template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureRef<Format>> {
 	static constexpr bool		 isRegistered = true;
 	static constexpr const char *glslTypeName = "image2D";
+};
+
+template <Runtime::PixelFormat Format> struct StructMeta<IR::Value::TextureRef3D<Format>> {
+	static constexpr bool		 isRegistered = true;
+	static constexpr const char *glslTypeName = "image3D";
 };
 } // namespace GPU::Meta
 

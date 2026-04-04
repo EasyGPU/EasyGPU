@@ -53,6 +53,7 @@ public:
 		std::string			 textureName;
 		uint32_t			 width;
 		uint32_t			 height;
+		uint32_t			 depth = 1;
 		bool				 sampled = false;
 	};
 
@@ -188,6 +189,8 @@ public:
 
 	void										  RegisterBufferSlot(Runtime::BufferSlotBase *slot) override;
 	void										  RegisterTextureSlot(Runtime::TextureSlotBase *slot) override;
+	void RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName, uint32_t width,
+															   uint32_t height, uint32_t depth, bool sampled = false) override;
 
 	const std::vector<Runtime::BufferSlotBase *> &GetBufferSlots() const {
 		return _bufferSlots;
