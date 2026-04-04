@@ -864,7 +864,7 @@ Kernel1D sort_neighbors([](Int i) {
 // Stack for DFS on small graphs
 Kernel1D dfs_local([](Int i) {
     VarArray<int, 32> stack;  // Fixed-size stack
-    Var<int> stackPtr = MakeInt(0);
+    Int stackPtr = MakeInt(0);
     
     // Push start node
     stack[stackPtr] = MakeInt(i);

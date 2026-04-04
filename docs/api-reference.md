@@ -2203,7 +2203,7 @@ shared.GetSize()        // Returns N (compile-time constant)
 ```cpp
 Kernel1D kernel([](Int i) {
     SharedMemory<float, 256> shared;
-    Var<int> localId = LocalThreadId();  // Clean API!
+    Int localId = LocalThreadId();  // Clean API!
     
     // Write to shared memory
     shared[localId] = input[i];
@@ -2326,7 +2326,7 @@ Kernel1D reduce([](Int i) {
     Expr<float> sum = WorkgroupReduce(shared, myValue);
     
     // Only thread 0 writes result
-    Var<int> localId = LocalThreadId();
+    Int localId = LocalThreadId();
     If(localId == 0, [&]() {
         output[WorkgroupId()] = sum;
     });
@@ -2412,7 +2412,7 @@ public:
 ```cpp
 Kernel1D kernel([](Int i) {
     SharedMemory<float, 256> shared;
-    Var<int> localId = LocalThreadId();
+    Int localId = LocalThreadId();
     
     // Write to shared memory
     shared[localId] = input[i];
@@ -2489,8 +2489,8 @@ Kernel2D kernel([](Int x, Int y) {
     
     // Get 2D local thread ID
     auto localId = LocalThreadId2D();
-    Var<int> localX = localId.x();
-    Var<int> localY = localId.y();
+    Int localX = localId.x();
+    Int localY = localId.y();
     
     // Flatten to 1D index
     Int localIdx = localY * 16 + localX;

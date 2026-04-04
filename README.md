@@ -228,7 +228,7 @@ Kernel1D reduce([](Int i) {
     Expr<float> sum = WorkgroupReduce(shared, myValue);
     
     // Thread 0 writes result
-    Var<int> localId = LocalThreadId();
+    Int localId = LocalThreadId();
     If(localId == 0, [&]() {
         output[WorkgroupId()] = sum;
     });

@@ -20,7 +20,7 @@ void test_shared_memory_basic() {
 		SharedMemory<float, 256> shared;
 		
 		// Get local thread ID
-		Var<int> localId = LocalThreadId();
+		Int localId = LocalThreadId();
 		
 		// Store value to shared memory
 		shared[localId] = MakeFloat(1.0f);
@@ -100,7 +100,7 @@ void test_atomic_shared_memory() {
 	
 	InspectorKernel1D inspector([](Int i) {
 		SharedMemory<int, 256> shared;
-		Var<int> localId = LocalThreadId();
+		Int localId = LocalThreadId();
 		
 		// Initialize
 		shared[localId] = MakeInt(0);
@@ -143,7 +143,7 @@ void test_workgroup_reduce() {
 		Buffer<float> output(1);
 		auto out = output.Bind();
 		
-		Var<int> localId = LocalThreadId();
+		Int localId = LocalThreadId();
 		If(localId == 0, [&]() {
 			out[0] = result;
 		});
@@ -190,7 +190,7 @@ void test_workgroup_scan() {
 		Buffer<float> output(256);
 		auto out = output.Bind();
 		
-		Var<int> localId = LocalThreadId();
+		Int localId = LocalThreadId();
 		out[localId] = result;
 	});
 	
@@ -265,7 +265,7 @@ void test_reduction_execution() {
 		
 		// Store result (only thread 0)
 		auto out = output.Bind();
-		Var<int> localId = LocalThreadId();
+		Int localId = LocalThreadId();
 		If(localId == 0, [&]() {
 			out[0] = result;
 		});

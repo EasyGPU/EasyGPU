@@ -33,7 +33,7 @@ Shared memory provides **fast, workgroup-local storage** that is accessible to a
 SharedMemory<float, 256> shared;
 
 // Each thread writes to shared memory
-Var<int> localId = LocalThreadId();  // Get local thread ID (0-255)
+Int localId = LocalThreadId();  // Get local thread ID (0-255)
 shared[localId] = inputValue;
 
 // Synchronize before reading other threads' data
@@ -183,7 +183,7 @@ Kernel1D reduceKernel([&](Int i) {
     // workgroupSum is valid in ALL threads (not just thread 0)
     
     // Typically only thread 0 writes the result
-    Var<int> localId = LocalThreadId();
+    Int localId = LocalThreadId();
     If(localId == 0, [&]() {
         result[WorkgroupId()] = workgroupSum;
     });
@@ -214,7 +214,7 @@ Kernel1D scanKernel([&](Int i) {
     auto in = input.Bind();
     auto out = output.Bind();
     
-    Var<int> lid = LocalThreadId();
+    Int lid = LocalThreadId();
     
     // Inclusive scan: result[i] = sum(in[0]..in[i])
     Var<float> scanned = WorkgroupScanInclusive(shared, in[lid]);
@@ -243,7 +243,7 @@ Kernel1D exclusiveScanKernel([&](Int i) {
     auto in = input.Bind();
     auto out = output.Bind();
     
-    Var<int> lid = LocalThreadId();
+    Int lid = LocalThreadId();
     
     // Exclusive scan: result[i] = sum(in[0]..in[i-1]), result[0] = identity
     Var<float> scanned = WorkgroupScanExclusive(shared, in[lid], 0.0f);
@@ -273,7 +273,7 @@ Kernel1D computeOffsets([&](Int i) {
     SharedMemory<int, 256> shared;
     
     // Exclusive scan gives starting position for each thread
-    Var<int> offset = WorkgroupScanExclusive(shared, counts[i], 0);
+    Int offset = WorkgroupScanExclusive(shared, counts[i], 0);
     offsets[i] = offset;
 });
 ```
@@ -382,8 +382,8 @@ Kernel2D transpose([](Int x, Int y) {
     auto out = output.Bind();
     
     auto localId = LocalThreadId2D();
-    Var<int> localX = localId.x();
-    Var<int> localY = localId.y();
+    Int localX = localId.x();
+    Int localY = localId.y();
     
     // Coalesced read from global memory
     tile[localY * TILE_SIZE + localX] = in[y * width + x];
@@ -392,8 +392,8 @@ Kernel2D transpose([](Int x, Int y) {
     
     // Write transposed
     auto wgId = WorkgroupId2D();
-    Var<int> globalX = wgId.x() * TILE_SIZE + localY;
-    Var<int> globalY = wgId.y() * TILE_SIZE + localX;
+    Int globalX = wgId.x() * TILE_SIZE + localY;
+    Int globalY = wgId.y() * TILE_SIZE + localX;
     out[globalY * height + globalX] = tile[localX * TILE_SIZE + localY];
 }, TILE_SIZE, TILE_SIZE);
 ```
@@ -406,8 +406,8 @@ Kernel1D fastHistogram([](Int i) {
     auto in = input.Bind();
     auto globalHist = histogram.Bind();
     
-    Var<int> lid = LocalThreadId();
-    Var<int> wgId = WorkgroupId();
+    Int lid = LocalThreadId();
+    Int wgId = WorkgroupId();
     
     // Shared memory for local histogram
     SharedMemory<int, 256> localHist;
@@ -442,8 +442,8 @@ Kernel1D localScan([](Int i) {
     auto out = partialSums.Bind();
     auto blockSums = blockTotals.Bind();
     
-    Var<int> lid = LocalThreadId();
-    Var<int> wgId = WorkgroupId();
+    Int lid = LocalThreadId();
+    Int wgId = WorkgroupId();
     
     // Load and scan within workgroup
     Var<float> scanned = WorkgroupScanInclusive(shared, in[i]);
