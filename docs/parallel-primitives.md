@@ -183,9 +183,9 @@ Kernel1D reduceKernel([&](Int i) {
     // workgroupSum is valid in ALL threads (not just thread 0)
     
     // Typically only thread 0 writes the result
-    Var<int> localId = Var<int>("(int(gl_LocalInvocationID.x))");
+    Var<int> localId = LocalThreadId();
     If(localId == 0, [&]() {
-        result[workgroupId] = workgroupSum;
+        result[WorkgroupId()] = workgroupSum;
     });
 }, 256);  // Workgroup size must match SharedMemory size
 ```
@@ -214,13 +214,13 @@ Kernel1D scanKernel([&](Int i) {
     auto in = input.Bind();
     auto out = output.Bind();
     
-    Var<int> localId = Var<int>("(int(gl_LocalInvocationID.x))");
+    Var<int> lid = LocalThreadId();
     
     // Inclusive scan: result[i] = sum(in[0]..in[i])
-    Var<float> scanned = WorkgroupScanInclusive(shared, in[localId]);
+    Var<float> scanned = WorkgroupScanInclusive(shared, in[lid]);
     
     // Each thread gets its prefix sum
-    out[globalId] = scanned;
+    out[i] = scanned;
 }, 256);
 ```
 
@@ -243,12 +243,12 @@ Kernel1D exclusiveScanKernel([&](Int i) {
     auto in = input.Bind();
     auto out = output.Bind();
     
-    Var<int> localId = Var<int>("(int(gl_LocalInvocationID.x))");
+    Var<int> lid = LocalThreadId();
     
     // Exclusive scan: result[i] = sum(in[0]..in[i-1]), result[0] = identity
-    Var<float> scanned = WorkgroupScanExclusive(shared, in[localId], 0.0f);
+    Var<float> scanned = WorkgroupScanExclusive(shared, in[lid], 0.0f);
     
-    out[globalId] = scanned;
+    out[i] = scanned;
 }, 256);
 ```
 
@@ -381,8 +381,9 @@ Kernel2D transpose([](Int x, Int y) {
     auto in = input.Bind();
     auto out = output.Bind();
     
-    Var<int> localX = Var<int>("(int(gl_LocalInvocationID.x))");
-    Var<int> localY = Var<int>("(int(gl_LocalInvocationID.y))");
+    auto localId = LocalThreadId2D();
+    Var<int> localX = localId.x();
+    Var<int> localY = localId.y();
     
     // Coalesced read from global memory
     tile[localY * TILE_SIZE + localX] = in[y * width + x];
@@ -390,8 +391,9 @@ Kernel2D transpose([](Int x, Int y) {
     Kernel2D::WorkgroupBarrier();
     
     // Write transposed
-    Var<int> globalX = Var<int>("(int(gl_WorkGroupID.x))") * TILE_SIZE + localY;
-    Var<int> globalY = Var<int>("(int(gl_WorkGroupID.y))") * TILE_SIZE + localX;
+    auto wgId = WorkgroupId2D();
+    Var<int> globalX = wgId.x() * TILE_SIZE + localY;
+    Var<int> globalY = wgId.y() * TILE_SIZE + localX;
     out[globalY * height + globalX] = tile[localX * TILE_SIZE + localY];
 }, TILE_SIZE, TILE_SIZE);
 ```
@@ -404,14 +406,14 @@ Kernel1D fastHistogram([](Int i) {
     auto in = input.Bind();
     auto globalHist = histogram.Bind();
     
-    Var<int> localId = Var<int>("(int(gl_LocalInvocationID.x))");
-    Var<int> workgroupId = WorkgroupId();
+    Var<int> lid = LocalThreadId();
+    Var<int> wgId = WorkgroupId();
     
     // Shared memory for local histogram
     SharedMemory<int, 256> localHist;
     
     // Initialize local histogram
-    localHist[localId] = MakeInt(0);
+    localHist[lid] = MakeInt(0);
     Kernel1D::WorkgroupBarrier();
     
     // Each thread processes multiple elements
@@ -423,8 +425,8 @@ Kernel1D fastHistogram([](Int i) {
     Kernel1D::WorkgroupBarrier();
     
     // Add local histogram to global (one thread per bin)
-    If(localId < 256, [&]() {
-        Int bin = localId;
+    If(lid < 256, [&]() {
+        Int bin = lid;
         ExprBase::NotUse(AtomicAdd(globalHist[bin], localHist[bin]));
     });
 }, 256);
@@ -440,16 +442,16 @@ Kernel1D localScan([](Int i) {
     auto out = partialSums.Bind();
     auto blockSums = blockTotals.Bind();
     
-    Var<int> localId = Var<int>("(int(gl_LocalInvocationID.x))");
-    Var<int> workgroupId = WorkgroupId();
+    Var<int> lid = LocalThreadId();
+    Var<int> wgId = WorkgroupId();
     
     // Load and scan within workgroup
     Var<float> scanned = WorkgroupScanInclusive(shared, in[i]);
     out[i] = scanned;
     
-    // Thread 0 writes block sum
-    If(localId == 255, [&]() {
-        blockSums[workgroupId] = scanned;
+    // Last thread writes block sum
+    If(lid == 255, [&]() {
+        blockSums[wgId] = scanned;
     });
 }, 256);
 

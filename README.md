@@ -228,9 +228,9 @@ Kernel1D reduce([](Int i) {
     Expr<float> sum = WorkgroupReduce(shared, myValue);
     
     // Thread 0 writes result
-    Var<int> localId = Var<int>("(int(gl_LocalInvocationID.x))");
+    Var<int> localId = LocalThreadId();
     If(localId == 0, [&]() {
-        output[workgroupId] = sum;
+        output[WorkgroupId()] = sum;
     });
 }, 256);
 ```
