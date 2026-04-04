@@ -212,6 +212,49 @@ For(0, 100, [&](Int& i) {
 });
 ```
 
+### Shared Memory & Atomics
+
+High-performance workgroup-level cooperation with shared memory and atomic operations:
+
+```cpp
+// Parallel reduction using shared memory
+SharedMemory<float, 256> shared;
+
+Kernel1D reduce([](Int i) {
+    // Each thread contributes one value
+    Expr<float> myValue = input[i];
+    
+    // Reduce across all threads in workgroup
+    Expr<float> sum = WorkgroupReduce(shared, myValue);
+    
+    // Thread 0 writes result
+    Var<int> localId = Var<int>("(int(gl_LocalInvocationID.x))");
+    If(localId == 0, [&]() {
+        output[workgroupId] = sum;
+    });
+}, 256);
+```
+
+Atomic operations for thread-safe counters and histograms:
+
+```cpp
+Kernel1D histogram([](Int i) {
+    auto hist = histogram.Bind();
+    Int bin = ComputeBin(input[i]);
+    
+    // Atomic increment
+    ExprBase::NotUse(AtomicAdd(hist[bin], MakeInt(1)));
+});
+```
+
+**Features:**
+- **SharedMemory** — Fast workgroup-local storage (~1-10 cycles vs ~100s for global memory)
+- **Atomic Operations** — AtomicAdd, AtomicMin, AtomicMax, AtomicAnd, AtomicOr, AtomicXor, AtomicExchange, AtomicCompSwap
+- **Parallel Primitives** — WorkgroupReduce, WorkgroupScanInclusive, WorkgroupScanExclusive
+- **Barriers** — WorkgroupBarrier, MemoryBarrier, FullBarrier for synchronization
+
+See [Parallel Primitives Guide](docs/parallel-primitives.md) for detailed documentation.
+
 ### Memory Management
 
 Automatic buffer alignment and struct layout:
@@ -504,6 +547,17 @@ g++ -std=c++20 hello_gpu.cpp -lEasyGPU -lGL -o hello_gpu
 | Intermediate | [julia_set](examples/julia_set/main.cpp) | Complex numbers |
 | Intermediate | [ray_tracing](examples/ray_tracing/main.cpp) | Structs, RNG, basic ray tracing |
 | Advanced | [sdf_renderer](examples/sdf_renderer/main.cpp) | Callables, SDF, path tracing |
+| Advanced | [parallel_reduction](examples/parallel_reduction/main.cpp) | Shared memory, parallel reduce |
+| Advanced | [histogram](examples/histogram/main.cpp) | Atomic operations, shared memory |
+
+### Parallel Primitives Examples
+
+| Level | Example | Topics |
+|:------|:--------|:-------|
+| Intermediate | [workgroup_reduce](examples/workgroup_reduce/main.cpp) | WorkgroupReduce, sum/max |
+| Intermediate | [prefix_sum](examples/prefix_sum/main.cpp) | WorkgroupScanInclusive, WorkgroupScanExclusive |
+| Advanced | [matrix_transpose](examples/matrix_transpose/main.cpp) | Shared memory tiling |
+| Advanced | [parallel_sort](examples/parallel_sort/main.cpp) | Bitonic sort with shared memory |
 
 ### Window Examples
 

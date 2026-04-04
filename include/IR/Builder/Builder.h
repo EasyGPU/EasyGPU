@@ -31,6 +31,8 @@
 #include <IR/Node/Operation.h>
 #include <IR/Node/RawCode.h>
 #include <IR/Node/Return.h>
+#include <IR/Node/SharedMemory.h>
+#include <IR/Node/AtomicOp.h>
 #include <IR/Node/Store.h>
 #include <IR/Node/Ternary.h>
 #include <IR/Node/While.h>
@@ -217,6 +219,20 @@ public:
 	 * @return The built string
 	 */
 	std::string BuildTernary(const Node::TernaryNode &Node);
+
+	/**
+	 * Building a shared memory node
+	 * @param Node The node to be built
+	 * @return The built string
+	 */
+	std::string BuildSharedMemory(const Node::SharedMemoryNode &Node);
+
+	/**
+	 * Building an atomic operation node
+	 * @param Node The node to be built
+	 * @return The built string
+	 */
+	std::string BuildAtomicOp(const Node::AtomicOpNode &Node);
 
 private:
 	Builder() = default;

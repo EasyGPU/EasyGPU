@@ -1,7 +1,7 @@
 /**
  * TestArray.cpp:
  *      @Description    :   Test for GPU VarArray functionality
- *      @Author         :   EasyGPU Team
+ *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
  *      @Date           :   2026
  */
 #include <array>

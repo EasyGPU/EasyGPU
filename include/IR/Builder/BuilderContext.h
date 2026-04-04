@@ -194,6 +194,28 @@ public:
 
 public:
 	// ===================================================================
+	// Shared Memory Support
+	// ===================================================================
+
+	/**
+	 * Push a shared memory declaration to the context
+	 * Shared memory is declared at global scope in GLSL (outside main)
+	 * @param declaration The shared memory declaration string (e.g., "shared float data[256];")
+	 */
+	virtual void PushSharedMemoryDeclaration(const std::string &declaration) {
+		// Default implementation does nothing - subclasses should override
+	}
+
+	/**
+	 * Get all shared memory declarations
+	 * @return Vector of shared memory declarations
+	 */
+	virtual std::vector<std::string> GetSharedMemoryDeclarations() const {
+		return {};
+	}
+
+public:
+	// ===================================================================
 	// Callable Function Support
 	// ===================================================================
 

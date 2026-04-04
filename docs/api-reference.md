@@ -39,6 +39,10 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 - [Structs](#structs)
 - [Textures](#textures)
 - [Texture Samplers](#texture-samplers)
+- [Shared Memory](#shared-memory)
+- [Atomic Operations](#atomic-operations)
+- [Parallel Primitives](#parallel-primitives)
+- [Thread Index Utilities](#thread-index-utilities)
 - [PBO Async Transfer](#pbo-async-transfer)
 - [OpenGL State Cache](#opengl-state-cache)
 
@@ -2169,3 +2173,349 @@ State caching provides significant performance benefits:
 | Multi-pass rendering | Re-bind everything | Bind only changes | **4-8x** |
 
 **Best Practice:** Avoid interleaving raw OpenGL with EasyGPU operations. Group raw GL operations and wrap with `Invalidate()` or use a separate context.
+
+---
+
+## Shared Memory
+
+Workgroup-local memory for fast thread cooperation.
+
+### SharedMemory<T, N>
+
+```cpp
+template <ScalarType Type, int N>
+class SharedMemory;
+```
+
+**Declaration:**
+```cpp
+SharedMemory<float, 256> shared;  // 256 floats per workgroup
+```
+
+**Element Access:**
+```cpp
+shared[index]           // index: Var<int>, Expr<int>, or int
+shared.GetName()        // Returns GLSL variable name
+shared.GetSize()        // Returns N (compile-time constant)
+```
+
+**Usage:**
+```cpp
+Kernel1D kernel([](Int i) {
+    SharedMemory<float, 256> shared;
+    Var<int> localId = LocalThreadId();  // Clean API!
+    
+    // Write to shared memory
+    shared[localId] = input[i];
+    
+    // Synchronize before reading
+    Kernel1D::WorkgroupBarrier();
+    
+    // Read from other threads
+    float neighbor = shared[(localId + 1) % 256];
+});
+```
+
+**Generated GLSL:**
+```glsl
+shared float v1[256];
+```
+
+---
+
+## Atomic Operations
+
+Read-modify-write operations with guaranteed atomicity.
+
+### Integer Atomics
+
+```cpp
+// Add - returns old value
+[[nodiscard]] Expr<int> AtomicAdd(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicAdd(const Expr<int>& target, int value);
+
+// Subtract (GLSL 4.6+)
+[[nodiscard]] Expr<int> AtomicSub(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicSub(const Expr<int>& target, int value);
+
+// Min/Max
+[[nodiscard]] Expr<int> AtomicMin(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicMin(const Expr<int>& target, int value);
+[[nodiscard]] Expr<int> AtomicMax(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicMax(const Expr<int>& target, int value);
+
+// Bitwise
+[[nodiscard]] Expr<int> AtomicAnd(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicAnd(const Expr<int>& target, int value);
+[[nodiscard]] Expr<int> AtomicOr(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicOr(const Expr<int>& target, int value);
+[[nodiscard]] Expr<int> AtomicXor(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicXor(const Expr<int>& target, int value);
+
+// Exchange and Compare-And-Swap
+[[nodiscard]] Expr<int> AtomicExchange(const Expr<int>& target, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicExchange(const Expr<int>& target, int value);
+[[nodiscard]] Expr<int> AtomicCompSwap(const Expr<int>& target, const Expr<int>& compare, const Expr<int>& value);
+[[nodiscard]] Expr<int> AtomicCompSwap(const Expr<int>& target, int compare, int value);
+```
+
+### Floating-Point Atomics
+
+```cpp
+// Note: float atomics have limited hardware support
+[[nodiscard]] Expr<float> AtomicAdd(const Expr<float>& target, const Expr<float>& value);
+[[nodiscard]] Expr<float> AtomicAdd(const Expr<float>& target, float value);
+[[nodiscard]] Expr<float> AtomicMin(const Expr<float>& target, const Expr<float>& value);
+[[nodiscard]] Expr<float> AtomicMin(const Expr<float>& target, float value);
+[[nodiscard]] Expr<float> AtomicMax(const Expr<float>& target, const Expr<float>& value);
+[[nodiscard]] Expr<float> AtomicMax(const Expr<float>& target, float value);
+[[nodiscard]] Expr<float> AtomicExchange(const Expr<float>& target, const Expr<float>& value);
+[[nodiscard]] Expr<float> AtomicExchange(const Expr<float>& target, float value);
+```
+
+**Usage:**
+```cpp
+Kernel1D histogram([](Int i) {
+    auto data = input.Bind();
+    auto hist = histogram.Bind();
+    
+    Int bin = data[i];
+    ExprBase::NotUse(AtomicAdd(hist[bin], MakeInt(1)));
+});
+```
+
+---
+
+## Parallel Primitives
+
+Built-in parallel algorithms using shared memory.
+
+### WorkgroupReduce
+
+Reduce values across all threads in a workgroup.
+
+```cpp
+// With custom operation
+template <typename T, int N, typename Op>
+[[nodiscard]] Expr<T> WorkgroupReduce(SharedMemory<T, N>& shared, const Expr<T>& value, Op op);
+
+// Default: Add operation
+template <typename T, int N>
+[[nodiscard]] Expr<T> WorkgroupReduce(SharedMemory<T, N>& shared, const Expr<T>& value);
+```
+
+**Operations:**
+```cpp
+Parallel::AddOp   // a + b
+Parallel::MulOp   // a * b
+Parallel::MinOp   // min(a, b)
+Parallel::MaxOp   // max(a, b)
+```
+
+**Example:**
+```cpp
+SharedMemory<float, 256> shared;
+
+Kernel1D reduce([](Int i) {
+    SharedMemory<float, 256> shared;
+    
+    // Each thread contributes a value
+    Expr<float> myValue = input[i];
+    
+    // Get sum of all values in workgroup
+    Expr<float> sum = WorkgroupReduce(shared, myValue);
+    
+    // Only thread 0 writes result
+    Var<int> localId = LocalThreadId();
+    If(localId == 0, [&]() {
+        output[WorkgroupId()] = sum;
+    });
+}, 256);
+```
+
+### WorkgroupScanInclusive
+
+Inclusive prefix sum (scan).
+
+```cpp
+template <typename T, int N, typename Op>
+[[nodiscard]] Var<T> WorkgroupScanInclusive(SharedMemory<T, N>& shared, const Expr<T>& value, Op op);
+
+template <typename T, int N>
+[[nodiscard]] Var<T> WorkgroupScanInclusive(SharedMemory<T, N>& shared, const Expr<T>& value);
+```
+
+**Example:**
+```cpp
+// Input:  [1, 2, 3, 4, 5]
+// Output: [1, 3, 6, 10, 15]  (cumulative sum including self)
+
+Kernel1D scan([](Int i) {
+    SharedMemory<float, 256> shared;
+    
+    Var<float> scanned = WorkgroupScanInclusive(shared, input[i]);
+    output[i] = scanned;
+}, 256);
+```
+
+### WorkgroupScanExclusive
+
+Exclusive prefix sum (scan).
+
+```cpp
+template <typename T, int N, typename Op>
+[[nodiscard]] Var<T> WorkgroupScanExclusive(SharedMemory<T, N>& shared, const Expr<T>& value, T identity, Op op);
+
+template <typename T, int N>
+[[nodiscard]] Var<T> WorkgroupScanExclusive(SharedMemory<T, N>& shared, const Expr<T>& value, T identity = T{});
+```
+
+**Example:**
+```cpp
+// Input:  [1, 2, 3, 4, 5]
+// Output: [0, 1, 3, 6, 10]  (cumulative sum of previous elements)
+//                            first element = identity (0)
+
+Kernel1D exclusiveScan([](Int i) {
+    SharedMemory<float, 256> shared;
+    
+    Var<float> scanned = WorkgroupScanExclusive(shared, input[i], 0.0f);
+    output[i] = scanned;
+}, 256);
+```
+
+---
+
+## Barriers
+
+Synchronization primitives for workgroup coordination.
+
+### WorkgroupBarrier
+
+Synchronize all threads within a workgroup.
+
+```cpp
+class KernelBase {
+public:
+    // Wait for all threads in workgroup to reach this point
+    static void WorkgroupBarrier();
+    
+    // Ensure memory writes are visible to subsequent operations
+    static void MemoryBarrier();
+    
+    // Combined: memory + execution barrier
+    static void FullBarrier();
+};
+```
+
+**Usage:**
+```cpp
+Kernel1D kernel([](Int i) {
+    SharedMemory<float, 256> shared;
+    Var<int> localId = LocalThreadId();
+    
+    // Write to shared memory
+    shared[localId] = input[i];
+    
+    // Must barrier before reading other threads' data
+    Kernel1D::WorkgroupBarrier();
+    
+    // Now safe to read
+    float neighbor = shared[(localId + 1) % 256];
+});
+```
+
+---
+
+## Thread Index Utilities
+
+Convenient access to GPU thread hierarchy information.
+
+### Functions
+
+```cpp
+// Local Thread ID (within workgroup)
+Var<int> LocalThreadId();      // 1D - same as LocalThreadIdX()
+Var<int> LocalThreadIdX();     // X dimension
+Var<int> LocalThreadIdY();     // Y dimension
+Var<int> LocalThreadIdZ();     // Z dimension
+auto LocalThreadId2D();        // Returns { x(), y() }
+
+// Workgroup ID
+Var<int> WorkgroupId();        // 1D - same as WorkgroupIdX()
+Var<int> WorkgroupIdX();       // X dimension
+Var<int> WorkgroupIdY();       // Y dimension
+Var<int> WorkgroupIdZ();       // Z dimension
+auto WorkgroupId2D();          // Returns { x(), y() }
+
+// Global Thread ID
+Var<int> GlobalThreadIdX();    // X dimension
+Var<int> GlobalThreadIdY();    // Y dimension
+Var<int> GlobalThreadIdZ();    // Z dimension
+auto GlobalThreadId2D();       // Returns { x(), y() }
+
+// Workgroup Size
+Var<int> WorkgroupSize();      // 1D - same as WorkgroupSizeX()
+Var<int> WorkgroupSizeX();     // X dimension
+Var<int> WorkgroupSizeY();     // Y dimension
+Var<int> WorkgroupSizeZ();     // Z dimension
+```
+
+### Usage Example
+
+```cpp
+Kernel1D kernel([](Int i) {
+    SharedMemory<float, 256> shared;
+    
+    // Get local thread ID (0-255)
+    Var<int> localId = LocalThreadId();
+    
+    // Write to shared memory
+    shared[localId] = input[i];
+    
+    // Barrier
+    Kernel1D::WorkgroupBarrier();
+    
+    // Read neighbor's value
+    float neighbor = shared[(localId + 1) % 256];
+});
+```
+
+### 2D Kernel Example
+
+```cpp
+Kernel2D kernel([](Int x, Int y) {
+    SharedMemory<float, 16 * 16> shared;
+    
+    // Get 2D local thread ID
+    auto localId = LocalThreadId2D();
+    Var<int> localX = localId.x();
+    Var<int> localY = localId.y();
+    
+    // Flatten to 1D index
+    Int localIdx = localY * 16 + localX;
+    shared[localIdx] = input[y * width + x];
+    
+    Kernel2D::WorkgroupBarrier();
+    
+    // Access neighbor
+    Float neighbor = shared[(localY * 16 + (localX + 1)) % 256];
+});
+```
+
+### Comparison: Old vs New API
+
+| Purpose | Old (Hacky) | New (Clean) |
+|:--------|:------------|:------------|
+| Local ID | `Var<int>("(int(gl_LocalInvocationID.x))")` | `LocalThreadId()` |
+| Workgroup ID | `Var<int>("(int(gl_WorkGroupID.x))")` | `WorkgroupId()` |
+| Global ID | `Var<int>("(int(gl_GlobalInvocationID.x))")` | `GlobalThreadIdX()` |
+| Workgroup Size | `Var<int>("(int(gl_WorkGroupSize.x))")` | `WorkgroupSize()` |
+
+---
+
+## See Also
+
+- [Parallel Primitives Guide](parallel-primitives.md) - Detailed usage patterns and examples
+- [Tutorial](tutorial.md) - Learn GPU programming basics
+- [Common Patterns](patterns.md) - Solutions to common tasks

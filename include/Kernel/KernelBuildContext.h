@@ -240,7 +240,27 @@ protected:
 	std::vector<Runtime::BufferSlotBase *>	_bufferSlots;
 	std::vector<Runtime::TextureSlotBase *> _textureSlots;
 
+	// Shared memory declarations
+	std::vector<std::string> _sharedMemoryDeclarations;
+
 public:
+	// ===================================================================
+	// Shared Memory Support
+	// ===================================================================
+
+	/**
+	 * Push a shared memory declaration to the context
+	 * @param declaration The shared memory declaration string
+	 */
+	void PushSharedMemoryDeclaration(const std::string &declaration) override;
+
+	/**
+	 * Get all shared memory declarations
+	 * @return Vector of shared memory declarations
+	 */
+	std::vector<std::string> GetSharedMemoryDeclarations() const override;
+
+	public:
 	// ===================================================================
 	// Pipeline Cache (replaces program cache)
 	// ===================================================================

@@ -44,6 +44,7 @@
 // IR Value Types - Order matters for template specializations
 // =============================================================================
 #include <IR/Value/BufferRef.h>
+#include <IR/Value/SharedMemory.h>
 #include <IR/Value/TextureRef.h>
 #include <IR/Value/Value.h>
 // Include vector/matrix expression specializations BEFORE Expr.h
@@ -102,11 +103,14 @@
 // =============================================================================
 // Utilities
 // =============================================================================
+#include <Utility/Atomic.h>
 #include <Utility/Helpers.h>
 #include <Utility/Math.h>
 #include <Utility/Matrix.h>
 #include <Utility/Meta/Std430Layout.h>
 #include <Utility/Meta/StructMeta.h>
+#include <Utility/Parallel.h>
+#include <Utility/ThreadIndex.h>
 #include <Utility/Unref.h>
 #include <Utility/Vec.h>
 
@@ -134,6 +138,12 @@ using namespace GPU::Flow;
 
 /// Utility functions: Unref
 using namespace GPU::Utility;
+
+/// Parallel primitives: WorkgroupReduce, WorkgroupScanInclusive
+using namespace GPU::Parallel;
+
+/// Thread index utilities: LocalThreadId, WorkgroupId, GlobalThreadId
+using namespace GPU;
 
 /// Window component: AppWindow, PixelBuffer, TexturePresenter, Input
 using namespace GPU::Window;

@@ -110,6 +110,12 @@ std::string Builder::BuildNode(const Node::Node &Node) {
 	case Node::NodeType::Ternary: {
 		return BuildTernary(dynamic_cast<const Node::TernaryNode &>(Node));
 	}
+	case Node::NodeType::SharedMemory: {
+		return BuildSharedMemory(dynamic_cast<const Node::SharedMemoryNode &>(Node));
+	}
+	case Node::NodeType::AtomicOp: {
+		return BuildAtomicOp(dynamic_cast<const Node::AtomicOpNode &>(Node));
+	}
 	default: {
 		return "";
 	}
@@ -387,5 +393,52 @@ std::string Builder::BuildRawCode(const Node::RawCodeNode &Node) {
 std::string Builder::BuildTernary(const Node::TernaryNode &Node) {
 	return std::format("({})?({}):({})", BuildNode(*Node.Condition()), BuildNode(*Node.TrueExpr()),
 					   BuildNode(*Node.FalseExpr()));
+}
+
+std::string Builder::BuildSharedMemory(const Node::SharedMemoryNode &Node) {
+	// Shared memory is declared at global scope, not inside main()
+	// So we return empty string here - the declaration is handled separately
+	return "";
+}
+
+std::string Builder::BuildAtomicOp(const Node::AtomicOpNode &Node) {
+	std::string opName;
+	switch (Node.Code()) {
+	case Node::AtomicOpCode::Add:
+		opName = "atomicAdd";
+		break;
+	case Node::AtomicOpCode::Sub:
+		opName = "atomicSub";
+		break;
+	case Node::AtomicOpCode::Min:
+		opName = "atomicMin";
+		break;
+	case Node::AtomicOpCode::Max:
+		opName = "atomicMax";
+		break;
+	case Node::AtomicOpCode::And:
+		opName = "atomicAnd";
+		break;
+	case Node::AtomicOpCode::Or:
+		opName = "atomicOr";
+		break;
+	case Node::AtomicOpCode::Xor:
+		opName = "atomicXor";
+		break;
+	case Node::AtomicOpCode::Exchange:
+		opName = "atomicExchange";
+		break;
+	case Node::AtomicOpCode::CompSwap:
+		opName = "atomicCompSwap";
+		break;
+	default:
+		return "";
+	}
+
+	if (Node.IsCompSwap()) {
+		return std::format("{}({}, {}, {})", opName, BuildNode(*Node.Target()), BuildNode(*Node.Compare()),
+						   BuildNode(*Node.Value()));
+	}
+	return std::format("{}({}, {})", opName, BuildNode(*Node.Target()), BuildNode(*Node.Value()));
 }
 } // namespace GPU::IR::Builder

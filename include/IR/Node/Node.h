@@ -18,6 +18,8 @@ namespace GPU::IR::Node {
 enum class NodeType {
 	LocalVariable,
 	LocalArray,
+	SharedMemory,
+	AtomicOp,
 	Load,
 	CallInst,
 	Operation,

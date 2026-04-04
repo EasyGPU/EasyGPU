@@ -270,6 +270,10 @@ add_library(EasyGPU STATIC
     source/IR/Node/RawCode.cpp
     include/IR/Node/Ternary.h
     source/IR/Node/Ternary.cpp
+    include/IR/Node/SharedMemory.h
+    source/IR/Node/SharedMemory.cpp
+    include/IR/Node/AtomicOp.h
+    source/IR/Node/AtomicOp.cpp
     
     # IR Values
     include/IR/Value/Value.h
@@ -290,6 +294,7 @@ add_library(EasyGPU STATIC
     include/IR/Value/ExprIVector.h
     include/IR/Value/ExprMatrix.h
     include/IR/Value/BufferRef.h
+    include/IR/Value/SharedMemory.h
     include/IR/Value/TextureRef.h
     include/IR/Value/TextureSampler.h
     
@@ -349,6 +354,9 @@ add_library(EasyGPU STATIC
     source/Utility/Math.cpp
     include/Utility/Helpers.h
     include/Utility/Unref.h
+    include/Utility/Atomic.h
+    include/Utility/Parallel.h
+    include/Utility/ThreadIndex.h
     include/Utility/Meta/StructMeta.h
     include/Utility/Meta/Std430Layout.h
     
@@ -408,6 +416,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestUniform.cpp
         tests/TestTernary.cpp
         tests/TestCopySign.cpp
+        tests/TestSharedMemory.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})
@@ -432,6 +441,8 @@ if(EASYGPU_BUILD_EXAMPLES)
         examples/ray_tracing/main.cpp
         examples/sdf_renderer/main.cpp
         examples/volumetric_fog/main.cpp
+        examples/parallel_reduction/main.cpp
+        examples/histogram/main.cpp
     )
     
     set(EASYGPU_EXAMPLE_NAMES
@@ -441,6 +452,8 @@ if(EASYGPU_BUILD_EXAMPLES)
         ray_tracing
         sdf_renderer
         volumetric_fog
+        parallel_reduction
+        histogram
     )
     
     list(LENGTH EASYGPU_EXAMPLE_SOURCES example_count)

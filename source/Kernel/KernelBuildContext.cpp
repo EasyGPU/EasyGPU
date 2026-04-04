@@ -155,6 +155,14 @@ std::string KernelBuildContext::GetCompleteCode() {
 		oss << uniformDecls << "\n";
 	}
 
+	// Output shared memory declarations (after uniform declarations, before callable declarations)
+	for (const auto &decl : _sharedMemoryDeclarations) {
+		oss << decl << "\n";
+	}
+	if (!_sharedMemoryDeclarations.empty()) {
+		oss << "\n";
+	}
+
 	// Output callable function forward declarations (before main)
 	for (const auto &decl : _callableDeclarations) {
 		oss << decl << ";\n";
@@ -477,6 +485,18 @@ void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
 	RegisterTexture(binding, slot->GetFormat(), textureName, width, height, slot->UsesSamplerBinding());
 	slot->SetBindingInfo(static_cast<int>(binding), textureName);
 	_textureSlots.push_back(slot);
+}
+
+// ===================================================================
+// Shared Memory Support
+// ===================================================================
+
+void KernelBuildContext::PushSharedMemoryDeclaration(const std::string &declaration) {
+	_sharedMemoryDeclarations.push_back(declaration);
+}
+
+std::vector<std::string> KernelBuildContext::GetSharedMemoryDeclarations() const {
+	return _sharedMemoryDeclarations;
 }
 
 } // namespace GPU::Kernel
