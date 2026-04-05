@@ -17,6 +17,7 @@
 #include <Runtime/TextureSlot.h>
 
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 
 namespace GPU::Kernel {

@@ -88,6 +88,10 @@ public:
 	bool				 SupportsPipelineCache() const override;
 	uint32_t			 GetPipelineCacheFormat() const override;
 
+	BackendType			 GetType() const override {
+		return BackendType::Vulkan;
+	}
+
 private:
 	// Vulkan resource info structures
 	struct BufferInfo {

@@ -208,6 +208,33 @@ struct BackendCaps {
 };
 
 // ============================================================================
+// Backend Factory
+// ============================================================================
+
+enum class BackendType {
+	OpenGL,
+	Vulkan,
+	DirectX12,
+	Metal,
+	Count
+};
+
+inline const char *GetBackendTypeName(BackendType type) {
+	switch (type) {
+	case BackendType::OpenGL:
+		return "OpenGL";
+	case BackendType::Vulkan:
+		return "Vulkan";
+	case BackendType::DirectX12:
+		return "DirectX12";
+	case BackendType::Metal:
+		return "Metal";
+	default:
+		return "Unknown";
+	}
+}
+
+// ============================================================================
 // Abstract Backend Interface
 // ============================================================================
 
@@ -324,35 +351,17 @@ public:
 	virtual void *GetNativeHandle() const {
 		return nullptr;
 	}
-};
 
-// ============================================================================
-// Backend Factory
-// ============================================================================
-
-enum class BackendType {
-	OpenGL,
-	Vulkan,
-	DirectX12,
-	Metal,
-	Count
-};
-
-inline const char *GetBackendTypeName(BackendType type) {
-	switch (type) {
-	case BackendType::OpenGL:
-		return "OpenGL";
-	case BackendType::Vulkan:
-		return "Vulkan";
-	case BackendType::DirectX12:
-		return "DirectX12";
-	case BackendType::Metal:
-		return "Metal";
-	default:
-		return "Unknown";
+	/**
+	 * Get the backend type identifier
+	 * @return The type of this backend
+	 */
+	virtual BackendType GetType() const {
+		return BackendType::Count;
 	}
-}
+};
 
+// ============================================================================
 Backend	   *CreateBackend(BackendType type);
 void		DestroyBackend(Backend *backend);
 BackendType GetDefaultBackendType();

@@ -130,14 +130,17 @@ public:
 	 * @param texture The 2D texture to attach
 	 */
 	void Attach(Texture2D<Format> &texture) {
-		_texture = &texture;
+		_textureHandle = texture.GetHandle();
+		_width		   = texture.GetWidth();
+		_height		   = texture.GetHeight();
 	}
 
 	/**
 	 * Detach the current texture
 	 */
 	void Detach() {
-		_texture = nullptr;
+		_textureHandle = Backend::INVALID_TEXTURE_HANDLE;
+		_width = _height = 0;
 	}
 
 	/**
@@ -145,7 +148,7 @@ public:
 	 * @return true if attached, false otherwise
 	 */
 	bool IsAttached() const override {
-		return _texture != nullptr;
+		return _textureHandle != Backend::INVALID_TEXTURE_HANDLE;
 	}
 
 	/**
@@ -153,7 +156,7 @@ public:
 	 * @return Pointer to the attached texture, or nullptr if not attached
 	 */
 	Texture2D<Format> *GetAttached() const {
-		return _texture;
+		return nullptr;
 	}
 
 	/**
@@ -161,7 +164,7 @@ public:
 	 * @return The backend texture handle, or INVALID_TEXTURE_HANDLE if not attached
 	 */
 	Backend::TextureHandle GetHandle() const override {
-		return _texture ? _texture->GetHandle() : Backend::INVALID_TEXTURE_HANDLE;
+		return _textureHandle;
 	}
 
 	/**
@@ -178,12 +181,8 @@ public:
 	 * @param[out] height The texture height
 	 */
 	void GetDimensions(uint32_t &width, uint32_t &height) const override {
-		if (_texture) {
-			width  = _texture->GetWidth();
-			height = _texture->GetHeight();
-		} else {
-			width = height = 0;
-		}
+		width  = _width;
+		height = _height;
 	}
 
 public:
@@ -238,7 +237,9 @@ public:
 	}
 
 private:
-	Texture2D<Format> *_texture = nullptr; // Currently attached texture
+	Backend::TextureHandle _textureHandle = Backend::INVALID_TEXTURE_HANDLE; // Currently attached texture handle
+	uint32_t			   _width		  = 0;
+	uint32_t			   _height		  = 0;
 
 	// Grant KernelBuildContext access to protected members
 	friend class KernelBuildContext;

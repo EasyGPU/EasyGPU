@@ -16,15 +16,15 @@
 namespace GPU::Runtime {
 
 // Static members
-Context *Context::_instance	 = nullptr;
-bool	 Context::_destroyed = false;
+std::unique_ptr<Context> Context::_instance;
+bool					 Context::_destroyed = false;
 
 Context &Context::GetInstance() {
-	if (_instance == nullptr) {
+	if (!_instance) {
 		if (_destroyed) {
 			throw std::runtime_error("Context was destroyed and cannot be recreated");
 		}
-		_instance = new Context();
+		_instance.reset(new Context());
 	}
 	// Auto-initialize on first access
 	if (!_instance->_initialized) {
@@ -40,7 +40,7 @@ Backend::Backend *Context::GetBackend() {
 Context::~Context() {
 	DestroyBackend();
 	_destroyed = true;
-	_instance  = nullptr;
+	_instance.release();
 }
 
 void Context::Initialize() {
@@ -112,17 +112,7 @@ Backend::BackendType Context::GetBackendType() const {
 	if (!_initialized || !_backend) {
 		return Backend::GetDefaultBackendType();
 	}
-	// Determine backend type from the backend pointer
-	// This is a bit hacky but works for now
-	if (dynamic_cast<Backend::OpenGLBackend *>(_backend.get()) != nullptr) {
-		return Backend::BackendType::OpenGL;
-	}
-#ifdef EASYGPU_BACKEND_VULKAN
-	if (dynamic_cast<Backend::VulkanBackend *>(_backend.get()) != nullptr) {
-		return Backend::BackendType::Vulkan;
-	}
-#endif
-	return Backend::GetDefaultBackendType();
+	return _backend->GetType();
 }
 
 void Context::CreateBackend() {

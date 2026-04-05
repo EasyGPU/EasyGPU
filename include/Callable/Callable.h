@@ -310,8 +310,10 @@ public:
 		auto &state = context->GetCallableState(reinterpret_cast<const void *>(_bodyGenerator.get()));
 
 		if (!state.declared) {
-			// Generate unique function name
-			_mangledName		  = Detail::GenerateUniqueFunctionName(_baseName);
+			// Generate unique function name once and reuse across kernels
+			if (_mangledName.empty()) {
+				_mangledName = Detail::GenerateUniqueFunctionName(_baseName);
+			}
 
 			// Generate function prototype (forward declaration)
 			std::string prototype = GeneratePrototype();
@@ -419,7 +421,9 @@ public:
 		auto &state = context->GetCallableState(reinterpret_cast<const void *>(_bodyGenerator.get()));
 
 		if (!state.declared) {
-			_mangledName		  = Detail::GenerateUniqueFunctionName(_baseName);
+			if (_mangledName.empty()) {
+				_mangledName = Detail::GenerateUniqueFunctionName(_baseName);
+			}
 
 			std::string prototype = GeneratePrototype();
 			context->AddCallableDeclaration(prototype);

@@ -186,6 +186,138 @@ int main() {
 		}
 
 		// ==================================================================
+		// Test 5: Multiple slots in same kernel
+		// ==================================================================
+		{
+			std::cout << "[Test 5] Multiple slots in same kernel..." << std::flush;
+			testsTotal++;
+
+			BufferSlot<float>  slotA;
+			BufferSlot<float>  slotB;
+			BufferSlot<float>  slotC;
+
+			Kernel1D		   kernel([&](Int i) {
+				  auto a = slotA.Bind();
+				  auto b = slotB.Bind();
+				  auto c = slotC.Bind();
+				  c[i]   = a[i] + b[i];
+			  });
+
+			std::vector<float> dataA = {1.0f, 2.0f, 3.0f};
+			std::vector<float> dataB = {10.0f, 20.0f, 30.0f};
+			std::vector<float> result(3);
+
+			Buffer<float>	   bufA(dataA);
+			Buffer<float>	   bufB(dataB);
+			Buffer<float>	   bufC(3);
+
+			slotA.Attach(bufA);
+			slotB.Attach(bufB);
+			slotC.Attach(bufC);
+
+			kernel.Dispatch(1, true);
+			bufC.Download(result);
+
+			bool pass = FloatEq(result[0], 11.0f) && FloatEq(result[1], 22.0f) && FloatEq(result[2], 33.0f);
+
+			if (pass) {
+				std::cout << " PASS" << std::endl;
+				testsPassed++;
+			} else {
+				std::cout << " FAIL (got " << result[0] << ", " << result[1] << ", " << result[2] << ")" << std::endl;
+			}
+		}
+
+		// ==================================================================
+		// Test 6: Large data processing
+		// ==================================================================
+		{
+			std::cout << "[Test 6] Large data processing (1M elements)..." << std::flush;
+			testsTotal++;
+
+			const size_t	   N = 1024 * 1024;
+			BufferSlot<float>  inputSlot;
+			BufferSlot<float>  outputSlot;
+
+			Kernel1D		   kernel([&](Int i) {
+				  auto in  = inputSlot.Bind();
+				  auto out = outputSlot.Bind();
+				  out[i]   = in[i] * 3.14159f;
+			  });
+
+			std::vector<float> input(N);
+			for (size_t i = 0; i < N; ++i)
+				input[i] = static_cast<float>(i);
+			std::vector<float> result(N);
+
+			Buffer<float>	   inputBuf(input);
+			Buffer<float>	   outputBuf(N);
+
+			inputSlot.Attach(inputBuf);
+			outputSlot.Attach(outputBuf);
+
+			kernel.Dispatch((N + 255) / 256, true);
+			outputBuf.Download(result);
+
+			bool pass = true;
+			// Spot check
+			for (size_t i : {0, 1, 100, 10000, N / 2, N - 1}) {
+				if (!FloatEq(result[i], input[i] * 3.14159f, 0.01f)) {
+					pass = false;
+					std::cout << "\n  Mismatch at " << i << ": got " << result[i] << ", expected "
+							  << input[i] * 3.14159f;
+					break;
+				}
+			}
+
+			if (pass) {
+				std::cout << " PASS" << std::endl;
+				testsPassed++;
+			} else {
+				std::cout << " FAIL" << std::endl;
+			}
+		}
+
+		// ==================================================================
+		// Test 7: Vector type BufferSlot
+		// ==================================================================
+		{
+			std::cout << "[Test 7] Vec4 BufferSlot..." << std::flush;
+			testsTotal++;
+
+			BufferSlot<Vec4>  inputSlot;
+			BufferSlot<Vec4>  outputSlot;
+
+			Kernel1D		  kernel([&](Int i) {
+				 auto in  = inputSlot.Bind();
+				 auto out = outputSlot.Bind();
+				 Vec4 v   = in[i];
+				 out[i]   = MakeFloat4(v.x() * 2.0f, v.y() * 2.0f, v.z() * 2.0f, v.w() * 2.0f);
+			 });
+
+			std::vector<Vec4> input = {Vec4(1.0f, 2.0f, 3.0f, 4.0f), Vec4(5.0f, 6.0f, 7.0f, 8.0f)};
+			std::vector<Vec4> result(2);
+
+			Buffer<Vec4>	  inputBuf(input);
+			Buffer<Vec4>	  outputBuf(2);
+
+			inputSlot.Attach(inputBuf);
+			outputSlot.Attach(outputBuf);
+			kernel.Dispatch(1, true);
+			outputBuf.Download(result);
+
+			bool pass = FloatEq(result[0].x, 2.0f) && FloatEq(result[0].y, 4.0f) && FloatEq(result[0].z, 6.0f) &&
+						FloatEq(result[0].w, 8.0f) && FloatEq(result[1].x, 10.0f) && FloatEq(result[1].y, 12.0f);
+
+			if (pass) {
+				std::cout << " PASS" << std::endl;
+				testsPassed++;
+			} else {
+				std::cout << " FAIL" << std::endl;
+			}
+		}
+
+		// ==================================================================
 		// Summary
 		// ==================================================================
 		std::cout << "\n========================================" << std::endl;

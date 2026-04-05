@@ -120,15 +120,15 @@ public:
 	 * @param buffer The buffer to attach
 	 */
 	void Attach(Buffer<T> &buffer) {
-		_buffer = &buffer;
-		_mode	= static_cast<int>(buffer.GetMode());
+		_bufferHandle = buffer.GetHandle();
+		_mode		  = static_cast<int>(buffer.GetMode());
 	}
 
 	/**
 	 * Detach the current buffer
 	 */
 	void Detach() {
-		_buffer = nullptr;
+		_bufferHandle = Backend::INVALID_BUFFER_HANDLE;
 	}
 
 	/**
@@ -136,7 +136,7 @@ public:
 	 * @return true if attached, false otherwise
 	 */
 	bool IsAttached() const override {
-		return _buffer != nullptr;
+		return _bufferHandle != Backend::INVALID_BUFFER_HANDLE;
 	}
 
 	/**
@@ -144,7 +144,7 @@ public:
 	 * @return Pointer to the attached buffer, or nullptr if not attached
 	 */
 	Buffer<T> *GetAttached() const {
-		return _buffer;
+		return nullptr;
 	}
 
 	/**
@@ -152,7 +152,7 @@ public:
 	 * @return The backend buffer handle, or INVALID_BUFFER_HANDLE if not attached
 	 */
 	Backend::BufferHandle GetHandle() const override {
-		return _buffer ? _buffer->GetHandle() : Backend::INVALID_BUFFER_HANDLE;
+		return _bufferHandle;
 	}
 
 public:
@@ -220,7 +220,7 @@ protected:
 	}
 
 private:
-	Buffer<T> *_buffer = nullptr; // Currently attached buffer
+	Backend::BufferHandle _bufferHandle = Backend::INVALID_BUFFER_HANDLE; // Currently attached buffer handle
 
 	// Grant KernelBuildContext access to protected members
 	friend class KernelBuildContext;

@@ -109,8 +109,7 @@ private:
 	bool							  _initialized = false;
 	std::unique_ptr<Backend::Backend> _backend;
 
-	// Reference count for automatic cleanup consideration
-	static Context					 *_instance;
+	static std::unique_ptr<Context>	  _instance;
 	static bool						  _destroyed;
 };
 

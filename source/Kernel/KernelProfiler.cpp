@@ -40,6 +40,7 @@ KernelProfiler::~KernelProfiler() {
 // ===================================================================================
 
 void KernelProfiler::InitializeQueries() {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 #if defined(EASYGPU_BACKEND_VULKAN)
 	// Vulkan manages timer queries inside the backend.
 	return;
@@ -57,6 +58,7 @@ void KernelProfiler::InitializeQueries() {
 }
 
 void KernelProfiler::CleanupQueries() {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 #if !defined(EASYGPU_BACKEND_VULKAN)
 	if (!_queryPool.empty()) {
 		glDeleteQueries(static_cast<GLsizei>(_queryPool.size()), _queryPool.data());
@@ -67,6 +69,7 @@ void KernelProfiler::CleanupQueries() {
 }
 
 unsigned int KernelProfiler::AcquireQuery() {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 #if defined(EASYGPU_BACKEND_VULKAN)
 	return 0; // Vulkan does not use the OpenGL-side query pool.
 #else
@@ -97,6 +100,7 @@ unsigned int KernelProfiler::AcquireQuery() {
 }
 
 void KernelProfiler::ReleaseQuery(unsigned int query) {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	if (query != 0) {
 		_availableQueries.push_back(query);
 	}
@@ -155,6 +159,7 @@ bool KernelProfiler::IsEnabled() const {
 // ===================================================================================
 
 void KernelProfiler::Clear() {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	_records.clear();
 	_stats.clear();
 	// Note: We don't delete queries, just clear the data
@@ -262,6 +267,7 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 // ===================================================================================
 
 KernelProfilerQueryResult KernelProfiler::QueryInfo(const std::string &kernelName) const {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	auto it = _stats.find(kernelName);
 	if (it != _stats.end()) {
 		return it->second;
@@ -270,6 +276,7 @@ KernelProfilerQueryResult KernelProfiler::QueryInfo(const std::string &kernelNam
 }
 
 double KernelProfiler::GetTotalTime() const {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	double total = 0.0;
 	for (const auto &[name, stat] : _stats) {
 		total += stat.totalTimeMs;
@@ -278,10 +285,12 @@ double KernelProfiler::GetTotalTime() const {
 }
 
 const std::vector<KernelProfileRecord> &KernelProfiler::GetRecords() const {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	return _records;
 }
 
 std::vector<KernelProfilerQueryResult> KernelProfiler::GetAllStats() const {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	std::vector<KernelProfilerQueryResult> results;
 	results.reserve(_stats.size());
 	for (const auto &[name, stat] : _stats) {
@@ -319,6 +328,7 @@ const char *Col(const char *color) {
 } // namespace
 
 void KernelProfiler::PrintInfo(const std::string &mode) const {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	if (!_enabled) {
 		std::cout << Col(COLOR_YELLOW) << "[KernelProfiler] " << Col(COLOR_RESET) << "Profiling is disabled. Call "
 				  << Col(COLOR_CYAN) << "EnableKernelProfiler(true)" << Col(COLOR_RESET) << " to enable.\n";
@@ -451,6 +461,7 @@ void KernelProfiler::PrintInfo(const std::string &mode) const {
 }
 
 std::string KernelProfiler::GetFormattedOutput(const std::string &mode) const {
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	std::ostringstream oss;
 
 	if (!_enabled) {

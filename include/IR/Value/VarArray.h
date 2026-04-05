@@ -40,7 +40,7 @@ public:
 	 * Create an empty array
 	 */
 	VarArray() {
-		auto name = Builder::Builder::Get().Context()->AssignVarName();
+		auto name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node	  = std::make_unique<Node::LocalVariableArrayNode>(name, TypeShaderName<Type>(), N);
 
@@ -52,7 +52,7 @@ public:
 	 * @param array The array to be loaded
 	 */
 	VarArray(std::array<Type, N> array) {
-		auto name	 = Builder::Builder::Get().Context()->AssignVarName();
+		auto name	 = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node		 = std::make_unique<Node::LocalVariableArrayNode>(name, TypeShaderName<Type>(), N);
 

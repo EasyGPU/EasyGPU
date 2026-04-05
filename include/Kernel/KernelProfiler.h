@@ -16,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <mutex>
 #include <vector>
 
 namespace GPU::Kernel {
@@ -176,6 +177,8 @@ private:
 	void		 RecordExecution(const std::string &kernelName, int groupX, int groupY, int groupZ, double elapsedMs);
 
 private:
+	mutable std::recursive_mutex								   _mutex;
+
 	bool													   _enabled = false;
 
 	// Query pool for timer queries

@@ -86,7 +86,7 @@ public:
 	 * Creating a variable through the VarBase API
 	 */
 	VarBase() {
-		auto name = Builder::Builder::Get().Context()->AssignVarName();
+		auto name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node	  = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
 		_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
@@ -101,7 +101,7 @@ public:
 	 * @param Value The expression to assign
 	 */
 	VarBase(Expr<Type> &&Value) noexcept {
-		std::string name = Builder::Builder::Get().Context()->AssignVarName();
+		std::string name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node			 = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
 		_varNode		 = dynamic_cast<Node::LocalVariableNode *>(_node.get());
@@ -124,7 +124,7 @@ public:
 	 * @param Value The expression to assign
 	 */
 	VarBase(Expr<Type> &Value) noexcept {
-		std::string name = Builder::Builder::Get().Context()->AssignVarName();
+		std::string name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node			 = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
 		_varNode		 = dynamic_cast<Node::LocalVariableNode *>(_node.get());
@@ -181,7 +181,7 @@ public:
 			// Note: Don't call Build() for external variables
 		} else {
 			// Normal copy: create new variable and copy value via IR load/store
-			auto name = Builder::Builder::Get().Context()->AssignVarName();
+			auto name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 			_node	  = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
 			_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
 			Builder::Builder::Get().Build(*_varNode, true);

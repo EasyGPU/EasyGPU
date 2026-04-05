@@ -35,12 +35,12 @@ public:
 	 * Maps to GLSL: shared Type Name[N];
 	 */
 	SharedMemory() {
-		auto name = Builder::Builder::Get().Context()->AssignVarName();
+		auto name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node	  = std::make_unique<Node::SharedMemoryNode>(name, TypeShaderName<Type>(), N);
 
 		// Declare the shared memory at global scope (outside main)
-		Builder::Builder::Get().Context()->PushSharedMemoryDeclaration(
+		Builder::Builder::Get().ContextChecked()->PushSharedMemoryDeclaration(
 			std::format("shared {} {}[{}];", TypeShaderName<Type>(), name, N));
 	}
 

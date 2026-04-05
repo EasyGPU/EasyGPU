@@ -432,6 +432,12 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestSharedMemory.cpp
         tests/TestShaderCache.cpp
         tests/TestKernelCache.cpp
+        tests/TestBreakContinue.cpp
+        tests/TestExpression.cpp
+        tests/TestFlowDoWhile.cpp
+        tests/TestFlowFor.cpp
+        tests/TestFlowIf.cpp
+        tests/TestMath.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})
@@ -483,6 +489,16 @@ if(EASYGPU_BUILD_EXAMPLES)
             target_compile_options(${example_name} PRIVATE /Zc:preprocessor)
         endif()
     endforeach()
+    
+    # Radiance Cascade with multiple source files
+    add_executable(radiance_cascade
+        examples/radiance_cascade/main.cpp
+        examples/radiance_cascade/rc_scene.cpp
+    )
+    target_link_libraries(radiance_cascade PRIVATE EasyGPU EasyGPUWindow)
+    if(MSVC)
+        target_compile_options(radiance_cascade PRIVATE /Zc:preprocessor)
+    endif()
 endif()
 
 # =============================================================================

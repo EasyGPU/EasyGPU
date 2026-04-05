@@ -97,6 +97,10 @@ public:
 #endif
 	}
 
+	BackendType GetType() const override {
+		return BackendType::OpenGL;
+	}
+
 private:
 	struct BufferInfo {
 		uint32_t glHandle = 0;

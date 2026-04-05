@@ -423,28 +423,12 @@ public:
 		}
 	}
 
+	/**
+	 * Experimental / Not fully implemented
+	 */
 	bool UploadAsync(const void *data) {
-		if (!_uploadPool) {
-			InitUploadPBOPool(2);
-		}
-
-		_uploadPool->UpdateStates();
-
-		PBOBuffer *pbo = _uploadPool->AcquireIdle();
-		if (!pbo) {
-			return false;
-		}
-
-		Runtime::Context::GetInstance().MakeCurrent();
-
-		size_t dataSize = _width * _height * GetBytesPerPixel();
-		pbo->CopyData(data, dataSize);
-		Upload(data);
-
-		pbo->SetState(PBOBuffer::State::Uploading);
-		pbo->InsertFence();
-
-		return true;
+		(void)data;
+		throw std::runtime_error("Async texture transfer is not yet fully implemented");
 	}
 
 	bool UploadAsyncStream(const void *data, uint32_t timeoutMs = 1000) {
@@ -469,24 +453,11 @@ public:
 		return true;
 	}
 
+	/**
+	 * Experimental / Not fully implemented
+	 */
 	bool DownloadAsync() {
-		if (!_downloadPool) {
-			InitDownloadPBOPool(2);
-		}
-
-		_downloadPool->UpdateStates();
-
-		PBOBuffer *pbo = _downloadPool->AcquireIdle();
-		if (!pbo) {
-			return false;
-		}
-
-		Runtime::Context::GetInstance().MakeCurrent();
-
-		pbo->SetState(PBOBuffer::State::Downloading);
-		pbo->InsertFence();
-
-		return true;
+		throw std::runtime_error("Async texture transfer is not yet fully implemented");
 	}
 
 	bool GetDownloadData(void *outData) {

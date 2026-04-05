@@ -163,9 +163,10 @@ public:
 		}
 
 		// Create upload function for this type
+		// We read the current value through the Uniform pointer at dispatch time,
+		// rather than capturing a stale value at kernel definition time.
 		auto uploadFunc = [](uint32_t program, const std::string &name, void *ptr) {
-			Uniform<T> *uniform = static_cast<Uniform<T> *>(ptr);
-			T			value	= uniform->GetValue();
+			T value = ptr ? static_cast<Uniform<T> *>(ptr)->GetValue() : T{};
 
 			// For struct types, upload each member individually (struct itself has no location)
 			if constexpr (GPU::Meta::RegisteredStruct<T>) {
@@ -199,8 +200,7 @@ public:
 		};
 
 		auto packFunc = [](void *dst, void *ptr) {
-			Uniform<T>					 *uniform = static_cast<Uniform<T> *>(ptr);
-			T							  value	  = uniform->GetValue();
+			T value = ptr ? static_cast<Uniform<T> *>(ptr)->GetValue() : T{};
 
 			GPU::Meta::Std430Converter<T> converter;
 			converter.ConvertToGPU(&value, dst, 1);

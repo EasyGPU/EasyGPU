@@ -62,6 +62,13 @@ BuilderContext *Builder::Context() {
 	return _context;
 }
 
+BuilderContext *Builder::ContextChecked() {
+	if (_context == nullptr) {
+		throw std::runtime_error("EasyGPU DSL operation called outside of Kernel definition");
+	}
+	return _context;
+}
+
 void Builder::Build(const Node::Node &Node, bool IsStatement) {
 	if (_context != nullptr) {
 		if (IsStatement) {
@@ -75,70 +82,70 @@ void Builder::Build(const Node::Node &Node, bool IsStatement) {
 std::string Builder::BuildNode(const Node::Node &Node) {
 	switch (Node.Type()) {
 	case Node::NodeType::CallInst: {
-		return BuildCallInst(dynamic_cast<const Node::IntrinsicCallNode &>(Node));
+		return BuildCallInst(static_cast<const Node::IntrinsicCallNode &>(Node));
 	}
 	case Node::NodeType::Operation: {
-		return BuildOperation(dynamic_cast<const Node::OperationNode &>(Node));
+		return BuildOperation(static_cast<const Node::OperationNode &>(Node));
 	}
 	case Node::NodeType::LocalVariable: {
-		return BuildLocalVariable(dynamic_cast<const Node::LocalVariableNode &>(Node));
+		return BuildLocalVariable(static_cast<const Node::LocalVariableNode &>(Node));
 	}
 	case Node::NodeType::Load: {
-		return BuildLoad(dynamic_cast<const Node::LoadNode &>(Node));
+		return BuildLoad(static_cast<const Node::LoadNode &>(Node));
 	}
 	case Node::NodeType::Store: {
-		return BuildStore(dynamic_cast<const Node::StoreNode &>(Node));
+		return BuildStore(static_cast<const Node::StoreNode &>(Node));
 	}
 	case Node::NodeType::LocalArray: {
-		return BuildLocalVariableArray(dynamic_cast<const Node::LocalVariableArrayNode &>(Node));
+		return BuildLocalVariableArray(static_cast<const Node::LocalVariableArrayNode &>(Node));
 	}
 	case Node::NodeType::ArrayAccess: {
-		return BuildArrayAccess(dynamic_cast<const Node::ArrayAccessNode &>(Node));
+		return BuildArrayAccess(static_cast<const Node::ArrayAccessNode &>(Node));
 	}
 	case Node::NodeType::CompoundAssignment: {
-		return BuildCompoundAssignment(dynamic_cast<const Node::CompoundAssignmentNode &>(Node));
+		return BuildCompoundAssignment(static_cast<const Node::CompoundAssignmentNode &>(Node));
 	}
 	case Node::NodeType::Increment: {
-		return BuildIncrement(dynamic_cast<const Node::IncrementNode &>(Node));
+		return BuildIncrement(static_cast<const Node::IncrementNode &>(Node));
 	}
 	case Node::NodeType::MemberAccess: {
-		return BuildMemberAccess(dynamic_cast<const Node::MemberAccessNode &>(Node));
+		return BuildMemberAccess(static_cast<const Node::MemberAccessNode &>(Node));
 	}
 	case Node::NodeType::If: {
-		return BuildIf(dynamic_cast<const Node::IfNode &>(Node));
+		return BuildIf(static_cast<const Node::IfNode &>(Node));
 	}
 	case Node::NodeType::While: {
-		return BuildWhile(dynamic_cast<const Node::WhileNode &>(Node));
+		return BuildWhile(static_cast<const Node::WhileNode &>(Node));
 	}
 	case Node::NodeType::DoWhile: {
-		return BuildDoWhile(dynamic_cast<const Node::DoWhileNode &>(Node));
+		return BuildDoWhile(static_cast<const Node::DoWhileNode &>(Node));
 	}
 	case Node::NodeType::For: {
-		return BuildFor(dynamic_cast<const Node::ForNode &>(Node));
+		return BuildFor(static_cast<const Node::ForNode &>(Node));
 	}
 	case Node::NodeType::Break: {
-		return BuildBreak(dynamic_cast<const Node::BreakNode &>(Node));
+		return BuildBreak(static_cast<const Node::BreakNode &>(Node));
 	}
 	case Node::NodeType::Continue: {
-		return BuildContinue(dynamic_cast<const Node::ContinueNode &>(Node));
+		return BuildContinue(static_cast<const Node::ContinueNode &>(Node));
 	}
 	case Node::NodeType::Return: {
-		return BuildReturn(dynamic_cast<const Node::ReturnNode &>(Node));
+		return BuildReturn(static_cast<const Node::ReturnNode &>(Node));
 	}
 	case Node::NodeType::Call: {
-		return BuildCall(dynamic_cast<const Node::CallNode &>(Node));
+		return BuildCall(static_cast<const Node::CallNode &>(Node));
 	}
 	case Node::NodeType::RawCode: {
-		return BuildRawCode(dynamic_cast<const Node::RawCodeNode &>(Node));
+		return BuildRawCode(static_cast<const Node::RawCodeNode &>(Node));
 	}
 	case Node::NodeType::Ternary: {
-		return BuildTernary(dynamic_cast<const Node::TernaryNode &>(Node));
+		return BuildTernary(static_cast<const Node::TernaryNode &>(Node));
 	}
 	case Node::NodeType::SharedMemory: {
-		return BuildSharedMemory(dynamic_cast<const Node::SharedMemoryNode &>(Node));
+		return BuildSharedMemory(static_cast<const Node::SharedMemoryNode &>(Node));
 	}
 	case Node::NodeType::AtomicOp: {
-		return BuildAtomicOp(dynamic_cast<const Node::AtomicOpNode &>(Node));
+		return BuildAtomicOp(static_cast<const Node::AtomicOpNode &>(Node));
 	}
 	default: {
 		return "";
@@ -150,9 +157,11 @@ std::string Builder::BuildCallInst(const Node::IntrinsicCallNode &Node) {
 	std::ostringstream stream;
 
 	stream << Node.Name() << "(";
-	stream << BuildNode(*Node.Parameter()[0]);
-	for (size_t index = 1; index < Node.Parameter().size(); ++index) {
-		stream << "," << BuildNode(*Node.Parameter()[index]);
+	if (!Node.Parameter().empty()) {
+		stream << BuildNode(*Node.Parameter()[0]);
+		for (size_t index = 1; index < Node.Parameter().size(); ++index) {
+			stream << "," << BuildNode(*Node.Parameter()[index]);
+		}
 	}
 	stream << ")";
 
@@ -316,7 +325,7 @@ std::string Builder::BuildIncrement(const Node::IncrementNode &Node) {
 }
 
 std::string Builder::BuildMemberAccess(const Node::MemberAccessNode &Node) {
-	return std::format("({}).({})", BuildNode(*Node.LHS()), BuildNode(*Node.RHS()));
+	return std::format("({}).{}", BuildNode(*Node.LHS()), BuildNode(*Node.RHS()));
 }
 
 std::string Builder::BuildIf(const Node::IfNode &Node) {

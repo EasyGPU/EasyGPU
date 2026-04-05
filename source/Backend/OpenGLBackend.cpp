@@ -246,7 +246,7 @@ void *OpenGLBackend::MapBuffer(BufferHandle buffer, bool read, bool write) {
 		access |= GL_MAP_WRITE_BIT;
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, it->second.glHandle);
-	void *ptr = glMapBuffer(GL_SHADER_STORAGE_BUFFER, access);
+	void *ptr = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, it->second.size, access);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	return ptr;
@@ -352,7 +352,14 @@ void OpenGLBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 	if (it == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
 	}
+	if (!outData) {
+		throw std::runtime_error("DownloadTexture: outData is null");
+	}
 
+	// NOTE: glGetTexImage always downloads the full texture mip-level.
+	// The (x, y, width, height) parameters are reserved for future sub-region
+	// implementation (e.g. via FBO + glReadPixels). Callers must ensure outData
+	// is large enough to hold the entire texture.
 	(void)x;
 	(void)y;
 	(void)width;
