@@ -434,7 +434,7 @@ kernel.Dispatch(4, false);  // Don't wait
 data.Download(results);      // Data may be incomplete
 
 // CORRECT
-kernel.Dispatch(4, true);   // Wait for completion
+kernel.Dispatch(4, true);   // Wait for completion (automatic barriers inserted for writable resources)
 data.Download(results);      // Data is ready
 ```
 

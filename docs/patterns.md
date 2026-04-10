@@ -488,6 +488,7 @@ Kernel Definition          Dispatch Time
 2. **Type Safety**: Slot type (`BufferSlot<float>`) ensures compile-time type checking
 3. **Zero Overhead**: Slots compile to direct OpenGL bindings - no runtime indirection
 4. **Resource Lifetime**: Slots don't own resources - you manage buffer/texture lifetime
+5. **Per-Kernel Bindings**: The same slot can be safely shared across multiple kernels. Each kernel maintains its own independent binding allocation, so slot attachment order or kernel compilation order does not affect binding indices.
 
 ### Slot Types
 

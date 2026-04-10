@@ -135,7 +135,7 @@ Kernel1D kernel(
 
 | Method | Description |
 |:-------|:------------|
-| `Dispatch(int groupX, bool sync = false)` | Execute kernel |
+| `Dispatch(int groupX, bool sync = false)` | Execute kernel. `sync=true` waits for GPU completion and automatically inserts memory barriers for writable buffers/textures. |
 | `SetName(const std::string& name)` | Set kernel name |
 | `GetName() const` | Get kernel name |
 | `GetCode()` | Get generated GLSL code |
@@ -166,7 +166,7 @@ Kernel2D kernel(
 
 | Method | Description |
 |:-------|:------------|
-| `Dispatch(int groupX, int groupY, bool sync = false)` | Execute kernel |
+| `Dispatch(int groupX, int groupY, bool sync = false)` | Execute kernel. `sync=true` waits for GPU completion and automatically inserts memory barriers for writable buffers/textures. |
 
 ### Kernel3D
 
@@ -185,7 +185,7 @@ Kernel3D kernel(
 
 | Method | Description |
 |:-------|:------------|
-| `Dispatch(int groupX, int groupY, int groupZ, bool sync = false)` | Execute kernel |
+| `Dispatch(int groupX, int groupY, int groupZ, bool sync = false)` | Execute kernel. `sync=true` waits for GPU completion and automatically inserts memory barriers for writable buffers/textures. |
 
 ### Inspector Kernels
 

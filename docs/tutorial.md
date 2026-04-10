@@ -159,7 +159,7 @@ int main() {
 1. **Thread Indexing**: Each thread receives a unique `i` value
 2. **Buffer Binding**: Must bind buffers inside the kernel lambda
 3. **Dispatch Calculation**: `(N + work_size - 1) / work_size` computes ceiling division
-4. **Synchronization**: `true` means wait for GPU to finish
+4. **Synchronization**: `true` means wait for GPU to finish. The runtime automatically infers and inserts memory barriers for any writable buffers or textures bound to the kernel.
 
 ---
 
