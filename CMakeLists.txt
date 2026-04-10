@@ -490,15 +490,6 @@ if(EASYGPU_BUILD_EXAMPLES)
         endif()
     endforeach()
     
-    # Radiance Cascade with multiple source files
-    add_executable(radiance_cascade
-        examples/radiance_cascade/main.cpp
-        examples/radiance_cascade/rc_scene.cpp
-    )
-    target_link_libraries(radiance_cascade PRIVATE EasyGPU EasyGPUWindow)
-    if(MSVC)
-        target_compile_options(radiance_cascade PRIVATE /Zc:preprocessor)
-    endif()
 endif()
 
 # =============================================================================

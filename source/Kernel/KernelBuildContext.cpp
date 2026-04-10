@@ -484,6 +484,7 @@ void KernelBuildContext::RegisterBufferSlot(Runtime::BufferSlotBase *slot) {
 	RegisterBuffer(binding, slot->GetTypeName(), bufferName, mode);
 	slot->SetBindingInfo(static_cast<int>(binding), bufferName);
 	_bufferSlots.push_back(slot);
+	_bufferSlotBindings[slot] = binding;
 }
 
 void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
@@ -501,6 +502,23 @@ void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
 	}
 	slot->SetBindingInfo(static_cast<int>(binding), textureName);
 	_textureSlots.push_back(slot);
+	_textureSlotBindings[slot] = binding;
+}
+
+uint32_t KernelBuildContext::GetBufferSlotBinding(Runtime::BufferSlotBase *slot) const {
+	auto it = _bufferSlotBindings.find(slot);
+	if (it != _bufferSlotBindings.end()) {
+		return it->second;
+	}
+	return static_cast<uint32_t>(slot->GetBinding());
+}
+
+uint32_t KernelBuildContext::GetTextureSlotBinding(Runtime::TextureSlotBase *slot) const {
+	auto it = _textureSlotBindings.find(slot);
+	if (it != _textureSlotBindings.end()) {
+		return it->second;
+	}
+	return static_cast<uint32_t>(slot->GetBinding());
 }
 
 // ===================================================================

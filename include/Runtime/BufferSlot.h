@@ -80,6 +80,14 @@ public:
 		_mode = mode;
 	}
 
+	/**
+	 * Get the buffer access mode
+	 * @return The buffer mode
+	 */
+	int GetMode() const {
+		return _mode;
+	}
+
 protected:
 	int			_binding = -1;	// Assigned by KernelBuildContext during Bind()
 	std::string _name;			// GLSL variable name

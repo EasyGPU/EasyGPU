@@ -200,6 +200,20 @@ public:
 		return _textureSlots;
 	}
 
+	/**
+	 * Get the binding assigned to a buffer slot within this kernel context
+	 * @param slot The buffer slot
+	 * @return The binding index, or the slot's global binding if not found
+	 */
+	uint32_t GetBufferSlotBinding(Runtime::BufferSlotBase *slot) const;
+
+	/**
+	 * Get the binding assigned to a texture slot within this kernel context
+	 * @param slot The texture slot
+	 * @return The binding index, or the slot's global binding if not found
+	 */
+	uint32_t GetTextureSlotBinding(Runtime::TextureSlotBase *slot) const;
+
 public:
 	// ===================================================================
 	// Callable Function Support
@@ -242,6 +256,10 @@ protected:
 	// Slot support for dynamic resource switching
 	std::vector<Runtime::BufferSlotBase *>	_bufferSlots;
 	std::vector<Runtime::TextureSlotBase *> _textureSlots;
+
+	// Per-context slot binding mappings (required because slots are shared across kernels)
+	std::unordered_map<Runtime::BufferSlotBase *, uint32_t> _bufferSlotBindings;
+	std::unordered_map<Runtime::TextureSlotBase *, uint32_t> _textureSlotBindings;
 
 	// Shared memory declarations
 	std::vector<std::string>				_sharedMemoryDeclarations;

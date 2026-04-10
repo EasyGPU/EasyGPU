@@ -264,7 +264,7 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 			throw std::runtime_error("BufferSlot not attached at dispatch time");
 		}
 		Backend::ResourceBinding rb;
-		rb.binding = static_cast<uint32_t>(slot->GetBinding());
+		rb.binding = context.GetBufferSlotBinding(slot);
 		rb.type	   = Backend::BindingType::Buffer;
 		rb.buffer  = slot->GetHandle();
 		bindings.push_back(rb);
@@ -276,12 +276,13 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 		if (!slot->IsAttached()) {
 			throw std::runtime_error("TextureSlot not attached at dispatch time");
 		}
-		const auto *textureInfo = context.FindTextureInfo(static_cast<uint32_t>(slot->GetBinding()));
+		uint32_t slotBinding = context.GetTextureSlotBinding(slot);
+		const auto *textureInfo = context.FindTextureInfo(slotBinding);
 		if (!textureInfo) {
 			throw std::runtime_error("TextureSlot missing shader-side texture metadata");
 		}
 		Backend::ResourceBinding rb;
-		rb.binding	= static_cast<uint32_t>(slot->GetBinding());
+		rb.binding	= slotBinding;
 		rb.type		= textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
 		rb.texture	= slot->GetHandle();
 		rb.format	= Runtime::ToBackendPixelFormat(slot->GetFormat());
@@ -297,9 +298,45 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 	// Dispatch the compute shader
 	backend->Dispatch(groupX, groupY, groupZ);
 
+	// Determine required memory barriers based on writable resources
+	Backend::BarrierType barrierType = Backend::BarrierType::None;
+
+	for (const auto &bufferInfo : context.GetBufferInfos()) {
+		if (bufferInfo.mode != GPU::Backend::BUFFER_MODE_READ_ONLY) {
+			barrierType = barrierType | Backend::BarrierType::Buffer;
+			break;
+		}
+	}
+
+	if (!HasFlag(barrierType, Backend::BarrierType::Buffer)) {
+		for (const auto *slot : context.GetBufferSlots()) {
+			if (slot->GetMode() != GPU::Backend::BUFFER_MODE_READ_ONLY) {
+				barrierType = barrierType | Backend::BarrierType::Buffer;
+				break;
+			}
+		}
+	}
+
+	for (const auto &textureInfo : context.GetTextureInfos()) {
+		if (!textureInfo.sampled) {
+			barrierType = barrierType | Backend::BarrierType::Texture;
+			break;
+		}
+	}
+
+	for (const auto *slot : context.GetTextureSlots()) {
+		if (!slot->UsesSamplerBinding()) {
+			barrierType = barrierType | Backend::BarrierType::Texture;
+			break;
+		}
+	}
+
+	if (barrierType != Backend::BarrierType::None) {
+		backend->MemoryBarrier(barrierType);
+	}
+
 	// Sync if requested
 	if (sync) {
-		backend->MemoryBarrier(Backend::BarrierType::All);
 		backend->Finish();
 	}
 }
