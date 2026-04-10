@@ -471,7 +471,7 @@ public:
 		_uploadPool->UpdateStates();
 		PBOBuffer *pbo = _uploadPool->AcquireIdle();
 		if (!pbo) {
-			pbo = _uploadPool->SyncAndAcquireOldest();
+			return false;
 		}
 
 		Runtime::Context::GetInstance().MakeCurrent();
