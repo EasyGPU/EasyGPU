@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -62,7 +63,7 @@ public:
 	 * @param backendType Required backend type
 	 * @return Pointer to entry if found, nullptr otherwise
 	 */
-	const CacheEntry *Lookup(const std::string &shaderHash, uint32_t backendType) const;
+	std::optional<CacheEntry> Lookup(const std::string &shaderHash, uint32_t backendType) const;
 
 	/**
 	 * Store a binary in the cache

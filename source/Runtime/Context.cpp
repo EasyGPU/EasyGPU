@@ -22,7 +22,7 @@ bool					 Context::_destroyed = false;
 Context &Context::GetInstance() {
 	if (!_instance) {
 		if (_destroyed) {
-			throw std::runtime_error("Context was destroyed and cannot be recreated");
+			_destroyed = false;
 		}
 		_instance.reset(new Context());
 	}

@@ -284,7 +284,7 @@ public:
 	 * @param def The function definition lambda that takes Var<Args>... and calls Return()
 	 * @param name Optional base name for the function
 	 */
-	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)) {
+	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)), _mangledName(Detail::GenerateUniqueFunctionName(_baseName)) {
 		// Type-erase the lambda using shared_ptr for easy copying
 		// Use scalar types for the body generator (Var<float> needs float)
 		_bodyGenerator =
@@ -310,11 +310,6 @@ public:
 		auto &state = context->GetCallableState(reinterpret_cast<const void *>(_bodyGenerator.get()));
 
 		if (!state.declared) {
-			// Generate unique function name once and reuse across kernels
-			if (_mangledName.empty()) {
-				_mangledName = Detail::GenerateUniqueFunctionName(_baseName);
-			}
-
 			// Generate function prototype (forward declaration)
 			std::string prototype = GeneratePrototype();
 			context->AddCallableDeclaration(prototype);
@@ -404,7 +399,7 @@ private:
 				  "registered structs, or texture types (TextureRef, TextureSampler2D)");
 
 public:
-	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)) {
+	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)), _mangledName(Detail::GenerateUniqueFunctionName(_baseName)) {
 		// Use scalar types for the body generator
 		_bodyGenerator =
 			std::make_shared<Detail::CallableBodyGenerator<Func, ScalarArg<Args>...>>(std::forward<Func>(def));
@@ -421,10 +416,6 @@ public:
 		auto &state = context->GetCallableState(reinterpret_cast<const void *>(_bodyGenerator.get()));
 
 		if (!state.declared) {
-			if (_mangledName.empty()) {
-				_mangledName = Detail::GenerateUniqueFunctionName(_baseName);
-			}
-
 			std::string prototype = GeneratePrototype();
 			context->AddCallableDeclaration(prototype);
 			context->AddCallableBodyGenerator([this]() { GenerateFunctionBody(); });

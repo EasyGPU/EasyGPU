@@ -29,7 +29,7 @@ bool TestBasicCacheOperations() {
 	}
 
 	// Lookup the entry
-	const CacheEntry *entry = cache.Lookup("test_hash_123", 0);
+	auto entry = cache.Lookup("test_hash_123", 0);
 	if (!entry) {
 		std::cerr << "Failed to lookup cache entry" << std::endl;
 		return false;
@@ -41,8 +41,8 @@ bool TestBasicCacheOperations() {
 	}
 
 	// Lookup non-existent entry
-	const CacheEntry *missing = cache.Lookup("non_existent", 0);
-	if (missing != nullptr) {
+	auto missing = cache.Lookup("non_existent", 0);
+	if (missing.has_value()) {
 		std::cerr << "Should not find non-existent entry" << std::endl;
 		return false;
 	}
@@ -159,7 +159,7 @@ bool TestGlobalShaderCache() {
 	cache.Store("global_test", 0, 99, data);
 
 	// Verify
-	const CacheEntry *entry = cache.Lookup("global_test", 0);
+	auto entry = cache.Lookup("global_test", 0);
 	if (!entry || entry->data != data) {
 		std::cerr << "Global cache store/lookup failed" << std::endl;
 		return false;

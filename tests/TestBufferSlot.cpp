@@ -261,7 +261,7 @@ int main() {
 
 			bool pass = true;
 			// Spot check
-			for (size_t i : {0, 1, 100, 10000, N / 2, N - 1}) {
+			const size_t indices[] = {0, 1, 100, 10000, N / 2, N - 1}; for (size_t i : indices) {
 				if (!FloatEq(result[i], input[i] * 3.14159f, 0.01f)) {
 					pass = false;
 					std::cout << "\n  Mismatch at " << i << ": got " << result[i] << ", expected "
@@ -291,7 +291,7 @@ int main() {
 			Kernel1D		  kernel([&](Int i) {
 				 auto in  = inputSlot.Bind();
 				 auto out = outputSlot.Bind();
-				 Vec4 v   = in[i];
+				 auto v   = in[i];
 				 out[i]   = MakeFloat4(v.x() * 2.0f, v.y() * 2.0f, v.z() * 2.0f, v.w() * 2.0f);
 			 });
 

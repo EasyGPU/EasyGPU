@@ -26,6 +26,10 @@
 #include <thread>
 #include <vector>
 
+#if !defined(EASYGPU_BACKEND_VULKAN)
+#include <GLAD/glad.h>
+#endif
+
 namespace GPU::Runtime {
 
 // Forward declaration
@@ -103,6 +107,11 @@ public:
 
 	~PBOBuffer() {
 		if (_pboHandle != Backend::INVALID_BUFFER_HANDLE) {
+#if !defined(EASYGPU_BACKEND_VULKAN)
+			if (_fence) {
+				Wait(0);
+			}
+#endif
 			auto *backend = Context::GetBackend();
 			if (backend) {
 				backend->DestroyBuffer(_pboHandle);
@@ -114,9 +123,16 @@ public:
 	PBOBuffer &operator=(const PBOBuffer &) = delete;
 
 	PBOBuffer(PBOBuffer &&other) noexcept
-		: _pboHandle(other._pboHandle), _size(other._size), _isDownload(other._isDownload), _state(other._state) {
+		: _pboHandle(other._pboHandle), _size(other._size), _isDownload(other._isDownload), _state(other._state)
+#if !defined(EASYGPU_BACKEND_VULKAN)
+		, _fence(other._fence)
+#endif
+	{
 		other._pboHandle = Backend::INVALID_BUFFER_HANDLE;
 		other._size		 = 0;
+#if !defined(EASYGPU_BACKEND_VULKAN)
+		other._fence     = nullptr;
+#endif
 	}
 
 	PBOBuffer &operator=(PBOBuffer &&other) noexcept {
@@ -203,19 +219,41 @@ public:
 	}
 
 	void InsertFence() {
-		// Backend handles synchronization internally
+#if !defined(EASYGPU_BACKEND_VULKAN)
+		if (_fence) {
+			glDeleteSync(_fence);
+		}
+		_fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+#endif
 	}
 
 	bool IsComplete() {
+#if !defined(EASYGPU_BACKEND_VULKAN)
+		if (!_fence) {
+			return true;
+		}
+		GLenum result = glClientWaitSync(_fence, 0, 0);
+		return (result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED);
+#else
 		return true;
+#endif
 	}
 
 	void Wait(uint64_t timeout = 0) {
+#if !defined(EASYGPU_BACKEND_VULKAN)
+		if (_fence) {
+			GLuint64 timeoutNs = timeout ? (timeout * 1000000ULL) : ~0ULL;
+			glClientWaitSync(_fence, GL_SYNC_FLUSH_COMMANDS_BIT, timeoutNs);
+			glDeleteSync(_fence);
+			_fence = nullptr;
+		}
+#else
 		(void)timeout;
 		auto *backend = Context::GetBackend();
 		if (backend) {
 			backend->Finish();
 		}
+#endif
 	}
 
 	void DeleteFence() {
@@ -226,6 +264,9 @@ private:
 	size_t				  _size		  = 0;
 	bool				  _isDownload = false;
 	State				  _state	  = State::Idle;
+#if !defined(EASYGPU_BACKEND_VULKAN)
+	GLsync                _fence      = nullptr;
+#endif
 };
 
 class PBOPool {
@@ -423,12 +464,24 @@ public:
 		}
 	}
 
-	/**
-	 * Experimental / Not fully implemented
-	 */
 	bool UploadAsync(const void *data) {
-		(void)data;
-		throw std::runtime_error("Async texture transfer is not yet fully implemented");
+		if (!_uploadPool) {
+			InitUploadPBOPool(2);
+		}
+		_uploadPool->UpdateStates();
+		PBOBuffer *pbo = _uploadPool->AcquireIdle();
+		if (!pbo) {
+			pbo = _uploadPool->SyncAndAcquireOldest();
+		}
+
+		Runtime::Context::GetInstance().MakeCurrent();
+
+		size_t dataSize = _width * _height * GetBytesPerPixel();
+		pbo->CopyData(data, dataSize);
+		Upload(data);
+		pbo->SetState(PBOBuffer::State::Uploading);
+		pbo->InsertFence();
+		return true;
 	}
 
 	bool UploadAsyncStream(const void *data, uint32_t timeoutMs = 1000) {

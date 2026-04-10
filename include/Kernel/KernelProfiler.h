@@ -15,6 +15,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <mutex>
 #include <vector>
@@ -191,6 +192,9 @@ private:
 
 	// Aggregated statistics per kernel name
 	std::unordered_map<std::string, KernelProfilerQueryResult> _stats;
+
+	// Track which thread started each query to prevent cross-thread use
+	std::unordered_map<unsigned int, std::thread::id> _queryOwners;
 };
 
 // ===================================================================================

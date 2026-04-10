@@ -81,15 +81,15 @@ public:
 
 ShaderCache::ShaderCache() = default;
 
-const CacheEntry *ShaderCache::Lookup(const std::string &shaderHash, uint32_t backendType) const {
+std::optional<CacheEntry> ShaderCache::Lookup(const std::string &shaderHash, uint32_t backendType) const {
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	std::string					key = std::to_string(backendType) + ":" + shaderHash;
 	auto						it	= _entries.find(key);
 	if (it != _entries.end()) {
-		return &it->second;
+		return it->second;
 	}
-	return nullptr;
+	return std::nullopt;
 }
 
 bool ShaderCache::Store(const std::string &shaderHash, uint32_t backendType, uint32_t format,

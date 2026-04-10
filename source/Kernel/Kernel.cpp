@@ -118,7 +118,7 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 		bool		loadedFromCache = false;
 		if (backend->SupportsPipelineCache()) {
 			auto			 &globalCache = GlobalShaderCache::Get();
-			const CacheEntry *entry		  = globalCache.Lookup(
+			auto entry = globalCache.Lookup(
 				  context.GetShaderHash(), static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()));
 
 			if (entry && entry->dataSize > 0) {

@@ -181,6 +181,8 @@ unsigned int KernelProfiler::BeginQuery() {
 	unsigned int query = AcquireQuery();
 	if (query != 0) {
 		glBeginQuery(GL_TIME_ELAPSED, query);
+		std::lock_guard<std::recursive_mutex> lock(_mutex);
+		_queryOwners[query] = std::this_thread::get_id();
 	}
 	return query;
 #endif
@@ -201,6 +203,17 @@ void KernelProfiler::EndQuery(unsigned int queryId, const std::string &kernelNam
 	double	 elapsedMs	  = static_cast<double>(elapsedNanos) / 1'000'000.0;
 	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
 #else
+	{
+		std::lock_guard<std::recursive_mutex> lock(_mutex);
+		auto it = _queryOwners.find(queryId);
+		if (it != _queryOwners.end() && it->second != std::this_thread::get_id()) {
+			_queryOwners.erase(it);
+			ReleaseQuery(queryId);
+			return;
+		}
+		_queryOwners.erase(it);
+	}
+
 	glEndQuery(GL_TIME_ELAPSED);
 
 	// Get the query result
@@ -229,6 +242,8 @@ unsigned int KernelProfiler::BeginQueryOnCurrentContext() {
 	unsigned int query = AcquireQuery();
 	if (query != 0) {
 		glBeginQuery(GL_TIME_ELAPSED, query);
+		std::lock_guard<std::recursive_mutex> lock(_mutex);
+		_queryOwners[query] = std::this_thread::get_id();
 	}
 	return query;
 #endif
@@ -249,6 +264,17 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 	RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
 #else
 	// No context switch - use current context
+	{
+		std::lock_guard<std::recursive_mutex> lock(_mutex);
+		auto it = _queryOwners.find(queryId);
+		if (it != _queryOwners.end() && it->second != std::this_thread::get_id()) {
+			_queryOwners.erase(it);
+			ReleaseQuery(queryId);
+			return;
+		}
+		_queryOwners.erase(it);
+	}
+
 	glEndQuery(GL_TIME_ELAPSED);
 
 	// Get the query result

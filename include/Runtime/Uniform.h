@@ -17,6 +17,7 @@
 #include <Utility/Unref.h>
 
 #include <format>
+#include <mutex>
 #include <string>
 #include <type_traits>
 
@@ -103,7 +104,9 @@ public:
 	/**
 	 * Copy constructor
 	 */
-	Uniform(const Uniform &other) : _value(other._value) {
+	Uniform(const Uniform &other) {
+		std::lock_guard<std::mutex> lock(other._mutex);
+		_value = other._value;
 	}
 
 	/**
@@ -112,6 +115,7 @@ public:
 	 * @return Reference to this uniform
 	 */
 	Uniform &operator=(T value) {
+		std::lock_guard<std::mutex> lock(_mutex);
 		_value = value;
 		return *this;
 	}
@@ -122,7 +126,10 @@ public:
 	 * @return Reference to this uniform
 	 */
 	Uniform &operator=(const Uniform &other) {
-		_value = other._value;
+		if (this != &other) {
+			std::scoped_lock lock(_mutex, other._mutex);
+			_value = other._value;
+		}
 		return *this;
 	}
 
@@ -222,6 +229,7 @@ public:
 	 * @return The current value
 	 */
 	[[nodiscard]] T GetValue() const {
+		std::lock_guard<std::mutex> lock(_mutex);
 		return _value;
 	}
 
@@ -230,6 +238,7 @@ public:
 	 * @param value The new value
 	 */
 	void SetValue(T value) {
+		std::lock_guard<std::mutex> lock(_mutex);
 		_value = value;
 	}
 
@@ -237,10 +246,12 @@ public:
 	 * Implicit conversion to value type
 	 */
 	operator T() const {
+		std::lock_guard<std::mutex> lock(_mutex);
 		return _value;
 	}
 
 private:
+	mutable std::mutex _mutex;
 	T _value{};
 };
 

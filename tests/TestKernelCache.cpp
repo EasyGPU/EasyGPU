@@ -65,7 +65,7 @@ bool Test_BasicCacheOperations() {
 	}
 
 	// Lookup entries
-	const CacheEntry *entry1 = cache.Lookup("shader1", 0);
+	auto entry1 = cache.Lookup("shader1", 0);
 	if (!entry1) {
 		std::cerr << "  FAILED: Lookup for existing entry returned nullptr" << std::endl;
 		return false;
@@ -77,22 +77,22 @@ bool Test_BasicCacheOperations() {
 	}
 
 	// Check backend-specific lookup
-	const CacheEntry *entry2 = cache.Lookup("shader2", 1);
+	auto entry2 = cache.Lookup("shader2", 1);
 	if (!entry2 || entry2->data != vkData) {
 		std::cerr << "  FAILED: Vulkan entry lookup failed" << std::endl;
 		return false;
 	}
 
 	// Check cross-backend isolation
-	const CacheEntry *wrongBackend = cache.Lookup("shader1", 1);
-	if (wrongBackend != nullptr) {
+	auto wrongBackend = cache.Lookup("shader1", 1);
+	if (wrongBackend.has_value()) {
 		std::cerr << "  FAILED: Cross-backend lookup should return nullptr" << std::endl;
 		return false;
 	}
 
 	// Test non-existent entry
-	const CacheEntry *missing = cache.Lookup("nonexistent", 0);
-	if (missing != nullptr) {
+	auto missing = cache.Lookup("nonexistent", 0);
+	if (missing.has_value()) {
 		std::cerr << "  FAILED: Non-existent entry should return nullptr" << std::endl;
 		return false;
 	}
@@ -342,7 +342,7 @@ bool Test_GlobalCacheOperations() {
 	cache.Store("test_global", 0, 99, data);
 
 	// Verify
-	const CacheEntry *entry = cache.Lookup("test_global", 0);
+	auto entry = cache.Lookup("test_global", 0);
 	if (!entry || entry->data != data) {
 		std::cerr << "  FAILED: Global cache store/lookup failed" << std::endl;
 		return false;
@@ -353,7 +353,7 @@ bool Test_GlobalCacheOperations() {
 
 	// Verify cleared
 	entry = cache.Lookup("test_global", 0);
-	if (entry != nullptr) {
+	if (entry.has_value()) {
 		std::cerr << "  FAILED: Global cache clear failed" << std::endl;
 		return false;
 	}
@@ -384,7 +384,7 @@ bool Test_LargeDataCaching() {
 	}
 
 	// Verify immediate lookup
-	const CacheEntry *entry = cache.Lookup("large_shader", 0);
+	auto entry = cache.Lookup("large_shader", 0);
 	if (!entry) {
 		std::cerr << "  FAILED: Large data lookup failed" << std::endl;
 		return false;

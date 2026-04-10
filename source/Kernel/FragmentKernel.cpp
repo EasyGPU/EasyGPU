@@ -335,7 +335,13 @@ void FragmentKernel2D::EnsureShaderCompiled() {
 		uint32_t fs	   = Runtime::ShaderCompiler::CompileShader(GL_FRAGMENT_SHADER, fsSource);
 
 		// Link program
-		_shaderProgram = Runtime::ShaderCompiler::LinkProgram({vs, fs});
+		try {
+			_shaderProgram = Runtime::ShaderCompiler::LinkProgram({vs, fs});
+		} catch (...) {
+			glDeleteShader(vs);
+			glDeleteShader(fs);
+			throw;
+		}
 
 		// Cache the program
 		_context->SetCachedPipeline(static_cast<GPU::Backend::PipelineHandle>(_shaderProgram));
