@@ -12,7 +12,6 @@
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Utility/Math.h>
-#include <GPU.h>
 
 using namespace GPU::IR::Value;
 using namespace GPU::Math;

@@ -53,7 +53,7 @@ public:
 		std::string			 textureName;
 		uint32_t			 width;
 		uint32_t			 height;
-		uint32_t			 depth = 1;
+		uint32_t			 depth	 = 1;
 		bool				 sampled = false;
 	};
 
@@ -187,10 +187,10 @@ public:
 	// Buffer/Texture Slot Support (Dynamic Resource Switching)
 	// ===================================================================
 
-	void										  RegisterBufferSlot(Runtime::BufferSlotBase *slot) override;
-	void										  RegisterTextureSlot(Runtime::TextureSlotBase *slot) override;
-	void RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName, uint32_t width,
-															   uint32_t height, uint32_t depth, bool sampled = false) override;
+	void RegisterBufferSlot(Runtime::BufferSlotBase *slot) override;
+	void RegisterTextureSlot(Runtime::TextureSlotBase *slot) override;
+	void RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName,
+						   uint32_t width, uint32_t height, uint32_t depth, bool sampled = false) override;
 
 	const std::vector<Runtime::BufferSlotBase *> &GetBufferSlots() const {
 		return _bufferSlots;
@@ -233,36 +233,36 @@ public:
 
 protected:
 	// Callable support
-	std::vector<std::string>				_callableDeclarations;
-	std::vector<std::function<void()>>		_callableBodyGenerators;
-	std::vector<std::string>				_callableBodies;
-	std::stack<std::string>					_callableBodyStack;
-	std::string								_currentCallableBody;
-	bool									_inCallableBody = false;
+	std::vector<std::string>								 _callableDeclarations;
+	std::vector<std::function<void()>>						 _callableBodyGenerators;
+	std::vector<std::string>								 _callableBodies;
+	std::stack<std::string>									 _callableBodyStack;
+	std::string												 _currentCallableBody;
+	bool													 _inCallableBody = false;
 
-	uint32_t								_nextBinding	= 0;
-	std::vector<BufferInfo>					_buffers;
-	std::vector<uint32_t>					_bufferBindings;
-	std::unordered_map<uint32_t, uint32_t>	_runtimeBuffers; // binding -> backend buffer handle
+	uint32_t												 _nextBinding	 = 0;
+	std::vector<BufferInfo>									 _buffers;
+	std::vector<uint32_t>									 _bufferBindings;
+	std::unordered_map<uint32_t, uint32_t>					 _runtimeBuffers; // binding -> backend buffer handle
 
-	std::vector<TextureInfo>				_textures;
-	std::vector<uint32_t>					_textureBindings;
-	std::unordered_map<uint32_t, uint32_t>	_runtimeTextures; // binding -> backend texture handle
+	std::vector<TextureInfo>								 _textures;
+	std::vector<uint32_t>									 _textureBindings;
+	std::unordered_map<uint32_t, uint32_t>					 _runtimeTextures; // binding -> backend texture handle
 
-	std::vector<UniformEntry>				_uniforms;
-	int										_nextUniformIndex  = 0;
-	size_t									_nextUniformOffset = 0;
+	std::vector<UniformEntry>								 _uniforms;
+	int														 _nextUniformIndex	= 0;
+	size_t													 _nextUniformOffset = 0;
 
 	// Slot support for dynamic resource switching
-	std::vector<Runtime::BufferSlotBase *>	_bufferSlots;
-	std::vector<Runtime::TextureSlotBase *> _textureSlots;
+	std::vector<Runtime::BufferSlotBase *>					 _bufferSlots;
+	std::vector<Runtime::TextureSlotBase *>					 _textureSlots;
 
 	// Per-context slot binding mappings (required because slots are shared across kernels)
-	std::unordered_map<Runtime::BufferSlotBase *, uint32_t> _bufferSlotBindings;
+	std::unordered_map<Runtime::BufferSlotBase *, uint32_t>	 _bufferSlotBindings;
 	std::unordered_map<Runtime::TextureSlotBase *, uint32_t> _textureSlotBindings;
 
 	// Shared memory declarations
-	std::vector<std::string>				_sharedMemoryDeclarations;
+	std::vector<std::string>								 _sharedMemoryDeclarations;
 
 public:
 	// ===================================================================

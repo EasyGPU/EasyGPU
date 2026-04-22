@@ -14,10 +14,10 @@
 
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
-#include <mutex>
 #include <vector>
 
 namespace GPU::Kernel {
@@ -178,7 +178,7 @@ private:
 	void		 RecordExecution(const std::string &kernelName, int groupX, int groupY, int groupZ, double elapsedMs);
 
 private:
-	mutable std::recursive_mutex								   _mutex;
+	mutable std::recursive_mutex							   _mutex;
 
 	bool													   _enabled = false;
 
@@ -194,7 +194,7 @@ private:
 	std::unordered_map<std::string, KernelProfilerQueryResult> _stats;
 
 	// Track which thread started each query to prevent cross-thread use
-	std::unordered_map<unsigned int, std::thread::id> _queryOwners;
+	std::unordered_map<unsigned int, std::thread::id>		   _queryOwners;
 };
 
 // ===================================================================================

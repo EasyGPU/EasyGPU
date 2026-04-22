@@ -66,13 +66,12 @@ inline IR::Value::Expr<float> BuildAtomicFloatOp(const std::string &opName, cons
 }
 
 /**
- * Atomic subtract operation (GLSL 4.6+) for int
+ * Atomic subtract operation for int
+ * Implemented via atomicAdd with negated value, as GLSL does not provide atomicSub.
  */
 [[nodiscard]] inline IR::Value::Expr<int> AtomicSub(const IR::Value::Expr<int> &target,
 													const IR::Value::Expr<int> &value) {
-	std::string targetStr = IR::Builder::Builder::Get().BuildNode(*target.Node());
-	std::string valueStr  = IR::Builder::Builder::Get().BuildNode(*value.Node());
-	return AtomicDetail::BuildAtomicIntOp("atomicSub", targetStr, valueStr);
+	return AtomicAdd(target, -value);
 }
 
 [[nodiscard]] inline IR::Value::Expr<int> AtomicSub(const IR::Value::Expr<int> &target, int value) {

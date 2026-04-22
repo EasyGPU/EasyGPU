@@ -58,14 +58,16 @@ public:
 	 * @param[out] height The texture height
 	 */
 	virtual void				   GetDimensions(uint32_t &width, uint32_t &height) const = 0;
-	virtual uint32_t		   GetDepth() const { return 1; }
+	virtual uint32_t			   GetDepth() const {
+		  return 1;
+	}
 
 	/**
 	 * Get the binding slot assigned by KernelBuildContext
 	 * @return The binding slot index, or -1 if not bound
 	 */
-	int							   GetBinding() const {
-		   return _binding;
+	int GetBinding() const {
+		return _binding;
 	}
 
 	/**
@@ -251,12 +253,12 @@ private:
  */
 template <PixelFormat Format> class Texture3DSlot : public TextureSlotBase {
 public:
-	Texture3DSlot() = default;
-	~Texture3DSlot() override = default;
+	Texture3DSlot()										= default;
+	~Texture3DSlot() override							= default;
 
-	Texture3DSlot(const Texture3DSlot &) = delete;
-	Texture3DSlot &operator=(const Texture3DSlot &) = delete;
-	Texture3DSlot(Texture3DSlot &&) noexcept = default;
+	Texture3DSlot(const Texture3DSlot &)				= delete;
+	Texture3DSlot &operator=(const Texture3DSlot &)		= delete;
+	Texture3DSlot(Texture3DSlot &&) noexcept			= default;
 	Texture3DSlot &operator=(Texture3DSlot &&) noexcept = default;
 
 public:
@@ -290,7 +292,7 @@ public:
 
 	void GetDimensions(uint32_t &width, uint32_t &height) const override {
 		if (_texture) {
-			width = _texture->GetWidth();
+			width  = _texture->GetWidth();
 			height = _texture->GetHeight();
 		} else {
 			width = height = 0;

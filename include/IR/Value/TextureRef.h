@@ -28,7 +28,7 @@
 namespace GPU::Runtime {
 template <PixelFormat Format> class Texture2D;
 template <PixelFormat Format> class Texture3D;
-}
+} // namespace GPU::Runtime
 
 namespace GPU::IR::Value {
 /**
@@ -504,48 +504,49 @@ public:
 
 	// Write operations - imageStore(texture, ivec3(x, y, z), value)
 	void Write(const Var<int> &x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
-		std::string xStr     = Builder::Builder::Get().BuildNode(*x.Load().get());
-		std::string yStr     = Builder::Builder::Get().BuildNode(*y.Load().get());
-		std::string zStr     = Builder::Builder::Get().BuildNode(*z.Load().get());
+		std::string xStr	 = Builder::Builder::Get().BuildNode(*x.Load().get());
+		std::string yStr	 = Builder::Builder::Get().BuildNode(*y.Load().get());
+		std::string zStr	 = Builder::Builder::Get().BuildNode(*z.Load().get());
 		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
-		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+		std::string code =
+			std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
 		Builder::Builder::Get().Context()->PushTranslatedCode(code);
 	}
 
 	void Write(int x, int y, int z, const Var<GPU::Math::Vec4> &color) {
 		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
-		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
+		std::string code	 = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
 		Builder::Builder::Get().Context()->PushTranslatedCode(code);
 	}
 
 	void Write(const Var<int> &x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::IVec4> &color) {
-		std::string xStr     = Builder::Builder::Get().BuildNode(*x.Load().get());
-		std::string yStr     = Builder::Builder::Get().BuildNode(*y.Load().get());
-		std::string zStr     = Builder::Builder::Get().BuildNode(*z.Load().get());
+		std::string xStr	 = Builder::Builder::Get().BuildNode(*x.Load().get());
+		std::string yStr	 = Builder::Builder::Get().BuildNode(*y.Load().get());
+		std::string zStr	 = Builder::Builder::Get().BuildNode(*z.Load().get());
 		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
-		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
+		std::string code =
+			std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, xStr, yStr, zStr, colorStr);
 		Builder::Builder::Get().Context()->PushTranslatedCode(code);
 	}
 
 	void Write(int x, int y, int z, const Var<GPU::Math::IVec4> &color) {
 		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
-		std::string code     = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
+		std::string code	 = std::format("imageStore({}, ivec3({}, {}, {}), {});\n", _textureName, x, y, z, colorStr);
 		Builder::Builder::Get().Context()->PushTranslatedCode(code);
 	}
 
 private:
 	std::string _textureName;
-	uint32_t    _binding;
-	uint32_t    _width;
-	uint32_t    _height;
-	uint32_t    _depth;
+	uint32_t	_binding;
+	uint32_t	_width;
+	uint32_t	_height;
+	uint32_t	_depth;
 };
 
 /**
  * Type alias for convenience
  */
 template <Runtime::PixelFormat Format> using image3d = TextureRef3D<Format>;
-
 
 } // namespace GPU::IR::Value
 

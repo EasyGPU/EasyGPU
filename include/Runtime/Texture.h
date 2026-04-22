@@ -125,13 +125,14 @@ public:
 	PBOBuffer(PBOBuffer &&other) noexcept
 		: _pboHandle(other._pboHandle), _size(other._size), _isDownload(other._isDownload), _state(other._state)
 #if !defined(EASYGPU_BACKEND_VULKAN)
-		, _fence(other._fence)
+		  ,
+		  _fence(other._fence)
 #endif
 	{
 		other._pboHandle = Backend::INVALID_BUFFER_HANDLE;
 		other._size		 = 0;
 #if !defined(EASYGPU_BACKEND_VULKAN)
-		other._fence     = nullptr;
+		other._fence = nullptr;
 #endif
 	}
 
@@ -265,7 +266,7 @@ private:
 	bool				  _isDownload = false;
 	State				  _state	  = State::Idle;
 #if !defined(EASYGPU_BACKEND_VULKAN)
-	GLsync                _fence      = nullptr;
+	GLsync _fence = nullptr;
 #endif
 };
 
@@ -690,34 +691,34 @@ public:
 		  _format(other._format), _boundBinding(other._boundBinding), _uploadPool(std::move(other._uploadPool)),
 		  _downloadPool(std::move(other._downloadPool)), _currentUploadPBO(other._currentUploadPBO),
 		  _currentDownloadPBO(other._currentDownloadPBO) {
-		other._textureHandle      = Backend::INVALID_TEXTURE_HANDLE;
-		other._width              = 0;
-		other._height             = 0;
-		other._depth              = 0;
-		other._boundBinding       = -1;
-		other._currentUploadPBO   = nullptr;
+		other._textureHandle	  = Backend::INVALID_TEXTURE_HANDLE;
+		other._width			  = 0;
+		other._height			  = 0;
+		other._depth			  = 0;
+		other._boundBinding		  = -1;
+		other._currentUploadPBO	  = nullptr;
 		other._currentDownloadPBO = nullptr;
 	}
 
 	Texture3D &operator=(Texture3D &&other) noexcept {
 		if (this != &other) {
 			DestroyTexture();
-			_textureHandle            = other._textureHandle;
-			_width                    = other._width;
-			_height                   = other._height;
-			_depth                    = other._depth;
-			_format                   = other._format;
-			_boundBinding             = other._boundBinding;
-			_uploadPool               = std::move(other._uploadPool);
-			_downloadPool             = std::move(other._downloadPool);
-			_currentUploadPBO         = other._currentUploadPBO;
-			_currentDownloadPBO       = other._currentDownloadPBO;
-			other._textureHandle      = Backend::INVALID_TEXTURE_HANDLE;
-			other._width              = 0;
-			other._height             = 0;
-			other._depth              = 0;
-			other._boundBinding       = -1;
-			other._currentUploadPBO   = nullptr;
+			_textureHandle			  = other._textureHandle;
+			_width					  = other._width;
+			_height					  = other._height;
+			_depth					  = other._depth;
+			_format					  = other._format;
+			_boundBinding			  = other._boundBinding;
+			_uploadPool				  = std::move(other._uploadPool);
+			_downloadPool			  = std::move(other._downloadPool);
+			_currentUploadPBO		  = other._currentUploadPBO;
+			_currentDownloadPBO		  = other._currentDownloadPBO;
+			other._textureHandle	  = Backend::INVALID_TEXTURE_HANDLE;
+			other._width			  = 0;
+			other._height			  = 0;
+			other._depth			  = 0;
+			other._boundBinding		  = -1;
+			other._currentUploadPBO	  = nullptr;
 			other._currentDownloadPBO = nullptr;
 		}
 		return *this;
@@ -727,7 +728,7 @@ public:
 		DestroyTexture();
 	}
 
-	Texture3D(const Texture3D &)            = delete;
+	Texture3D(const Texture3D &)			= delete;
 	Texture3D &operator=(const Texture3D &) = delete;
 
 public:
@@ -788,7 +789,7 @@ public:
 
 	void InitDownloadPBOPool(uint32_t bufferCount = 2) {
 		if (!_downloadPool) {
-			size_t size = _width * _height * _depth * GetBytesPerPixel();
+			size_t size	  = _width * _height * _depth * GetBytesPerPixel();
 			_downloadPool = std::make_unique<PBOPool>(size, bufferCount, true);
 		}
 	}
@@ -896,7 +897,7 @@ public:
 		if (!context) {
 			throw std::runtime_error("Texture3D::Bind() called outside of Kernel definition");
 		}
-		uint32_t    binding     = context->AllocateTextureBinding();
+		uint32_t	binding		= context->AllocateTextureBinding();
 		std::string textureName = std::format("tex{}", binding);
 		context->RegisterTexture3D(binding, _format, textureName, _width, _height, _depth);
 		context->BindRuntimeTexture(binding, static_cast<uint32_t>(_textureHandle));
@@ -909,7 +910,7 @@ public:
 		if (!context) {
 			throw std::runtime_error("Texture3D::BindSampler() called outside of Kernel definition");
 		}
-		uint32_t    binding     = context->AllocateTextureBinding();
+		uint32_t	binding		= context->AllocateTextureBinding();
 		std::string textureName = std::format("tex{}", binding);
 		context->RegisterTexture3D(binding, _format, textureName, _width, _height, _depth, true);
 		context->BindRuntimeTexture(binding, static_cast<uint32_t>(_textureHandle));
@@ -955,12 +956,12 @@ private:
 			throw std::runtime_error("Backend not available");
 		}
 		Backend::TextureDesc desc;
-		desc.width       = _width;
-		desc.height      = _height;
-		desc.depth       = _depth;
-		desc.format      = ToBackendPixelFormat(_format);
+		desc.width		 = _width;
+		desc.height		 = _height;
+		desc.depth		 = _depth;
+		desc.format		 = ToBackendPixelFormat(_format);
 		desc.initialData = initialData;
-		_textureHandle   = backend->CreateTexture(desc);
+		_textureHandle	 = backend->CreateTexture(desc);
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE) {
 			throw std::runtime_error("Failed to create GPU texture");
 		}
@@ -978,24 +979,23 @@ private:
 	}
 
 private:
-	Backend::TextureHandle   _textureHandle = Backend::INVALID_TEXTURE_HANDLE;
-	uint32_t                 _width         = 0;
-	uint32_t                 _height        = 0;
-	uint32_t                 _depth         = 0;
-	PixelFormat              _format        = Format;
-	int                      _boundBinding  = -1;
+	Backend::TextureHandle	 _textureHandle = Backend::INVALID_TEXTURE_HANDLE;
+	uint32_t				 _width			= 0;
+	uint32_t				 _height		= 0;
+	uint32_t				 _depth			= 0;
+	PixelFormat				 _format		= Format;
+	int						 _boundBinding	= -1;
 	std::unique_ptr<PBOPool> _uploadPool;
 	std::unique_ptr<PBOPool> _downloadPool;
-	PBOBuffer               *_currentUploadPBO   = nullptr;
-	PBOBuffer               *_currentDownloadPBO = nullptr;
+	PBOBuffer				*_currentUploadPBO	 = nullptr;
+	PBOBuffer				*_currentDownloadPBO = nullptr;
 };
 
 using Texture3DRGBA8   = Texture3D<PixelFormat::RGBA8>;
 using Texture3DRGBA32F = Texture3D<PixelFormat::RGBA32F>;
-using Texture3DR32F    = Texture3D<PixelFormat::R32F>;
+using Texture3DR32F	   = Texture3D<PixelFormat::R32F>;
 using Texture3DRG32F   = Texture3D<PixelFormat::RG32F>;
-using Texture3DR8      = Texture3D<PixelFormat::R8>;
-
+using Texture3DR8	   = Texture3D<PixelFormat::R8>;
 
 } // namespace GPU::Runtime
 

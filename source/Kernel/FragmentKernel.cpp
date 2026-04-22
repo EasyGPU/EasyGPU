@@ -329,10 +329,10 @@ void FragmentKernel2D::EnsureShaderCompiled() {
 
 	try {
 		// Compile vertex shader
-		uint32_t vs	   = Runtime::ShaderCompiler::CompileShader(GL_VERTEX_SHADER, vsSource);
+		uint32_t vs = Runtime::ShaderCompiler::CompileShader(GL_VERTEX_SHADER, vsSource);
 
 		// Compile fragment shader
-		uint32_t fs	   = Runtime::ShaderCompiler::CompileShader(GL_FRAGMENT_SHADER, fsSource);
+		uint32_t fs = Runtime::ShaderCompiler::CompileShader(GL_FRAGMENT_SHADER, fsSource);
 
 		// Link program
 		try {

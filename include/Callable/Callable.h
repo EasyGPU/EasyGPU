@@ -284,7 +284,9 @@ public:
 	 * @param def The function definition lambda that takes Var<Args>... and calls Return()
 	 * @param name Optional base name for the function
 	 */
-	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)), _mangledName(Detail::GenerateUniqueFunctionName(_baseName)) {
+	template <typename Func>
+	Callable(Func &&def, std::string name = "")
+		: _baseName(std::move(name)), _mangledName(Detail::GenerateUniqueFunctionName(_baseName)) {
 		// Type-erase the lambda using shared_ptr for easy copying
 		// Use scalar types for the body generator (Var<float> needs float)
 		_bodyGenerator =
@@ -399,7 +401,9 @@ private:
 				  "registered structs, or texture types (TextureRef, TextureSampler2D)");
 
 public:
-	template <typename Func> Callable(Func &&def, std::string name = "") : _baseName(std::move(name)), _mangledName(Detail::GenerateUniqueFunctionName(_baseName)) {
+	template <typename Func>
+	Callable(Func &&def, std::string name = "")
+		: _baseName(std::move(name)), _mangledName(Detail::GenerateUniqueFunctionName(_baseName)) {
 		// Use scalar types for the body generator
 		_bodyGenerator =
 			std::make_shared<Detail::CallableBodyGenerator<Func, ScalarArg<Args>...>>(std::forward<Func>(def));

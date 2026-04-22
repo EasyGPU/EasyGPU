@@ -49,13 +49,13 @@ public:
 	 */
 	ShaderCache();
 
-	~ShaderCache()										 = default;
+	~ShaderCache()												 = default;
 
 	// Non-copyable, non-movable (mutex member prevents move)
-	ShaderCache(const ShaderCache &)					 = delete;
-	ShaderCache &operator=(const ShaderCache &)			 = delete;
-	ShaderCache(ShaderCache &&) noexcept				 = delete;
-	ShaderCache		 &operator=(ShaderCache &&) noexcept = delete;
+	ShaderCache(const ShaderCache &)							 = delete;
+	ShaderCache &operator=(const ShaderCache &)					 = delete;
+	ShaderCache(ShaderCache &&) noexcept						 = delete;
+	ShaderCache				 &operator=(ShaderCache &&) noexcept = delete;
 
 	/**
 	 * Look up a cached binary by shader source hash

@@ -19,7 +19,7 @@ namespace GPU::Runtime {
 std::unique_ptr<Context> Context::_instance;
 bool					 Context::_destroyed = false;
 
-Context &Context::GetInstance() {
+Context					&Context::GetInstance() {
 	if (!_instance) {
 		if (_destroyed) {
 			_destroyed = false;

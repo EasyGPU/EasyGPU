@@ -81,6 +81,7 @@ struct MaxOp {
 template <typename T, int N, typename Op>
 [[nodiscard]] IR::Value::Expr<T> WorkgroupReduce(IR::Value::SharedMemory<T, N> &shared, const IR::Value::Expr<T> &value,
 												 Op op) {
+	static_assert(N > 0 && (N & (N - 1)) == 0, "WorkgroupReduce requires N to be a positive power of 2");
 	using namespace IR::Value;
 
 	Var<int> lid = LocalThreadId();
@@ -166,6 +167,7 @@ template <typename T, int N>
 template <typename T, int N, typename Op>
 [[nodiscard]] IR::Value::Var<T> WorkgroupScanInclusive(IR::Value::SharedMemory<T, N> &shared,
 													   const IR::Value::Expr<T> &value, Op op) {
+	static_assert(N > 0 && (N & (N - 1)) == 0, "WorkgroupScanInclusive requires N to be a positive power of 2");
 	using namespace IR::Value;
 
 	Var<int> lid = LocalThreadId();
@@ -275,6 +277,7 @@ template <typename T, int N>
 template <typename T, int N, typename Op>
 [[nodiscard]] IR::Value::Var<T> WorkgroupScanExclusive(IR::Value::SharedMemory<T, N> &shared,
 													   const IR::Value::Expr<T> &value, T identity, Op op) {
+	static_assert(N > 0 && (N & (N - 1)) == 0, "WorkgroupScanExclusive requires N to be a positive power of 2");
 	using namespace IR::Value;
 
 	Var<int> lid = LocalThreadId();

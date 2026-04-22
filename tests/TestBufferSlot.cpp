@@ -200,7 +200,7 @@ int main() {
 				  auto a = slotA.Bind();
 				  auto b = slotB.Bind();
 				  auto c = slotC.Bind();
-				  c[i]   = a[i] + b[i];
+				  c[i]	 = a[i] + b[i];
 			  });
 
 			std::vector<float> dataA = {1.0f, 2.0f, 3.0f};
@@ -259,9 +259,10 @@ int main() {
 			kernel.Dispatch((N + 255) / 256, true);
 			outputBuf.Download(result);
 
-			bool pass = true;
+			bool		 pass	   = true;
 			// Spot check
-			const size_t indices[] = {0, 1, 100, 10000, N / 2, N - 1}; for (size_t i : indices) {
+			const size_t indices[] = {0, 1, 100, 10000, N / 2, N - 1};
+			for (size_t i : indices) {
 				if (!FloatEq(result[i], input[i] * 3.14159f, 0.01f)) {
 					pass = false;
 					std::cout << "\n  Mismatch at " << i << ": got " << result[i] << ", expected "
@@ -291,8 +292,8 @@ int main() {
 			Kernel1D		  kernel([&](Int i) {
 				 auto in  = inputSlot.Bind();
 				 auto out = outputSlot.Bind();
-				 auto v   = in[i];
-				 out[i]   = MakeFloat4(v.x() * 2.0f, v.y() * 2.0f, v.z() * 2.0f, v.w() * 2.0f);
+				 auto v	  = in[i];
+				 out[i]	  = MakeFloat4(v.x() * 2.0f, v.y() * 2.0f, v.z() * 2.0f, v.w() * 2.0f);
 			 });
 
 			std::vector<Vec4> input = {Vec4(1.0f, 2.0f, 3.0f, 4.0f), Vec4(5.0f, 6.0f, 7.0f, 8.0f)};

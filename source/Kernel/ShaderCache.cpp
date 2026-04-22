@@ -19,8 +19,8 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h>
 #include <wincrypt.h>
+#include <windows.h>
 #else
 #include <openssl/evp.h>
 #endif
@@ -31,8 +31,8 @@ namespace GPU::Kernel {
 class SHA256 {
 public:
 	static std::string Hash(const std::string &input) {
-			unsigned char hash[32] = {};
-			bool hashComputed = false;
+		unsigned char hash[32]	   = {};
+		bool		  hashComputed = false;
 
 #ifdef _WIN32
 		// Windows Cryptography API

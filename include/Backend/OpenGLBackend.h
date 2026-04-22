@@ -56,12 +56,12 @@ public:
 	void		   DestroyTexture(TextureHandle texture) override;
 	void		   UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 								 const void *data) override;
-	void				   UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-																   uint32_t height, uint32_t depth, const void *data) override;
-	void		   DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-								   void *outData) override;
-	void				   DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-																   uint32_t height, uint32_t depth, void *outData) override;
+	void UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+						 uint32_t depth, const void *data) override;
+	void DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+						 void *outData) override;
+	void DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+						   uint32_t depth, void *outData) override;
 
 	ShaderHandle   CreateShader(const ShaderDesc &desc) override;
 	void		   DestroyShader(ShaderHandle shader) override;

@@ -284,7 +284,8 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-		glTexImage3D(GL_TEXTURE_3D, 0, internalFormat, desc.width, desc.height, desc.depth, 0, format, type, desc.initialData);
+		glTexImage3D(GL_TEXTURE_3D, 0, internalFormat, desc.width, desc.height, desc.depth, 0, format, type,
+					 desc.initialData);
 		glBindTexture(GL_TEXTURE_3D, 0);
 	} else {
 		glBindTexture(GL_TEXTURE_2D, glHandle);
@@ -335,7 +336,7 @@ void OpenGLBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y,
 }
 
 void OpenGLBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-										uint32_t height, uint32_t depth, const void *data) {
+									uint32_t height, uint32_t depth, const void *data) {
 	auto it = _textures.find(texture);
 	if (it == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
@@ -371,7 +372,7 @@ void OpenGLBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 }
 
 void OpenGLBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-										  uint32_t height, uint32_t depth, void *outData) {
+									  uint32_t height, uint32_t depth, void *outData) {
 	auto it = _textures.find(texture);
 	if (it == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");

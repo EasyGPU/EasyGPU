@@ -51,6 +51,19 @@ inline Backend::BufferMode ToBackendBufferMode(BufferMode mode) {
 	}
 }
 
+inline int ToBackendBufferModeInt(BufferMode mode) {
+	switch (mode) {
+	case BufferMode::Read:
+		return Backend::BUFFER_MODE_READ_ONLY;
+	case BufferMode::Write:
+		return Backend::BUFFER_MODE_WRITE_ONLY;
+	case BufferMode::ReadWrite:
+		return Backend::BUFFER_MODE_READ_WRITE;
+	default:
+		return Backend::BUFFER_MODE_READ_WRITE;
+	}
+}
+
 /**
  * Helper function to get GLSL type name for buffer elements
  */
@@ -189,7 +202,7 @@ public:
 		std::string bufferName = std::format("buf{}", binding);
 		std::string typeName   = GetGLSLTypeNameForBuffer<T>();
 
-		context->RegisterBuffer(binding, typeName, bufferName, static_cast<int>(_mode));
+		context->RegisterBuffer(binding, typeName, bufferName, ToBackendBufferModeInt(_mode));
 		context->BindRuntimeBuffer(binding, _bufferHandle);
 		_boundBinding = binding;
 
@@ -201,7 +214,7 @@ public:
 			return;
 		}
 		if (count > _count) {
-			count = _count;
+			throw std::out_of_range(std::format("Upload count ({}) exceeds buffer element count ({})", count, _count));
 		}
 
 		Runtime::Context::GetInstance().MakeCurrent();
@@ -231,7 +244,8 @@ public:
 			return;
 		}
 		if (count > _count) {
-			count = _count;
+			throw std::out_of_range(
+				std::format("Download count ({}) exceeds buffer element count ({})", count, _count));
 		}
 
 		Runtime::Context::GetInstance().MakeCurrent();

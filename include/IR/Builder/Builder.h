@@ -14,30 +14,30 @@
 #include <stack>
 
 namespace GPU::IR::Node {
-	class Node;
-	class IntrinsicCallNode;
-	class OperationNode;
-	class LocalVariableNode;
-	class LocalVariableArrayNode;
-	class LoadNode;
-	class StoreNode;
-	class ArrayAccessNode;
-	class CompoundAssignmentNode;
-	class IncrementNode;
-	class MemberAccessNode;
-	class IfNode;
-	class WhileNode;
-	class DoWhileNode;
-	class ForNode;
-	class BreakNode;
-	class ContinueNode;
-	class ReturnNode;
-	class CallNode;
-	class RawCodeNode;
-	class TernaryNode;
-	class SharedMemoryNode;
-	class AtomicOpNode;
-}
+class Node;
+class IntrinsicCallNode;
+class OperationNode;
+class LocalVariableNode;
+class LocalVariableArrayNode;
+class LoadNode;
+class StoreNode;
+class ArrayAccessNode;
+class CompoundAssignmentNode;
+class IncrementNode;
+class MemberAccessNode;
+class IfNode;
+class WhileNode;
+class DoWhileNode;
+class ForNode;
+class BreakNode;
+class ContinueNode;
+class ReturnNode;
+class CallNode;
+class RawCodeNode;
+class TernaryNode;
+class SharedMemoryNode;
+class AtomicOpNode;
+} // namespace GPU::IR::Node
 
 namespace GPU::IR::Builder {
 /**

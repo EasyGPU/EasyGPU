@@ -130,7 +130,7 @@ public:
 	 * Allocate a binding slot for texture/image
 	 * @return The allocated binding slot index
 	 */
-	virtual uint32_t AllocateTextureBinding()														  = 0;
+	virtual uint32_t AllocateTextureBinding()							= 0;
 
 	/**
 	 * Register a 2D texture for the kernel
@@ -141,9 +141,9 @@ public:
 	 * @param height Texture height
 	 */
 	virtual void RegisterTexture(uint32_t binding, PixelFormat format, const std::string &textureName, uint32_t width,
-								 uint32_t height, bool sampled = false)								  = 0;
+								 uint32_t height, bool sampled = false) = 0;
 	virtual void RegisterTexture3D(uint32_t binding, PixelFormat format, const std::string &textureName, uint32_t width,
-															   uint32_t height, uint32_t depth, bool sampled = false) {
+								   uint32_t height, uint32_t depth, bool sampled = false) {
 	}
 
 	/**

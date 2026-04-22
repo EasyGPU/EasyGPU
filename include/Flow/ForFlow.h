@@ -38,8 +38,9 @@ inline void ForImpl(GPU::IR::Value::Expr<int> &&start, GPU::IR::Value::Expr<int>
 		throw std::runtime_error("For() called outside of Kernel definition");
 	}
 
-	// Get variable name for loop variable
+	// Get variable name for loop variable and step variable
 	std::string				 varName  = originalContext->AssignVarName();
+	std::string				 stepVar  = originalContext->AssignVarName();
 
 	// Build bound expressions from Expr nodes
 	std::string				 startStr = GPU::IR::Builder::Builder::Get().BuildNode(*start.Node());
@@ -56,9 +57,13 @@ inline void ForImpl(GPU::IR::Value::Expr<int> &&start, GPU::IR::Value::Expr<int>
 		body(loopVar);
 	}
 
-	// Build for loop code
+	// Build for loop code with support for both positive and negative step values.
+	// The condition (s > 0 && v < end) || (s < 0 && v > end) correctly handles
+	// positive step (forward) and negative step (backward), and safely skips
+	// the loop when step is zero.
 	std::string forCode =
-		std::format("for (int {} = {}; {} < {}; {} += {}) {{\n", varName, startStr, varName, endStr, varName, stepStr);
+		std::format("for (int {} = {}, {} = {}; ({} > 0 && {} < {}) || ({} < 0 && {} > {}); {} += {}) {{\n", varName,
+					startStr, stepVar, stepStr, stepVar, varName, endStr, stepVar, varName, endStr, varName, stepVar);
 	for (const auto &line : collectContext.GetCollectedCode()) {
 		forCode += "    " + line;
 	}

@@ -21,27 +21,27 @@ static int pass_count = 0;
 #define TEST(name)                                                                                                     \
 	void test_##name() {                                                                                               \
 		std::cout << "\n[TEST] " #name " ... ";                                                                        \
-		test_count++;                                                                                                    \
+		test_count++;                                                                                                  \
 		try {
 
 #define END_TEST                                                                                                       \
-		pass_count++;                                                                                                    \
-		std::cout << "PASSED\n";                                                                                         \
-		}                                                                                                                \
-		catch (const GPU::Runtime::ShaderCompileException &e) {                                                          \
-			std::cout << "FAILED: Shader compilation error\n";                                                             \
-			std::cout << e.GetBeautifulOutput() << "\n";                                                                   \
-		}                                                                                                                \
-		catch (const GPU::Runtime::ShaderException &e) {                                                                 \
-			std::cout << "FAILED: Shader error - " << e.what() << "\n";                                                    \
-		}                                                                                                                \
-		catch (const std::exception &e) {                                                                                \
-			std::cout << "FAILED: " << e.what() << "\n";                                                                   \
-		}                                                                                                                \
-		catch (...) {                                                                                                    \
-			std::cout << "FAILED: Unknown exception\n";                                                                    \
-		}                                                                                                                \
-		}
+	pass_count++;                                                                                                      \
+	std::cout << "PASSED\n";                                                                                           \
+	}                                                                                                                  \
+	catch (const GPU::Runtime::ShaderCompileException &e) {                                                            \
+		std::cout << "FAILED: Shader compilation error\n";                                                             \
+		std::cout << e.GetBeautifulOutput() << "\n";                                                                   \
+	}                                                                                                                  \
+	catch (const GPU::Runtime::ShaderException &e) {                                                                   \
+		std::cout << "FAILED: Shader error - " << e.what() << "\n";                                                    \
+	}                                                                                                                  \
+	catch (const std::exception &e) {                                                                                  \
+		std::cout << "FAILED: " << e.what() << "\n";                                                                   \
+	}                                                                                                                  \
+	catch (...) {                                                                                                      \
+		std::cout << "FAILED: Unknown exception\n";                                                                    \
+	}                                                                                                                  \
+	}
 
 #define ASSERT(cond)                                                                                                   \
 	if (!(cond)) {                                                                                                     \
@@ -64,8 +64,8 @@ END_TEST
 // Test 2: 3D texture creation from raw buffer
 // =============================================================================
 TEST(texture3d_create_from_buffer)
-const int W = 8, H = 8, D = 8;
-std::vector<uint8_t> voxels(W * H * D * 4);
+const int			 W = 8, H = 8, D = 8;
+std::vector<uint8_t> voxels(W *H *D * 4);
 for (int i = 0; i < W * H * D; ++i) {
 	voxels[i * 4 + 0] = 255;
 	voxels[i * 4 + 1] = 128;
@@ -84,14 +84,14 @@ END_TEST
 // Test 3: 3D texture upload/download
 // =============================================================================
 TEST(texture3d_upload_download)
-const int W = 8, H = 8, D = 8;
-std::vector<uint8_t> uploadVoxels(W * H * D * 4);
-std::vector<uint8_t> downloadVoxels(W * H * D * 4);
+const int			 W = 8, H = 8, D = 8;
+std::vector<uint8_t> uploadVoxels(W *H *D * 4);
+std::vector<uint8_t> downloadVoxels(W *H *D * 4);
 
 for (int z = 0; z < D; ++z) {
 	for (int y = 0; y < H; ++y) {
 		for (int x = 0; x < W; ++x) {
-			int idx = ((z * H + y) * W + x) * 4;
+			int idx				  = ((z * H + y) * W + x) * 4;
 			uploadVoxels[idx + 0] = static_cast<uint8_t>(x * 32);
 			uploadVoxels[idx + 1] = static_cast<uint8_t>(y * 32);
 			uploadVoxels[idx + 2] = static_cast<uint8_t>(z * 32);
@@ -121,8 +121,8 @@ END_TEST
 // Test 4: 3D texture sub-region upload
 // =============================================================================
 TEST(texture3d_subregion_upload)
-const int W = 8, H = 8, D = 8;
-std::vector<uint8_t> uploadVoxels(W * H * D * 4, 0);
+const int			 W = 8, H = 8, D = 8;
+std::vector<uint8_t> uploadVoxels(W *H *D * 4, 0);
 std::vector<uint8_t> subVoxels(4 * 4 * 4 * 4, 255);
 for (int i = 0; i < 4 * 4 * 4; ++i) {
 	subVoxels[i * 4 + 0] = 10;
@@ -134,7 +134,7 @@ for (int i = 0; i < 4 * 4 * 4; ++i) {
 Texture3D<PixelFormat::RGBA8> tex(W, H, D);
 tex.UploadSubRegion(2, 2, 2, 4, 4, 4, subVoxels.data());
 
-std::vector<uint8_t> downloadVoxels(W * H * D * 4);
+std::vector<uint8_t> downloadVoxels(W *H *D * 4);
 tex.Download(downloadVoxels.data());
 
 bool correct = true;
@@ -142,8 +142,8 @@ for (int z = 2; z < 6; ++z) {
 	for (int y = 2; y < 6; ++y) {
 		for (int x = 2; x < 6; ++x) {
 			int idx = ((z * H + y) * W + x) * 4;
-			if (downloadVoxels[idx + 0] != 10 || downloadVoxels[idx + 1] != 20 ||
-				downloadVoxels[idx + 2] != 30 || downloadVoxels[idx + 3] != 40) {
+			if (downloadVoxels[idx + 0] != 10 || downloadVoxels[idx + 1] != 20 || downloadVoxels[idx + 2] != 30 ||
+				downloadVoxels[idx + 3] != 40) {
 				correct = false;
 				break;
 			}
@@ -159,10 +159,10 @@ END_TEST
 // =============================================================================
 TEST(texture3d_move)
 Texture3D<PixelFormat::RGBA8> tex1(8, 8, 8);
-uint32_t handle1 = tex1.GetHandle();
+uint32_t					  handle1 = tex1.GetHandle();
 
 Texture3D<PixelFormat::RGBA8> tex2(std::move(tex1));
-uint32_t handle2 = tex2.GetHandle();
+uint32_t					  handle2 = tex2.GetHandle();
 
 ASSERT(handle1 == handle2);
 ASSERT(tex1.GetHandle() == 0);
@@ -183,15 +183,15 @@ END_TEST
 TEST(texture3d_bind_api_inspector)
 Texture3D<PixelFormat::RGBA8> tex(8, 8, 8);
 
-GPU::Kernel::InspectorKernel kernel([&](Var<int> &id) {
-	auto vol = tex.Bind();
+GPU::Kernel::InspectorKernel  kernel([&](Var<int> &id) {
+	 auto	   vol	 = tex.Bind();
 
-	Var<int> x = id % 8;
-	Var<int> y = (id / 8) % 8;
-	Var<int> z = id / 64;
+	 Var<int>  x	 = id % 8;
+	 Var<int>  y	 = (id / 8) % 8;
+	 Var<int>  z	 = id / 64;
 
-	Var<Vec4> color = vol.Read(x, y, z);
-	vol.Write(x, y, z, Vec4(1.0f) - color);
+	 Var<Vec4> color = vol.Read(x, y, z);
+	 vol.Write(x, y, z, Vec4(1.0f) - color);
 });
 
 std::cout << "\n=== Generated GLSL (Texture3D Bind API) ===\n";
@@ -205,20 +205,20 @@ END_TEST
 // Test 7: End-to-end GPU 3D texture operation - volume fill
 // =============================================================================
 TEST(gpu_texture3d_fill)
-const int W = 8, H = 8, D = 8;
+const int					  W = 8, H = 8, D = 8;
 Texture3D<PixelFormat::RGBA8> tex(W, H, D);
 
-GPU::Kernel::Kernel1D kernel(
+GPU::Kernel::Kernel1D		  kernel(
 	[&](Var<int> &id) {
-		auto vol = tex.Bind();
+		auto	   vol = tex.Bind();
 
-		Var<int> x = id % W;
-		Var<int> y = (id / W) % H;
-		Var<int> z = id / (W * H);
+		Var<int>   x   = id % W;
+		Var<int>   y   = (id / W) % H;
+		Var<int>   z   = id / (W * H);
 
-		Var<float> r = Expr<float>(x) / static_cast<float>(W);
-		Var<float> g = Expr<float>(y) / static_cast<float>(H);
-		Var<float> b = Expr<float>(z) / static_cast<float>(D);
+		Var<float> r   = Expr<float>(x) / static_cast<float>(W);
+		Var<float> g   = Expr<float>(y) / static_cast<float>(H);
+		Var<float> b   = Expr<float>(z) / static_cast<float>(D);
 
 		vol.Write(x, y, z, Expr<Vec4>(r, g, b, 1.0f));
 	},
@@ -226,18 +226,18 @@ GPU::Kernel::Kernel1D kernel(
 
 kernel.Dispatch((W * H * D + 63) / 64, true);
 
-std::vector<uint8_t> resultVoxels(W * H * D * 4);
+std::vector<uint8_t> resultVoxels(W *H *D * 4);
 tex.Download(resultVoxels.data());
 
 bool correct = true;
 for (int z = 0; z < D && correct; ++z) {
 	for (int y = 0; y < H && correct; ++y) {
 		for (int x = 0; x < W && correct; ++x) {
-			int idx = ((z * H + y) * W + x) * 4;
-			uint8_t r = resultVoxels[idx + 0];
-			uint8_t g = resultVoxels[idx + 1];
-			uint8_t b = resultVoxels[idx + 2];
-			uint8_t a = resultVoxels[idx + 3];
+			int		idx		  = ((z * H + y) * W + x) * 4;
+			uint8_t r		  = resultVoxels[idx + 0];
+			uint8_t g		  = resultVoxels[idx + 1];
+			uint8_t b		  = resultVoxels[idx + 2];
+			uint8_t a		  = resultVoxels[idx + 3];
 
 			uint8_t expectedR = static_cast<uint8_t>((x / static_cast<float>(W)) * 255.0f);
 			uint8_t expectedG = static_cast<uint8_t>((y / static_cast<float>(H)) * 255.0f);
@@ -246,8 +246,8 @@ for (int z = 0; z < D && correct; ++z) {
 			if (std::abs(r - expectedR) > 5 || std::abs(g - expectedG) > 5 || std::abs(b - expectedB) > 5 || a != 255) {
 				correct = false;
 				std::cout << "Voxel (" << x << "," << y << "," << z << ") mismatch: got (" << (int)r << "," << (int)g
-						  << "," << (int)b << "," << (int)a << "), expected (~" << (int)expectedR << ",~" << (int)expectedG
-						  << ",~" << (int)expectedB << ",255)";
+						  << "," << (int)b << "," << (int)a << "), expected (~" << (int)expectedR << ",~"
+						  << (int)expectedG << ",~" << (int)expectedB << ",255)";
 			}
 		}
 	}
@@ -261,9 +261,9 @@ END_TEST
 // Test 8: Float 3D texture format (RGBA32F)
 // =============================================================================
 TEST(texture3d_rgba32f_format)
-const int W = 4, H = 4, D = 4;
+const int		   W = 4, H = 4, D = 4;
 
-std::vector<float> floatVoxels(W * H * D * 4);
+std::vector<float> floatVoxels(W *H *D * 4);
 for (int i = 0; i < W * H * D; ++i) {
 	floatVoxels[i * 4 + 0] = 0.25f;
 	floatVoxels[i * 4 + 1] = 0.5f;
@@ -273,22 +273,22 @@ for (int i = 0; i < W * H * D; ++i) {
 
 Texture3D<PixelFormat::RGBA32F> floatTex(W, H, D, floatVoxels.data());
 
-GPU::Kernel::Kernel1D kernel(
-	[&](Var<int> &id) {
-		auto vol = floatTex.Bind();
+GPU::Kernel::Kernel1D			kernel(
+	  [&](Var<int> &id) {
+		  auto		vol	  = floatTex.Bind();
 
-		Var<int> x = id % W;
-		Var<int> y = (id / W) % H;
-		Var<int> z = id / (W * H);
+		  Var<int>	x	  = id % W;
+		  Var<int>	y	  = (id / W) % H;
+		  Var<int>	z	  = id / (W * H);
 
-		Var<Vec4> color = vol.Read(x, y, z);
-		vol.Write(x, y, z, color * 2.0f);
-	},
-	32);
+		  Var<Vec4> color = vol.Read(x, y, z);
+		  vol.Write(x, y, z, color * 2.0f);
+	  },
+	  32);
 
 kernel.Dispatch((W * H * D + 31) / 32, true);
 
-std::vector<float> resultVoxels(W * H * D * 4);
+std::vector<float> resultVoxels(W *H *D * 4);
 floatTex.Download(resultVoxels.data());
 
 bool correct = true;
@@ -307,31 +307,31 @@ END_TEST
 // Test 9: 3D texture with R32F format
 // =============================================================================
 TEST(texture3d_r32f_format)
-const int W = 4, H = 4, D = 4;
+const int		   W = 4, H = 4, D = 4;
 
-std::vector<float> floatVoxels(W * H * D);
+std::vector<float> floatVoxels(W *H *D);
 for (int i = 0; i < W * H * D; ++i) {
 	floatVoxels[i] = static_cast<float>(i);
 }
 
 Texture3D<PixelFormat::R32F> floatTex(W, H, D, floatVoxels.data());
 
-GPU::Kernel::Kernel1D kernel(
-	[&](Var<int> &id) {
-		auto vol = floatTex.Bind();
+GPU::Kernel::Kernel1D		 kernel(
+	   [&](Var<int> &id) {
+		   auto		 vol   = floatTex.Bind();
 
-		Var<int> x = id % W;
-		Var<int> y = (id / W) % H;
-		Var<int> z = id / (W * H);
+		   Var<int>	 x	   = id % W;
+		   Var<int>	 y	   = (id / W) % H;
+		   Var<int>	 z	   = id / (W * H);
 
-		Var<Vec4> color = vol.Read(x, y, z);
-		vol.Write(x, y, z, MakeFloat4(color.x() + 1.0f, 0.0f, 0.0f, 0.0f));
-	},
-	32);
+		   Var<Vec4> color = vol.Read(x, y, z);
+		   vol.Write(x, y, z, MakeFloat4(color.x() + 1.0f, 0.0f, 0.0f, 0.0f));
+	   },
+	   32);
 
 kernel.Dispatch((W * H * D + 31) / 32, true);
 
-std::vector<float> resultVoxels(W * H * D);
+std::vector<float> resultVoxels(W *H *D);
 floatTex.Download(resultVoxels.data());
 
 bool correct = true;

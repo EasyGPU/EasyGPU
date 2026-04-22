@@ -270,8 +270,9 @@ void KernelBuildContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat 
 	_textureBindings.push_back(binding);
 }
 
-void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName,
-																   uint32_t width, uint32_t height, uint32_t depth, bool sampled) {
+void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
+										   const std::string &textureName, uint32_t width, uint32_t height,
+										   uint32_t depth, bool sampled) {
 	_textures.push_back({binding, format, textureName, width, height, depth, sampled});
 	_textureBindings.push_back(binding);
 }
@@ -493,7 +494,7 @@ void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
 
 	uint32_t	width = 0, height = 0;
 	slot->GetDimensions(width, height);
-	uint32_t	depth = slot->GetDepth();
+	uint32_t depth = slot->GetDepth();
 
 	if (depth > 1) {
 		RegisterTexture3D(binding, slot->GetFormat(), textureName, width, height, depth, slot->UsesSamplerBinding());

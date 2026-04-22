@@ -207,7 +207,7 @@ public:
 		};
 
 		auto packFunc = [](void *dst, void *ptr) {
-			T value = ptr ? static_cast<Uniform<T> *>(ptr)->GetValue() : T{};
+			T							  value = ptr ? static_cast<Uniform<T> *>(ptr)->GetValue() : T{};
 
 			GPU::Meta::Std430Converter<T> converter;
 			converter.ConvertToGPU(&value, dst, 1);
@@ -252,7 +252,7 @@ public:
 
 private:
 	mutable std::mutex _mutex;
-	T _value{};
+	T				   _value{};
 };
 
 } // namespace GPU::Runtime

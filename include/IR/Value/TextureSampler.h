@@ -29,7 +29,7 @@
 namespace GPU::Runtime {
 template <PixelFormat Format> class Texture2D;
 template <PixelFormat Format> class Texture3D;
-}
+} // namespace GPU::Runtime
 
 namespace GPU::IR::Value {
 
@@ -325,17 +325,16 @@ private:
 	}
 
 	std::string _textureName;
-	uint32_t    _binding;
-	uint32_t    _width;
-	uint32_t    _height;
-	uint32_t    _depth;
+	uint32_t	_binding;
+	uint32_t	_width;
+	uint32_t	_height;
+	uint32_t	_depth;
 };
 
 /**
  * Type alias for convenience
  */
 template <Runtime::PixelFormat Format> using sampler3D = TextureSampler3D<Format>;
-
 
 } // namespace GPU::IR::Value
 

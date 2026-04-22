@@ -205,7 +205,7 @@ void KernelProfiler::EndQuery(unsigned int queryId, const std::string &kernelNam
 #else
 	{
 		std::lock_guard<std::recursive_mutex> lock(_mutex);
-		auto it = _queryOwners.find(queryId);
+		auto								  it = _queryOwners.find(queryId);
 		if (it != _queryOwners.end() && it->second != std::this_thread::get_id()) {
 			_queryOwners.erase(it);
 			ReleaseQuery(queryId);
@@ -266,7 +266,7 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 	// No context switch - use current context
 	{
 		std::lock_guard<std::recursive_mutex> lock(_mutex);
-		auto it = _queryOwners.find(queryId);
+		auto								  it = _queryOwners.find(queryId);
 		if (it != _queryOwners.end() && it->second != std::this_thread::get_id()) {
 			_queryOwners.erase(it);
 			ReleaseQuery(queryId);
@@ -294,7 +294,7 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 
 KernelProfilerQueryResult KernelProfiler::QueryInfo(const std::string &kernelName) const {
 	std::lock_guard<std::recursive_mutex> lock(_mutex);
-	auto it = _stats.find(kernelName);
+	auto								  it = _stats.find(kernelName);
 	if (it != _stats.end()) {
 		return it->second;
 	}
@@ -303,7 +303,7 @@ KernelProfilerQueryResult KernelProfiler::QueryInfo(const std::string &kernelNam
 
 double KernelProfiler::GetTotalTime() const {
 	std::lock_guard<std::recursive_mutex> lock(_mutex);
-	double total = 0.0;
+	double								  total = 0.0;
 	for (const auto &[name, stat] : _stats) {
 		total += stat.totalTimeMs;
 	}
@@ -316,7 +316,7 @@ const std::vector<KernelProfileRecord> &KernelProfiler::GetRecords() const {
 }
 
 std::vector<KernelProfilerQueryResult> KernelProfiler::GetAllStats() const {
-	std::lock_guard<std::recursive_mutex> lock(_mutex);
+	std::lock_guard<std::recursive_mutex>  lock(_mutex);
 	std::vector<KernelProfilerQueryResult> results;
 	results.reserve(_stats.size());
 	for (const auto &[name, stat] : _stats) {
@@ -488,7 +488,7 @@ void KernelProfiler::PrintInfo(const std::string &mode) const {
 
 std::string KernelProfiler::GetFormattedOutput(const std::string &mode) const {
 	std::lock_guard<std::recursive_mutex> lock(_mutex);
-	std::ostringstream oss;
+	std::ostringstream					  oss;
 
 	if (!_enabled) {
 		oss << "[KernelProfiler] Profiling is disabled. Call EnableKernelProfiler(true) to enable.\n";

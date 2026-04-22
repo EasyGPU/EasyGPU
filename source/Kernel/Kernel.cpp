@@ -16,8 +16,8 @@
 #include <Runtime/ShaderUtils.h>
 #include <Runtime/TextureSlot.h>
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <stdexcept>
 
 namespace GPU::Kernel {
@@ -117,9 +117,9 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 		// Try to load from binary cache first
 		bool		loadedFromCache = false;
 		if (backend->SupportsPipelineCache()) {
-			auto			 &globalCache = GlobalShaderCache::Get();
-			auto entry = globalCache.Lookup(
-				  context.GetShaderHash(), static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()));
+			auto &globalCache = GlobalShaderCache::Get();
+			auto  entry		  = globalCache.Lookup(context.GetShaderHash(),
+												   static_cast<uint32_t>(Runtime::Context::GetInstance().GetBackendType()));
 
 			if (entry && entry->dataSize > 0) {
 				// Try to create pipeline from cached binary
@@ -276,7 +276,7 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 		if (!slot->IsAttached()) {
 			throw std::runtime_error("TextureSlot not attached at dispatch time");
 		}
-		uint32_t slotBinding = context.GetTextureSlotBinding(slot);
+		uint32_t	slotBinding = context.GetTextureSlotBinding(slot);
 		const auto *textureInfo = context.FindTextureInfo(slotBinding);
 		if (!textureInfo) {
 			throw std::runtime_error("TextureSlot missing shader-side texture metadata");

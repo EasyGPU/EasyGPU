@@ -438,6 +438,16 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestFlowFor.cpp
         tests/TestFlowIf.cpp
         tests/TestMath.cpp
+        tests/TestEdgeCases.cpp
+        tests/TestStressLargeScale.cpp
+        tests/TestMultiKernelSequence.cpp
+        tests/TestNestedControlFlow.cpp
+        tests/TestTextureFormats.cpp
+        tests/TestCallableAdvanced.cpp
+        tests/TestAtomicAdvanced.cpp
+        tests/TestMathPrecision.cpp
+        tests/TestMatrixFull.cpp
+        tests/TestUniformAdvanced.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})

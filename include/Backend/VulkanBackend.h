@@ -34,35 +34,35 @@ public:
 	VulkanBackend();
 	~VulkanBackend() override;
 
-	VulkanBackend(const VulkanBackend &)			 = delete;
-	VulkanBackend &operator=(const VulkanBackend &)	 = delete;
-	VulkanBackend(VulkanBackend &&)					 = delete;
-	VulkanBackend		&operator=(VulkanBackend &&) = delete;
+	VulkanBackend(const VulkanBackend &)			= delete;
+	VulkanBackend &operator=(const VulkanBackend &) = delete;
+	VulkanBackend(VulkanBackend &&)					= delete;
+	VulkanBackend &operator=(VulkanBackend &&)		= delete;
 
-	void				 Initialize() override;
-	void				 Shutdown() override;
-	bool				 IsInitialized() const override;
-	void				 MakeCurrent() override;
-	void				 MakeNoneCurrent() override;
-	BackendCaps			 GetCaps() const override;
+	void		   Initialize() override;
+	void		   Shutdown() override;
+	bool		   IsInitialized() const override;
+	void		   MakeCurrent() override;
+	void		   MakeNoneCurrent() override;
+	BackendCaps	   GetCaps() const override;
 
-	BufferHandle		 CreateBuffer(const BufferDesc &desc) override;
-	void				 DestroyBuffer(BufferHandle buffer) override;
-	void				 UploadBuffer(BufferHandle buffer, size_t offset, size_t size, const void *data) override;
-	void				 DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData) override;
-	void				*MapBuffer(BufferHandle buffer, bool read, bool write) override;
-	void				 UnmapBuffer(BufferHandle buffer) override;
+	BufferHandle   CreateBuffer(const BufferDesc &desc) override;
+	void		   DestroyBuffer(BufferHandle buffer) override;
+	void		   UploadBuffer(BufferHandle buffer, size_t offset, size_t size, const void *data) override;
+	void		   DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData) override;
+	void		  *MapBuffer(BufferHandle buffer, bool read, bool write) override;
+	void		   UnmapBuffer(BufferHandle buffer) override;
 
-	TextureHandle		 CreateTexture(const TextureDesc &desc) override;
-	void				 DestroyTexture(TextureHandle texture) override;
-	void				 UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-									   const void *data) override;
-	void				 UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-										  uint32_t height, uint32_t depth, const void *data) override;
-	void				 DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-										 void *outData) override;
-	void				 DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-										  uint32_t height, uint32_t depth, void *outData) override;
+	TextureHandle  CreateTexture(const TextureDesc &desc) override;
+	void		   DestroyTexture(TextureHandle texture) override;
+	void		   UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+								 const void *data) override;
+	void UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+						 uint32_t depth, const void *data) override;
+	void DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+						 void *outData) override;
+	void DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+						   uint32_t depth, void *outData) override;
 
 	ShaderHandle		 CreateShader(const ShaderDesc &desc) override;
 	void				 DestroyShader(ShaderHandle shader) override;
@@ -89,7 +89,7 @@ public:
 	uint32_t			 GetPipelineCacheFormat() const override;
 
 	BackendType			 GetType() const override {
-		return BackendType::Vulkan;
+		 return BackendType::Vulkan;
 	}
 
 private:
@@ -159,37 +159,37 @@ private:
 	};
 
 	// Internal helpers
-	void	 UploadBufferInternal(VkBuffer buffer, size_t size, const void *data);
-	void	 UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-										   uint32_t height, uint32_t depth, const void *data);
-	void	 DownloadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-										   uint32_t height, uint32_t depth, void *outData);
-	void	 EnsureNoPendingGpuWork();
-	void	 TransitionTexture(TextureInfo &info, VkImageLayout newLayout, VkPipelineStageFlags dstStage,
-							   VkAccessFlags dstAccess);
-	void	 InvalidateAllDescriptorCaches();
-	void	 InvalidateDescriptorCachesForPipeline(PipelineHandle pipeline);
-	void	 InvalidateDescriptorCachesForBuffer(BufferHandle buffer);
-	void	 InvalidateDescriptorCachesForTexture(TextureHandle texture);
+	void UploadBufferInternal(VkBuffer buffer, size_t size, const void *data);
+	void UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+							   uint32_t depth, const void *data);
+	void DownloadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+								 uint32_t depth, void *outData);
+	void EnsureNoPendingGpuWork();
+	void TransitionTexture(TextureInfo &info, VkImageLayout newLayout, VkPipelineStageFlags dstStage,
+						   VkAccessFlags dstAccess);
+	void InvalidateAllDescriptorCaches();
+	void InvalidateDescriptorCachesForPipeline(PipelineHandle pipeline);
+	void InvalidateDescriptorCachesForBuffer(BufferHandle buffer);
+	void InvalidateDescriptorCachesForTexture(TextureHandle texture);
 
 	// Initialization helpers
-	void	 CreateInstance();
-	void	 SelectPhysicalDevice();
-	void	 CreateDevice();
-	void	 CreateCommandPool();
-	void	 CreateDescriptorPool();
-	void	 CreateQueryPool();
-	void	 CreateDefaultSampler();
+	void CreateInstance();
+	void SelectPhysicalDevice();
+	void CreateDevice();
+	void CreateCommandPool();
+	void CreateDescriptorPool();
+	void CreateQueryPool();
+	void CreateDefaultSampler();
 
 	// Cleanup helpers
-	void	 CleanupVulkan();
+	void CleanupVulkan();
 
 	// Command buffer management
-	void	 BeginCommandBuffer();
-	void	 EndCommandBuffer();
-	void	 SubmitCommandBuffer(bool wait = false);
-	void	 EnsureCommandBuffer();
-	void	 WaitForSubmittedWork();
+	void BeginCommandBuffer();
+	void EndCommandBuffer();
+	void SubmitCommandBuffer(bool wait = false);
+	void EnsureCommandBuffer();
+	void WaitForSubmittedWork();
 
 	// Memory management
 	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
