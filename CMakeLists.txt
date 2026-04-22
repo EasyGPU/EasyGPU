@@ -474,6 +474,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         examples/volumetric_fog/main.cpp
         examples/parallel_reduction/main.cpp
         examples/histogram/main.cpp
+        examples/cornell_box_gi/main.cpp
     )
     
     set(EASYGPU_EXAMPLE_NAMES
@@ -485,6 +486,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         volumetric_fog
         parallel_reduction
         histogram
+        cornell_box_gi
     )
     
     list(LENGTH EASYGPU_EXAMPLE_SOURCES example_count)
@@ -495,6 +497,9 @@ if(EASYGPU_BUILD_EXAMPLES)
         list(GET EASYGPU_EXAMPLE_NAMES ${i} example_name)
         add_executable(${example_name} ${example_source})
         target_link_libraries(${example_name} PRIVATE EasyGPU)
+        if(${example_name} STREQUAL "cornell_box_gi" AND TARGET EasyGPUWindow)
+            target_link_libraries(${example_name} PRIVATE EasyGPUWindow)
+        endif()
         if(MSVC)
             target_compile_options(${example_name} PRIVATE /Zc:preprocessor)
         endif()
