@@ -290,6 +290,14 @@ public:
 		return std::make_unique<Node::LoadLocalVariableNode>(_varNode->VarName());
 	}
 
+	/**
+	 * Check if this variable is an external reference (uniform, function parameter, etc.)
+	 * External variables are not declared in the shader main() and share their name.
+	 */
+	[[nodiscard]] bool IsExternal() const {
+		return _varNode && _varNode->IsExternal();
+	}
+
 public:
 	// VarBase op VarBase -> Expr<Type>
 	template <ScalarType T> friend Expr<T> operator+(const VarBase<T> &lhs, const VarBase<T> &rhs);

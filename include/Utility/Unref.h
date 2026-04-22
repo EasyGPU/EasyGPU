@@ -19,15 +19,29 @@
 
 namespace GPU::Utility {
 
+namespace Detail {
+/**
+ * Internal helper: create a true local copy from any Var, even if the source
+ * is an external reference (uniform, buffer element, function parameter, etc.).
+ * The copy constructor short-circuits for external variables (shares the name),
+ * so we must explicitly create a new local variable and emit IR load/store.
+ */
+template <typename T> [[nodiscard]] inline GPU::IR::Value::Var<T> DeepCopyVar(const GPU::IR::Value::Var<T> &var) {
+	GPU::IR::Value::Var<T> result;
+	result = var; // VarBase::operator= always emits load/store
+	return result;
+}
+} // namespace Detail
+
 /**
  * Create an independent copy of a GPU variable.
  *
- * This function forces a copy (via copy constructor) instead of move semantics,
+ * This function forces a copy instead of move semantics or reference sharing,
  * ensuring the result is a new independent variable with its own storage,
  * rather than a reference to the original variable.
  *
  * @tparam T The scalar type of the variable
- * @param var The source variable (typically from buffer access like buf[i])
+ * @param var The source variable (typically from buffer access like buf[i] or Uniform::Load())
  * @return A new independent Var<T> with copied value
  *
  * Example:
@@ -40,8 +54,9 @@ namespace GPU::Utility {
  *   val = 5;  // Only modifies val, NOT buf[i]
  */
 template <typename T> [[nodiscard]] inline GPU::IR::Value::Var<T> Unref(const GPU::IR::Value::Var<T> &var) {
-	// Use copy constructor to create a new independent variable
-	// The copy constructor generates IR load/store to copy the value
+	if (var.IsExternal()) {
+		return Detail::DeepCopyVar(var);
+	}
 	return GPU::IR::Value::Var<T>(var);
 }
 
@@ -49,8 +64,9 @@ template <typename T> [[nodiscard]] inline GPU::IR::Value::Var<T> Unref(const GP
  * Overload for rvalue references - same effect, forces copy instead of move
  */
 template <typename T> [[nodiscard]] inline GPU::IR::Value::Var<T> Unref(GPU::IR::Value::Var<T> &&var) {
-	// Even though var is an rvalue, we want to copy it, not move it
-	// We cast it to lvalue reference to select the copy constructor
+	if (var.IsExternal()) {
+		return Detail::DeepCopyVar(var);
+	}
 	return GPU::IR::Value::Var<T>(var);
 }
 

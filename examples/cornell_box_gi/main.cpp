@@ -404,8 +404,7 @@ int main() {
 		Float3 ro = camPos;
 
 		Var<Ray> ray;
-		ray.origin() = ro;
-		ray.dir() = rd;
+		SetRay(ray, ro, rd);
 
 		// Path trace 1 sample
 		Float3 sampleColor = Trace(ray, rng);
