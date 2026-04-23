@@ -1050,43 +1050,101 @@ Kernel1D transform([&](Int i) {
 
 ## Image Processing
 
-### Gaussian Blur
+### Working with Packed Pixels (Bitwise Operations)
+
+When using `Buffer<int>` to store packed 32-bit RGBA values, bitwise operators extract and recombine channels directly on the GPU:
 
 ```cpp
-Callable<Float4(BufferRef<Vec4>&, Int, Int, Int, Int)> GaussianBlur = 
-[](BufferRef<Vec4>& img, Int& x, Int& y, Int& width, Int& height) {
-    Float4 sum = MakeFloat4(0.0f);
-    Float weight_sum = MakeFloat(0.0f);
-    
-    // 3x3 Gaussian kernel
-    const float kernel[3][3] = {
-        {1.0f/16, 2.0f/16, 1.0f/16},
-        {2.0f/16, 4.0f/16, 2.0f/16},
-        {1.0f/16, 2.0f/16, 1.0f/16}
-    };
-    
-    For(-1, 2, [&](Int& ky) {
-        For(-1, 2, [&](Int& kx) {
-            Int px = Clamp(x + kx, 0, width - 1);
-            Int py = Clamp(y + ky, 0, height - 1);
-            Int idx = py * width + px;
-            
-            Float weight = MakeFloat(kernel[ky + 1][kx + 1]);
-            sum = sum + img[idx] * weight;
-            weight_sum = weight_sum + weight;
+Kernel2D channel_split([](Int x, Int y) {
+    auto img = image.Bind();
+    Int p    = img[y * WIDTH + x];
+
+    // Extract channels with & and >>
+    Int b = p & 0xFF;
+    Int g = (p >> 8) & 0xFF;
+    Int r = (p >> 16) & 0xFF;
+    Int a = (p >> 24) & 0xFF;
+
+    // Process channels...
+    Int gray = (r + g + b) / 3;
+
+    // Repack with << and |
+    Int result = (a << 24) | (gray << 16) | (gray << 8) | gray;
+    img[y * WIDTH + x] = result;
+});
+```
+
+> **Tip:** Bitwise operators work seamlessly with `Int` and integer literals such as `0xFF`, `8`, or `16`.
+
+### Gaussian Blur (2-Pass Separable)
+
+For large kernels, separable blur is much faster than a naive 2D convolution. It uses two 1D passes (horizontal then vertical) and ping-pongs between two buffers:
+
+```cpp
+Buffer<int> temp(WIDTH * HEIGHT);
+Buffer<int> output(WIDTH * HEIGHT);
+
+Kernel2D horizontal_blur([&](Int x, Int y) {
+    auto in  = image.Bind();
+    auto out = temp.Bind();
+    Int idx  = y * WIDTH + x;
+
+    Int xl = Clamp(x - 1, 0, WIDTH - 1);
+    Int xr = Clamp(x + 1, 0, WIDTH - 1);
+
+    // Apply 1D weights [0.25, 0.5, 0.25]
+    // (per-channel math omitted for brevity)
+    out[idx] = ...;
+});
+
+Kernel2D vertical_blur([&](Int x, Int y) {
+    auto in  = temp.Bind();
+    auto out = output.Bind();
+    Int idx  = y * WIDTH + x;
+
+    Int yt = Clamp(y - 1, 0, HEIGHT - 1);
+    Int yb = Clamp(y + 1, 0, HEIGHT - 1);
+
+    out[idx] = ...;
+});
+
+horizontal_blur.Dispatch(groups_x, groups_y, true);
+vertical_blur.Dispatch(groups_x, groups_y, true);
+```
+
+> **Performance Note:** Keep intermediate results in GPU buffers. Avoid `Download()` between passes because it triggers a synchronous GPU-to-CPU copy and stalls the pipeline.
+
+### Box Mean Filter (Nested For Loops)
+
+A straightforward 2D convolution using nested `For` loops and boundary clamping:
+
+```cpp
+Kernel2D box_filter([&](Int x, Int y) {
+    auto in  = image.Bind();
+    auto out = output.Bind();
+    Int idx  = y * WIDTH + x;
+
+    Int sum_r = MakeInt(0);
+    Int sum_g = MakeInt(0);
+    Int sum_b = MakeInt(0);
+
+    For(-1, 2, [&](Int& dy) {
+        For(-1, 2, [&](Int& dx) {
+            Int sx = Clamp(x + dx, 0, WIDTH - 1);
+            Int sy = Clamp(y + dy, 0, HEIGHT - 1);
+            Int p  = in[sy * WIDTH + sx];
+
+            sum_b = sum_b + (p & 0xFF);
+            sum_g = sum_g + ((p >> 8) & 0xFF);
+            sum_r = sum_r + ((p >> 16) & 0xFF);
         });
     });
-    
-    Return(sum / weight_sum);
-};
 
-// Usage
-Kernel2D blur([](Int x, Int y) {
-    auto in = input_image.Bind();
-    auto out = output_image.Bind();
-    
-    Int idx = y * WIDTH + x;
-    out[idx] = GaussianBlur(in, x, y, WIDTH, HEIGHT);
+    Int avg_b = sum_b / 9;
+    Int avg_g = sum_g / 9;
+    Int avg_r = sum_r / 9;
+
+    out[idx] = (0xFF000000) | (avg_r << 16) | (avg_g << 8) | avg_b;
 });
 ```
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /**
  * Helpers.h:
@@ -255,7 +255,7 @@ template <typename X>
 	return IR::Value::Expr<Math::Vec2>(std::make_unique<IR::Node::LoadUniformNode>(std::format("vec2({})", xStr)));
 }
 
-// Single float broadcast - generates vec3(x) ✅ OPTIMIZED
+// Single float broadcast - generates vec3(x) [OPTIMIZED]
 template <typename X>
 	requires Detail::FloatComponent<X> && (!Detail::IsVecType<std::remove_cvref_t<X>>::value)
 [[nodiscard]] inline auto MakeFloat3(X &&x) {

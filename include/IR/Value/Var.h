@@ -314,23 +314,33 @@ public:
 
 	template <ScalarType T>
 	friend Expr<T> operator&(const VarBase<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T>;
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
 
 	template <ScalarType T>
 	friend Expr<T> operator|(const VarBase<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T>;
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
 
 	template <ScalarType T>
 	friend Expr<T> operator^(const VarBase<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T>;
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator~(const VarBase<T> &var)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
 
 	template <ScalarType T>
 	friend Expr<T> operator<<(const VarBase<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T>;
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
 
 	template <ScalarType T>
 	friend Expr<T> operator>>(const VarBase<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T>;
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
 
 	template <ScalarType T> friend Expr<bool> operator<(const VarBase<T> &lhs, const VarBase<T> &rhs);
 
@@ -343,6 +353,58 @@ public:
 	template <ScalarType T> friend Expr<bool> operator<=(const VarBase<T> &lhs, const VarBase<T> &rhs);
 
 	template <ScalarType T> friend Expr<bool> operator>=(const VarBase<T> &lhs, const VarBase<T> &rhs);
+
+	// VarBase op Expr -> Expr<T> (bitwise)
+	template <ScalarType T>
+	friend Expr<T> operator&(const VarBase<T> &lhs, const Expr<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator|(const VarBase<T> &lhs, const Expr<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator^(const VarBase<T> &lhs, const Expr<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator<<(const VarBase<T> &lhs, const Expr<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator>>(const VarBase<T> &lhs, const Expr<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	// Expr op VarBase -> Expr<T> (bitwise)
+	template <ScalarType T>
+	friend Expr<T> operator&(const Expr<T> &lhs, const VarBase<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator|(const Expr<T> &lhs, const VarBase<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator^(const Expr<T> &lhs, const VarBase<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator<<(const Expr<T> &lhs, const VarBase<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
+
+	template <ScalarType T>
+	friend Expr<T> operator>>(const Expr<T> &lhs, const VarBase<T> &rhs)
+		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+				 std::same_as<T, Math::IVec4>;
 
 	// VarBase op Scalar -> Expr<T>
 	template <ScalarType T> friend Expr<T>	  operator+(const VarBase<T> &lhs, T rhs);
@@ -843,7 +905,10 @@ template <ScalarType Type> [[nodiscard]] Expr<Type> operator/(const VarBase<Type
 		std::make_unique<Node::OperationNode>(Node::OperationCode::Div, std::move(lhsLoad), std::move(rhsLoad)));
 }
 
-template <ScalarType Type> [[nodiscard]] Expr<Type> operator%(const VarBase<Type> &lhs, const VarBase<Type> &rhs) {
+template <ScalarType Type>
+[[nodiscard]] Expr<Type> operator%(const VarBase<Type> &lhs, const VarBase<Type> &rhs)
+	requires BitableType<Type>
+{
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = rhs.Load();
 	return Expr<Type>(
@@ -1222,6 +1287,132 @@ template <ScalarType Type> [[nodiscard]] Expr<bool> operator>=(Type lhs, const V
 }
 
 // ============================================================================
+// Bitwise Operators with Convertible Literal Types
+// ============================================================================
+// These overloads accept any type convertible to T (e.g. unsigned int literals)
+// without conflicting with the exact-T overloads above.
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator&(const VarBase<T> &lhs, U rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator&(U lhs, const VarBase<T> &rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
+	auto rhsLoad = rhs.Load();
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitAnd, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator|(const VarBase<T> &lhs, U rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator|(U lhs, const VarBase<T> &rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
+	auto rhsLoad = rhs.Load();
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitOr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator^(const VarBase<T> &lhs, U rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator^(U lhs, const VarBase<T> &rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
+	auto rhsLoad = rhs.Load();
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator<<(const VarBase<T> &lhs, U rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator<<(U lhs, const VarBase<T> &rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
+	auto rhsLoad = rhs.Load();
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator>>(const VarBase<T> &lhs, U rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = lhs.Load();
+	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+template <ScalarType T, typename U>
+[[nodiscard]] Expr<T> operator>>(U lhs, const VarBase<T> &rhs)
+	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>)
+{
+	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
+	auto rhsLoad = rhs.Load();
+	return Expr<T>(
+		std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, std::move(lhsLoad), std::move(rhsLoad)));
+}
+
+// ============================================================================
 // Logical Operators for Var<bool> (&&, ||, !)
 // ============================================================================
 
@@ -1457,6 +1648,38 @@ template <ScalarType Type>
 			 std::same_as<Type, Math::IVec4>
 {
 	return Expr<Type>(std::make_unique<Node::OperationNode>(Node::OperationCode::BitXor, CloneNode(lhs), rhs.Load()));
+}
+
+template <ScalarType Type>
+[[nodiscard]] Expr<Type> operator<<(const VarBase<Type> &lhs, const Expr<Type> &rhs)
+	requires BitableType<Type> || std::same_as<Type, Math::IVec2> || std::same_as<Type, Math::IVec3> ||
+			 std::same_as<Type, Math::IVec4>
+{
+	return Expr<Type>(std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, lhs.Load(), CloneNode(rhs)));
+}
+
+template <ScalarType Type>
+[[nodiscard]] Expr<Type> operator<<(const Expr<Type> &lhs, const VarBase<Type> &rhs)
+	requires BitableType<Type> || std::same_as<Type, Math::IVec2> || std::same_as<Type, Math::IVec3> ||
+			 std::same_as<Type, Math::IVec4>
+{
+	return Expr<Type>(std::make_unique<Node::OperationNode>(Node::OperationCode::Shl, CloneNode(lhs), rhs.Load()));
+}
+
+template <ScalarType Type>
+[[nodiscard]] Expr<Type> operator>>(const VarBase<Type> &lhs, const Expr<Type> &rhs)
+	requires BitableType<Type> || std::same_as<Type, Math::IVec2> || std::same_as<Type, Math::IVec3> ||
+			 std::same_as<Type, Math::IVec4>
+{
+	return Expr<Type>(std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, lhs.Load(), CloneNode(rhs)));
+}
+
+template <ScalarType Type>
+[[nodiscard]] Expr<Type> operator>>(const Expr<Type> &lhs, const VarBase<Type> &rhs)
+	requires BitableType<Type> || std::same_as<Type, Math::IVec2> || std::same_as<Type, Math::IVec3> ||
+			 std::same_as<Type, Math::IVec4>
+{
+	return Expr<Type>(std::make_unique<Node::OperationNode>(Node::OperationCode::Shr, CloneNode(lhs), rhs.Load()));
 }
 
 // ============================================================================

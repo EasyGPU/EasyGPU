@@ -391,14 +391,16 @@ class Buffer;
 | Method | Description |
 |:-------|:------------|
 | `Bind()` | Bind to current kernel (returns BufferRef) |
-| `Upload(const T* data, size_t count)` | Upload data to GPU |
-| `Upload(const std::vector<T>& data)` | Upload from vector |
-| `Download(T* outData, size_t count)` | Download data from GPU |
-| `Download(std::vector<T>& outData)` | Download to vector |
+| `Upload(const T* data, size_t count)` | Upload data to GPU (synchronous) |
+| `Upload(const std::vector<T>& data)` | Upload from vector (synchronous) |
+| `Download(T* outData, size_t count)` | Download data from GPU (synchronous) |
+| `Download(std::vector<T>& outData)` | Download to vector (synchronous) |
 | `GetCount() const` | Get element count |
 | `GetElementSize() const` | Get element size in bytes |
 | `GetBufferSize() const` | Get total size in bytes |
 | `GetHandle() const` | Get OpenGL buffer ID |
+
+> **Performance Note:** `Upload()` and `Download()` perform **synchronous** CPU-GPU memory copies. For multi-pass algorithms, keep intermediate results in GPU buffers and avoid unnecessary `Download()` calls between passes. Reuse `Buffer` instances rather than recreating them each frame.
 
 **Example:**
 

@@ -1218,6 +1218,10 @@ inline void DispatchUploadUniformField(uint32_t program, const std::string &unif
 		[[nodiscard]] std::unique_ptr<Node::LoadLocalVariableNode> Load() const {                                      \
 			return std::make_unique<Node::LoadLocalVariableNode>(_varNode->VarName());                                 \
 		}                                                                                                              \
+		/* Check if this variable is an external reference (uniform, buffer element, etc.) */                            \
+		[[nodiscard]] bool IsExternal() const {                                                                        \
+			return _varNode && _varNode->IsExternal();                                                                   \
+		}                                                                                                              \
                                                                                                                        \
 	private:                                                                                                           \
 		Node::LocalVariableNode *_varNode = nullptr;                                                                   \

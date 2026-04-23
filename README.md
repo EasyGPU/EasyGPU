@@ -1,4 +1,4 @@
-<div align="center">
+ <div align="center">
 
 <img src="docs/image/logo.png" alt="EasyGPU Logo" width="180">
 

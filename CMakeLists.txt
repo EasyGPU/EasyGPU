@@ -31,6 +31,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(MSVC)
+    # Treat all source files as UTF-8 to prevent C4819 warnings on non-ASCII characters
+    add_compile_options(/utf-8)
+    # Optionally suppress C4819 entirely for downstream users on non-UTF-8 code pages
+    add_compile_options(/wd4819)
+endif()
+
 if(MSVC AND EASYGPU_BACKEND STREQUAL "Vulkan")
     # The Vulkan SDK ships glslang/SPIRV static libraries built against the
     # release DLL CRT and STL iterator debug level 0. Match that ABI even for
@@ -474,6 +481,9 @@ if(EASYGPU_BUILD_EXAMPLES)
         examples/volumetric_fog/main.cpp
         examples/parallel_reduction/main.cpp
         examples/histogram/main.cpp
+        examples/image_processing/color_filter/main.cpp
+        examples/image_processing/gaussian_blur/main.cpp
+        examples/image_processing/box_filter/main.cpp
     )
     
     set(EASYGPU_EXAMPLE_NAMES
@@ -485,6 +495,9 @@ if(EASYGPU_BUILD_EXAMPLES)
         volumetric_fog
         parallel_reduction
         histogram
+        color_filter
+        gaussian_blur
+        box_filter
     )
     
     list(LENGTH EASYGPU_EXAMPLE_SOURCES example_count)
