@@ -354,58 +354,6 @@ public:
 
 	template <ScalarType T> friend Expr<bool> operator>=(const VarBase<T> &lhs, const VarBase<T> &rhs);
 
-	// VarBase op Expr -> Expr<T> (bitwise)
-	template <ScalarType T>
-	friend Expr<T> operator&(const VarBase<T> &lhs, const Expr<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator|(const VarBase<T> &lhs, const Expr<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator^(const VarBase<T> &lhs, const Expr<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator<<(const VarBase<T> &lhs, const Expr<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator>>(const VarBase<T> &lhs, const Expr<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	// Expr op VarBase -> Expr<T> (bitwise)
-	template <ScalarType T>
-	friend Expr<T> operator&(const Expr<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator|(const Expr<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator^(const Expr<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator<<(const Expr<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
-	template <ScalarType T>
-	friend Expr<T> operator>>(const Expr<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-				 std::same_as<T, Math::IVec4>;
-
 	// VarBase op Scalar -> Expr<T>
 	template <ScalarType T> friend Expr<T>	  operator+(const VarBase<T> &lhs, T rhs);
 
