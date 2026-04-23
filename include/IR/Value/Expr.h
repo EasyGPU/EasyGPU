@@ -721,9 +721,9 @@ public:
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator&(Expr<T> lhs, U rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::BitAnd, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
@@ -731,9 +731,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator&(U lhs, Expr<T> rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::BitAnd, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))), rhs.Release()));
@@ -741,9 +741,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator|(Expr<T> lhs, U rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::BitOr, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
@@ -751,9 +751,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator|(U lhs, Expr<T> rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::BitOr, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))), rhs.Release()));
@@ -761,9 +761,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator^(Expr<T> lhs, U rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::BitXor, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
@@ -771,9 +771,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator^(U lhs, Expr<T> rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::BitXor, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))), rhs.Release()));
@@ -781,9 +781,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator<<(Expr<T> lhs, U rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::Shl, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
@@ -791,9 +791,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator>>(Expr<T> lhs, U rhs)
-	requires std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			  std::same_as<T, Math::IVec4>)
+	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			   std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
 		Node::OperationCode::Shr, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
