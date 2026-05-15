@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.21)
 # Project Information
 # =============================================================================
 project(EasyGPU
-    VERSION 1.0.0
+    VERSION 0.2.0
     DESCRIPTION "A C++20 embedded DSL for GPU programming"
     LANGUAGES CXX C
 )
@@ -372,6 +372,10 @@ add_library(EasyGPU STATIC
     include/Utility/Meta/StructMeta.h
     include/Utility/Meta/Std430Layout.h
     
+    # Benchmark
+    include/Benchmark/Benchmark.h
+    source/Benchmark/Benchmark.cpp
+
     # Lazy Header
     include/GPU.h
     source/IR/Node/Load.cpp

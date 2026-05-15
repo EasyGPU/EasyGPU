@@ -70,6 +70,7 @@
 #include <Runtime/Buffer.h>
 #include <Runtime/BufferSlot.h>
 #include <Runtime/Context.h>
+#include <Runtime/Exception.h>
 #include <Runtime/PixelFormat.h>
 #include <Runtime/ShaderException.h>
 #include <Runtime/ShaderUtils.h>
@@ -90,6 +91,7 @@
 // =============================================================================
 // Utilities
 // =============================================================================
+#include <Benchmark/Benchmark.h>
 #include <Utility/Atomic.h>
 #include <Utility/Helpers.h>
 #include <Utility/Math.h>

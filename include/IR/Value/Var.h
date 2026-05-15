@@ -22,6 +22,8 @@
 #include <IR/Node/LocalVariable.h>
 #include <IR/Node/Store.h>
 
+#include <Runtime/Exception.h>
+
 #include <Utility/Meta/StructMeta.h>
 
 #include <concepts>
@@ -94,7 +96,9 @@ public:
 
 		_node	  = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
 		_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		assert(_varNode && "Internal error: Failed to create variable node");
+		if (!_varNode) {
+			throw Runtime::InternalIRException("Failed to create variable node in default constructor");
+		}
 
 		// The variable definition is truly the statement
 		Builder::Builder::Get().Build(*_varNode, true);
@@ -104,12 +108,14 @@ public:
 	 * Assignment from a expression
 	 * @param Value The expression to assign
 	 */
-	VarBase(Expr<Type> &&Value) noexcept {
+	VarBase(Expr<Type> &&Value) {
 		std::string name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node			 = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
 		_varNode		 = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		assert(_varNode && "Internal error: Failed to create variable node");
+		if (!_varNode) {
+			throw Runtime::InternalIRException("Failed to create variable node in Expr&& constructor");
+		}
 
 		auto lhs   = Load();
 		auto rhs   = Value.Release();
@@ -155,7 +161,9 @@ public:
 	VarBase(std::string Name) {
 		_node	 = std::make_unique<Node::LocalVariableNode>(Name, TypeShaderName<Type>());
 		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		assert(_varNode && "Internal error: Failed to create variable node");
+		if (!_varNode) {
+			throw Runtime::InternalIRException("Failed to create variable node in named constructor");
+		}
 	}
 
 	/**
@@ -167,7 +175,9 @@ public:
 	VarBase(std::string Name, bool IsExternal) {
 		_node	 = std::make_unique<Node::LocalVariableNode>(Name, TypeShaderName<Type>(), IsExternal);
 		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		assert(_varNode && "Internal error: Failed to create variable node");
+		if (!_varNode) {
+			throw Runtime::InternalIRException("Failed to create variable node in external constructor");
+		}
 	}
 
 	/**

@@ -47,6 +47,8 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 - [Parallel Primitives](#parallel-primitives)
 - [Thread Index Utilities](#thread-index-utilities)
 - [PBO Async Transfer](#pbo-async-transfer)
+- [Error Handling](#error-handling)
+- [Benchmark Suite](#benchmark-suite)
 - [OpenGL State Cache](#opengl-state-cache)
 
 ---
@@ -2414,9 +2416,34 @@ if (!texture.UploadAsync(data)) {
 
 ## Error Handling
 
+### Exception Hierarchy
+
+All EasyGPU-specific exceptions derive from `GPU::Runtime::Exception`, which itself extends `std::runtime_error`.  The `what()` string is formatted at construction and cached, making it safe to call from `noexcept` contexts.
+
+| Exception Class | Component | When Thrown |
+|:----------------|:----------|:------------|
+| `GPU::Runtime::Exception` | (varies) | Root class for all library errors |
+| `GPU::Runtime::InternalIRException` | `IR` | Internal invariant violation during IR construction (indicates a library bug) |
+| `GPU::Runtime::BuilderContextException` | `Builder` | IR node built without a valid Builder context (e.g. GPU variable outside a kernel) |
+| `GPU::Runtime::ResourceExhaustionException` | `Resource` | Buffer, texture, or pipeline allocation failure (out-of-memory) |
+
+Catch the root class to handle any library error uniformly:
+
+```cpp
+#include <Runtime/Exception.h>
+
+try {
+    kernel.Dispatch(100, true);
+} catch (const GPU::Runtime::Exception &e) {
+    std::cerr << "Component: " << e.Component() << "\n";
+    std::cerr << "Message:   " << e.RawMessage() << "\n";
+    std::cerr << "Full:      " << e.what() << std::endl;
+}
+```
+
 ### ShaderException
 
-Thrown on GPU errors.
+Thrown on GPU shader compilation and linking errors.
 
 ```cpp
 try {
@@ -2433,6 +2460,82 @@ try {
 | `Buffer::Bind() called outside of Kernel` | Move Bind() inside kernel lambda |
 | `No active OpenGL context` | Check OpenGL support and drivers |
 | `GLSL compilation failed` | Use `GetCode()` to debug generated code |
+| `[GPU::IR] Failed to create variable node` | Ensure GPU variables are constructed inside a kernel definition |
+
+---
+
+## Benchmark Suite
+
+The benchmark framework provides a lightweight way to measure GPU kernel and operation performance using wall-clock time.  For GPU-side timer queries (GL_TIME_ELAPSED / Vulkan timestamps), use `Kernel::KernelProfiler` directly.
+
+Include `<Benchmark/Benchmark.h>` or use the lazy header `<GPU.h>`.
+
+### BenchmarkConfig
+
+Controls iteration counts and synchronisation behaviour.
+
+```cpp
+struct BenchmarkConfig {
+    int  warmupIterations   = 5;   // Dispatches executed but not measured
+    int  measuredIterations = 20;  // Dispatches whose timing is recorded
+    bool syncAfterEach      = true; // glFinish / vkQueueWaitIdle after each dispatch
+};
+```
+
+### BenchmarkResult
+
+Statistical summary computed from per-iteration timings.
+
+```cpp
+struct BenchmarkResult {
+    std::string        name;
+    int                warmupCount;
+    int                measuredCount;
+    double             minMs, maxMs, avgMs, medianMs, stddevMs, totalMs;
+    std::vector<double> individualTimesMs;
+};
+```
+
+### BenchmarkRunner
+
+Ad-hoc runner for timing individual operations.
+
+```cpp
+GPU::Benchmark::BenchmarkRunner runner;
+
+runner.RunAndRecord("vector_add", [&]() {
+    kernel.Dispatch(64, true);
+});
+
+runner.RunAndRecord("vector_mul", [&]() {
+    kernelMul.Dispatch(64, true);
+}, BenchmarkConfig(10, 50));  // Custom config
+
+runner.PrintResults();
+std::string report = runner.GetFormattedResults(); // For logging
+runner.Clear();
+```
+
+### BenchmarkSuite
+
+Organised collection executed as a group.
+
+```cpp
+GPU::Benchmark::BenchmarkSuite suite("MySuite");
+
+suite.Add("kernel_a", [&]() { kernelA.Dispatch(64, true); });
+suite.Add("kernel_b", [&]() { kernelB.Dispatch(64, true); });
+suite.Add("kernel_c", [&]() { kernelC.Dispatch(64, true); });
+
+suite.Run(BenchmarkConfig(5, 50));  // 5 warmup, 50 measured
+suite.PrintResults();
+
+// Query individual results
+const auto &results = suite.GetResults();
+for (const auto &r : results) {
+    std::cout << r.name << ": " << r.avgMs << " ms (median: " << r.medianMs << " ms)\n";
+}
+```
 
 ---
 

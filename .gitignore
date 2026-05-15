@@ -82,5 +82,8 @@ Thumbs.db
 # Generated source files (if any)
 generated/
 
+# Claude Code
+.claude/
+
 # Ensure formatting config is tracked
 !.clang-format
