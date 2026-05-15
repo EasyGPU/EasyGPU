@@ -1,9 +1,8 @@
 /**
- * TestBuffer.cpp:
- *      @Descripiton    :   Test for GPU Buffer functionality with Bind() API
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+ * @file TestBuffer.cpp
+ * @brief Test for GPU Buffer functionality with Bind() API.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iomanip>

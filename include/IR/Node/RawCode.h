@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * RawCode.h:
- *      @Descripiton    :   The node for raw GLSL code (used in control flow)
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file RawCode.h
+ * @brief The node for raw GLSL code (used in control flow).
  */
+
 #ifndef EASYGPU_RAWCODE_H
 #define EASYGPU_RAWCODE_H
 

@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Matrix.h
- *      Matrix types for GPU Math (non-templated explicit sizes)
- *      @author Margoo
- *      @date 2026-02-12
+ * @file Matrix.h
+ * @brief Matrix types for GPU Math (non-templated explicit sizes).
  */
+
 #ifndef EASYGPU_MATRIX_H
 #define EASYGPU_MATRIX_H
 
@@ -77,25 +76,36 @@ public:
 	Mat2				operator*(const Mat2 &Rhs) const;
 
 public: // Operators
+	/** @brief Matrix addition. @param Rhs The matrix to add. @return Sum of the two matrices. */
 	Mat2  operator+(const Mat2 &Rhs) const;
 
+	/** @brief Matrix subtraction. @param Rhs The matrix to subtract. @return Difference of the two matrices. */
 	Mat2  operator-(const Mat2 &Rhs) const;
 
+	/** @brief Scalar multiplication. @param S The scalar. @return The scaled matrix. */
 	Mat2  operator*(float S) const;
 
+	/** @brief Scalar division. @param S The scalar. @return The divided matrix. */
 	Mat2  operator/(float S) const;
 
+	/** @brief Compound matrix addition. @param Rhs The matrix to add. @return Reference to this. */
 	Mat2 &operator+=(const Mat2 &Rhs);
 
+	/** @brief Compound matrix subtraction. @param Rhs The matrix to subtract. @return Reference to this. */
 	Mat2 &operator-=(const Mat2 &Rhs);
 
+	/** @brief Compound scalar multiplication. @param S The scalar. @return Reference to this. */
 	Mat2 &operator*=(float S);
 
+	/** @brief Compound scalar division. @param S The scalar. @return Reference to this. */
 	Mat2 &operator/=(float S);
 
 	/** Hadamard product (element-wise multiplication) */
+	/** @brief Hadamard (element-wise) matrix product. @param Rhs The matrix to multiply element-wise. @return The
+	 * element-wise product. */
 	Mat2  operator%(const Mat2 &Rhs) const;
 
+	/** @brief Compound Hadamard product. @param Rhs The matrix to multiply element-wise. @return Reference to this. */
 	Mat2 &operator%=(const Mat2 &Rhs);
 
 public:
@@ -111,8 +121,20 @@ public:
  */
 class Mat3 {
 public:
+	/** @brief Default constructor, initialized to identity. */
 	Mat3();
 
+	/** @brief Construct from 9 components in column-major order.
+	 * @param m00 element row0,col0
+	 * @param m10 element row1,col0
+	 * @param m20 element row2,col0
+	 * @param m01 element row0,col1
+	 * @param m11 element row1,col1
+	 * @param m21 element row2,col1
+	 * @param m02 element row0,col2
+	 * @param m12 element row1,col2
+	 * @param m22 element row2,col2
+	 */
 	Mat3(float m00, float m10, float m20, float m01, float m11, float m21, float m02, float m12, float m22);
 
 public:
@@ -126,8 +148,12 @@ public:
 	 */
 	[[nodiscard]] Mat3	Transposed() const;
 
+	/** @brief Compute determinant. @return Determinant scalar. */
 	[[nodiscard]] float Determinant() const;
 
+	/** @brief Compute inverse matrix. May throw on singular.
+	 * @return The inverse matrix.
+	 */
 	[[nodiscard]] Mat3	Inverse() const; // may throw
 	[[nodiscard]] Vec3	operator*(const Vec3 &V) const;
 
@@ -135,25 +161,36 @@ public:
 	Mat3				operator*(const Mat3 &Rhs) const;
 
 public:
+	/** @brief Matrix addition. @param Rhs The matrix to add. @return Sum of the two matrices. */
 	Mat3  operator+(const Mat3 &Rhs) const;
 
+	/** @brief Matrix subtraction. @param Rhs The matrix to subtract. @return Difference of the two matrices. */
 	Mat3  operator-(const Mat3 &Rhs) const;
 
+	/** @brief Scalar multiplication. @param S The scalar. @return The scaled matrix. */
 	Mat3  operator*(float S) const;
 
+	/** @brief Scalar division. @param S The scalar. @return The divided matrix. */
 	Mat3  operator/(float S) const;
 
+	/** @brief Compound matrix addition. @param Rhs The matrix to add. @return Reference to this. */
 	Mat3 &operator+=(const Mat3 &Rhs);
 
+	/** @brief Compound matrix subtraction. @param Rhs The matrix to subtract. @return Reference to this. */
 	Mat3 &operator-=(const Mat3 &Rhs);
 
+	/** @brief Compound scalar multiplication. @param S The scalar. @return Reference to this. */
 	Mat3 &operator*=(float S);
 
+	/** @brief Compound scalar division. @param S The scalar. @return Reference to this. */
 	Mat3 &operator/=(float S);
 
 	/** Hadamard product (element-wise multiplication) */
+	/** @brief Hadamard (element-wise) matrix product. @param Rhs The matrix to multiply element-wise. @return The
+	 * element-wise product. */
 	Mat3  operator%(const Mat3 &Rhs) const;
 
+	/** @brief Compound Hadamard product. @param Rhs The matrix to multiply element-wise. @return Reference to this. */
 	Mat3 &operator%=(const Mat3 &Rhs);
 
 public:
@@ -168,8 +205,12 @@ public:
  */
 class Mat4 {
 public:
+	/** @brief Default constructor, initialized to identity. */
 	Mat4();
 
+	/** @brief Construct from 16 components in column-major order.
+	 * @param m00-m33 Matrix elements (row,column).
+	 */
 	Mat4(float m00, float m10, float m20, float m30, float m01, float m11, float m21, float m31, float m02, float m12,
 		 float m22, float m32, float m03, float m13, float m23, float m33);
 
@@ -178,37 +219,61 @@ public:
 
 	static Mat4			Zero();
 
+	/** @brief Return the transposed matrix.
+	 * @return Transposed Mat4.
+	 */
 	[[nodiscard]] Mat4	Transposed() const;
 
+	/** @brief Compute determinant.
+	 * @return Determinant scalar.
+	 */
 	[[nodiscard]] float Determinant() const;
 
+	/** @brief Compute inverse matrix. May throw on singular.
+	 * @return The inverse matrix.
+	 */
 	[[nodiscard]] Mat4	Inverse() const; // may throw
 
+	/** @brief Multiply matrix by Vec4.
+	 * @param V The Vec4 to multiply.
+	 * @return The resulting Vec4.
+	 */
 	Vec4				operator*(const Vec4 &V) const;
 
 	/** Multiply by `Mat4` (matrix multiplication). Complexity: O(1). */
 	Mat4				operator*(const Mat4 &Rhs) const;
 
 public:
+	/** @brief Matrix addition. @param Rhs The matrix to add. @return Sum of the two matrices. */
 	Mat4  operator+(const Mat4 &Rhs) const;
 
+	/** @brief Matrix subtraction. @param Rhs The matrix to subtract. @return Difference of the two matrices. */
 	Mat4  operator-(const Mat4 &Rhs) const;
 
+	/** @brief Scalar multiplication. @param S The scalar. @return The scaled matrix. */
 	Mat4  operator*(float S) const;
 
+	/** @brief Scalar division. @param S The scalar. @return The divided matrix. */
 	Mat4  operator/(float S) const;
 
+	/** @brief Compound matrix addition. @param Rhs The matrix to add. @return Reference to this. */
 	Mat4 &operator+=(const Mat4 &Rhs);
 
+	/** @brief Compound matrix subtraction. @param Rhs The matrix to subtract. @return Reference to this. */
 	Mat4 &operator-=(const Mat4 &Rhs);
 
+	/** @brief Compound scalar multiplication. @param S The scalar. @return Reference to this. */
 	Mat4 &operator*=(float S);
 
+	/** @brief Compound scalar division. @param S The scalar. @return Reference to this. */
 	Mat4 &operator/=(float S);
 
 	/** Hadamard product (element-wise multiplication) */
+	/** @brief Hadamard (element-wise) matrix product. @param Rhs The matrix to multiply element-wise. @return The
+	 * element-wise product. */
 	Mat4  operator%(const Mat4 &Rhs) const;
 
+	/** @brief Compound Hadamard product. @param Rhs The matrix to multiply element-wise. @return Reference to this. */
 	Mat4 &operator%=(const Mat4 &Rhs);
 
 public:
@@ -225,8 +290,13 @@ class Mat3x2;
 // Mat2x3: 2 columns x 3 rows -> multiplies Vec2 -> Vec3
 class Mat2x3 {
 public:
+	/** @brief Default constructor. */
 	Mat2x3();
 
+	/** @brief Construct from two Vec3 columns.
+	 * @param col0 First column.
+	 * @param col1 Second column.
+	 */
 	Mat2x3(const Vec3 &col0, const Vec3 &col1);
 
 public:
@@ -234,25 +304,37 @@ public:
 
 	[[nodiscard]] Mat3x2 Transposed() const;
 
+	/** @brief Multiply matrix by Vec2, producing a Vec3.
+	 * @param V The Vec2 to multiply.
+	 * @return The resulting Vec3.
+	 */
 	Vec3				 operator*(const Vec2 &V) const;
 
 	/** Multiply by `Mat3x2` (2x3 * 3x2 = 3x3). Complexity: O(1). */
 	Mat3				 operator*(const Mat3x2 &Rhs) const;
 
 public:
+	/** @brief Matrix addition. @param Rhs The matrix to add. @return Sum of the two matrices. */
 	Mat2x3	operator+(const Mat2x3 &Rhs) const;
 
+	/** @brief Matrix subtraction. @param Rhs The matrix to subtract. @return Difference. */
 	Mat2x3	operator-(const Mat2x3 &Rhs) const;
 
+	/** @brief Scalar multiplication. @param S The scalar. @return The scaled matrix. */
 	Mat2x3	operator*(float S) const;
 
+	/** @brief Compound matrix addition. @param Rhs The matrix to add. @return Reference to this. */
 	Mat2x3 &operator+=(const Mat2x3 &Rhs);
 
+	/** @brief Compound matrix subtraction. @param Rhs The matrix to subtract. @return Reference to this. */
 	Mat2x3 &operator-=(const Mat2x3 &Rhs);
 
 	/** Hadamard product (element-wise multiplication) */
+	/** @brief Hadamard (element-wise) product. @param Rhs The matrix to multiply element-wise. @return The element-wise
+	 * product. */
 	Mat2x3	operator%(const Mat2x3 &Rhs) const;
 
+	/** @brief Compound Hadamard product. @param Rhs The matrix. @return Reference to this. */
 	Mat2x3 &operator%=(const Mat2x3 &Rhs);
 
 public:
@@ -262,8 +344,14 @@ public:
 
 class Mat3x2 {
 public:
+	/** @brief Default constructor. */
 	Mat3x2();
 
+	/** @brief Construct from three Vec2 columns.
+	 * @param c0 First column.
+	 * @param c1 Second column.
+	 * @param c2 Third column.
+	 */
 	Mat3x2(const Vec2 &c0, const Vec2 &c1, const Vec2 &c2);
 
 public:
@@ -275,25 +363,36 @@ public:
 	 */
 	[[nodiscard]] Mat2x3 Transposed() const;
 
+	/** @brief Multiply matrix by Vec3, producing a Vec2.
+	 * @param V The Vec3 to multiply.
+	 * @return The resulting Vec2.
+	 */
 	Vec2				 operator*(const Vec3 &V) const;
 
 	/** Multiply by `Mat2x3` (3x2 * 2x3 = 2x2). Complexity: O(1). */
 	Mat2				 operator*(const Mat2x3 &Rhs) const;
 
 public:
+	/** @brief Matrix addition. @param Rhs The matrix to add. @return Sum. */
 	Mat3x2	operator+(const Mat3x2 &Rhs) const;
 
+	/** @brief Matrix subtraction. @param Rhs The matrix to subtract. @return Difference. */
 	Mat3x2	operator-(const Mat3x2 &Rhs) const;
 
+	/** @brief Scalar multiplication. @param S The scalar. @return The scaled matrix. */
 	Mat3x2	operator*(float S) const;
 
+	/** @brief Compound matrix addition. @param Rhs The matrix to add. @return Reference to this. */
 	Mat3x2 &operator+=(const Mat3x2 &Rhs);
 
+	/** @brief Compound matrix subtraction. @param Rhs The matrix to subtract. @return Reference to this. */
 	Mat3x2 &operator-=(const Mat3x2 &Rhs);
 
 	/** Hadamard product (element-wise multiplication) */
+	/** @brief Hadamard (element-wise) product. @param Rhs The matrix. @return The element-wise product. */
 	Mat3x2	operator%(const Mat3x2 &Rhs) const;
 
+	/** @brief Compound Hadamard product. @param Rhs The matrix. @return Reference to this. */
 	Mat3x2 &operator%=(const Mat3x2 &Rhs);
 
 public:
@@ -304,13 +403,22 @@ public:
 
 class Mat2x4 {
 public:
+	/** @brief Default constructor. */
 	Mat2x4();
 
+	/** @brief Construct from two Vec4 columns.
+	 * @param c0 First column.
+	 * @param c1 Second column.
+	 */
 	Mat2x4(const Vec4 &c0, const Vec4 &c1);
 
 public:
 	static Mat2x4		 Zero();
 
+	/** @brief Multiply matrix by Vec2, producing a Vec4.
+	 * @param V The Vec2 to multiply.
+	 * @return The resulting Vec4.
+	 */
 	Vec4				 operator*(const Vec2 &V) const;
 
 	/** Multiply by `Mat4x2` (2x4 * 4x2 = 4x4). Complexity: O(1). */
@@ -330,13 +438,24 @@ public:
 
 class Mat4x2 {
 public:
+	/** @brief Default constructor. */
 	Mat4x2();
 
+	/** @brief Construct from four Vec2 columns.
+	 * @param c0 First column.
+	 * @param c1 Second column.
+	 * @param c2 Third column.
+	 * @param c3 Fourth column.
+	 */
 	Mat4x2(const Vec2 &c0, const Vec2 &c1, const Vec2 &c2, const Vec2 &c3);
 
 public:
 	static Mat4x2		 Zero();
 
+	/** @brief Multiply matrix by Vec4, producing a Vec2.
+	 * @param V The Vec4 to multiply.
+	 * @return The resulting Vec2.
+	 */
 	Vec2				 operator*(const Vec4 &V) const;
 
 	/** Multiply by `Mat2x4` (4x2 * 2x4 = 2x2). Complexity: O(1). */
@@ -358,13 +477,23 @@ public:
 
 class Mat3x4 {
 public:
+	/** @brief Default constructor. */
 	Mat3x4();
 
+	/** @brief Construct from three Vec4 columns.
+	 * @param c0 First column.
+	 * @param c1 Second column.
+	 * @param c2 Third column.
+	 */
 	Mat3x4(const Vec4 &c0, const Vec4 &c1, const Vec4 &c2);
 
 public:
 	static Mat3x4		 Zero();
 
+	/** @brief Multiply matrix by Vec3, producing a Vec4.
+	 * @param V The Vec3 to multiply.
+	 * @return The resulting Vec4.
+	 */
 	Vec4				 operator*(const Vec3 &V) const;
 
 	/** Multiply by `Mat4x3` (3x4 * 4x3 = 4x4). Complexity: O(1). */
@@ -385,13 +514,24 @@ public:
 
 class Mat4x3 {
 public:
+	/** @brief Default constructor. */
 	Mat4x3();
 
+	/** @brief Construct from four Vec3 columns.
+	 * @param c0 First column.
+	 * @param c1 Second column.
+	 * @param c2 Third column.
+	 * @param c3 Fourth column.
+	 */
 	Mat4x3(const Vec3 &c0, const Vec3 &c1, const Vec3 &c2, const Vec3 &c3);
 
 public:
 	static Mat4x3		 Zero();
 
+	/** @brief Multiply matrix by Vec4, producing a Vec3.
+	 * @param V The Vec4 to multiply.
+	 * @return The resulting Vec3.
+	 */
 	Vec3				 operator*(const Vec4 &V) const;
 
 	/** Multiply by `Mat3x4` (4x3 * 3x4 = 3x3). Complexity: O(1). */

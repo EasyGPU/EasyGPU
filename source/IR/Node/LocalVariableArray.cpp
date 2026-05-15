@@ -1,7 +1,6 @@
-﻿/**
- * LocalVariableArray.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file LocalVariableArray.cpp
+ * @brief Implementation of local array declaration IR node.
  */
 
 #include <IR/Node/LocalVariableArray.h>

@@ -1,17 +1,10 @@
 #pragma once
 
 /**
- * BufferRef.h:
- *      @Descripiton    :   The buffer reference for DSL access - Full IR integration
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
- *
- * Design inspired by VarVector.h swizzle access:
- * - BufferElement<T> acts like a variable that can be read/written
- * - Implicit conversion to Var<T> for reading
- * - operator= for writing back to buffer
- * - Full Expr<T> integration via operator overloading
+ * @file BufferRef.h
+ * @brief The buffer reference for DSL access - Full IR integration.
  */
+
 #ifndef EASYGPU_BUFFERREF_H
 #define EASYGPU_BUFFERREF_H
 
@@ -32,7 +25,8 @@ namespace GPU::IR::Value {
 template <typename T> class BufferElement;
 
 /**
- * The buffer reference class for DSL access
+ * @brief Buffer reference for DSL read/write access
+ *
  * Usage:
  *   auto buf = buffer.Bind();
  *   Var<float> v = buf[id];        // Read
@@ -46,15 +40,17 @@ public:
 	BufferRef(std::string bufferName, uint32_t binding) : _bufferName(std::move(bufferName)), _binding(binding) {
 	}
 
+	/** @brief Get the binding index of this buffer reference */
 	[[nodiscard]] uint32_t GetBinding() const {
 		return _binding;
 	}
+	/** @brief Get the name of the underlying buffer */
 	[[nodiscard]] const std::string &GetBufferName() const {
 		return _bufferName;
 	}
 
 	/**
-	 * Array access - returns a Var<T> that can be read/written
+	 * @brief Array access returning a Var<T> that can be read or written
 	 */
 	[[nodiscard]] Var<T> operator[](const Var<int> &index) const;
 	[[nodiscard]] Var<T> operator[](const Expr<int> &index) const;
@@ -81,9 +77,7 @@ template <typename T> [[nodiscard]] Var<T> BufferRef<T>::operator[](int index) c
 	return Var<T>(std::format("{}[{}]", GetBufferName(), std::to_string(index)));
 }
 
-/**
- * Type alias for convenience
- */
+/** @brief Convenience type alias for BufferRef */
 template <typename T> using buffer = BufferRef<T>;
 
 } // namespace GPU::IR::Value

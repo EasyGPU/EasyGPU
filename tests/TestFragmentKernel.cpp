@@ -1,13 +1,6 @@
 /**
- * TestFragmentKernel - Comprehensive test for FragmentKernel2D
- *
- * Tests all major features:
- * - Uniform variables (time, params)
- * - Texture sampling (BindSampler)
- * - Buffer/SSBO access
- * - Callable functions
- * - Complex shader effects
- * - GPU Profiling
+ * @file TestFragmentKernel.cpp
+ * @brief TestFragmentKernel - Comprehensive test for FragmentKernel2D.
  */
 
 #include <GPU.h>

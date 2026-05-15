@@ -1,14 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * KernelProfiler.h:
- *      @Descripiton    :   Kernel profiling tool for measuring GPU execution time
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
- *
- *  Reference: Taichi Kernel Profiler API
- *  https://docs.taichi-lang.org/api/taichi/profiler/kernel_profiler/
+ * @file KernelProfiler.h
+ * @brief Kernel profiling tool for measuring GPU execution time.
  */
+
 #ifndef EASYGPU_KERNEL_PROFILER_H
 #define EASYGPU_KERNEL_PROFILER_H
 
@@ -67,7 +63,8 @@ struct KernelProfileRecord {
 class KernelProfiler {
 public:
 	/**
-	 * Get the singleton instance
+	 * @brief Get the singleton instance.
+	 * @return Reference to the KernelProfiler singleton.
 	 */
 	static KernelProfiler &GetInstance();
 
@@ -79,91 +76,97 @@ public:
 
 public:
 	/**
-	 * Enable or disable profiling
-	 * When disabled, no records are collected
+	 * @brief Enable or disable profiling.
+	 *
+	 * When disabled, no records are collected.
+	 * @param enabled True to enable profiling.
 	 */
 	void		 SetEnabled(bool enabled);
 
 	/**
-	 * Check if profiling is enabled
+	 * @brief Check if profiling is enabled.
+	 * @return true if profiling is active.
 	 */
 	bool		 IsEnabled() const;
 
 	/**
-	 * Clear all profiling records and statistics
+	 * @brief Clear all profiling records and statistics.
 	 */
 	void		 Clear();
 
 	/**
-	 * Begin profiling a kernel dispatch
-	 * @return Query ID for ending the timer, 0 if profiling is disabled
+	 * @brief Begin profiling a kernel dispatch.
+	 * @return Query ID for ending the timer, 0 if profiling is disabled.
 	 */
 	unsigned int BeginQuery();
 
 	/**
-	 * End profiling a kernel dispatch and record the result
-	 * @param queryId The query ID from BeginQuery
-	 * @param kernelName Name of the kernel
-	 * @param groupX X dimension dispatch size
-	 * @param groupY Y dimension dispatch size
-	 * @param groupZ Z dimension dispatch size
+	 * @brief End profiling a kernel dispatch and record the result.
+	 * @param queryId The query ID from BeginQuery.
+	 * @param kernelName Name of the kernel.
+	 * @param groupX X dimension dispatch size.
+	 * @param groupY Y dimension dispatch size.
+	 * @param groupZ Z dimension dispatch size.
 	 */
 	void		 EndQuery(unsigned int queryId, const std::string &kernelName, int groupX, int groupY, int groupZ);
 
 	/**
-	 * Begin profiling on the current OpenGL context (without context switch)
-	 * Use this for FragmentKernel profiling where the context is already set
-	 * @return Query ID for ending the timer, 0 if profiling is disabled
+	 * @brief Begin profiling on the current OpenGL context (without context switch).
+	 *
+	 * Use this for FragmentKernel profiling where the context is already set.
+	 * @return Query ID for ending the timer, 0 if profiling is disabled.
 	 */
 	unsigned int BeginQueryOnCurrentContext();
 
 	/**
-	 * End profiling on the current OpenGL context (without context switch)
-	 * Use this for FragmentKernel profiling where the context is already set
-	 * @param queryId The query ID from BeginQueryOnCurrentContext
-	 * @param kernelName Name of the kernel
-	 * @param groupX X dimension dispatch size
-	 * @param groupY Y dimension dispatch size
-	 * @param groupZ Z dimension dispatch size
+	 * @brief End profiling on the current OpenGL context (without context switch).
+	 *
+	 * Use this for FragmentKernel profiling where the context is already set.
+	 * @param queryId The query ID from BeginQueryOnCurrentContext.
+	 * @param kernelName Name of the kernel.
+	 * @param groupX X dimension dispatch size.
+	 * @param groupY Y dimension dispatch size.
+	 * @param groupZ Z dimension dispatch size.
 	 */
 	void		 EndQueryOnCurrentContext(unsigned int queryId, const std::string &kernelName, int groupX, int groupY,
 										  int groupZ);
 
 public:
 	/**
-	 * Query profiling statistics for a specific kernel by name
-	 * @param kernelName The name of the kernel to query
-	 * @return Query result with counter, min, max, avg times
+	 * @brief Query profiling statistics for a specific kernel by name.
+	 * @param kernelName The name of the kernel to query.
+	 * @return Query result with counter, min, max, avg times.
 	 */
 	KernelProfilerQueryResult				QueryInfo(const std::string &kernelName) const;
 
 	/**
-	 * Get total elapsed time of all kernels recorded
-	 * @return Total time in milliseconds
+	 * @brief Get total elapsed time of all kernels recorded.
+	 * @return Total time in milliseconds.
 	 */
 	double									GetTotalTime() const;
 
 	/**
-	 * Print profiling results
-	 * @param mode "count" - print statistics (default)
-	 *             "trace" - print individual execution records
+	 * @brief Print profiling results to stdout.
+	 * @param mode "count" to print statistics (default), "trace" to print individual execution records.
 	 */
 	void									PrintInfo(const std::string &mode = "count") const;
 
 	/**
-	 * Get formatted profiling results as string
-	 * @param mode "count" - statistics (default), "trace" - execution records
-	 * @return Formatted string with profiling results
+	 * @brief Get formatted profiling results as string.
+	 * @param mode "count" for statistics (default), "trace" for execution records.
+	 * @return Formatted string with profiling results.
 	 */
 	std::string								GetFormattedOutput(const std::string &mode = "count") const;
 
 	/**
-	 * Get all profiling records (trace mode)
+	 * @brief Get all profiling records (trace mode).
+	 * @return Vector of KernelProfileRecord entries.
 	 */
 	const std::vector<KernelProfileRecord> &GetRecords() const;
 
 	/**
-	 * Get all kernel statistics
+	 * @brief Get all kernel statistics.
+	 * @return Vector of KernelProfilerQueryResult for all profiled kernels.
 	 */
 	std::vector<KernelProfilerQueryResult>	GetAllStats() const;
 
@@ -206,7 +209,18 @@ private:
  */
 class KernelProfileScope {
 public:
+	/**
+	 * @brief Begin a profiling scope for a kernel dispatch.
+	 * @param kernelName Name of the kernel.
+	 * @param groupX X dimension dispatch size.
+	 * @param groupY Y dimension dispatch size (default 1).
+	 * @param groupZ Z dimension dispatch size (default 1).
+	 */
 	KernelProfileScope(const std::string &kernelName, int groupX, int groupY = 1, int groupZ = 1);
+
+	/**
+	 * @brief End the profiling scope and record the result.
+	 */
 	~KernelProfileScope();
 
 	// Disable copy and move
@@ -222,28 +236,54 @@ private:
 };
 
 /**
- * Convenience functions for global profiler access
+ * @brief Convenience functions for global profiler access.
+ */
+
+/**
+ * @brief Enable or disable the global kernel profiler.
+ * @param enabled True to enable (default).
  */
 inline void EnableKernelProfiler(bool enabled = true) {
 	KernelProfiler::GetInstance().SetEnabled(enabled);
 }
 
+/**
+ * @brief Clear all global profiler records.
+ */
 inline void ClearKernelProfilerInfo() {
 	KernelProfiler::GetInstance().Clear();
 }
 
+/**
+ * @brief Print global profiler results to stdout.
+ * @param mode "count" for statistics (default), "trace" for execution records.
+ */
 inline void PrintKernelProfilerInfo(const std::string &mode = "count") {
 	KernelProfiler::GetInstance().PrintInfo(mode);
 }
 
+/**
+ * @brief Query profiler statistics for a named kernel.
+ * @param kernelName The kernel name.
+ * @return Query result with timing statistics.
+ */
 inline KernelProfilerQueryResult QueryKernelProfilerInfo(const std::string &kernelName) {
 	return KernelProfiler::GetInstance().QueryInfo(kernelName);
 }
 
+/**
+ * @brief Get total elapsed time across all profiled kernels.
+ * @return Total time in milliseconds.
+ */
 inline double GetKernelProfilerTotalTime() {
 	return KernelProfiler::GetInstance().GetTotalTime();
 }
 
+/**
+ * @brief Get formatted profiler output as string.
+ * @param mode "count" for statistics (default), "trace" for execution records.
+ * @return Formatted string with profiling results.
+ */
 inline std::string GetKernelProfilerFormattedOutput(const std::string &mode = "count") {
 	return KernelProfiler::GetInstance().GetFormattedOutput(mode);
 }

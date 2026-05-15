@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Value.h:
- *      @Descripiton    :   The value class
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file Value.h
+ * @brief The value class.
  */
+
 #ifndef EASYGPU_VALUE_H
 #define EASYGPU_VALUE_H
 
@@ -14,7 +13,7 @@
 
 namespace GPU::IR::Value {
 /**
- * The value class which maintains node pointer
+ * @brief Base class for GPU IR values that owns a node pointer
  */
 class Value {
 public:
@@ -30,7 +29,7 @@ public:
 
 public:
 	/**
-	 * Release ownership of the node
+	 * @brief Release ownership of the node
 	 * @return The owned node as unique_ptr
 	 */
 	[[nodiscard]] std::unique_ptr<Node::Node> Release() noexcept {

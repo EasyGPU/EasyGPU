@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * VarStruct.h:
- *      @Descripiton    :   Var<StructType> specialization support
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
+ * @file VarStruct.h
+ * @brief Var<StructType> specialization support.
  */
+
 #ifndef EASYGPU_VAR_STRUCT_H
 #define EASYGPU_VAR_STRUCT_H
 
@@ -20,12 +19,13 @@
 
 namespace GPU::IR::Value {
 /**
- * Base class for struct-based Var specializations
+ * @brief Base class for struct-based Var specializations providing shared Load() logic
  */
 class VarStructBase : public Value {
 protected:
 	Node::LocalVariableNode						*_varNode = nullptr;
 
+	/// @brief Load the struct variable, creating a LoadLocalVariableNode
 	std::unique_ptr<Node::LoadLocalVariableNode> Load() const {
 		return std::make_unique<Node::LoadLocalVariableNode>(_varNode->VarName());
 	}

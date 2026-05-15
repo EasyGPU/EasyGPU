@@ -20,6 +20,9 @@
 #include <format>
 
 namespace GPU::IR::Value {
+/**
+ * @brief Var specialization for Math::Mat2 (2x2 square matrix) with column constructor and matrix-vector multiplication
+ */
 template <> class Var<Math::Mat2> : public VarBase<Math::Mat2> {
 public:
 	using VarBase<Math::Mat2>::VarBase;
@@ -30,7 +33,13 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat2> m(col0, col1)
+	/**
+	 * @brief Construct a Mat2 from two Vec2 column vectors
+	 * @tparam C0 Type of the first column (Var<Vec2> or Expr<Vec2>)
+	 * @tparam C1 Type of the second column (Var<Vec2> or Expr<Vec2>)
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 */
 	template <typename C0, typename C1>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec2>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec2>>) &&
@@ -99,6 +108,9 @@ private:
 	}
 };
 
+/**
+ * @brief Var specialization for Math::Mat3 (3x3 square matrix) with column constructor and matrix-vector multiplication
+ */
 template <> class Var<Math::Mat3> : public VarBase<Math::Mat3> {
 public:
 	using VarBase<Math::Mat3>::VarBase;
@@ -109,7 +121,15 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat3> m(col0, col1, col2)
+	/**
+	 * @brief Construct a Mat3 from three Vec3 column vectors
+	 * @tparam C0 Type of the first column (Var<Vec3> or Expr<Vec3>)
+	 * @tparam C1 Type of the second column (Var<Vec3> or Expr<Vec3>)
+	 * @tparam C2 Type of the third column (Var<Vec3> or Expr<Vec3>)
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 * @param col2 The third column vector
+	 */
 	template <typename C0, typename C1, typename C2>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec3>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec3>>) &&
@@ -179,6 +199,9 @@ private:
 	}
 };
 
+/**
+ * @brief Var specialization for Math::Mat4 (4x4 square matrix) with column constructor and matrix-vector multiplication
+ */
 template <> class Var<Math::Mat4> : public VarBase<Math::Mat4> {
 public:
 	using VarBase<Math::Mat4>::VarBase;
@@ -189,7 +212,17 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat4> m(col0, col1, col2, col3)
+	/**
+	 * @brief Construct a Mat4 from four Vec4 column vectors
+	 * @tparam C0 Type of the first column (Var<Vec4> or Expr<Vec4>)
+	 * @tparam C1 Type of the second column (Var<Vec4> or Expr<Vec4>)
+	 * @tparam C2 Type of the third column (Var<Vec4> or Expr<Vec4>)
+	 * @tparam C3 Type of the fourth column (Var<Vec4> or Expr<Vec4>)
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 * @param col2 The third column vector
+	 * @param col3 The fourth column vector
+	 */
 	template <typename C0, typename C1, typename C2, typename C3>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec4>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec4>>) &&
@@ -264,6 +297,10 @@ private:
 
 // ==================== Rectangular Matrices ====================
 
+/**
+ * @brief Var specialization for Math::Mat2x3 (2x3 rectangular matrix) with column constructor and matrix-vector
+ * multiplication
+ */
 template <> class Var<Math::Mat2x3> : public VarBase<Math::Mat2x3> {
 public:
 	using VarBase<Math::Mat2x3>::VarBase;
@@ -274,7 +311,13 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat2x3> m(col0, col1) - 2 columns of vec3
+	/**
+	 * @brief Construct a Mat2x3 from two Vec3 column vectors
+	 * @tparam C0 Type of the first column
+	 * @tparam C1 Type of the second column
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 */
 	template <typename C0, typename C1>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec3>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec3>>) &&
@@ -341,6 +384,10 @@ private:
 	}
 };
 
+/**
+ * @brief Var specialization for Math::Mat2x4 (2x4 rectangular matrix) with column constructor and matrix-vector
+ * multiplication
+ */
 template <> class Var<Math::Mat2x4> : public VarBase<Math::Mat2x4> {
 public:
 	using VarBase<Math::Mat2x4>::VarBase;
@@ -351,7 +398,13 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat2x4> m(col0, col1) - 2 columns of vec4
+	/**
+	 * @brief Construct a Mat2x4 from two Vec4 column vectors
+	 * @tparam C0 Type of the first column
+	 * @tparam C1 Type of the second column
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 */
 	template <typename C0, typename C1>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec4>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec4>>) &&
@@ -418,6 +471,10 @@ private:
 	}
 };
 
+/**
+ * @brief Var specialization for Math::Mat3x2 (3x2 rectangular matrix) with column constructor and matrix-vector
+ * multiplication
+ */
 template <> class Var<Math::Mat3x2> : public VarBase<Math::Mat3x2> {
 public:
 	using VarBase<Math::Mat3x2>::VarBase;
@@ -428,7 +485,15 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat3x2> m(col0, col1, col2) - 3 columns of vec2
+	/**
+	 * @brief Construct a Mat3x2 from three Vec2 column vectors
+	 * @tparam C0 Type of the first column
+	 * @tparam C1 Type of the second column
+	 * @tparam C2 Type of the third column
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 * @param col2 The third column vector
+	 */
 	template <typename C0, typename C1, typename C2>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec2>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec2>>) &&
@@ -498,6 +563,10 @@ private:
 	}
 };
 
+/**
+ * @brief Var specialization for Math::Mat3x4 (3x4 rectangular matrix) with column constructor and matrix-vector
+ * multiplication
+ */
 template <> class Var<Math::Mat3x4> : public VarBase<Math::Mat3x4> {
 public:
 	using VarBase<Math::Mat3x4>::VarBase;
@@ -508,7 +577,15 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat3x4> m(col0, col1, col2) - 3 columns of vec4
+	/**
+	 * @brief Construct a Mat3x4 from three Vec4 column vectors
+	 * @tparam C0 Type of the first column
+	 * @tparam C1 Type of the second column
+	 * @tparam C2 Type of the third column
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 * @param col2 The third column vector
+	 */
 	template <typename C0, typename C1, typename C2>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec4>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec4>>) &&
@@ -578,6 +655,10 @@ private:
 	}
 };
 
+/**
+ * @brief Var specialization for Math::Mat4x2 (4x2 rectangular matrix) with column constructor and matrix-vector
+ * multiplication
+ */
 template <> class Var<Math::Mat4x2> : public VarBase<Math::Mat4x2> {
 public:
 	using VarBase<Math::Mat4x2>::VarBase;
@@ -588,7 +669,17 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat4x2> m(col0, col1, col2, col3) - 4 columns of vec2
+	/**
+	 * @brief Construct a Mat4x2 from four Vec2 column vectors
+	 * @tparam C0 Type of the first column
+	 * @tparam C1 Type of the second column
+	 * @tparam C2 Type of the third column
+	 * @tparam C3 Type of the fourth column
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 * @param col2 The third column vector
+	 * @param col3 The fourth column vector
+	 */
 	template <typename C0, typename C1, typename C2, typename C3>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec2>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec2>>) &&
@@ -661,6 +752,10 @@ private:
 	}
 };
 
+/**
+ * @brief Var specialization for Math::Mat4x3 (4x3 rectangular matrix) with column constructor and matrix-vector
+ * multiplication
+ */
 template <> class Var<Math::Mat4x3> : public VarBase<Math::Mat4x3> {
 public:
 	using VarBase<Math::Mat4x3>::VarBase;
@@ -671,7 +766,17 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Column constructor: Var<Mat4x3> m(col0, col1, col2, col3) - 4 columns of vec3
+	/**
+	 * @brief Construct a Mat4x3 from four Vec3 column vectors
+	 * @tparam C0 Type of the first column
+	 * @tparam C1 Type of the second column
+	 * @tparam C2 Type of the third column
+	 * @tparam C3 Type of the fourth column
+	 * @param col0 The first column vector
+	 * @param col1 The second column vector
+	 * @param col2 The third column vector
+	 * @param col3 The fourth column vector
+	 */
 	template <typename C0, typename C1, typename C2, typename C3>
 		requires(std::same_as<std::remove_cvref_t<C0>, Var<Math::Vec3>> ||
 				 std::same_as<std::remove_cvref_t<C0>, Expr<Math::Vec3>>) &&

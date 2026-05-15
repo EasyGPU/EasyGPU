@@ -1,9 +1,8 @@
 /**
- * TestBufferSlot.cpp:
- *      @Descripiton    :   BufferSlot functionality tests
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/6/2026
+ * @file TestBufferSlot.cpp
+ * @brief BufferSlot functionality tests.
  */
+
 #include <GPU.h>
 #include <cmath>
 #include <iostream>

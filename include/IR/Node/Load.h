@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Load.h:
- *      @Descripiton    :   The node for any address loading
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file Load.h
+ * @brief The node for any address loading.
  */
+
 #ifndef EASYGPU_LOAD_H
 #define EASYGPU_LOAD_H
 

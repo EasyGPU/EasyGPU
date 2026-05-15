@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Break.h:
- *      @Descripiton    :   The break control flow API for users
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file BreakFlow.h
+ * @brief The break control flow API for users.
  */
+
 #ifndef EASYGPU_FLOW_BREAK_H
 #define EASYGPU_FLOW_BREAK_H
 
@@ -14,7 +13,7 @@
 
 namespace GPU::Flow {
 /**
- * Emit a break statement to exit from the current loop
+ * @brief Emit a break statement to exit from the current loop.
  *
  * Usage:
  *   For(0, 10, [&](Var<int>& i) {

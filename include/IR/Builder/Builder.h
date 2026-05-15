@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Builder.h:
- *      @Descripiton    :   The builder for the DSL
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file Builder.h
+ * @brief The builder for the DSL.
  */
+
 #ifndef EASYGPU_BUILDER_H
 #define EASYGPU_BUILDER_H
 

@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @brief Minimal window example - opens a window and handles events
+ * @brief Minimal window example - opens a window and handles events.
  */
 
 #include <Window/AppWindow.h>

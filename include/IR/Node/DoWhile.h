@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * DoWhile.h:
- *      @Descripiton    :   The node for do-while loop control flow
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file DoWhile.h
+ * @brief The node for do-while loop control flow.
  */
+
 #ifndef EASYGPU_DOWHILE_H
 #define EASYGPU_DOWHILE_H
 

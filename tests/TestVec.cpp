@@ -1,4 +1,9 @@
-﻿#include <cmath>
+/**
+ * @file TestVec.cpp
+ * @brief Tests for GPU vector types (Vec2, Vec3, Vec4) and operations.
+ */
+
+#include <cmath>
 #include <iostream>
 
 #include <Utility/Matrix.h>

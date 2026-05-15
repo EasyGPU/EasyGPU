@@ -1,7 +1,6 @@
-﻿/**
- * CompoundAssignment.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+/**
+ * @file CompoundAssignment.cpp
+ * @brief Implementation of compound assignment IR nodes.
  */
 
 #include <IR/Node/CompoundAssignment.h>

@@ -1,6 +1,6 @@
 /**
  * @file TestShaderCache.cpp
- * @brief Tests for in-memory shader binary cache functionality
+ * @brief Tests for in-memory shader binary cache functionality.
  */
 
 #include <GPU.h>

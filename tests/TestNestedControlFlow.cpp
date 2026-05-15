@@ -1,6 +1,6 @@
 /**
- * TestNestedControlFlow.cpp
- * Tests deeply nested and mixed control flow constructs.
+ * @file TestNestedControlFlow.cpp
+ * @brief Tests deeply nested and mixed control flow constructs.
  */
 
 #include <GPU.h>

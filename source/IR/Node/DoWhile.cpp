@@ -1,7 +1,6 @@
 /**
- * DoWhile.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file DoWhile.cpp
+ * @brief Implementation of the do-while loop IR node.
  */
 
 #include <IR/Node/DoWhile.h>

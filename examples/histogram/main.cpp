@@ -1,8 +1,6 @@
 /**
- * Histogram Example
- *
- * Demonstrates atomic operations for computing a histogram.
- * Each thread processes one pixel and atomically increments the appropriate bin.
+ * @file main.cpp
+ * @brief Histogram Example.
  */
 
 #include <GPU.h>

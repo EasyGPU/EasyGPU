@@ -1,7 +1,6 @@
 /**
- * ContinueNode.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
+ * @file Continue.cpp
+ * @brief Implementation of the continue statement IR node.
  */
 
 #include <IR/Node/Continue.h>

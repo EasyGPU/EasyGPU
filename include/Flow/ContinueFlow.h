@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Continue.h:
- *      @Descripiton    :   The continue control flow API for users
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
+ * @file ContinueFlow.h
+ * @brief The continue control flow API for users.
  */
+
 #ifndef EASYGPU_FLOW_CONTINUE_H
 #define EASYGPU_FLOW_CONTINUE_H
 
@@ -14,7 +13,7 @@
 
 namespace GPU::Flow {
 /**
- * Emit a continue statement to skip to the next iteration of the current loop
+ * @brief Emit a continue statement to skip to the next iteration of the current loop.
  *
  * Usage:
  *   For(0, 10, [&](Var<int>& i) {

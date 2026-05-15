@@ -1,7 +1,6 @@
-﻿/**
- * Expr.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file Expr.cpp
+ * @brief Implementation of GPU expression value types.
  */
 
 #include <IR/Value/Expr.h>

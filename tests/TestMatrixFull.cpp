@@ -1,7 +1,6 @@
 /**
- * TestMatrixFull.cpp
- * Comprehensive tests for matrix types: construction, multiplication,
- * vector transforms, and swizzle-like access patterns.
+ * @file TestMatrixFull.cpp
+ * @brief Comprehensive tests for matrix types: construction, multiplication,.
  */
 
 #include <GPU.h>

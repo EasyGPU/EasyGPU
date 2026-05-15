@@ -1,7 +1,6 @@
 /**
- * TestUniformAdvanced.cpp
- * Advanced uniform tests: dynamic updates, multi-kernel uniform changes,
- * and large/complex uniform types.
+ * @file TestUniformAdvanced.cpp
+ * @brief Advanced uniform tests: dynamic updates, multi-kernel uniform changes,.
  */
 
 #include <GPU.h>

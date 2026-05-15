@@ -1,7 +1,6 @@
-﻿/**
- * Builder.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+/**
+ * @file Builder.cpp
+ * @brief Implementation of the IR builder for constructing GPU shader code from DSL expressions.
  */
 
 #include <IR/Builder/Builder.h>

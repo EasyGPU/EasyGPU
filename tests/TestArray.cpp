@@ -1,9 +1,8 @@
 /**
- * TestArray.cpp:
- *      @Description    :   Test for GPU VarArray functionality
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file TestArray.cpp
+ * @brief Tests for GPU array variables and array operations.
  */
+
 #include <array>
 #include <cassert>
 #include <cmath>

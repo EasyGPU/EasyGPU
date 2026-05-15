@@ -1,9 +1,8 @@
 /**
- * TestDispatch.cpp:
- *      @Descripiton    :   Test Kernel Dispatch with sync/async modes
- *      @Author         :   Margoo
- *      @Date           :   2/15/2026
+ * @file TestDispatch.cpp
+ * @brief Test Kernel Dispatch with sync/async modes.
  */
+
 #include <Flow/ForFlow.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>

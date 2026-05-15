@@ -1,12 +1,6 @@
 /**
  * @file TestKernelCache.cpp
- * @brief Comprehensive tests for kernel shader binary cache functionality
- *
- * This test suite validates:
- * - Basic cache CRUD operations
- * - Cross-backend cache compatibility (OpenGL/Vulkan)
- * - Kernel compilation caching and reuse
- * - Cache in memory only (no file persistence)
+ * @brief Comprehensive tests for kernel shader binary cache functionality.
  */
 
 #include <GPU.h>

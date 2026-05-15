@@ -17,7 +17,9 @@
 #include <format>
 
 namespace GPU::IR::Value {
-// Specialization for Mat2 expressions with column access
+/**
+ * @brief Expr specialization for Math::Mat2 with column access and matrix-vector multiplication
+ */
 template <> class Expr<Math::Mat2> : public ExprBase {
 public:
 	using ValueType		= Math::Mat2;
@@ -73,7 +75,9 @@ public:
 	}
 };
 
-// Specialization for Mat3 expressions
+/**
+ * @brief Expr specialization for Math::Mat3 with column access, scalar ops, and matrix-vector multiplication
+ */
 template <> class Expr<Math::Mat3> : public ExprBase {
 public:
 	using ValueType		= Math::Mat3;
@@ -143,7 +147,9 @@ public:
 	}
 };
 
-// Specialization for Mat4 expressions
+/**
+ * @brief Expr specialization for Math::Mat4 with column access, scalar ops, and matrix-vector multiplication
+ */
 template <> class Expr<Math::Mat4> : public ExprBase {
 public:
 	using ValueType		= Math::Mat4;
@@ -213,7 +219,9 @@ public:
 	}
 };
 
-// Mat2x3: 2 columns x 3 rows -> multiplies Vec2 -> Vec3
+/**
+ * @brief Expr specialization for Math::Mat2x3 (2x3): column access and Mat2x3*Vec2->Vec3 multiplication
+ */
 template <> class Expr<Math::Mat2x3> : public ExprBase {
 public:
 	using ValueType		= Math::Mat2x3;
@@ -257,7 +265,9 @@ public:
 	}
 };
 
-// Mat3x2: 3 columns x 2 rows -> multiplies Vec3 -> Vec2
+/**
+ * @brief Expr specialization for Math::Mat3x2 (3x2): column access and Mat3x2*Vec3->Vec2 multiplication
+ */
 template <> class Expr<Math::Mat3x2> : public ExprBase {
 public:
 	using ValueType		= Math::Mat3x2;
@@ -301,7 +311,9 @@ public:
 	}
 };
 
-// Mat2x4: 2 columns x 4 rows -> multiplies Vec2 -> Vec4
+/**
+ * @brief Expr specialization for Math::Mat2x4 (2x4): column access and Mat2x4*Vec2->Vec4 multiplication
+ */
 template <> class Expr<Math::Mat2x4> : public ExprBase {
 public:
 	using ValueType		= Math::Mat2x4;
@@ -345,7 +357,9 @@ public:
 	}
 };
 
-// Mat4x2: 4 columns x 2 rows -> multiplies Vec4 -> Vec2
+/**
+ * @brief Expr specialization for Math::Mat4x2 (4x2): column access and Mat4x2*Vec4->Vec2 multiplication
+ */
 template <> class Expr<Math::Mat4x2> : public ExprBase {
 public:
 	using ValueType		= Math::Mat4x2;
@@ -389,7 +403,9 @@ public:
 	}
 };
 
-// Mat3x4: 3 columns x 4 rows -> multiplies Vec3 -> Vec4
+/**
+ * @brief Expr specialization for Math::Mat3x4 (3x4): column access and Mat3x4*Vec3->Vec4 multiplication
+ */
 template <> class Expr<Math::Mat3x4> : public ExprBase {
 public:
 	using ValueType		= Math::Mat3x4;
@@ -433,7 +449,9 @@ public:
 	}
 };
 
-// Mat4x3: 4 columns x 3 rows -> multiplies Vec4 -> Vec3
+/**
+ * @brief Expr specialization for Math::Mat4x3 (4x3): column access and Mat4x3*Vec4->Vec3 multiplication
+ */
 template <> class Expr<Math::Mat4x3> : public ExprBase {
 public:
 	using ValueType		= Math::Mat4x3;
@@ -820,14 +838,23 @@ public:
 }
 
 // Type aliases for matrix expressions (defined after specializations)
+/** @brief Convenience alias for Expr<Math::Mat2> */
 using Mat2Expr	 = Expr<Math::Mat2>;
+/** @brief Convenience alias for Expr<Math::Mat3> */
 using Mat3Expr	 = Expr<Math::Mat3>;
+/** @brief Convenience alias for Expr<Math::Mat4> */
 using Mat4Expr	 = Expr<Math::Mat4>;
+/** @brief Convenience alias for Expr<Math::Mat2x3> */
 using Mat2x3Expr = Expr<Math::Mat2x3>;
+/** @brief Convenience alias for Expr<Math::Mat2x4> */
 using Mat2x4Expr = Expr<Math::Mat2x4>;
+/** @brief Convenience alias for Expr<Math::Mat3x2> */
 using Mat3x2Expr = Expr<Math::Mat3x2>;
+/** @brief Convenience alias for Expr<Math::Mat3x4> */
 using Mat3x4Expr = Expr<Math::Mat3x4>;
+/** @brief Convenience alias for Expr<Math::Mat4x2> */
 using Mat4x2Expr = Expr<Math::Mat4x2>;
+/** @brief Convenience alias for Expr<Math::Mat4x3> */
 using Mat4x3Expr = Expr<Math::Mat4x3>;
 
 } // namespace GPU::IR::Value

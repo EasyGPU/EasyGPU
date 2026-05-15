@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Return.h:
- *      @Descripiton    :   The node for return statement in functions
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file Return.h
+ * @brief The node for return statement in functions.
  */
+
 #ifndef EASYGPU_RETURN_H
 #define EASYGPU_RETURN_H
 

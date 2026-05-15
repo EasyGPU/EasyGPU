@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @brief Pixel buffer example - draws a colorful animated pattern
+ * @brief Pixel buffer example - draws a colorful animated pattern.
  */
 
 #ifdef _WIN32

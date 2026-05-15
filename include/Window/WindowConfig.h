@@ -2,7 +2,7 @@
 
 /**
  * @file WindowConfig.h
- * @brief Window configuration structure
+ * @brief Window configuration structure.
  */
 
 #ifndef EASYGPU_WINDOW_CONFIG_H

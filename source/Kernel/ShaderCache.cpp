@@ -1,6 +1,6 @@
 /**
  * @file ShaderCache.cpp
- * @brief Implementation of in-memory shader binary cache
+ * @brief Implementation of in-memory shader binary cache.
  */
 
 #include <Kernel/ShaderCache.h>
@@ -20,6 +20,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+
 #include <wincrypt.h>
 #else
 #include <openssl/evp.h>

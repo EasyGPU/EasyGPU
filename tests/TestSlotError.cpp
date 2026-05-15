@@ -1,9 +1,8 @@
 /**
- * TestSlotError.cpp:
- *      @Descripiton    :   Error handling tests for Slots
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/6/2026
+ * @file TestSlotError.cpp
+ * @brief Error handling tests for Slots.
  */
+
 #include <GPU.h>
 #include <iostream>
 #include <vector>

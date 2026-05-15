@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * ThreadIndex.h:
- *      @Descripiton    :   Thread index utilities for GPU kernels
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file ThreadIndex.h
+ * @brief Thread index utilities for GPU kernels.
  */
+
 #ifndef EASYGPU_THREADINDEX_H
 #define EASYGPU_THREADINDEX_H
 

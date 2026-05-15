@@ -2,8 +2,9 @@
 
 /**
  * @file Texture.h
- * @brief 2D Texture for GPU compute shader with backend support
+ * @brief 2D Texture for GPU compute shader with backend support.
  */
+
 #ifndef EASYGPU_TEXTURE_H
 #define EASYGPU_TEXTURE_H
 
@@ -36,7 +37,9 @@ namespace GPU::Runtime {
 class PBOBuffer;
 
 /**
- * Convert Runtime PixelFormat to Backend PixelFormat
+ * @brief Convert Runtime PixelFormat to Backend PixelFormat.
+ * @param format The runtime pixel format.
+ * @return The equivalent Backend::PixelFormat enum value.
  */
 inline Backend::PixelFormat ToBackendPixelFormat(PixelFormat format) {
 	switch (format) {
@@ -75,8 +78,12 @@ inline Backend::PixelFormat ToBackendPixelFormat(PixelFormat format) {
 	}
 }
 
+/**
+ * @brief Pixel Buffer Object wrapper for asynchronous texture uploads/downloads.
+ */
 class PBOBuffer {
 public:
+	/** @brief PBO lifecycle state. */
 	enum class State {
 		Idle,
 		Uploading,
@@ -85,6 +92,11 @@ public:
 	};
 
 public:
+	/**
+	 * @brief Create a PBO buffer.
+	 * @param size Size in bytes to allocate on the GPU.
+	 * @param isDownload If true, this PBO is used for download (readback) operations.
+	 */
 	PBOBuffer(size_t size, bool isDownload = false) : _size(size), _isDownload(isDownload), _state(State::Idle) {
 		Runtime::AutoInitContext();
 		Runtime::Context::GetInstance().MakeCurrent();
@@ -155,6 +167,10 @@ public:
 	}
 
 public:
+	/**
+	 * @brief Map the PBO for CPU write access (upload PBOs only).
+	 * @return Pointer to the mapped GPU memory, or nullptr on failure.
+	 */
 	void *MapWrite() {
 		if (_isDownload) {
 			throw std::runtime_error("Cannot map write on download PBO");
@@ -166,6 +182,10 @@ public:
 		return backend->MapBuffer(_pboHandle, false, true);
 	}
 
+	/**
+	 * @brief Map the PBO for CPU read access (download PBOs only).
+	 * @return Pointer to the mapped GPU memory, or nullptr on failure.
+	 */
 	const void *MapRead() {
 		if (!_isDownload) {
 			throw std::runtime_error("Cannot map read on upload PBO");
@@ -177,6 +197,7 @@ public:
 		return backend->MapBuffer(_pboHandle, true, false);
 	}
 
+	/** @brief Unmap the PBO buffer, making GPU writes visible. */
 	void Unmap() {
 		auto *backend = Context::GetBackend();
 		if (!backend) {
@@ -185,6 +206,11 @@ public:
 		backend->UnmapBuffer(_pboHandle);
 	}
 
+	/**
+	 * @brief Copy host data into the PBO for upload.
+	 * @param data Pointer to the source data on the host.
+	 * @param size Number of bytes to copy (must not exceed PBO size).
+	 */
 	void CopyData(const void *data, size_t size) {
 		if (_isDownload) {
 			throw std::runtime_error("Cannot copy data to download PBO");
@@ -270,8 +296,17 @@ private:
 #endif
 };
 
+/**
+ * @brief Pool of PBO buffers for asynchronous multi-buffered texture transfers.
+ */
 class PBOPool {
 public:
+	/**
+	 * @brief Create a PBO pool.
+	 * @param bufferSize Size in bytes for each PBO in the pool.
+	 * @param bufferCount Number of PBOs to create.
+	 * @param isDownload If true, PBOs are for download (readback) operations.
+	 */
 	PBOPool(size_t bufferSize, uint32_t bufferCount, bool isDownload = false)
 		: _bufferSize(bufferSize), _isDownload(isDownload) {
 		for (uint32_t i = 0; i < bufferCount; ++i) {
@@ -279,6 +314,10 @@ public:
 		}
 	}
 
+	/**
+	 * @brief Get an idle PBO from the pool (non-blocking).
+	 * @return Pointer to an idle PBO, or nullptr if all are busy.
+	 */
 	PBOBuffer *AcquireIdle() {
 		for (auto &pbo : _buffers) {
 			if (pbo->GetState() == PBOBuffer::State::Idle) {
@@ -341,12 +380,27 @@ private:
 	std::vector<std::unique_ptr<PBOBuffer>> _buffers;
 };
 
+/**
+ * @brief 2D GPU texture for compute shader image access.
+ * @tparam Format The pixel format of the texture.
+ */
 template <PixelFormat Format> class Texture2D {
 public:
+	/**
+	 * @brief Create a 2D texture with uninitialized data.
+	 * @param width Texture width in pixels.
+	 * @param height Texture height in pixels.
+	 */
 	Texture2D(uint32_t width, uint32_t height) : _width(width), _height(height), _format(Format) {
 		CreateTexture(nullptr);
 	}
 
+	/**
+	 * @brief Create a 2D texture and upload initial data.
+	 * @param width Texture width in pixels.
+	 * @param height Texture height in pixels.
+	 * @param data Pointer to the initial pixel data to upload.
+	 */
 	Texture2D(uint32_t width, uint32_t height, const void *data) : _width(width), _height(height), _format(Format) {
 		CreateTexture(data);
 	}
@@ -394,6 +448,10 @@ public:
 	Texture2D &operator=(const Texture2D &) = delete;
 
 public:
+	/**
+	 * @brief Upload pixel data to the full texture.
+	 * @param data Pointer to pixel data in the texture's pixel format.
+	 */
 	void Upload(const void *data) {
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
 			return;
@@ -427,6 +485,10 @@ public:
 		backend->UploadTexture(_textureHandle, x, y, w, h, data);
 	}
 
+	/**
+	 * @brief Download pixel data from the full texture to host memory.
+	 * @param[out] outData Pointer to host memory to receive pixel data.
+	 */
 	void Download(void *outData) const {
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || outData == nullptr) {
 			return;
@@ -442,6 +504,10 @@ public:
 		backend->DownloadTexture(_textureHandle, 0, 0, _width, _height, outData);
 	}
 
+	/**
+	 * @brief Download pixel data into a typed vector, resizing if needed.
+	 * @param[out] outData Vector to receive pixel data.
+	 */
 	template <typename T> void Download(std::vector<T> &outData) const {
 		size_t requiredSize = (_width * _height * GetBytesPerPixel() + sizeof(T) - 1) / sizeof(T);
 		if (outData.size() < requiredSize) {
@@ -668,14 +734,29 @@ private:
 	PBOBuffer				*_currentDownloadPBO = nullptr;
 };
 
+/** @brief Convenience typedef for RGBA8 2D texture. */
 using TextureRGBA8	 = Texture2D<PixelFormat::RGBA8>;
+/** @brief Convenience typedef for RGBA32F 2D texture. */
 using TextureRGBA32F = Texture2D<PixelFormat::RGBA32F>;
+/** @brief Convenience typedef for R32F 2D texture. */
 using TextureR32F	 = Texture2D<PixelFormat::R32F>;
+/** @brief Convenience typedef for RG32F 2D texture. */
 using TextureRG32F	 = Texture2D<PixelFormat::RG32F>;
+/** @brief Convenience typedef for R8 2D texture. */
 using TextureR8		 = Texture2D<PixelFormat::R8>;
 
+/**
+ * @brief 3D GPU texture for compute shader image access.
+ * @tparam Format The pixel format of the texture.
+ */
 template <PixelFormat Format> class Texture3D {
 public:
+	/**
+	 * @brief Create a 3D texture with uninitialized data.
+	 * @param width Texture width in pixels.
+	 * @param height Texture height in pixels.
+	 * @param depth Texture depth in pixels.
+	 */
 	Texture3D(uint32_t width, uint32_t height, uint32_t depth)
 		: _width(width), _height(height), _depth(depth), _format(Format) {
 		CreateTexture(nullptr);
@@ -732,6 +813,10 @@ public:
 	Texture3D &operator=(const Texture3D &) = delete;
 
 public:
+	/**
+	 * @brief Upload pixel data to the full 3D texture.
+	 * @param data Pointer to pixel data in the texture's pixel format.
+	 */
 	void Upload(const void *data) {
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
 			return;
@@ -991,10 +1076,15 @@ private:
 	PBOBuffer				*_currentDownloadPBO = nullptr;
 };
 
+/** @brief Convenience typedef for RGBA8 3D texture. */
 using Texture3DRGBA8   = Texture3D<PixelFormat::RGBA8>;
+/** @brief Convenience typedef for RGBA32F 3D texture. */
 using Texture3DRGBA32F = Texture3D<PixelFormat::RGBA32F>;
+/** @brief Convenience typedef for R32F 3D texture. */
 using Texture3DR32F	   = Texture3D<PixelFormat::R32F>;
+/** @brief Convenience typedef for RG32F 3D texture. */
 using Texture3DRG32F   = Texture3D<PixelFormat::RG32F>;
+/** @brief Convenience typedef for R8 3D texture. */
 using Texture3DR8	   = Texture3D<PixelFormat::R8>;
 
 } // namespace GPU::Runtime

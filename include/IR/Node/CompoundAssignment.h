@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * CompoundAssignment.h:
- *      @Descripiton    :   The node for compound assignment
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+ * @file CompoundAssignment.h
+ * @brief The node for compound assignment.
  */
+
 #ifndef EASYGPU_COMPOUNDASSIGNMENT_H
 #define EASYGPU_COMPOUNDASSIGNMENT_H
 

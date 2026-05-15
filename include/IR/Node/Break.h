@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Break.h:
- *      @Descripiton    :   The node for break statement in loops
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file Break.h
+ * @brief The node for break statement in loops.
  */
+
 #ifndef EASYGPU_BREAK_H
 #define EASYGPU_BREAK_H
 

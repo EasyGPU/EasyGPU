@@ -1,7 +1,6 @@
-﻿/**
- * LoadLocalArray.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+/**
+ * @file LoadLocalArray.cpp
+ * @brief Implementation of local array load IR node.
  */
 
 #include <IR/Node/LoadLocalArray.h>

@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Atomic.h:
- *      @Descripiton    :   Atomic operations for GPU
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file Atomic.h
+ * @brief Atomic operations for GPU.
  */
+
 #ifndef EASYGPU_ATOMIC_H
 #define EASYGPU_ATOMIC_H
 

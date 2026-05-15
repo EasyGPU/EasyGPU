@@ -1,12 +1,6 @@
 /**
  * @file main.cpp
- * @brief Real-time GPU compute visualization using TexturePresenter
- *
- * This example demonstrates:
- * - Using EasyGPU Kernel2D to generate images on the GPU
- * - Displaying GPU textures in real-time using TexturePresenter
- * - Interactive rendering (mouse affects the pattern)
- * - Frame rate display
+ * @brief Real-time GPU compute visualization using TexturePresenter.
  */
 
 #include <GPU.h>

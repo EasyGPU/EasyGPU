@@ -1,6 +1,6 @@
 /**
  * @file VulkanBackend.cpp
- * @brief Vulkan backend implementation
+ * @brief Vulkan backend implementation.
  */
 
 #include <Backend/VulkanBackend.h>

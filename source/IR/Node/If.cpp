@@ -1,7 +1,6 @@
 /**
- * If.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file If.cpp
+ * @brief Implementation of the if statement IR node.
  */
 
 #include <IR/Node/If.h>

@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * LocalVariableArray.h:
- *      @Descripiton    :   The node for the local variable array definition
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file LocalVariableArray.h
+ * @brief The node for the local variable array definition.
  */
+
 #ifndef EASYGPU_LOCALVARIABLEARRAY_H
 #define EASYGPU_LOCALVARIABLEARRAY_H
 

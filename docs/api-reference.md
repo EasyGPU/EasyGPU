@@ -28,6 +28,9 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 - [Fragment Kernels](#fragment-kernels)
 - [Buffers](#buffers)
 - [Uniforms](#uniforms)
+- [UniformBuffer](#uniformbuffer)
+- [Graphics Pipeline](#graphics-pipeline)
+- [Inspector Validation](#inspector-validation)
 - [Variables and Expressions](#variables-and-expressions)
 - [Unref](#unref)
 - [Select (Ternary Operator)](#select-ternary-operator)
@@ -546,6 +549,305 @@ Kernel1D kernel([&](Int i) {
 // Toggle feature off
 enableFeature = false;
 kernel.Dispatch(4, true);
+```
+
+---
+
+## UniformBuffer
+
+### UniformBuffer&lt;T&gt;
+
+Uniform Buffer Object (UBO) for passing large structs to GPU shaders. Unlike `Uniform<T>` which is limited to ~128-256 bytes (push constants), `UniformBuffer<T>` uses GPU UBO binding and supports structs up to 64KB+ in size.
+
+```cpp
+template<typename T>
+class UniformBuffer;
+```
+
+**When to use UniformBuffer vs Uniform:**
+
+| Feature | `Uniform<T>` | `UniformBuffer<T>` |
+|:--------|:-------------|:-------------------|
+| Transport | Push constant / `glProgramUniform` | UBO (`glBindBufferBase`) |
+| GLSL layout | `uniform float u0;` | `layout(std140, binding=N) uniform Block { T data; };` |
+| Size limit | ~128-256 bytes | Up to max UBO size (64KB+) |
+| Layout standard | std430 | std140 |
+| Best for | Small params (float, Vec3, Mat4) | Large structs, multiple fields |
+
+**Prerequisite — Register struct with `EASYGPU_STRUCT`:**
+
+```cpp
+EASYGPU_STRUCT(MyConfig,
+    (GPU::Math::Vec3, lightDir),
+    (float, exposure),
+    (GPU::Math::Mat4, shadowMatrix)
+);
+```
+
+**Constructors:**
+
+| Constructor | Description |
+|:------------|:------------|
+| `UniformBuffer()` | Default constructor — uninitialized UBO |
+| `UniformBuffer(const T& value)` | Constructor with initial value |
+
+**Methods:**
+
+| Method | Description |
+|:-------|:------------|
+| `Load()` | Load the UBO in kernel context, returns `Var<T>` |
+| `GetValue() const` | Get the current CPU-side value |
+| `SetValue(const T& value)` | Set the CPU-side value and upload to GPU |
+| `operator=(const T& value)` | Assign value from struct literal |
+| `GetHandle() const` | Get the backend UBO handle |
+
+**Example:**
+
+```cpp
+// Define config struct
+EASYGPU_STRUCT(RenderConfig, (GPU::Math::Vec3, lightDir), (float, exposure));
+
+// Create UBO
+UniformBuffer<RenderConfig> config;
+RenderConfig cfg;
+cfg.lightDir = Vec3(0.5f, 1.0f, 0.3f);
+cfg.exposure = 2.0f;
+config = cfg;
+
+// Use in kernel
+Buffer<float> output(256);
+Kernel1D kernel([&](Int i) {
+    auto buf = output.Bind();
+    auto c   = config.Load();
+
+    buf[0]   = c.lightDir().x();
+    buf[1]   = c.lightDir().y();
+    buf[2]   = c.lightDir().z();
+    buf[3]   = c.exposure();
+});
+
+kernel.Dispatch(1, true);
+```
+
+**Multiple Dispatches with Value Update:**
+
+```cpp
+UniformBuffer<RenderConfig> config;
+
+// First dispatch
+RenderConfig cfg1;
+cfg1.lightDir  = Vec3(1.0f, 1.0f, 1.0f);
+cfg1.exposure  = 1.0f;
+config         = cfg1;
+kernel.Dispatch(1, true);
+
+// Second dispatch with different values — no recompilation needed
+RenderConfig cfg2;
+cfg2.lightDir  = Vec3(0.0f, 0.0f, 1.0f);
+cfg2.exposure  = 4.0f;
+config         = cfg2;
+kernel.Dispatch(1, true);
+```
+
+**Generated GLSL:**
+
+```glsl
+layout(std140, binding=0) uniform EasyGPU_UBO_0 {
+    RenderConfig data;
+};
+
+void main() {
+    // c.lightDir().x() → data.lightDir.x
+    // c.exposure()     → data.exposure
+}
+```
+
+---
+
+## Graphics Pipeline
+
+EasyGPU provides a backend-agnostic graphics pipeline API for fullscreen and offscreen rendering. Both OpenGL (FBO-based) and Vulkan (VK_KHR_dynamic_rendering) backends are supported.
+
+### BackendCaps
+
+Check for graphics support before using graphics features:
+
+```cpp
+auto* backend = GPU::Runtime::Context::GetBackend();
+if (!backend->GetCaps().supportsGraphics) {
+    // Graphics not available — compute-only GPU or Vulkan without dynamic rendering
+}
+```
+
+### GraphicsPipelineDesc
+
+Descriptor for creating a graphics pipeline with vertex and fragment shaders:
+
+```cpp
+struct GraphicsPipelineDesc {
+    ShaderHandle vertexShader   = INVALID_SHADER_HANDLE;
+    ShaderHandle fragmentShader = INVALID_SHADER_HANDLE;
+    PrimitiveTopology topology  = PrimitiveTopology::TriangleList;
+    std::vector<ResourceLayoutEntry> resources;
+    uint32_t pushConstantSize = 0;
+};
+```
+
+**PrimitiveTopology values:**
+
+| Value | Description |
+|:------|:------------|
+| `TriangleList` | Independent triangles (default) |
+| `TriangleStrip` | Connected triangle strip |
+| `LineList` | Independent line segments |
+| `PointList` | Individual points |
+
+### RenderPassBeginDesc
+
+Descriptor for beginning a render pass targeting a texture:
+
+```cpp
+struct RenderPassBeginDesc {
+    TextureHandle colorAttachment = INVALID_TEXTURE_HANDLE;
+    float clearColor[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    bool clear = true;
+};
+```
+
+### Backend Graphics Methods
+
+| Method | Description |
+|:-------|:------------|
+| `CreateGraphicsPipeline(const GraphicsPipelineDesc&)` | Create a graphics pipeline from VS+FS shaders |
+| `BeginRendering(const RenderPassBeginDesc&)` | Begin a render pass targeting a texture |
+| `EndRendering()` | End the current render pass |
+| `Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)` | Issue a draw call |
+| `SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)` | Set the viewport rectangle |
+| `SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)` | Set the scissor test rectangle |
+
+### Rendering Example
+
+```cpp
+#include <GPU.h>
+
+int main() {
+    GPU::Runtime::AutoInitContext();
+    auto* backend = GPU::Runtime::Context::GetBackend();
+    backend->MakeCurrent();
+
+    if (!backend->GetCaps().supportsGraphics) {
+        return 0;  // Graphics not available
+    }
+
+    // Create shaders
+    const char* vsSrc = "#version 450\nvoid main() {\n"
+        "vec2 pos; pos.x = float((gl_VertexID & 1) << 2) - 1.0;\n"
+        "pos.y = float((gl_VertexID & 2) << 1) - 1.0;\n"
+        "gl_Position = vec4(pos, 0.0, 1.0);\n}\n";
+    const char* fsSrc = "#version 450\nlayout(location = 0) out vec4 outColor;\n"
+        "void main() { outColor = vec4(0.5, 0.3, 0.1, 1.0); }\n";
+
+    GPU::Backend::ShaderDesc vsDesc{GPU::Backend::ShaderType::Vertex, vsSrc, "main"};
+    auto vs = backend->CreateShader(vsDesc);
+    GPU::Backend::ShaderDesc fsDesc{GPU::Backend::ShaderType::Fragment, fsSrc, "main"};
+    auto fs = backend->CreateShader(fsDesc);
+
+    // Create graphics pipeline
+    GPU::Backend::GraphicsPipelineDesc pipeDesc;
+    pipeDesc.vertexShader   = vs;
+    pipeDesc.fragmentShader = fs;
+    pipeDesc.topology       = GPU::Backend::PrimitiveTopology::TriangleList;
+    auto pipeline = backend->CreateGraphicsPipeline(pipeDesc);
+
+    // Create render target texture
+    const uint32_t W = 256, H = 256;
+    GPU::Backend::TextureDesc texDesc;
+    texDesc.width  = W;
+    texDesc.height = H;
+    texDesc.format = GPU::Backend::PixelFormat::RGBA8;
+    auto rt = backend->CreateTexture(texDesc);
+
+    // Render
+    GPU::Backend::RenderPassBeginDesc rpDesc;
+    rpDesc.colorAttachment = rt;
+    rpDesc.clearColor[0]   = 0.0f;
+    rpDesc.clearColor[1]   = 0.0f;
+    rpDesc.clearColor[2]   = 0.0f;
+    rpDesc.clearColor[3]   = 1.0f;
+    rpDesc.clear           = true;
+
+    backend->BeginRendering(rpDesc);
+    backend->SetViewport(0, 0, W, H);
+    backend->SetScissor(0, 0, W, H);
+    backend->BindPipeline(pipeline);
+    backend->Draw(3, 1, 0, 0);
+    backend->EndRendering();
+    backend->Finish();
+
+    // Read back pixels
+    std::vector<uint8_t> pixels(W * H * 4);
+    backend->DownloadTexture(rt, 0, 0, W, H, pixels.data());
+}
+```
+
+**Error Handling:**
+
+The following runtime errors are enforced:
+- Calling `Draw()` outside `BeginRendering()`/`EndRendering()` throws `std::runtime_error`
+- Calling `BeginRendering()` while already in a render pass throws `std::runtime_error`
+
+**Vulkan Implementation Notes:**
+- Uses `VK_KHR_dynamic_rendering` (Vulkan 1.1 extension) to eliminate render pass/framebuffer objects
+- Function pointers loaded via `vkGetDeviceProcAddr` — if unavailable, `supportsGraphics` is set to `false`
+- Compute operations remain unaffected when graphics is unavailable
+
+---
+
+## Inspector Validation
+
+The `InspectorKernel` family provides GLSL code inspection and offline validation without requiring a working GPU.
+
+### Validate()
+
+Performs pure-software GLSL syntax validation using `glslang`. Returns `true` if the generated shader code is valid GLSL.
+
+```cpp
+class InspectorKernel1D {
+public:
+    /** @brief Validate the generated GLSL without GPU compilation. */
+    bool Validate(std::string& errorMessage) const;
+};
+```
+
+**Example:**
+
+```cpp
+InspectorKernel1D kernel([&](Var<int>& id) {
+    auto buf = buffer.Bind();
+    buf[id]  = buf[id] * 2.0f;
+});
+
+std::string error;
+if (kernel.Validate(error)) {
+    std::cout << "GLSL is valid" << std::endl;
+} else {
+    std::cout << "GLSL validation failed: " << error << std::endl;
+}
+```
+
+**CI Integration:**
+
+For headless CI environments without a GPU, use `Validate()` instead of `Compile()`:
+
+```cpp
+InspectorKernel1D kernel(myKernelFunction);
+std::string error;
+
+// Works in CI without GPU
+if (!kernel.Validate(error)) {
+    std::cerr << "Kernel validation failed: " << error << std::endl;
+    return 1;
+}
 ```
 
 ---

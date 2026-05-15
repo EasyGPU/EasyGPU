@@ -1,7 +1,6 @@
-﻿/**
- * TestKernel1D.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+/**
+ * @file TestKernel1D.cpp
+ * @brief Tests for basic 1D kernel dispatch and execution.
  */
 
 #include <IR/Value/Var.h>

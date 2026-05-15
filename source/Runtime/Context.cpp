@@ -1,6 +1,6 @@
 /**
  * @file Context.cpp
- * @brief GPU context implementation with backend abstraction
+ * @brief GPU context implementation with backend abstraction.
  */
 
 #include <Runtime/Context.h>

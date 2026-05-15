@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * LoadLocalVariable.h:
- *      @Descripiton    :   The load node for local variable
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file LoadLocalVariable.h
+ * @brief The load node for local variable.
  */
+
 #ifndef EASYGPU_LOADLOCALVARIABLE_H
 #define EASYGPU_LOADLOCALVARIABLE_H
 

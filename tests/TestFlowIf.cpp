@@ -1,8 +1,8 @@
 /**
- * TestFlowIf.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file TestFlowIf.cpp
+ * @brief Tests for if-else control flow in kernels.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

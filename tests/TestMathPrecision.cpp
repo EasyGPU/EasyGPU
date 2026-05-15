@@ -1,6 +1,6 @@
 /**
- * TestMathPrecision.cpp
- * Runtime precision tests for math functions and edge-case inputs.
+ * @file TestMathPrecision.cpp
+ * @brief Runtime precision tests for math functions and edge-case inputs.
  */
 
 #include <GPU.h>

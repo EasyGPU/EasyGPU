@@ -1,9 +1,8 @@
 /**
- * JuliaSet:
- *      @Descripiton    :   Julia set fractal renderer
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
+ * @file main.cpp
+ * @brief JuliaSet.
  */
+
 #include <Callable/Callable.h>
 #include <Flow/BreakFlow.h>
 #include <Flow/ForFlow.h>

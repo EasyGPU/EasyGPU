@@ -1,16 +1,6 @@
 /**
- * @file gaussian_blur.cpp
- * @brief 2-pass separable Gaussian blur example
- *
- * Demonstrates multi-pass image processing with Buffer reuse
- * and Uniform parameters. Uses a separable 1D Gaussian kernel
- * applied horizontally then vertically to reduce computation.
- *
- * Techniques shown:
- * - Buffer<int> read/write with packed RGBA pixels
- * - Ping-pong between two buffers for multi-pass algorithms
- * - Uniform<int> for dynamic image dimensions
- * - Clamp for boundary-safe sampling
+ * @file main.cpp
+ * @brief 2-pass separable Gaussian blur example.
  */
 
 #include <GPU.h>
@@ -24,14 +14,14 @@ int main() {
 	// ========================================================================
 	// Configuration
 	// ========================================================================
-	constexpr int WIDTH  = 8;
-	constexpr int HEIGHT = 8;
-	constexpr int PIXEL_COUNT = WIDTH * HEIGHT;
+	constexpr int	 WIDTH		   = 8;
+	constexpr int	 HEIGHT		   = 8;
+	constexpr int	 PIXEL_COUNT   = WIDTH * HEIGHT;
 
 	// 1D Gaussian kernel (radius = 1, sigma ~ 1.0), normalized
 	// Weights: [0.25, 0.5, 0.25]
-	constexpr float WEIGHT_CENTER = 0.5f;
-	constexpr float WEIGHT_SIDE   = 0.25f;
+	constexpr float	 WEIGHT_CENTER = 0.5f;
+	constexpr float	 WEIGHT_SIDE   = 0.25f;
 
 	// ========================================================================
 	// Host Data Preparation
@@ -40,10 +30,10 @@ int main() {
 	std::vector<int> host_input(PIXEL_COUNT);
 	for (int y = 0; y < HEIGHT; ++y) {
 		for (int x = 0; x < WIDTH; ++x) {
-			int r = (x * 255) / (WIDTH - 1);
-			int g = (y * 255) / (HEIGHT - 1);
-			int b = 128;
-			int a = 255;
+			int r					  = (x * 255) / (WIDTH - 1);
+			int g					  = (y * 255) / (HEIGHT - 1);
+			int b					  = 128;
+			int a					  = 255;
 			host_input[y * WIDTH + x] = static_cast<int>((a << 24) | (r << 16) | (g << 8) | b);
 		}
 	}
@@ -54,41 +44,41 @@ int main() {
 	// ========================================================================
 	// Device Data Upload
 	// ========================================================================
-	Buffer<int> input_image(host_input);
-	Buffer<int> temp_image(PIXEL_COUNT);
-	Buffer<int> output_image(PIXEL_COUNT);
+	Buffer<int>		 input_image(host_input);
+	Buffer<int>		 temp_image(PIXEL_COUNT);
+	Buffer<int>		 output_image(PIXEL_COUNT);
 
 	// Uniforms for dimensions
-	Uniform<int> u_width(WIDTH);
-	Uniform<int> u_height(HEIGHT);
+	Uniform<int>	 u_width(WIDTH);
+	Uniform<int>	 u_height(HEIGHT);
 
 	// ========================================================================
 	// Pass 1: Horizontal Blur
 	// ========================================================================
-	Kernel2D horizontal_blur(
+	Kernel2D		 horizontal_blur(
 		"HorizontalBlur",
 		[&](Int x, Int y) {
 			If(x < WIDTH && y < HEIGHT, [&]() {
-				auto in  = input_image.Bind();
-				auto out = temp_image.Bind();
-				auto w   = u_width.Load();
+				auto in			  = input_image.Bind();
+				auto out		  = temp_image.Bind();
+				auto w			  = u_width.Load();
 
-				Int idx = y * w + x;
+				Int	 idx		  = y * w + x;
 
 				// Sample left, center, right with clamping
-				Int xl = Clamp(x - 1, 0, w - 1);
-				Int xr = Clamp(x + 1, 0, w - 1);
+				Int	 xl			  = Clamp(x - 1, 0, w - 1);
+				Int	 xr			  = Clamp(x + 1, 0, w - 1);
 
-				Int pl = in[y * w + xl];
-				Int pc = in[y * w + x];
-				Int pr = in[y * w + xr];
+				Int	 pl			  = in[y * w + xl];
+				Int	 pc			  = in[y * w + x];
+				Int	 pr			  = in[y * w + xr];
 
 				// Apply weights per channel
 				auto apply_weight = [&](Int p, Float weight) -> Int {
-					Int b = p & 0xFF;
-					Int g = (p >> 8) & 0xFF;
-					Int r = (p >> 16) & 0xFF;
-					Int a = (p >> 24) & 0xFF;
+					Int b  = p & 0xFF;
+					Int g  = (p >> 8) & 0xFF;
+					Int r  = (p >> 16) & 0xFF;
+					Int a  = (p >> 24) & 0xFF;
 
 					Int nb = ToInt(ToFloat(b) * weight);
 					Int ng = ToInt(ToFloat(g) * weight);
@@ -98,9 +88,8 @@ int main() {
 					return (na << 24) | (nr << 16) | (ng << 8) | nb;
 				};
 
-				Int sum = apply_weight(pl, MakeFloat(WEIGHT_SIDE))
-						+ apply_weight(pc, MakeFloat(WEIGHT_CENTER))
-						+ apply_weight(pr, MakeFloat(WEIGHT_SIDE));
+				Int sum = apply_weight(pl, MakeFloat(WEIGHT_SIDE)) + apply_weight(pc, MakeFloat(WEIGHT_CENTER)) +
+						  apply_weight(pr, MakeFloat(WEIGHT_SIDE));
 
 				out[idx] = sum;
 			});
@@ -114,27 +103,27 @@ int main() {
 		"VerticalBlur",
 		[&](Int x, Int y) {
 			If(x < WIDTH && y < HEIGHT, [&]() {
-				auto in  = temp_image.Bind();
-				auto out = output_image.Bind();
-				auto w   = u_width.Load();
-				auto h   = u_height.Load();
+				auto in			  = temp_image.Bind();
+				auto out		  = output_image.Bind();
+				auto w			  = u_width.Load();
+				auto h			  = u_height.Load();
 
-				Int idx = y * w + x;
+				Int	 idx		  = y * w + x;
 
 				// Sample top, center, bottom with clamping
-				Int yt = Clamp(y - 1, 0, h - 1);
-				Int yb = Clamp(y + 1, 0, h - 1);
+				Int	 yt			  = Clamp(y - 1, 0, h - 1);
+				Int	 yb			  = Clamp(y + 1, 0, h - 1);
 
-				Int pt = in[yt * w + x];
-				Int pc = in[y * w + x];
-				Int pb = in[yb * w + x];
+				Int	 pt			  = in[yt * w + x];
+				Int	 pc			  = in[y * w + x];
+				Int	 pb			  = in[yb * w + x];
 
 				// Apply weights per channel
 				auto apply_weight = [&](Int p, Float weight) -> Int {
-					Int b = p & 0xFF;
-					Int g = (p >> 8) & 0xFF;
-					Int r = (p >> 16) & 0xFF;
-					Int a = (p >> 24) & 0xFF;
+					Int b  = p & 0xFF;
+					Int g  = (p >> 8) & 0xFF;
+					Int r  = (p >> 16) & 0xFF;
+					Int a  = (p >> 24) & 0xFF;
 
 					Int nb = ToInt(ToFloat(b) * weight);
 					Int ng = ToInt(ToFloat(g) * weight);
@@ -144,9 +133,8 @@ int main() {
 					return (na << 24) | (nr << 16) | (ng << 8) | nb;
 				};
 
-				Int sum = apply_weight(pt, MakeFloat(WEIGHT_SIDE))
-						+ apply_weight(pc, MakeFloat(WEIGHT_CENTER))
-						+ apply_weight(pb, MakeFloat(WEIGHT_SIDE));
+				Int sum = apply_weight(pt, MakeFloat(WEIGHT_SIDE)) + apply_weight(pc, MakeFloat(WEIGHT_CENTER)) +
+						  apply_weight(pb, MakeFloat(WEIGHT_SIDE));
 
 				out[idx] = sum;
 			});

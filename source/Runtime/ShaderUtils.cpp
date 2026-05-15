@@ -1,7 +1,6 @@
-﻿/**
- * ShaderUtils.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
+/**
+ * @file ShaderUtils.cpp
+ * @brief Implementation of shader utility functions for runtime compilation.
  */
 
 #include "Runtime/ShaderUtils.h"

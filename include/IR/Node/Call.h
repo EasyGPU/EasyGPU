@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Call.h:
- *      @Descripiton    :   The node for calling user-defined callable functions
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file Call.h
+ * @brief The node for calling user-defined callable functions.
  */
+
 #ifndef EASYGPU_CALL_H
 #define EASYGPU_CALL_H
 

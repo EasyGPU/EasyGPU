@@ -1,9 +1,8 @@
 /**
- * TestUniform.cpp
- *      Test cases for Uniform API
- *      @author EasyGPU
- *      @date 2026-02-16
+ * @file TestUniform.cpp
+ * @brief Test cases for Uniform API.
  */
+
 #include <GPU.h>
 #include <cmath>
 #include <iostream>

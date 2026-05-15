@@ -1,9 +1,8 @@
 /**
- * TestSlotMixed.cpp:
- *      @Descripiton    :   Mixed usage tests for Slots with other features
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/6/2026
+ * @file TestSlotMixed.cpp
+ * @brief Mixed usage tests for Slots with other features.
  */
+
 #include <GPU.h>
 #include <iostream>
 #include <vector>

@@ -1,9 +1,8 @@
 /**
- * TestInspector.cpp:
- *      @Descripiton    :   Test Inspector Kernels for all dimensions
- *      @Author         :   Margoo
- *      @Date           :   2/15/2026
+ * @file TestInspector.cpp
+ * @brief Test Inspector Kernels for all dimensions.
  */
+
 #include <Flow/ForFlow.h>
 #include <Flow/IfFlow.h>
 #include <IR/Value/BufferRef.h>

@@ -2,7 +2,7 @@
 
 /**
  * @file WindowEvents.h
- * @brief Window event types using std::variant
+ * @brief Window event types using std::variant.
  */
 
 #ifndef EASYGPU_WINDOW_EVENTS_H

@@ -1,8 +1,6 @@
-﻿/**
- * KernelProfiler.cpp:
- *      @Descripiton    :   Kernel profiling tool implementation using OpenGL timer queries
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
+/**
+ * @file KernelProfiler.cpp
+ * @brief Kernel profiling tool implementation using OpenGL timer queries.
  */
 
 // Makes MSVC Happy :)

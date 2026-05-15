@@ -1,7 +1,6 @@
 /**
- * SharedMemory.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file SharedMemory.cpp
+ * @brief Implementation of shared memory IR node.
  */
 
 #include <IR/Node/SharedMemory.h>

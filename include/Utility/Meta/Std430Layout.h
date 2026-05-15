@@ -1,14 +1,10 @@
 #pragma once
 
 /**
- * Std430Layout.h:
- *      @Descripiton    :   Automatic std430 layout conversion for GPU buffers
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
- *
- * TRUE AUTOMATIC LAYOUT CONVERSION:
- * Users write natural C++ structs, we handle all the conversion!
+ * @file Std430Layout.h
+ * @brief Automatic std430 layout conversion for GPU buffers.
  */
+
 #ifndef EASYGPU_STD430_LAYOUT_H
 #define EASYGPU_STD430_LAYOUT_H
 

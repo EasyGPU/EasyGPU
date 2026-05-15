@@ -49,7 +49,9 @@ template <ScalarType T> class Var;
 		return Expr<Math::Vec4>(std::make_unique<Node::LoadUniformNode>(std::format("({}).{}", exprStr, #n)));         \
 	}
 
-// Specialization for Vec2 expressions with swizzle access
+/**
+ * @brief Expr specialization for Math::Vec2 with swizzle access, component constructors, and operators
+ */
 template <> class Expr<Math::Vec2> : public ExprBase {
 public:
 	using ValueType		= Math::Vec2;
@@ -64,10 +66,19 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
-	// Construct from same-type Var
+	/**
+	 * @brief Construct a Vec2 expression from a Var<Vec2>, cloning its expression tree
+	 * @param var The source Var<Vec2> to convert
+	 */
 	Expr(const Var<Math::Vec2> &var);
 
-	// Construct from components
+	/**
+	 * @brief Construct a Vec2 expression from two components (float, Var<float>, or Expr<float>)
+	 * @tparam X Type of the first component
+	 * @tparam Y Type of the second component
+	 * @param x The first component value
+	 * @param y The second component value
+	 */
 	template <typename X, typename Y>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
 				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
@@ -81,7 +92,12 @@ public:
 
 	~Expr() = default;
 
-	// Subscript access
+	/**
+	 * @brief Rvalue-only subscript access: extract a component by index, consuming this expression
+	 * @tparam IndexType The countable index type
+	 * @param index The index value
+	 * @return Expr<float> representing the indexed component
+	 */
 	template <CountableType IndexType> Expr<float> operator[](IndexType index) && {
 		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
 		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
@@ -169,7 +185,9 @@ public:
 	}
 };
 
-// Specialization for Vec3 expressions with swizzle access
+/**
+ * @brief Expr specialization for Math::Vec3 with swizzle access, component constructors, and operators
+ */
 template <> class Expr<Math::Vec3> : public ExprBase {
 public:
 	using ValueType		= Math::Vec3;
@@ -184,10 +202,21 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
-	// Construct from same-type Var
+	/**
+	 * @brief Construct a Vec3 expression from a Var<Vec3>, cloning its expression tree
+	 * @param var The source Var<Vec3> to convert
+	 */
 	Expr(const Var<Math::Vec3> &var);
 
-	// Construct from components
+	/**
+	 * @brief Construct a Vec3 expression from three components
+	 * @tparam X Type of the first component
+	 * @tparam Y Type of the second component
+	 * @tparam Z Type of the third component
+	 * @param x The first component value
+	 * @param y The second component value
+	 * @param z The third component value
+	 */
 	template <typename X, typename Y, typename Z>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
 				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
@@ -204,7 +233,12 @@ public:
 
 	~Expr() = default;
 
-	// Subscript access
+	/**
+	 * @brief Rvalue-only subscript access: extract a component by index, consuming this expression
+	 * @tparam IndexType The countable index type
+	 * @param index The index value
+	 * @return Expr<float> representing the indexed component
+	 */
 	template <CountableType IndexType> Expr<float> operator[](IndexType index) && {
 		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
 		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
@@ -307,7 +341,9 @@ public:
 	}
 };
 
-// Specialization for Vec4 expressions with swizzle access
+/**
+ * @brief Expr specialization for Math::Vec4 with swizzle access, component constructors, and operators
+ */
 template <> class Expr<Math::Vec4> : public ExprBase {
 public:
 	using ValueType		= Math::Vec4;
@@ -322,10 +358,23 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
-	// Construct from same-type Var
+	/**
+	 * @brief Construct a Vec4 expression from a Var<Vec4>, cloning its expression tree
+	 * @param var The source Var<Vec4> to convert
+	 */
 	Expr(const Var<Math::Vec4> &var);
 
-	// Construct from components
+	/**
+	 * @brief Construct a Vec4 expression from four components
+	 * @tparam X Type of the first component
+	 * @tparam Y Type of the second component
+	 * @tparam Z Type of the third component
+	 * @tparam W Type of the fourth component
+	 * @param x The first component value
+	 * @param y The second component value
+	 * @param z The third component value
+	 * @param w The fourth component value
+	 */
 	template <typename X, typename Y, typename Z, typename W>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
 				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
@@ -345,7 +394,12 @@ public:
 
 	~Expr() = default;
 
-	// Subscript access
+	/**
+	 * @brief Rvalue-only subscript access: extract a component by index, consuming this expression
+	 * @tparam IndexType The countable index type
+	 * @param index The index value
+	 * @return Expr<float> representing the indexed component
+	 */
 	template <CountableType IndexType> Expr<float> operator[](IndexType index) && {
 		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
 		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
@@ -503,9 +557,12 @@ private:
 #undef EXPR_SWZ3
 #undef EXPR_SWZ4
 
-// Type aliases for vector expressions (defined after specializations)
+/** @brief Convenience alias for Expr<Math::Vec2> */
 using Vec2Expr = Expr<Math::Vec2>;
+
+/** @brief Convenience alias for Expr<Math::Vec3> */
 using Vec3Expr = Expr<Math::Vec3>;
+/** @brief Convenience alias for Expr<Math::Vec4> */
 using Vec4Expr = Expr<Math::Vec4>;
 
 } // namespace GPU::IR::Value

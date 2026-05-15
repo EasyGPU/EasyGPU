@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * ShaderUtils.h:
- *      @Descripiton    :   Shader compilation utilities and beautiful error formatting
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
+ * @file ShaderUtils.h
+ * @brief Shader compilation utilities and beautiful error formatting.
  */
+
 #ifndef EASYGPU_SHADERUTILS_H
 #define EASYGPU_SHADERUTILS_H
 
@@ -22,7 +21,7 @@
 
 namespace GPU::Runtime {
 /**
- * ANSI color codes for beautiful terminal output
+ * @brief ANSI color codes for beautiful terminal output.
  */
 namespace Colors {
 constexpr const char *Reset		= "\033[0m";
@@ -44,7 +43,7 @@ constexpr const char *BGCyan	= "\033[46m";
 } // namespace Colors
 
 /**
- * Box drawing characters for beautiful frames
+ * @brief Box drawing characters for beautiful terminal frames.
  */
 namespace BoxChars {
 constexpr const char *TopLeft	  = "╔";
@@ -65,7 +64,7 @@ constexpr const char *Info		  = "[i]";
 } // namespace BoxChars
 
 /**
- * Utility class for shader operations
+ * @brief Utility class for shader compilation and linking.
  */
 class ShaderCompiler {
 public:
@@ -101,29 +100,43 @@ private:
 };
 
 /**
- * Beautiful output formatter
+ * @brief Beautiful output formatter for shader errors.
+ *
+ * Renders shader compilation/linking errors with ANSI-colored framed boxes,
+ * source code highlighting, and severity icons for terminal output.
  */
 class ShaderErrorFormatter {
 public:
 	/**
-	 * Print beautiful error to output stream
+	 * @brief Print a beautifully formatted error to an output stream.
+	 * @param out The output stream to write to.
+	 * @param ex The shader exception to format and print.
 	 */
 	static void		   PrintError(std::ostream &out, const ShaderException &ex);
 
 	/**
-	 * Format source code with line numbers and error highlighting
+	 * @brief Format source code with line numbers and error highlighting.
+	 * @param source The GLSL source code string.
+	 * @param diagnostics List of diagnostics to highlight in the source.
+	 * @return Formatted source string with ANSI color codes.
 	 */
 	static std::string FormatSourceWithErrors(const std::string					  &source,
 											  const std::vector<ShaderDiagnostic> &diagnostics);
 
 	/**
-	 * Create a framed box with title
+	 * @brief Create a framed box with a title.
+	 * @param title The title text for the box.
+	 * @param lines The content lines to place inside the box.
+	 * @param titleColor ANSI color code for the title.
+	 * @return Formatted string with box-drawing characters.
 	 */
 	static std::string MakeBox(const std::string &title, const std::vector<std::string> &lines,
 							   const char *titleColor = Colors::Red);
 
 	/**
-	 * Format severity with icon and color
+	 * @brief Format a severity level with icon and color.
+	 * @param severity The error severity level.
+	 * @return Formatted string with ANSI color and icon.
 	 */
 	static std::string FormatSeverity(ErrorSeverity severity);
 

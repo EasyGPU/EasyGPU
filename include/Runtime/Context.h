@@ -1,12 +1,9 @@
+#pragma once
+
 /**
  * @file Context.h
- * @brief GPU context management with backend abstraction
- *
- * This singleton manages the GPU backend and provides automatic initialization.
- * It creates a hidden window for off-screen compute shader execution.
+ * @brief GPU context management with backend abstraction.
  */
-
-#pragma once
 
 // X11 defines Bool as typedef int Bool, which conflicts with our Bool alias
 // Must be done before any X11 headers are included
@@ -22,6 +19,7 @@
 
 namespace GPU::Runtime {
 
+/** @brief Convenience typedef for a raw backend pointer */
 using BackendPtr = Backend::Backend *;
 
 /**
@@ -40,7 +38,8 @@ public:
 	Context							  &operator=(Context &&) = delete;
 
 	/**
-	 * Get the singleton instance, auto-initializing if needed
+	 * @brief Get the singleton instance, auto-initializing if needed
+	 * @return Reference to the singleton Context instance
 	 */
 	static Context					  &GetInstance();
 
@@ -57,7 +56,8 @@ public:
 	void							   Initialize();
 
 	/**
-	 * Check if context is already initialized
+	 * @brief Check if context is already initialized
+	 * @return true if the context has been initialized, false otherwise
 	 */
 	[[nodiscard]] bool				   IsInitialized() const;
 
@@ -72,17 +72,22 @@ public:
 	void							   MakeNoneCurrent();
 
 	/**
-	 * Get backend version string
+	 * @brief Get backend version string
+	 * @return Human-readable backend version string (e.g., "OpenGL 4.6")
 	 */
 	[[nodiscard]] std::string		   GetVersionString() const;
 
 	/**
-	 * Check if compute shaders are supported
+	 * @brief Check if compute shaders are supported
+	 * @return true if the backend supports compute shaders, false otherwise
 	 */
 	[[nodiscard]] bool				   HasComputeShadersSupport() const;
 
 	/**
-	 * Get compute shader max work group size
+	 * @brief Get compute shader max work group size
+	 * @param[out] x Maximum work group size in X dimension
+	 * @param[out] y Maximum work group size in Y dimension
+	 * @param[out] z Maximum work group size in Z dimension
 	 */
 	void							   GetMaxWorkGroupSize(int &x, int &y, int &z) const;
 
@@ -114,10 +119,16 @@ private:
 };
 
 /**
- * RAII guard for making context current on a scope
+ * @brief RAII guard for making context current on a scope.
+ *
+ * Makes the context current upon construction and releases it upon destruction.
  */
 class ContextGuard {
 public:
+	/**
+	 * @brief Construct a guard and make the context current.
+	 * @param ctx The Context to make current for the lifetime of this guard.
+	 */
 	explicit ContextGuard(Context &ctx) : _ctx(ctx) {
 		_ctx.MakeCurrent();
 	}
@@ -134,7 +145,9 @@ private:
 };
 
 /**
- * Auto-initialization helper - call this in any GPU operation entry point
+ * @brief Auto-initialization helper.
+ *
+ * Call this at the entry point of any GPU operation to ensure the context is initialized.
  */
 inline void AutoInitContext() {
 	Context::GetInstance().Initialize();

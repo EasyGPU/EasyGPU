@@ -1,13 +1,8 @@
 #pragma once
 
 /**
- * WindowAttachment.h:
- *      @Descripiton    :   Window management for FragmentKernel with dynamic HWND binding
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/19/2026
- *
- * Provides HWND attachment, pixel format management, and WM_SIZE hook for automatic
- * framebuffer resize. Uses Win32 subclassing to intercept window messages.
+ * @file WindowAttachment.h
+ * @brief Window management for FragmentKernel with dynamic HWND binding.
  */
 
 #ifndef EASYGPU_WINDOW_ATTACHMENT_H
@@ -36,14 +31,21 @@ namespace GPU::Kernel {
 class WindowAttachment {
 public:
 	/**
-	 * Resize callback signature
-	 * @param width New client width
-	 * @param height New client height
+	 * @brief Resize callback signature.
+	 * @param width New client width.
+	 * @param height New client height.
 	 */
 	using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
 
 public:
+	/**
+	 * @brief Construct a window attachment.
+	 */
 	WindowAttachment();
+
+	/**
+	 * @brief Destructor - detaches from window if still attached.
+	 */
 	~WindowAttachment();
 
 	// Disable copy and move
@@ -54,80 +56,88 @@ public:
 
 public:
 	/**
-	 * Attach to a HWND window
-	 * Sets up pixel format and installs window message hook
-	 * @param hwnd Target window handle
-	 * @param resizeCallback Callback invoked on window resize
-	 * @return true if attachment succeeded
+	 * @brief Attach to a HWND window.
+	 *
+	 * Sets up pixel format and installs window message hook.
+	 * @param hwnd Target window handle.
+	 * @param resizeCallback Callback invoked on window resize.
+	 * @return true if attachment succeeded.
 	 */
 	bool	 Attach(HWND hwnd, ResizeCallback resizeCallback);
 
 	/**
-	 * Detach from current window
-	 * Restores original window procedure
+	 * @brief Detach from current window.
+	 *
+	 * Restores original window procedure.
 	 */
 	void	 Detach();
 
 	/**
-	 * Check if currently attached to a window
+	 * @brief Check if currently attached to a window.
+	 * @return true if attached.
 	 */
 	bool	 IsAttached() const;
 
 	/**
-	 * Get the attached HWND
+	 * @brief Get the attached HWND.
+	 * @return The window handle.
 	 */
 	HWND	 GetHWND() const;
 
 	/**
-	 * Get the window DC
+	 * @brief Get the window device context.
+	 * @return The window DC handle.
 	 */
 	HDC		 GetWindowDC() const;
 
 	/**
-	 * Get current client width
+	 * @brief Get current client width.
+	 * @return Width in pixels.
 	 */
 	uint32_t GetWidth() const;
 
 	/**
-	 * Get current client height
+	 * @brief Get current client height.
+	 * @return Height in pixels.
 	 */
 	uint32_t GetHeight() const;
 
 	/**
-	 * Swap buffers (present rendered frame)
+	 * @brief Swap buffers (present rendered frame).
 	 */
 	void	 SwapBuffers();
 
 	/**
-	 * Make the window's DC current for OpenGL rendering
-	 * @param hglrc The OpenGL context to bind
-	 * @return true if successful
+	 * @brief Make the window DC current for OpenGL rendering.
+	 * @param hglrc The OpenGL context to bind.
+	 * @return true if successful.
 	 */
 	bool	 MakeCurrent(HGLRC hglrc);
 
 	/**
-	 * Check if pixel format was set by us
+	 * @brief Check if pixel format was set by this attachment.
+	 * @return true if pixel format was configured.
 	 */
 	bool	 IsPixelFormatSet() const;
 
 private:
 	/**
-	 * Window procedure hook for intercepting WM_SIZE
+	 * @brief Window procedure hook for intercepting WM_SIZE.
 	 */
 	static LRESULT CALLBACK	 SubclassWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 	/**
-	 * Get the WindowAttachment instance from HWND user data
+	 * @brief Get the WindowAttachment instance from HWND user data.
 	 */
 	static WindowAttachment *GetInstanceFromHWND(HWND hwnd);
 
 	/**
-	 * Set up OpenGL pixel format for the window
+	 * @brief Set up OpenGL pixel format for the window.
 	 */
 	bool					 SetupPixelFormat();
 
 	/**
-	 * Handle WM_SIZE message
+	 * @brief Handle WM_SIZE message.
 	 */
 	void					 OnResize(uint32_t width, uint32_t height);
 

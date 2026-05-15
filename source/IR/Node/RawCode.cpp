@@ -1,7 +1,6 @@
 /**
- * RawCode.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file RawCode.cpp
+ * @brief Implementation of raw GLSL code injection IR node.
  */
 
 #include <IR/Node/RawCode.h>

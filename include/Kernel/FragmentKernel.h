@@ -1,24 +1,8 @@
 #pragma once
 
 /**
- * FragmentKernel.h:
- *      @Descripiton    :   Fragment shader based kernel for high-performance pixel rendering
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/19/2026
- *
- * Provides rasterization-based GPU execution using vertex/fragment shader pipeline.
- * Much faster than compute shaders for pixel-oriented workloads (no CPU readback).
- *
- * Usage:
- *   FragmentKernel2D kernel("Effect", [&](Float2 fragCoord, Float2 resolution, Var<Vec4>& fragColor) {
- *       Float2 uv = fragCoord / resolution;
- *       fragColor = MakeFloat4(uv.x(), uv.y(), 0.0f, 1.0f);
- *   }, 1920, 1080);
- *
- *   kernel.Attach(hwnd);  // Bind to window
- *   while (running) {
- *       kernel.Flush();    // Render frame
- *   }
+ * @file FragmentKernel.h
+ * @brief Fragment shader based kernel for high-performance pixel rendering.
  */
 
 #ifndef EASYGPU_FRAGMENT_KERNEL_H
@@ -42,8 +26,9 @@ namespace GPU::Kernel {
 class FragmentKernelBuilderGuard;
 
 /**
- * 2D Fragment Kernel for pixel-based GPU rendering
- * Uses traditional rasterization pipeline (VS + FS) instead of compute shaders
+ * @brief 2D Fragment Kernel for pixel-based GPU rendering.
+ *
+ * Uses traditional rasterization pipeline (VS + FS) instead of compute shaders.
  */
 class FragmentKernel2D {
 public:
@@ -73,103 +58,116 @@ public:
 
 public:
 	/**
-	 * Attach kernel to a window for rendering
-	 * Sets up OpenGL context on the window and installs resize hook
-	 * @param hwnd Target window handle (must be valid)
-	 * @return true if attachment succeeded
+	 * @brief Attach kernel to a window for rendering.
+	 *
+	 * Sets up OpenGL context on the window and installs resize hook.
+	 * @param hwnd Target window handle (must be valid).
+	 * @return true if attachment succeeded.
 	 */
 	bool Attach(HWND hwnd);
 
 	/**
-	 * Detach from current window
+	 * @brief Detach from current window.
 	 */
 	void Detach();
 
 	/**
-	 * Check if attached to a window
+	 * @brief Check if attached to a window.
+	 * @return true if currently attached.
 	 */
 	bool IsAttached() const;
 
 	/**
-	 * Get attached window handle
+	 * @brief Get attached window handle.
+	 * @return The HWND, or nullptr if not attached.
 	 */
 	HWND GetWindow() const;
 
 public:
 	/**
-	 * Execute rendering and present to screen
-	 * Must be called after Attach()
-	 * This is equivalent to Dispatch() in compute kernels
+	 * @brief Execute rendering and present to screen.
+	 *
+	 * Must be called after Attach(). Equivalent to Dispatch() in compute kernels.
 	 */
 	void		Flush();
 
 	/**
-	 * Set the kernel name for profiling
+	 * @brief Set the kernel name for profiling.
+	 * @param name The kernel name.
 	 */
 	void		SetName(const std::string &name);
 
 	/**
-	 * Get the kernel name
+	 * @brief Get the kernel name.
+	 * @return The kernel name string.
 	 */
 	std::string GetName() const;
 
 	/**
-	 * Get the generated GLSL shader source
+	 * @brief Get the generated GLSL shader source.
+	 * @return The full GLSL shader source code.
 	 */
 	std::string GetShaderSource();
 
 public:
 	/**
-	 * Get current rendering width
+	 * @brief Get current rendering width.
+	 * @return Width in pixels.
 	 */
 	uint32_t GetWidth() const;
 
 	/**
-	 * Get current rendering height
+	 * @brief Get current rendering height.
+	 * @return Height in pixels.
 	 */
 	uint32_t GetHeight() const;
 
 	/**
-	 * Set rendering resolution
+	 * @brief Set rendering resolution.
+	 * @param width New width in pixels.
+	 * @param height New height in pixels.
 	 */
 	void	 SetResolution(uint32_t width, uint32_t height);
 
 public:
 	/**
-	 * Enable or disable profiling for this kernel
-	 * When enabled, each Flush() will record GPU execution time
-	 * Use KernelProfiler::PrintInfo() to view results
+	 * @brief Enable or disable profiling for this kernel.
+	 *
+	 * When enabled, each Flush() will record GPU execution time.
+	 * Use KernelProfiler::PrintInfo() to view results.
+	 * @param enabled True to enable profiling.
 	 */
 	void SetProfilingEnabled(bool enabled);
 
 	/**
-	 * Check if profiling is enabled
+	 * @brief Check if profiling is enabled.
+	 * @return true if profiling is active.
 	 */
 	bool IsProfilingEnabled() const;
 
 private:
 	/**
-	 * Initialize OpenGL resources (VAO, shader)
+	 * @brief Initialize OpenGL resources (VAO, shader).
 	 */
 	void InitializeResources();
 
 	/**
-	 * Cleanup OpenGL resources
+	 * @brief Cleanup OpenGL resources.
 	 */
 	void CleanupResources();
 
 	/**
-	 * Compile shader program if needed
+	 * @brief Compile shader program if needed.
 	 */
 	void EnsureShaderCompiled();
 
 	/**
-	 * Handle window resize
+	 * @brief Handle window resize.
 	 */
 	void OnResize(uint32_t width, uint32_t height);
 
 	/**
-	 * Execute actual rendering
+	 * @brief Execute actual rendering.
 	 */
 	void ExecuteRender();
 

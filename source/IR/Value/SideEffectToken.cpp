@@ -1,8 +1,8 @@
 /**
- * SideEffectToken.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/6/2026
+ * @file SideEffectToken.cpp
+ * @brief Implementation of side-effect token for ordering GPU operations.
  */
+
 #include <IR/Value/SideEffectToken.h>
 
 namespace GPU::IR::Value {

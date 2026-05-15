@@ -1,7 +1,6 @@
-﻿/**
- * Store.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file Store.cpp
+ * @brief Implementation of store IR nodes for writing to buffers and variables.
  */
 
 #include <IR/Node/Store.h>

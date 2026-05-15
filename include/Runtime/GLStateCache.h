@@ -1,17 +1,9 @@
+#pragma once
+
 /**
  * @file GLStateCache.h
- * @brief OpenGL state cache for minimizing redundant state changes
- *
- * This class implements an exclusive-mode OpenGL state manager that assumes
- * EasyGPU is the sole controller of OpenGL state within the current context.
- * It caches bound programs, buffers, and textures to avoid redundant driver calls.
- *
- * @warning This class assumes exclusive ownership of OpenGL state. If you need
- * to interleave raw OpenGL calls with EasyGPU operations, call Invalidate()
- * to force state re-binding on the next operation.
+ * @brief OpenGL state cache for minimizing redundant state changes.
  */
-
-#pragma once
 
 #include <GLAD/glad.h>
 

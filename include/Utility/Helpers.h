@@ -1,12 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Helpers.h:
- *      @Descripiton    :   Helper functions and type aliases for EasyGPU
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
- *      @Modified       :   MakeFloat3 broadcast optimization
+ * @file Helpers.h
+ * @brief Helper functions and type aliases for EasyGPU.
  */
+
 #ifndef EASYGPU_HELPERS_H
 #define EASYGPU_HELPERS_H
 
@@ -25,49 +23,53 @@
 
 namespace GPU {
 // ============================================================================
-// Type Aliases for Var types
+/** @name Type Aliases for Var types */
+///@{
 // ============================================================================
 namespace Alias {
-using Int		 = IR::Value::Var<int>;
-using Float		 = IR::Value::Var<float>;
-using Bool		 = IR::Value::Var<bool>;
-using Float2	 = IR::Value::Var<Math::Vec2>;
-using Float3	 = IR::Value::Var<Math::Vec3>;
-using Float4	 = IR::Value::Var<Math::Vec4>;
-using Int2		 = IR::Value::Var<Math::IVec2>;
-using Int3		 = IR::Value::Var<Math::IVec3>;
-using Int4		 = IR::Value::Var<Math::IVec4>;
-using Matrix2	 = IR::Value::Var<Math::Mat2>;
-using Matrix3	 = IR::Value::Var<Math::Mat3>;
-using Matrix4	 = IR::Value::Var<Math::Mat4>;
-using Matrix2x3	 = IR::Value::Var<Math::Mat2x3>;
-using Matrix3x2	 = IR::Value::Var<Math::Mat3x2>;
-using Matrix2x4	 = IR::Value::Var<Math::Mat2x4>;
-using Matrix4x2	 = IR::Value::Var<Math::Mat4x2>;
-using Matrix3x4	 = IR::Value::Var<Math::Mat3x4>;
-using Matrix4x3	 = IR::Value::Var<Math::Mat4x3>;
-using IntExpr	 = IR::Value::Expr<int>;
-using FloatExpr	 = IR::Value::Expr<float>;
-using BoolExpr	 = IR::Value::Expr<bool>;
-using Float2Expr = IR::Value::Expr<Math::Vec2>;
-using Float3Expr = IR::Value::Expr<Math::Vec3>;
-using Float4Expr = IR::Value::Expr<Math::Vec4>;
-using Int2Expr	 = IR::Value::Expr<Math::IVec2>;
-using Int3Expr	 = IR::Value::Expr<Math::IVec3>;
-using Int4Expr	 = IR::Value::Expr<Math::IVec4>;
-using Mat2Expr	 = IR::Value::Expr<Math::Mat2>;
-using Mat3Expr	 = IR::Value::Expr<Math::Mat3>;
-using Mat4Expr	 = IR::Value::Expr<Math::Mat4>;
-using Mat2x3Expr = IR::Value::Expr<Math::Mat2x3>;
-using Mat3x2Expr = IR::Value::Expr<Math::Mat3x2>;
-using Mat2x4Expr = IR::Value::Expr<Math::Mat2x4>;
-using Mat4x2Expr = IR::Value::Expr<Math::Mat4x2>;
-using Mat3x4Expr = IR::Value::Expr<Math::Mat3x4>;
-using Mat4x3Expr = IR::Value::Expr<Math::Mat4x3>;
+using Int		 = IR::Value::Var<int>;			  ///< @brief GPU integer variable.
+using Float		 = IR::Value::Var<float>;		  ///< @brief GPU float variable.
+using Bool		 = IR::Value::Var<bool>;		  ///< @brief GPU boolean variable.
+using Float2	 = IR::Value::Var<Math::Vec2>;	  ///< @brief GPU vec2 variable.
+using Float3	 = IR::Value::Var<Math::Vec3>;	  ///< @brief GPU vec3 variable.
+using Float4	 = IR::Value::Var<Math::Vec4>;	  ///< @brief GPU vec4 variable.
+using Int2		 = IR::Value::Var<Math::IVec2>;	  ///< @brief GPU ivec2 variable.
+using Int3		 = IR::Value::Var<Math::IVec3>;	  ///< @brief GPU ivec3 variable.
+using Int4		 = IR::Value::Var<Math::IVec4>;	  ///< @brief GPU ivec4 variable.
+using Matrix2	 = IR::Value::Var<Math::Mat2>;	  ///< @brief GPU mat2 variable.
+using Matrix3	 = IR::Value::Var<Math::Mat3>;	  ///< @brief GPU mat3 variable.
+using Matrix4	 = IR::Value::Var<Math::Mat4>;	  ///< @brief GPU mat4 variable.
+using Matrix2x3	 = IR::Value::Var<Math::Mat2x3>;  ///< @brief GPU mat2x3 variable.
+using Matrix3x2	 = IR::Value::Var<Math::Mat3x2>;  ///< @brief GPU mat3x2 variable.
+using Matrix2x4	 = IR::Value::Var<Math::Mat2x4>;  ///< @brief GPU mat2x4 variable.
+using Matrix4x2	 = IR::Value::Var<Math::Mat4x2>;  ///< @brief GPU mat4x2 variable.
+using Matrix3x4	 = IR::Value::Var<Math::Mat3x4>;  ///< @brief GPU mat3x4 variable.
+using Matrix4x3	 = IR::Value::Var<Math::Mat4x3>;  ///< @brief GPU mat4x3 variable.
+using IntExpr	 = IR::Value::Expr<int>;		  ///< @brief GPU integer expression.
+using FloatExpr	 = IR::Value::Expr<float>;		  ///< @brief GPU float expression.
+using BoolExpr	 = IR::Value::Expr<bool>;		  ///< @brief GPU boolean expression.
+using Float2Expr = IR::Value::Expr<Math::Vec2>;	  ///< @brief GPU vec2 expression.
+using Float3Expr = IR::Value::Expr<Math::Vec3>;	  ///< @brief GPU vec3 expression.
+using Float4Expr = IR::Value::Expr<Math::Vec4>;	  ///< @brief GPU vec4 expression.
+using Int2Expr	 = IR::Value::Expr<Math::IVec2>;  ///< @brief GPU ivec2 expression.
+using Int3Expr	 = IR::Value::Expr<Math::IVec3>;  ///< @brief GPU ivec3 expression.
+using Int4Expr	 = IR::Value::Expr<Math::IVec4>;  ///< @brief GPU ivec4 expression.
+using Mat2Expr	 = IR::Value::Expr<Math::Mat2>;	  ///< @brief GPU mat2 expression.
+using Mat3Expr	 = IR::Value::Expr<Math::Mat3>;	  ///< @brief GPU mat3 expression.
+using Mat4Expr	 = IR::Value::Expr<Math::Mat4>;	  ///< @brief GPU mat4 expression.
+using Mat2x3Expr = IR::Value::Expr<Math::Mat2x3>; ///< @brief GPU mat2x3 expression.
+using Mat3x2Expr = IR::Value::Expr<Math::Mat3x2>; ///< @brief GPU mat3x2 expression.
+using Mat2x4Expr = IR::Value::Expr<Math::Mat2x4>; ///< @brief GPU mat2x4 expression.
+using Mat4x2Expr = IR::Value::Expr<Math::Mat4x2>; ///< @brief GPU mat4x2 expression.
+using Mat3x4Expr = IR::Value::Expr<Math::Mat3x4>; ///< @brief GPU mat3x4 expression.
+using Mat4x3Expr = IR::Value::Expr<Math::Mat4x3>; ///< @brief GPU mat4x3 expression.
 } // namespace Alias
 
 // ============================================================================
-// Helper functions to construct vectors from components
+///@}
+
+/** @name Helper functions to construct vectors from components */
+///@{
 // ============================================================================
 namespace Construct {
 namespace Detail {
@@ -243,7 +245,7 @@ template <typename T> [[nodiscard]] inline IR::Value::Expr<float> ToFloatExpr(T 
 } // namespace Detail
 
 // ============================================================================
-// Broadcast construction - SINGLE SCALAR (Optimized)
+/** @name Broadcast construction (single scalar) */
 // Generates vec3(x) instead of vec3(x, x, x) for GLSL native broadcast
 // ============================================================================
 
@@ -294,7 +296,7 @@ template <typename X>
 }
 
 // ============================================================================
-// Component-wise construction (multiple arguments)
+/** @name Component-wise construction (multiple arguments) */
 // ============================================================================
 
 // Two components
@@ -343,7 +345,7 @@ template <typename X, typename Y, typename Z, typename W>
 }
 
 // ============================================================================
-// Vector swizzle broadcast (e.g., MakeFloat3(Vec2, float))
+/** @name Vector swizzle broadcast construction */
 // ============================================================================
 
 // MakeFloat3 from Vec2 + scalar
@@ -410,7 +412,7 @@ template <typename XY, typename Z, typename W>
 }
 
 // ============================================================================
-// CPU-side constant to GPU Expr conversions
+/** @name CPU-side constant to GPU Expr conversions */
 // ============================================================================
 
 [[nodiscard]] inline IR::Value::Expr<Math::Vec2> MakeFloat2(const Math::Vec2 &v) {
@@ -444,7 +446,7 @@ template <typename XY, typename Z, typename W>
 }
 
 // ============================================================================
-// Matrix construction helpers
+/** @name Matrix construction helpers */
 // ============================================================================
 
 namespace Detail {
@@ -475,7 +477,13 @@ namespace Detail {
 }
 } // namespace Detail
 
-[[nodiscard]] inline auto MakeMat2(const IR::Value::Expr<Math::Vec2> &c0, const IR::Value::Expr<Math::Vec2> &c1) {
+[[nodiscard]] /** @brief Construct a GPU mat2 from two columm expressions.
+			   * @param c0 First column Vec2 expression.
+			   * @param c1 Second column Vec2 expression.
+			   * @return An Expr<Mat2>.
+			   */
+inline auto
+MakeMat2(const IR::Value::Expr<Math::Vec2> &c0, const IR::Value::Expr<Math::Vec2> &c1) {
 	return Detail::MakeMat2Impl(c0, c1);
 }
 
@@ -490,43 +498,77 @@ namespace Detail {
 }
 
 // CPU-side matrix to GPU Expr conversions
-[[nodiscard]] inline IR::Value::Expr<Math::Mat2> MakeMat2(const Math::Mat2 &m) {
+[[nodiscard]] /** @brief Construct a GPU mat2 expression from a CPU-side Mat2.
+			   * @param m The CPU-side Mat2.
+			   * @return An Expr<Mat2> uniform load.
+			   */
+inline IR::Value::Expr<Math::Mat2>
+MakeMat2(const Math::Mat2 &m) {
 	return IR::Value::Expr<Math::Mat2>(std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m)));
 }
 
-[[nodiscard]] inline IR::Value::Expr<Math::Mat3> MakeMat3(const Math::Mat3 &m) {
+[[nodiscard]] /** @brief Construct a GPU mat3 expression from a CPU-side Mat3.
+			   * @param m The CPU-side Mat3.
+			   * @return An Expr<Mat3> uniform load.
+			   */
+inline IR::Value::Expr<Math::Mat3>
+MakeMat3(const Math::Mat3 &m) {
 	return IR::Value::Expr<Math::Mat3>(std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m)));
 }
 
-[[nodiscard]] inline IR::Value::Expr<Math::Mat4> MakeMat4(const Math::Mat4 &m) {
+[[nodiscard]] /** @brief Construct a GPU mat4 expression from a CPU-side Mat4.
+			   * @param m The CPU-side Mat4.
+			   * @return An Expr<Mat4> uniform load.
+			   */
+inline IR::Value::Expr<Math::Mat4>
+MakeMat4(const Math::Mat4 &m) {
 	return IR::Value::Expr<Math::Mat4>(std::make_unique<IR::Node::LoadUniformNode>(IR::Value::ValueToString(m)));
 }
 } // namespace Construct
 
 // ============================================================================
-// Scalar construction helpers
+/** @name Scalar construction helpers */
 // ============================================================================
 
 template <typename T>
 	requires std::convertible_to<std::remove_cvref_t<T>, float>
-[[nodiscard]] inline auto MakeFloat(T &&x) {
+[[nodiscard]] /** @brief Construct a GPU float expression from a CPU value.
+			   * @tparam T A type convertible to float.
+			   * @param x The value to convert.
+			   * @return An Expr<float>.
+			   */
+inline auto
+MakeFloat(T &&x) {
 	return IR::Value::Expr<float>(std::forward<T>(x));
 }
 
 template <typename T>
 	requires std::convertible_to<std::remove_cvref_t<T>, int>
-[[nodiscard]] inline auto MakeInt(T &&x) {
+[[nodiscard]] /** @brief Construct a GPU int expression from a CPU value.
+			   * @tparam T A type convertible to int.
+			   * @param x The value to convert.
+			   * @return An Expr<int>.
+			   */
+inline auto
+MakeInt(T &&x) {
 	return IR::Value::Expr<int>(std::forward<T>(x));
 }
 
 template <typename T>
 	requires std::convertible_to<std::remove_cvref_t<T>, bool>
-[[nodiscard]] inline auto MakeBool(T &&x) {
+[[nodiscard]] /** @brief Construct a GPU bool expression from a CPU value.
+			   * @tparam T A type convertible to bool.
+			   * @param x The value to convert.
+			   * @return An Expr<bool>.
+			   */
+inline auto
+MakeBool(T &&x) {
 	return IR::Value::Expr<bool>(std::forward<T>(x));
 }
 
 // ============================================================================
-// Convenience: bring Alias and Construct into GPU namespace
+/** @name Convenience using-directives */
+///@{
 // ============================================================================
 using namespace Alias;
 using namespace Construct;

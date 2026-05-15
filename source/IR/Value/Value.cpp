@@ -1,7 +1,6 @@
-﻿/**
- * Value.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file Value.cpp
+ * @brief Implementation of base GPU value types.
  */
 
 #include <IR/Value/Value.h>

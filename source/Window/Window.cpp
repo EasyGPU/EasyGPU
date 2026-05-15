@@ -1,3 +1,8 @@
+/**
+ * @file Window.cpp
+ * @brief Implementation of window management for GPU rendering.
+ */
+
 #include <MiniFB.h> // For mfb_wait_sync
 
 // Include Window headers only - avoid GPU core headers to prevent template instantiation issues

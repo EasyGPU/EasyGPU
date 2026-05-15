@@ -1,3 +1,8 @@
+/**
+ * @file MiniFBWindowPlatform.cpp
+ * @brief Implementation of MiniFB-based window platform backend.
+ */
+
 // Platform-specific includes (needed for Sleep/usleep)
 #ifdef _WIN32
 #include <windows.h>

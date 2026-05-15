@@ -2,11 +2,7 @@
 
 /**
  * @file ShaderCache.h
- * @brief In-memory shader binary cache for kernel compilation acceleration
- *
- * This module provides runtime caching of compiled GPU programs to avoid
- * recompilation overhead within a single application session. Cache is
- * NOT persisted to disk - it only exists in memory.
+ * @brief In-memory shader binary cache for kernel compilation acceleration.
  */
 
 #ifndef EASYGPU_SHADERCACHE_H
@@ -45,7 +41,7 @@ struct CacheEntry {
 class ShaderCache {
 public:
 	/**
-	 * Create an in-memory shader cache
+	 * @brief Create an in-memory shader cache.
 	 */
 	ShaderCache();
 
@@ -58,39 +54,39 @@ public:
 	ShaderCache				 &operator=(ShaderCache &&) noexcept = delete;
 
 	/**
-	 * Look up a cached binary by shader source hash
-	 * @param shaderHash Hash of the shader source code
-	 * @param backendType Required backend type
-	 * @return Pointer to entry if found, nullptr otherwise
+	 * @brief Look up a cached binary by shader source hash.
+	 * @param shaderHash Hash of the shader source code.
+	 * @param backendType Required backend type identifier.
+	 * @return The cached entry if found, or std::nullopt.
 	 */
 	std::optional<CacheEntry> Lookup(const std::string &shaderHash, uint32_t backendType) const;
 
 	/**
-	 * Store a binary in the cache
-	 * @param shaderHash Hash of the shader source code
-	 * @param backendType Backend type identifier
-	 * @param format Backend-specific format code
-	 * @param data Binary data to store
-	 * @return True if stored successfully
+	 * @brief Store a binary in the cache.
+	 * @param shaderHash Hash of the shader source code.
+	 * @param backendType Backend type identifier.
+	 * @param format Backend-specific format code.
+	 * @param data Binary data to store.
+	 * @return True if stored successfully.
 	 */
 	bool Store(const std::string &shaderHash, uint32_t backendType, uint32_t format, const std::vector<uint8_t> &data);
 
 	/**
-	 * Get cache statistics
-	 * @param[out] totalEntries Number of entries in cache
-	 * @param[out] totalBytes Total size of cached data
+	 * @brief Get cache statistics.
+	 * @param[out] totalEntries Number of entries in cache.
+	 * @param[out] totalBytes Total size of cached data in bytes.
 	 */
 	void GetStats(size_t &totalEntries, size_t &totalBytes) const;
 
 	/**
-	 * Clear all cached entries
+	 * @brief Clear all cached entries.
 	 */
 	void Clear();
 
 	/**
-	 * Generate a hash key from shader source code
-	 * @param sourceCode GLSL source code
-	 * @return Hash string suitable for cache lookup
+	 * @brief Generate a hash key from shader source code.
+	 * @param sourceCode GLSL source code.
+	 * @return Hash string suitable for cache lookup.
 	 */
 	static std::string ComputeShaderHash(const std::string &sourceCode);
 
@@ -110,17 +106,19 @@ private:
 class GlobalShaderCache {
 public:
 	/**
-	 * Get the global shader cache instance
+	 * @brief Get the global shader cache instance.
+	 * @return Reference to the singleton ShaderCache.
 	 */
 	static ShaderCache &Get();
 
 	/**
-	 * Clear the global cache
+	 * @brief Clear the global cache.
 	 */
 	static void			Clear();
 
 	/**
-	 * Check if global cache is initialized
+	 * @brief Check if global cache is initialized.
+	 * @return true if the cache is active.
 	 */
 	static bool			IsEnabled();
 

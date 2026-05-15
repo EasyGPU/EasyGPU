@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * MemberAccess.h:
- *      @Descripiton    :   The node for member access
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+ * @file MemberAccess.h
+ * @brief The node for member access.
  */
+
 #ifndef EASYGPU_MEMBERACCESS_H
 #define EASYGPU_MEMBERACCESS_H
 

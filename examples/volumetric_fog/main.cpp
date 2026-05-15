@@ -1,9 +1,8 @@
 /**
- * VolumetricFog:
- *      @Descripiton    :   Volumetric cloud rendering with procedural noise
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
+ * @file main.cpp
+ * @brief VolumetricFog.
  */
+
 #include <Callable/Callable.h>
 #include <Flow/BreakFlow.h>
 #include <Flow/ForFlow.h>

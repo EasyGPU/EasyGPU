@@ -1,8 +1,8 @@
 /**
- * TestBreakContinue.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
+ * @file TestBreakContinue.cpp
+ * @brief Tests for break and continue statements in kernel control flow.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

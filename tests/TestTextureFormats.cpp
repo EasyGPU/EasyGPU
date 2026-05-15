@@ -1,6 +1,6 @@
 /**
- * TestTextureFormats.cpp
- * Comprehensive read/write tests for all supported texture pixel formats.
+ * @file TestTextureFormats.cpp
+ * @brief Comprehensive read/write tests for all supported texture pixel formats.
  */
 
 #include <GPU.h>

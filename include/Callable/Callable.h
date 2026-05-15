@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Callable.h:
- *      @Descripiton    :   The callable function API for user-defined functions
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file Callable.h
+ * @brief The callable function API for user-defined functions.
  */
+
 #ifndef EASYGPU_CALLABLE_H
 #define EASYGPU_CALLABLE_H
 
@@ -64,6 +63,7 @@ template <typename T> struct ExtractScalar<IR::Value::Expr<T>> {
 // Helper alias
 template <typename T> using ToScalar				  = typename ExtractScalar<RemoveRef<T>>::type;
 
+/** @brief True if the type is a GPU type (Var<T> or Expr<T>). */
 template <typename T> inline constexpr bool IsGpuType = ExtractScalar<RemoveRef<T>>::isGpuType;
 } // namespace TypeExtractor
 
@@ -80,6 +80,7 @@ template <typename T> struct IsTextureRef : std::false_type {};
 
 template <Runtime::PixelFormat F> struct IsTextureRef<IR::Value::TextureRef<F>> : std::true_type {};
 
+/** @brief True if the type is a TextureRef. */
 template <typename T> inline constexpr bool IsTextureRefV = IsTextureRef<T>::value;
 
 /**
@@ -90,6 +91,7 @@ template <typename T> struct IsTextureSampler2D : std::false_type {};
 
 template <Runtime::PixelFormat F> struct IsTextureSampler2D<IR::Value::TextureSampler2D<F>> : std::true_type {};
 
+/** @brief True if the type is a TextureSampler2D. */
 template <typename T> inline constexpr bool		 IsTextureSampler2DV = IsTextureSampler2D<T>::value;
 
 /**

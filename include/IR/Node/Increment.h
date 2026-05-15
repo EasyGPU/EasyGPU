@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Increment.h:
- *      @Descripiton    :   The node for increment/decrement
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+ * @file Increment.h
+ * @brief The node for increment/decrement.
  */
+
 #ifndef EASYGPU_INCREMENT_H
 #define EASYGPU_INCREMENT_H
 

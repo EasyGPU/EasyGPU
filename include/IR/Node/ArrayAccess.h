@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * ArrayAccess.h:
- *      @Descripiton    :   The node for array access
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file ArrayAccess.h
+ * @brief The node for array access.
  */
+
 #ifndef EASYGPU_ARRAYACCESS_H
 #define EASYGPU_ARRAYACCESS_H
 

@@ -1,3 +1,8 @@
+/**
+ * @file TexturePresenter.cpp
+ * @brief Implementation of texture presenter for displaying GPU output in a window.
+ */
+
 // TexturePresenter.cpp
 // Implementation of non-template methods only.
 // Template methods are in TexturePresenter.inl

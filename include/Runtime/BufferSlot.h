@@ -2,8 +2,9 @@
 
 /**
  * @file BufferSlot.h
- * @brief Dynamic buffer slot for runtime resource switching with backend support
+ * @brief Dynamic buffer slot for runtime resource switching with backend support.
  */
+
 #ifndef EASYGPU_BUFFERSLOT_H
 #define EASYGPU_BUFFERSLOT_H
 
@@ -198,7 +199,9 @@ public:
 
 protected:
 	/**
-	 * Helper to get GLSL type name
+	 * @brief Helper to deduce the GLSL type name for a given C++ type at compile time.
+	 * @tparam Type The C++ type to map.
+	 * @return The corresponding GLSL type name string literal.
 	 */
 	template <typename Type> static const char *GetGLSLTypeName() {
 		if constexpr (std::same_as<Type, float>)

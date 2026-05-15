@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Operation.h:
- *      @Descripiton    :   The operation node for the binary operation
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file Operation.h
+ * @brief The operation node for the binary operation.
  */
+
 #ifndef EASYGPU_OPERATION_H
 #define EASYGPU_OPERATION_H
 

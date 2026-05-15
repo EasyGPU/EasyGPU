@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Parallel.h:
- *      @Descripiton    :   Parallel primitives for GPU (Reduce, Scan, etc.)
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file Parallel.h
+ * @brief Parallel primitives for GPU (Reduce, Scan, etc.).
  */
+
 #ifndef EASYGPU_PARALLEL_H
 #define EASYGPU_PARALLEL_H
 

@@ -1,7 +1,8 @@
 /**
- * TestBroadcastConstruct.cpp:
- *      Test suite for broadcast construction helpers (MakeFloat3(Float2, z), etc.)
+ * @file TestBroadcastConstruct.cpp
+ * @brief Test suite for broadcast construction helpers (MakeFloat3(Float2, z), etc.).
  */
+
 #include <cassert>
 #include <iostream>
 

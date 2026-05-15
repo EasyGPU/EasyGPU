@@ -2,7 +2,7 @@
 
 /**
  * @file PixelBuffer.h
- * @brief CPU-side pixel buffer for window presentation
+ * @brief CPU-side pixel buffer for window presentation.
  */
 
 #ifndef EASYGPU_PIXEL_BUFFER_H

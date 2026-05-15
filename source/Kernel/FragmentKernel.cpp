@@ -1,8 +1,6 @@
 /**
- * FragmentKernel.cpp:
- *      @Descripiton    :   Fragment kernel implementation - rasterization-based GPU rendering
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/19/2026
+ * @file FragmentKernel.cpp
+ * @brief Fragment kernel implementation - rasterization-based GPU rendering.
  */
 
 #ifdef _WIN32

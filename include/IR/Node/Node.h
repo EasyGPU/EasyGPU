@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Node.h:
- *      @Descripiton    :   The base class for all the node type
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file Node.h
+ * @brief The base class for all the node type.
  */
+
 #ifndef EASYGPU_NODE_H
 #define EASYGPU_NODE_H
 

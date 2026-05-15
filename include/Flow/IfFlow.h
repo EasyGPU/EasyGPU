@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * If.h:
- *      @Descripiton    :   The if-elif-else control flow API for users
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file IfFlow.h
+ * @brief The if-elif-else control flow API for users.
  */
+
 #ifndef EASYGPU_FLOW_IF_H
 #define EASYGPU_FLOW_IF_H
 

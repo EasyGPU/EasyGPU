@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * For.h:
- *      @Descripiton    :   The node for for loop control flow
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file For.h
+ * @brief The node for for loop control flow.
  */
+
 #ifndef EASYGPU_FOR_H
 #define EASYGPU_FOR_H
 

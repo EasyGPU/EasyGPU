@@ -1,9 +1,8 @@
 /**
- * TestTextureSlot.cpp:
- *      @Descripiton    :   TextureSlot (2D) functionality tests
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/6/2026
+ * @file TestTextureSlot.cpp
+ * @brief TextureSlot (2D) functionality tests.
  */
+
 #include <GPU.h>
 #include <cassert>
 #include <cstring>

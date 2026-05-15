@@ -1,9 +1,8 @@
 /**
- * BufferSlot.cpp:
- *      @Descripiton    :   Implementation of BufferSlotBase
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/6/2026
+ * @file BufferSlot.cpp
+ * @brief Implementation of BufferSlotBase.
  */
+
 #include <Runtime/BufferSlot.h>
 
 namespace GPU::Runtime {

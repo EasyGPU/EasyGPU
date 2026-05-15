@@ -1,7 +1,6 @@
 /**
- * TestCallableAdvanced.cpp
- * Advanced tests for Callable functions: multi-parameter, texture args,
- * nested calls, side effects, and usage inside loops.
+ * @file TestCallableAdvanced.cpp
+ * @brief Advanced tests for Callable functions: multi-parameter, texture args,.
  */
 
 #include <GPU.h>

@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Expr.h:
- *      @Descripiton    :   The expression API for users
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/12/2026
+ * @file Expr.h
+ * @brief The expression API for users.
  */
+
 #ifndef EASYGPU_EXPR_H
 #define EASYGPU_EXPR_H
 
@@ -35,9 +34,15 @@ template <ScalarType T> class Var;
 // Forward declaration of ExprBase for CloneNode
 class ExprBase;
 
-// Helper to clone a node from const Expr - defined after ExprBase
+/** @brief Clone a node from a const Expr (defined after ExprBase) */
 [[nodiscard]] std::unique_ptr<Node::Node> CloneNode(const ExprBase &expr);
 
+/**
+ * @brief Convert a typed value to its GLSL string representation
+ * @tparam Type The GPU-compatible value type (float, int, bool, Vec2, etc.)
+ * @param Value The value to convert
+ * @return GLSL-formatted string representation of the value
+ */
 template <typename Type> std::string	  ValueToString(const Type &Value) {
 	 std::ostringstream oss;
 
@@ -143,6 +148,10 @@ class ExprBase : public Value {
 public:
 	ExprBase() = default;
 
+	/**
+	 * @brief Construct from an IR node, taking ownership
+	 * @param Node The IR node to own
+	 */
 	ExprBase(std::unique_ptr<Node::Node> Node) {
 		_node = std::move(Node);
 	}
@@ -170,13 +179,18 @@ public:
 	/**
 	 * If there is a statement or expression that really need unused, using this function
 	 * to ensure the IR building is correct
+	 * @param Expression The expression to build into the IR even though its result is unused
 	 */
 	static void NotUse(ExprBase Expression) {
 		Builder::Builder::Get().Build(*Expression.Node(), true);
 	}
 };
 
-// Inline definition of CloneNode after ExprBase is defined
+/**
+ * @brief Clone the IR node held by an ExprBase
+ * @param expr The expression whose node to clone
+ * @return A deep copy of the underlying IR node
+ */
 [[nodiscard]] inline std::unique_ptr<Node::Node> CloneNode(const ExprBase &expr) {
 	return expr.Node()->Clone();
 }
@@ -184,7 +198,10 @@ public:
 // Forward declaration for friend declarations
 template <ScalarType T> class Expr;
 
-// Type traits to get element type of vector/matrix
+/**
+ * @brief Trait to extract the scalar element type from a vector/matrix type
+ * @tparam T The vector/matrix or scalar type
+ */
 template <typename T> struct ElementType {
 	using type = T;
 };
@@ -209,6 +226,10 @@ template <> struct ElementType<Math::IVec4> {
 };
 
 // Vector dimension traits
+/**
+ * @brief Trait to get the component count (dimension) of a vector type
+ * @tparam T The vector type
+ */
 template <typename T> struct VecDimension {
 	static constexpr int value = 0;
 };
@@ -233,6 +254,10 @@ template <> struct VecDimension<Math::IVec4> {
 };
 
 // Matrix traits
+/**
+ * @brief Trait to get the column and row counts of a matrix type
+ * @tparam T The matrix type
+ */
 template <typename T> struct MatrixTraits {
 	static constexpr int cols = 0;
 	static constexpr int rows = 0;
@@ -721,82 +746,90 @@ public:
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator&(Expr<T> lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::BitAnd, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
+		Node::OperationCode::BitAnd, lhs.Release(),
+		std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
 }
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator&(U lhs, Expr<T> rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::BitAnd, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))), rhs.Release()));
+		Node::OperationCode::BitAnd, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))),
+		rhs.Release()));
 }
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator|(Expr<T> lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::BitOr, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
+		Node::OperationCode::BitOr, lhs.Release(),
+		std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
 }
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator|(U lhs, Expr<T> rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::BitOr, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))), rhs.Release()));
+		Node::OperationCode::BitOr, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))),
+		rhs.Release()));
 }
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator^(Expr<T> lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::BitXor, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
+		Node::OperationCode::BitXor, lhs.Release(),
+		std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
 }
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator^(U lhs, Expr<T> rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::BitXor, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))), rhs.Release()));
+		Node::OperationCode::BitXor, std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs))),
+		rhs.Release()));
 }
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator<<(Expr<T> lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::Shl, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
+		Node::OperationCode::Shl, lhs.Release(),
+		std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
 }
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator>>(Expr<T> lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	return Expr<T>(std::make_unique<Node::OperationNode>(
-		Node::OperationCode::Shr, lhs.Release(), std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
+		Node::OperationCode::Shr, lhs.Release(),
+		std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)))));
 }
 
 /**

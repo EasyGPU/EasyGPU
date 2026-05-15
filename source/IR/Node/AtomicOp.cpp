@@ -1,7 +1,6 @@
 /**
- * AtomicOp.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file AtomicOp.cpp
+ * @brief Implementation of atomic operation IR nodes.
  */
 
 #include <IR/Node/AtomicOp.h>

@@ -1,6 +1,6 @@
 /**
- * TestMultiKernelSequence.cpp
- * Tests multi-kernel execution pipelines and resource isolation.
+ * @file TestMultiKernelSequence.cpp
+ * @brief Tests multi-kernel execution pipelines and resource isolation.
  */
 
 #include <GPU.h>

@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Vec.h:
- *      @Descripiton    :   The vector library for GPU programing
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file Vec.h
+ * @brief The vector library for GPU programing.
  */
+
 #ifndef EASYGPU_VEC_H
 #define EASYGPU_VEC_H
 
@@ -15,8 +14,12 @@ namespace GPU::Math {
  */
 class Vec2 {
 public:
+	/** @brief Default constructor (zero vector). */
 	Vec2();
 
+	/** @brief Construct all components from a single scalar.
+	 * @param S The scalar value for all components.
+	 */
 	Vec2(float S);
 
 	/**
@@ -137,7 +140,7 @@ public:
  */
 class Vec3 {
 public:
-	/** Default constructor */
+	/** @brief Default constructor (zero vector). */
 	Vec3();
 
 	/**
@@ -275,6 +278,7 @@ public:
  */
 class Vec4 {
 public:
+	/** @brief Default constructor (zero vector). */
 	Vec4();
 
 	/**
@@ -390,6 +394,9 @@ public:
 	void				Normalize();
 
 public:
+	/** @brief Return a normalized copy of this vector.
+	 * @return Normalized Vec4.
+	 */
 	[[nodiscard]] Vec4 Normalized() const;
 
 	/**
@@ -512,6 +519,7 @@ public:
  */
 class IVec3 {
 public:
+	/** @brief Default constructor (zero vector). */
 	IVec3();
 
 	/**

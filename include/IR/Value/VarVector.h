@@ -38,7 +38,9 @@ namespace GPU::IR::Value {
 		return std::move(Var<Math::Vec4>(std::format("{}.{}", _varNode->VarName(), #n)));                              \
 	}
 
-// Swizzle accessing for Vec2
+/**
+ * @brief Var specialization for Math::Vec2 with swizzle access and component constructor
+ */
 template <> class Var<Math::Vec2> : public VarBase<Math::Vec2> {
 public:
 	using VarBase<Math::Vec2>::VarBase;
@@ -50,7 +52,13 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Component constructor: Var<Vec2> v(x, y)
+	/**
+	 * @brief Construct a Vec2 variable from two components (float, Var<float>, or Expr<float>)
+	 * @tparam X Type of the first component
+	 * @tparam Y Type of the second component
+	 * @param x The first component value
+	 * @param y The second component value
+	 */
 	template <typename X, typename Y>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
 				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
@@ -90,15 +98,32 @@ public:
 	}
 
 public:
+	/**
+	 * @brief Indexed access using a countable type (int, float literal, etc.)
+	 * @tparam T The countable index type
+	 * @param Index The index value
+	 * @return Var<float> representing the indexed component
+	 */
 	template <CountableType T> Var<float> operator[](T Index) {
 		return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
 	}
 
+	/**
+	 * @brief Indexed access using an untyped expression as the index
+	 * @param Index The expression producing the index value
+	 * @return Var<float> representing the indexed component
+	 */
 	Var<float> operator[](ExprBase Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
 	}
 
+	/**
+	 * @brief Indexed access using a typed expression as the index
+	 * @tparam IndexT The scalar type of the index expression
+	 * @param Index The expression producing the index value
+	 * @return Var<float> representing the indexed component
+	 */
 	template <ScalarType IndexT> Var<float> operator[](Expr<IndexT> Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
@@ -129,7 +154,9 @@ public:
 	}
 };
 
-// Swizzle accessing for Vec3
+/**
+ * @brief Var specialization for Math::Vec3 with swizzle access and component constructor
+ */
 template <> class Var<Math::Vec3> : public VarBase<Math::Vec3> {
 public:
 	using VarBase<Math::Vec3>::VarBase;
@@ -141,7 +168,15 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Component constructor: Var<Vec3> v(x, y, z)
+	/**
+	 * @brief Construct a Vec3 variable from three components
+	 * @tparam X Type of the first component
+	 * @tparam Y Type of the second component
+	 * @tparam Z Type of the third component
+	 * @param x The first component value
+	 * @param y The second component value
+	 * @param z The third component value
+	 */
 	template <typename X, typename Y, typename Z>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
 				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
@@ -184,15 +219,32 @@ public:
 	}
 
 public:
+	/**
+	 * @brief Indexed access using a countable type (int, float literal, etc.)
+	 * @tparam T The countable index type
+	 * @param Index The index value
+	 * @return Var<float> representing the indexed component
+	 */
 	template <CountableType T> Var<float> operator[](T Index) {
 		return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
 	}
 
+	/**
+	 * @brief Indexed access using an untyped expression as the index
+	 * @param Index The expression producing the index value
+	 * @return Var<float> representing the indexed component
+	 */
 	Var<float> operator[](ExprBase Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
 	}
 
+	/**
+	 * @brief Indexed access using a typed expression as the index
+	 * @tparam IndexT The scalar type of the index expression
+	 * @param Index The expression producing the index value
+	 * @return Var<float> representing the indexed component
+	 */
 	template <ScalarType IndexT> Var<float> operator[](Expr<IndexT> Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
@@ -238,8 +290,9 @@ public:
 	}
 };
 
-// Swizzle accessing for Vec4
-
+/**
+ * @brief Var specialization for Math::Vec4 with swizzle access and component constructor
+ */
 template <> class Var<Math::Vec4> : public VarBase<Math::Vec4> {
 public:
 	using VarBase<Math::Vec4>::VarBase;
@@ -251,7 +304,17 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Component constructor: Var<Vec4> v(x, y, z, w)
+	/**
+	 * @brief Construct a Vec4 variable from four components
+	 * @tparam X Type of the first component
+	 * @tparam Y Type of the second component
+	 * @tparam Z Type of the third component
+	 * @tparam W Type of the fourth component
+	 * @param x The first component value
+	 * @param y The second component value
+	 * @param z The third component value
+	 * @param w The fourth component value
+	 */
 	template <typename X, typename Y, typename Z, typename W>
 		requires(std::same_as<std::remove_cvref_t<X>, Var<float>> ||
 				 std::same_as<std::remove_cvref_t<X>, Expr<float>> || std::same_as<std::remove_cvref_t<X>, float>) &&
@@ -297,15 +360,32 @@ public:
 	}
 
 public:
+	/**
+	 * @brief Indexed access using a countable type (int, float literal, etc.)
+	 * @tparam T The countable index type
+	 * @param Index The index value
+	 * @return Var<float> representing the indexed component
+	 */
 	template <CountableType T> Var<float> operator[](T Index) {
 		return Var<float>(std::format("{}[{}]", _varNode->VarName(), ValueToString(Index)));
 	}
 
+	/**
+	 * @brief Indexed access using an untyped expression as the index
+	 * @param Index The expression producing the index value
+	 * @return Var<float> representing the indexed component
+	 */
 	Var<float> operator[](ExprBase Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};
 	}
 
+	/**
+	 * @brief Indexed access using a typed expression as the index
+	 * @tparam IndexT The scalar type of the index expression
+	 * @param Index The expression producing the index value
+	 * @return Var<float> representing the indexed component
+	 */
 	template <ScalarType IndexT> Var<float> operator[](Expr<IndexT> Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return {std::format("{}[{}]", _varNode->VarName(), exprStr)};

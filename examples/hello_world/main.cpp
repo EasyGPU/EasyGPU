@@ -1,15 +1,6 @@
 /**
- * @file hello_world.cpp
- * @brief First EasyGPU example: Parallel array increment
- *
- * This example demonstrates the fundamental EasyGPU workflow:
- * 1. Prepare data on the host (CPU)
- * 2. Upload data to the device (GPU)
- * 3. Define and dispatch a kernel
- * 4. Download results back to the host
- * 5. Verify correctness
- *
- * The kernel adds 1 to each element of an array in parallel.
+ * @file main.cpp
+ * @brief First EasyGPU example: Parallel array increment.
  */
 
 #include <GPU.h>

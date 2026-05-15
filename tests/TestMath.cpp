@@ -1,8 +1,8 @@
 /**
- * TestMath.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file TestMath.cpp
+ * @brief Tests for GPU math functions and operations.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

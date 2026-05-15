@@ -1,8 +1,8 @@
 /**
- * TestDSL.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file TestDSL.cpp
+ * @brief Tests for EasyGPU DSL basic features and syntax.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

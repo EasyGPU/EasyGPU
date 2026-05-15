@@ -1,8 +1,6 @@
 /**
- * FragmentBuildContext.cpp:
- *      @Descripiton    :   Fragment shader code generation implementation
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/19/2026
+ * @file FragmentBuildContext.cpp
+ * @brief Fragment shader code generation implementation.
  */
 
 #include <Kernel/FragmentBuildContext.h>

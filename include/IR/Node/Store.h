@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Store.h:
- *      @Descripiton    :   The store node
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file Store.h
+ * @brief The store node.
  */
+
 #ifndef EASYGPU_STORE_H
 #define EASYGPU_STORE_H
 

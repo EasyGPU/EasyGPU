@@ -1,9 +1,8 @@
 /**
- * TestProfiler.cpp:
- *      @Descripiton    :   Test Kernel Profiler functionality
- *      @Author         :   Margoo
- *      @Date           :   2/15/2026
+ * @file TestProfiler.cpp
+ * @brief Test Kernel Profiler functionality.
  */
+
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Kernel/KernelProfiler.h>

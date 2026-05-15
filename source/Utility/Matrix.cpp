@@ -1,7 +1,8 @@
-﻿/**
- * Matrix.cpp
- * Implementation for Matrix.h
+/**
+ * @file Matrix.cpp
+ * @brief Implementation for Matrix.h.
  */
+
 #include <Utility/Matrix.h>
 #include <Utility/Vec.h>
 

@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * While.h:
- *      @Descripiton    :   The while loop control flow API for users
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/15/2026
+ * @file WhileFlow.h
+ * @brief The while loop control flow API for users.
  */
+
 #ifndef EASYGPU_FLOW_WHILE_H
 #define EASYGPU_FLOW_WHILE_H
 
@@ -23,7 +22,10 @@
 namespace GPU::Flow {
 
 /**
- * While loop API
+ * @brief While loop control flow.
+ * @param condition The loop condition expression (Expr<bool>).
+ * @param body The lambda containing the loop body code.
+ *
  * Usage:
  *   Var<int> i = 0;
  *   While(i < 10, [&]() {

@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * ShaderException.h:
- *      @Descripiton    :   Beautiful exception types for shader compilation errors
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
+ * @file ShaderException.h
+ * @brief Beautiful exception types for shader compilation errors.
  */
+
 #ifndef EASYGPU_SHADEREXCEPTION_H
 #define EASYGPU_SHADEREXCEPTION_H
 
@@ -18,7 +17,7 @@
 namespace GPU::Runtime {
 
 /**
- * Error severity level for syntax highlighting
+ * @brief Error severity level for diagnostic messages.
  */
 enum class ErrorSeverity {
 	Info,	 // General information
@@ -28,7 +27,7 @@ enum class ErrorSeverity {
 };
 
 /**
- * Single diagnostic message with location info
+ * @brief Single diagnostic message with source location info.
  */
 struct ShaderDiagnostic {
 	ErrorSeverity severity;
@@ -43,7 +42,7 @@ struct ShaderDiagnostic {
 };
 
 /**
- * Base class for shader-related exceptions
+ * @brief Base class for all shader-related exceptions.
  */
 class ShaderException : public std::exception {
 public:
@@ -81,7 +80,7 @@ protected:
 };
 
 /**
- * Shader compilation failed
+ * @brief Exception thrown when shader compilation fails.
  */
 class ShaderCompileException : public ShaderException {
 public:
@@ -119,7 +118,7 @@ private:
 };
 
 /**
- * Program linking failed
+ * @brief Exception thrown when shader program linking fails.
  */
 class ShaderLinkException : public ShaderException {
 public:
@@ -139,7 +138,7 @@ private:
 };
 
 /**
- * Resource creation failed (out of memory, etc.)
+ * @brief Exception thrown when GPU resource creation fails (out of memory, etc.).
  */
 class ShaderResourceException : public ShaderException {
 public:
@@ -162,7 +161,7 @@ private:
 };
 
 /**
- * Context not available for shader operations
+ * @brief Exception thrown when the GPU context is not available for shader operations.
  */
 class ShaderContextException : public ShaderException {
 public:

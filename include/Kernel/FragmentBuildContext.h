@@ -1,13 +1,8 @@
 #pragma once
 
 /**
- * FragmentBuildContext.h:
- *      @Descripiton    :   Build context for FragmentKernel - generates vertex/fragment shader pair
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/19/2026
- *
- * Inherits from KernelBuildContext to reuse all resource management.
- * Overrides code generation to produce VS/FS pair instead of compute shader.
+ * @file FragmentBuildContext.h
+ * @brief Build context for FragmentKernel - generates vertex/fragment shader pair.
  */
 
 #ifndef EASYGPU_FRAGMENT_BUILD_CONTEXT_H
@@ -18,15 +13,16 @@
 namespace GPU::Kernel {
 
 /**
- * Build context for fragment shader generation
- * Generates VS + FS pair for rasterization-based rendering
+ * @brief Build context for fragment shader generation.
+ *
+ * Generates VS + FS pair for rasterization-based rendering.
  */
 class FragmentBuildContext : public KernelBuildContext {
 public:
 	/**
-	 * Construct a fragment build context
-	 * @param width Rendering width
-	 * @param height Rendering height
+	 * @brief Construct a fragment build context.
+	 * @param width Rendering width in pixels.
+	 * @param height Rendering height in pixels.
 	 */
 	FragmentBuildContext(uint32_t width, uint32_t height);
 
@@ -46,24 +42,30 @@ public:
 	// ===================================================================
 
 	/**
-	 * Get complete shader program source (VS + FS)
-	 * Overrides to generate vertex/fragment shader pair instead of compute shader
+	 * @brief Get complete shader program source (VS + FS).
+	 *
+	 * Overrides to generate vertex/fragment shader pair instead of compute shader.
+	 * @return The full shader program source code.
 	 */
 	std::string GetCompleteCode() override;
 
 	/**
-	 * Get vertex shader source only
+	 * @brief Get vertex shader source only.
+	 * @return The vertex shader GLSL source code.
 	 */
 	std::string GetVertexShaderSource();
 
 	/**
-	 * Get fragment shader source only
+	 * @brief Get fragment shader source only.
+	 * @return The fragment shader GLSL source code.
 	 */
 	std::string GetFragmentShaderSource();
 
 	/**
-	 * Get texture declarations for fragment shader
-	 * Uses sampler2D instead of image2D
+	 * @brief Get texture declarations for fragment shader.
+	 *
+	 * Uses sampler2D instead of image2D for rasterization pipeline.
+	 * @return GLSL sampler declaration string.
 	 */
 	std::string GetTextureDeclarations() const override;
 
@@ -73,33 +75,38 @@ public:
 	// ===================================================================
 
 	/**
-	 * Get current resolution width
+	 * @brief Get current resolution width.
+	 * @return Width in pixels.
 	 */
 	uint32_t GetWidth() const {
 		return _width;
 	}
 
 	/**
-	 * Get current resolution height
+	 * @brief Get current resolution height.
+	 * @return Height in pixels.
 	 */
 	uint32_t GetHeight() const {
 		return _height;
 	}
 
 	/**
-	 * Set resolution (called on window resize)
+	 * @brief Set resolution (called on window resize).
+	 * @param width New width in pixels.
+	 * @param height New height in pixels.
 	 */
 	void SetResolution(uint32_t width, uint32_t height);
 
 	/**
-	 * Mark that shader needs recompilation
+	 * @brief Mark that shader needs recompilation.
 	 */
 	void InvalidateShader() {
 		InvalidateCachedPipeline();
 	}
 
 	/**
-	 * Check if shader is valid for current state
+	 * @brief Check if shader is valid for current state.
+	 * @return true if a valid pipeline is cached.
 	 */
 	bool IsShaderValid() const {
 		return HasCachedPipeline();

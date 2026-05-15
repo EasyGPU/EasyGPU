@@ -1,6 +1,6 @@
 /**
  * @file Kernel.cpp
- * @brief Kernel implementation with backend abstraction
+ * @brief Kernel implementation with backend abstraction.
  */
 
 #include <Kernel/Kernel.h>

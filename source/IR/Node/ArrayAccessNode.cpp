@@ -1,7 +1,6 @@
-﻿/**
- * ArrayAccessNode.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file ArrayAccessNode.cpp
+ * @brief Implementation of the array access IR node.
  */
 
 #include <IR/Node/ArrayAccess.h>

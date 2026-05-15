@@ -2,7 +2,7 @@
 
 /**
  * @file MiniFBWindowPlatform.h
- * @brief Internal platform abstraction using minifb
+ * @brief Internal platform abstraction using minifb.
  */
 
 #ifndef EASYGPU_MINIFB_WINDOW_PLATFORM_H

@@ -1,8 +1,6 @@
 /**
- * WindowAttachment.cpp:
- *      @Descripiton    :   Window management implementation for FragmentKernel
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/19/2026
+ * @file WindowAttachment.cpp
+ * @brief Window management implementation for FragmentKernel.
  */
 
 #ifdef _WIN32

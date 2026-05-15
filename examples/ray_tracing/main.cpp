@@ -1,9 +1,8 @@
 /**
- * RayTracing:
- *      @Descripiton    :   Monte Carlo path tracing renderer for Cornell Box
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file main.cpp
+ * @brief RayTracing.
  */
+
 #include <Callable/Callable.h>
 #include <Flow/BreakFlow.h>
 #include <Flow/ForFlow.h>

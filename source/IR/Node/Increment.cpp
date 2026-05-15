@@ -1,7 +1,6 @@
-﻿/**
- * Increment.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+/**
+ * @file Increment.cpp
+ * @brief Implementation of increment/decrement IR nodes.
  */
 
 #include <IR/Node/Increment.h>

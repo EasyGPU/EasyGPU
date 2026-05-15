@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * While.h:
- *      @Descripiton    :   The node for while loop control flow
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file While.h
+ * @brief The node for while loop control flow.
  */
+
 #ifndef EASYGPU_WHILE_H
 #define EASYGPU_WHILE_H
 

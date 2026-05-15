@@ -1,7 +1,6 @@
-﻿/**
- * Var.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file Var.cpp
+ * @brief Implementation of GPU variable value types.
  */
 
 #include <IR/Value/Var.h>

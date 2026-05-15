@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Ternary.h:
- *      @Descripiton    :   The node for ternary conditional expression (condition ? trueExpr : falseExpr)
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/8/2026
+ * @file Ternary.h
+ * @brief The node for ternary conditional expression (condition ? trueExpr : falseExpr).
  */
+
 #ifndef EASYGPU_TERNARY_H
 #define EASYGPU_TERNARY_H
 

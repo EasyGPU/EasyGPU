@@ -1,7 +1,6 @@
-﻿/**
- * LoadLocalVariable.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+/**
+ * @file LoadLocalVariable.cpp
+ * @brief Implementation of local variable load IR node.
  */
 
 #include <IR/Node/LoadLocalVariable.h>

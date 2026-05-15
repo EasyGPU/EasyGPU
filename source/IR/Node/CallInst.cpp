@@ -1,7 +1,6 @@
 /**
- * CallInst.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/11/2026
+ * @file CallInst.cpp
+ * @brief Implementation of callable instance IR node.
  */
 
 #include <IR/Node/CallInst.h>

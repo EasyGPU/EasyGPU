@@ -1,5 +1,10 @@
 #pragma once
 
+/**
+ * @file GPU.h
+ * @brief EasyGPU lazy header - includes everything with all namespaces.
+ */
+
 // Mark that GPU.h has been included (used by Window components)
 #define GPU_H_INCLUDED
 
@@ -8,24 +13,6 @@
 #ifdef Bool
 #undef Bool
 #endif
-
-/**
- * @file GPU.h
- * @brief EasyGPU lazy header - includes everything with all namespaces
- *
- * This is a convenience header that includes all EasyGPU components
- * and brings all commonly used namespaces into scope.
- *
- * Usage:
- *   #include <GPU.h>
- *
- *   int main() {
- *       // All EasyGPU types are directly available
- *       Buffer<float> data(1024);
- *       Kernel::Kernel1D kernel(...);
- *       ...
- *   }
- */
 
 // =============================================================================
 // Core Kernel

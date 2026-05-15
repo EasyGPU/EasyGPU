@@ -2,7 +2,7 @@
 
 /**
  * @file Input.h
- * @brief Input enums for keyboard and mouse
+ * @brief Input enums for keyboard and mouse.
  */
 
 #ifndef EASYGPU_WINDOW_INPUT_H

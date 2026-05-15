@@ -1,6 +1,6 @@
 /**
- * TestSharedMemory.cpp
- * Test for SharedMemory, Atomic Operations, and Parallel Primitives
+ * @file TestSharedMemory.cpp
+ * @brief Test for SharedMemory, Atomic Operations, and Parallel Primitives.
  */
 
 #include <GPU.h>

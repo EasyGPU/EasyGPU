@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * VarBase.h:
- *      @Descripiton    :   The variable API for users
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/12/2026
+ * @file Var.h
+ * @brief The variable API for users.
  */
+
 #ifndef EASYGPU_VAR_H
 #define EASYGPU_VAR_H
 
@@ -32,6 +31,11 @@
 #include <type_traits>
 
 namespace GPU::IR::Value {
+/**
+ * @brief Map C++ type to GLSL type name string at compile time
+ * @tparam Type The C++ type to map (float, int, bool, vectors, matrices, or registered structs)
+ * @return GLSL type name as a string literal or "unknown" for unregistered types
+ */
 template <typename Type> constexpr const char *TypeShaderName() {
 	if constexpr (std::same_as<Type, float>)
 		return "float";
@@ -444,6 +448,11 @@ public:
 	template <ScalarType T> friend Expr<bool> operator>=(T lhs, const VarBase<T> &rhs);
 
 public:
+	/**
+	 * @brief Compound add-assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator+=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -454,6 +463,11 @@ public:
 
 		return *this;
 	}
+	/**
+	 * @brief Compound add-assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator+=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -465,6 +479,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound subtract-assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator-=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -476,6 +495,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound subtract-assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator-=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -487,6 +511,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound multiply-assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator*=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -498,6 +527,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound multiply-assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator*=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -509,6 +543,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound divide-assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator/=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -520,6 +559,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound divide-assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator/=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -532,6 +576,11 @@ public:
 	}
 
 	// Compound assignment with Expr<Type>
+	/**
+	 * @brief Compound add-assignment from an Expr (clones the expression node)
+	 * @param other The right-hand expression operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator+=(const Expr<Type> &other) {
 		auto lhsLoad   = this->Load();
 		auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::AddAssign,
@@ -542,6 +591,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound subtract-assignment from an Expr (clones the expression node)
+	 * @param other The right-hand expression operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator-=(const Expr<Type> &other) {
 		auto lhsLoad   = this->Load();
 		auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::SubAssign,
@@ -552,6 +606,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound multiply-assignment from an Expr (clones the expression node)
+	 * @param other The right-hand expression operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator*=(const Expr<Type> &other) {
 		auto lhsLoad   = this->Load();
 		auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::MulAssign,
@@ -562,6 +621,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound divide-assignment from an Expr (clones the expression node)
+	 * @param other The right-hand expression operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator/=(const Expr<Type> &other) {
 		auto lhsLoad   = this->Load();
 		auto comAssign = std::make_unique<Node::CompoundAssignmentNode>(Node::CompoundAssignmentCode::DivAssign,
@@ -572,6 +636,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound modulo-assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator%=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -583,6 +652,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound modulo-assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator%=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -594,6 +668,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound bitwise-AND assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator&=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -605,6 +684,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound bitwise-AND assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator&=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -616,6 +700,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound bitwise-OR assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator|=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -627,6 +716,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound bitwise-OR assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator|=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -638,6 +732,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound bitwise-XOR assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator^=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -648,6 +747,11 @@ public:
 
 		return *this;
 	}
+	/**
+	 * @brief Compound bitwise-XOR assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator^=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -659,6 +763,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound left-shift assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator<<=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -669,6 +778,11 @@ public:
 
 		return *this;
 	}
+	/**
+	 * @brief Compound left-shift assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator<<=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -680,6 +794,11 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Compound right-shift assignment from another VarBase
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator>>=(const VarBase &other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = other.Load();
@@ -690,6 +809,11 @@ public:
 
 		return *this;
 	}
+	/**
+	 * @brief Compound right-shift assignment from a scalar literal
+	 * @param other The right-hand operand
+	 * @return Reference to this variable for chaining
+	 */
 	VarBase &operator>>=(Type other) {
 		auto lhsLoad   = this->Load();
 		auto rhsLoad   = std::make_unique<Node::LoadUniformNode>(ValueToString(other));
@@ -702,6 +826,10 @@ public:
 	}
 
 public:
+	/**
+	 * @brief Prefix increment (++x), emits IR increment node
+	 * @return Reference to this variable
+	 */
 	VarBase &operator++() {
 		static_assert(std::is_same_v<Type, int>, "Prefix increment only supported for 'int'");
 
@@ -711,6 +839,10 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Postfix increment (x++), returns a copy and emits IR increment node
+	 * @return Expression representing the value before increment
+	 */
 	[[nodiscard("post-increment returns a new value; discarding it loses the result")]] Expr<Type> operator++(int) {
 		static_assert(std::is_same_v<Type, int>, "Postfix increment only supported for 'int'");
 
@@ -720,6 +852,10 @@ public:
 		return Expr<Type>(std::move(increment));
 	}
 
+	/**
+	 * @brief Prefix decrement (--x), emits IR decrement node
+	 * @return Reference to this variable
+	 */
 	VarBase &operator--() {
 		static_assert(std::is_same_v<Type, int>, "Prefix decrement only supported for 'int'");
 
@@ -729,6 +865,10 @@ public:
 		return *this;
 	}
 
+	/**
+	 * @brief Postfix decrement (x--), returns a copy and emits IR decrement node
+	 * @return Expression representing the value before decrement
+	 */
 	[[nodiscard("post-decrement returns a new value; discarding it loses the result")]] Expr<Type> operator--(int) {
 		static_assert(std::is_same_v<Type, int>, "Postfix decrement only supported for 'int'");
 
@@ -780,13 +920,29 @@ public:
 	Var(const Var &) = default;
 	Var(Var &&)		 = default;
 
-	// Forward to base class constructors
+	/**
+	 * @brief Forwarding constructor: create a variable reference from an existing name
+	 * @param Name The name of the existing variable
+	 */
 	Var(std::string Name) : VarBase<Type>(Name) {
 	}
+	/**
+	 * @brief Forwarding constructor: create a reference to an external variable (uniform, etc.)
+	 * @param Name The name of the external variable
+	 * @param IsExternal Flag to indicate this is an external reference
+	 */
 	Var(std::string Name, bool IsExternal) : VarBase<Type>(Name, IsExternal) {
 	}
+	/**
+	 * @brief Forwarding constructor: create a variable initialized from an rvalue expression
+	 * @param Value The expression to initialize from
+	 */
 	Var(Expr<Type> &&Value) : VarBase<Type>(std::move(Value)) {
 	}
+	/**
+	 * @brief Forwarding constructor: create a variable initialized from an lvalue expression
+	 * @param Value The expression to initialize from
+	 */
 	Var(Expr<Type> &Value) : VarBase<Type>(Value) {
 	}
 
@@ -1242,9 +1398,9 @@ template <ScalarType Type> [[nodiscard]] Expr<bool> operator>=(Type lhs, const V
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator&(const VarBase<T> &lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
@@ -1254,9 +1410,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator&(U lhs, const VarBase<T> &rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
 	auto rhsLoad = rhs.Load();
@@ -1266,9 +1422,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator|(const VarBase<T> &lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
@@ -1278,9 +1434,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator|(U lhs, const VarBase<T> &rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
 	auto rhsLoad = rhs.Load();
@@ -1290,9 +1446,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator^(const VarBase<T> &lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
@@ -1302,9 +1458,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator^(U lhs, const VarBase<T> &rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
 	auto rhsLoad = rhs.Load();
@@ -1314,9 +1470,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator<<(const VarBase<T> &lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
@@ -1326,9 +1482,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator<<(U lhs, const VarBase<T> &rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
 	auto rhsLoad = rhs.Load();
@@ -1338,9 +1494,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator>>(const VarBase<T> &lhs, U rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(rhs)));
@@ -1350,9 +1506,9 @@ template <ScalarType T, typename U>
 
 template <ScalarType T, typename U>
 [[nodiscard]] Expr<T> operator>>(U lhs, const VarBase<T> &rhs)
-	requires (std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
-			  (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
-			   std::same_as<T, Math::IVec4>))
+	requires(std::convertible_to<U, T> && !std::same_as<std::remove_cvref_t<U>, T> &&
+			 (BitableType<T> || std::same_as<T, Math::IVec2> || std::same_as<T, Math::IVec3> ||
+			  std::same_as<T, Math::IVec4>))
 {
 	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString<T>(static_cast<T>(lhs)));
 	auto rhsLoad = rhs.Load();

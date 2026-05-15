@@ -1,9 +1,8 @@
 /**
- * TestCallable.cpp:
- *      @Descripiton    :   Test for Callable function functionality
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file TestCallable.cpp
+ * @brief Test for Callable function functionality.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

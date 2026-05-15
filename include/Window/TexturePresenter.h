@@ -2,11 +2,7 @@
 
 /**
  * @file TexturePresenter.h
- * @brief Present EasyGPU textures and buffers to a window
- *
- * NOTE: This header does NOT include EasyGPU core headers.
- * You must include <GPU.h> BEFORE including this header to use
- * the template methods Present(Texture2D) and Present(Buffer).
+ * @brief Present EasyGPU textures and buffers to a window.
  */
 
 #ifndef EASYGPU_TEXTURE_PRESENTER_H

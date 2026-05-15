@@ -1,7 +1,6 @@
-﻿/**
- * VarArray.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file VarArray.cpp
+ * @brief Implementation of GPU array variable value types.
  */
 
 #include <IR/Value/VarArray.h>

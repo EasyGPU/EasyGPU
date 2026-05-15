@@ -1,6 +1,6 @@
 /**
  * @file KernelBuildContext.cpp
- * @brief Kernel build context implementation with backend integration
+ * @brief Kernel build context implementation with backend integration.
  */
 
 #include <Kernel/KernelBuildContext.h>

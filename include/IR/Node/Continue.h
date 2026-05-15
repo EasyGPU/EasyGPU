@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * ContinueNode.h:
- *      @Descripiton    :   The node for continue statement in loops
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
+ * @file Continue.h
+ * @brief The node for continue statement in loops.
  */
+
 #ifndef EASYGPU_CONTINUE_NODE_H
 #define EASYGPU_CONTINUE_NODE_H
 

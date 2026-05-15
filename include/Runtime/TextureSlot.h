@@ -2,8 +2,9 @@
 
 /**
  * @file TextureSlot.h
- * @brief Dynamic texture slot for runtime resource switching with backend support
+ * @brief Dynamic texture slot for runtime resource switching with backend support.
  */
+
 #ifndef EASYGPU_TEXTURESLOT_H
 #define EASYGPU_TEXTURESLOT_H
 
@@ -78,6 +79,10 @@ public:
 		return _name;
 	}
 
+	/**
+	 * @brief Check if this slot was bound as a sampler rather than as an image.
+	 * @return true if bound via BindSampler(), false if bound via Bind().
+	 */
 	bool UsesSamplerBinding() const {
 		return _sampledBinding;
 	}
@@ -266,6 +271,10 @@ public:
 	// Runtime API - Called outside kernel definition
 	// ===================================================================
 
+	/**
+	 * @brief Attach a 3D texture to this slot.
+	 * @param texture The 3D texture to attach.
+	 */
 	void Attach(Texture3D<Format> &texture) {
 		_texture = &texture;
 	}
@@ -278,6 +287,10 @@ public:
 		return _texture != nullptr;
 	}
 
+	/**
+	 * @brief Get the currently attached 3D texture.
+	 * @return Pointer to the attached texture, or nullptr if not attached.
+	 */
 	Texture3D<Format> *GetAttached() const {
 		return _texture;
 	}
@@ -308,6 +321,10 @@ public:
 	// DSL API - Called inside kernel definition
 	// ===================================================================
 
+	/**
+	 * @brief Bind this slot to the current kernel being defined.
+	 * @return TextureRef3D<Format> for DSL access (imageLoad/imageStore on 3D texture).
+	 */
 	[[nodiscard]] IR::Value::TextureRef3D<Format> Bind() {
 		auto *context = IR::Builder::Builder::Get().Context();
 		if (!context) {
@@ -321,6 +338,10 @@ public:
 		return IR::Value::TextureRef3D<Format>(_name, static_cast<uint32_t>(_binding), width, height, GetDepth());
 	}
 
+	/**
+	 * @brief Bind this slot as a sampler to the current kernel being defined.
+	 * @return TextureSampler3D<Format> for DSL access (texture sampling on 3D texture).
+	 */
 	[[nodiscard]] IR::Value::TextureSampler3D<Format> BindSampler() {
 		auto *context = IR::Builder::Builder::Get().Context();
 		if (!context) {

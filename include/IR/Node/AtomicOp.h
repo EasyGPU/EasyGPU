@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * AtomicOp.h:
- *      @Descripiton    :   The node for atomic operations
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file AtomicOp.h
+ * @brief The node for atomic operations.
  */
+
 #ifndef EASYGPU_ATOMICOP_H
 #define EASYGPU_ATOMICOP_H
 

@@ -1,8 +1,8 @@
 /**
- * TestTernary.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/8/2026
+ * @file TestTernary.cpp
+ * @brief Tests for ternary conditional expressions in kernels.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

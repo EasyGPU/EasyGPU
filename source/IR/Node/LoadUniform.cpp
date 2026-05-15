@@ -1,7 +1,6 @@
-﻿/**
- * LoadUniform.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file LoadUniform.cpp
+ * @brief Implementation of uniform load IR node.
  */
 
 #include <IR/Node/LoadUniform.h>

@@ -1,8 +1,8 @@
 /**
- * TestFlowFor.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file TestFlowFor.cpp
+ * @brief Tests for for loop control flow in kernels.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

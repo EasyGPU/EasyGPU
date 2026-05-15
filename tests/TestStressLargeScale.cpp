@@ -1,6 +1,6 @@
 /**
- * TestStressLargeScale.cpp
- * Stress tests for large data sets, repeated dispatches, and resource pressure.
+ * @file TestStressLargeScale.cpp
+ * @brief Stress tests for large data sets, repeated dispatches, and resource pressure.
  */
 
 #include <GPU.h>

@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * SharedMemory.h:
- *      @Descripiton    :   The node for shared memory declaration
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2026
+ * @file SharedMemory.h
+ * @brief The node for shared memory declaration.
  */
+
 #ifndef EASYGPU_SHAREDMEMORY_H
 #define EASYGPU_SHAREDMEMORY_H
 

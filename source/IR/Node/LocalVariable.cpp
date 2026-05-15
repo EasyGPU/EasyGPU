@@ -1,7 +1,6 @@
-﻿/**
- * LocalVariable.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+/**
+ * @file LocalVariable.cpp
+ * @brief Implementation of local variable declaration IR node.
  */
 
 #include <IR/Node/LocalVariable.h>

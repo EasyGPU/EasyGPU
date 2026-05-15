@@ -1,9 +1,8 @@
 /**
- * TestTexture.cpp:
- *      @Descripiton    :   Test for GPU Texture functionality
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
+ * @file TestTexture.cpp
+ * @brief Test for GPU Texture functionality.
  */
+
 #include <cassert>
 #include <chrono>
 #include <cmath>

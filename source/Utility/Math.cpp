@@ -1,8 +1,6 @@
-﻿/**
- * Math.cpp:
- *      @Descripiton    :   The math library implementation for GPU programing
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file Math.cpp
+ * @brief The math library implementation for GPU programing.
  */
 
 #include <Utility/Math.h>

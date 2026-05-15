@@ -1,9 +1,8 @@
 /**
- * TestTexture3D.cpp:
- *      @Descripiton    :   Test for GPU Texture3D functionality
- *      @Author         :   EasyGPU
- *      @Date           :   4/4/2026
+ * @file TestTexture3D.cpp
+ * @brief Test for GPU Texture3D functionality.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

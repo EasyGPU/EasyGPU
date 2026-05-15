@@ -1,8 +1,8 @@
 #pragma once
 
 /**
- * @file Window.h
- * @brief Cross-platform window for interactive GPU compute visualization
+ * @file AppWindow.h
+ * @brief Cross-platform window for interactive GPU compute visualization.
  */
 
 #ifndef EASYGPU_WINDOW_H

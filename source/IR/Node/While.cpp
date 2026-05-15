@@ -1,7 +1,6 @@
 /**
- * While.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file While.cpp
+ * @brief Implementation of the while loop IR node.
  */
 
 #include <IR/Node/While.h>

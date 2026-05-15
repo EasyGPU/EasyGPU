@@ -46,7 +46,9 @@ namespace GPU::IR::Value {
 		return Expr<Math::IVec4>(std::make_unique<Node::LoadUniformNode>(std::format("{}.{}", exprStr, #n)));          \
 	}
 
-// Specialization for IVec2 expressions with swizzle access
+/**
+ * @brief Expr specialization for Math::IVec2 with swizzle access, component constructors, and operators
+ */
 template <> class Expr<Math::IVec2> : public ExprBase {
 public:
 	using ValueType		= Math::IVec2;
@@ -61,12 +63,20 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
-	// Construct from same-type Var
+	/**
+	 * @brief Construct an IVec2 expression from a Var<IVec2>, cloning its expression tree
+	 * @param var The source Var<IVec2> to convert
+	 */
 	Expr(const Var<Math::IVec2> &var);
 
 	~Expr() = default;
 
-	// Subscript access
+	/**
+	 * @brief Rvalue-only subscript access: extract a component by index, consuming this expression
+	 * @tparam IndexType The countable index type
+	 * @param index The index value
+	 * @return Expr<int> representing the indexed component
+	 */
 	template <CountableType IndexType> Expr<int> operator[](IndexType index) && {
 		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
 		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
@@ -229,7 +239,9 @@ public:
 	}
 };
 
-// Specialization for IVec3 expressions with swizzle access
+/**
+ * @brief Expr specialization for Math::IVec3 with swizzle access, component constructors, and operators
+ */
 template <> class Expr<Math::IVec3> : public ExprBase {
 public:
 	using ValueType		= Math::IVec3;
@@ -244,12 +256,20 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
-	// Construct from same-type Var
+	/**
+	 * @brief Construct an IVec3 expression from a Var<IVec3>, cloning its expression tree
+	 * @param var The source Var<IVec3> to convert
+	 */
 	Expr(const Var<Math::IVec3> &var);
 
 	~Expr() = default;
 
-	// Subscript access
+	/**
+	 * @brief Rvalue-only subscript access: extract a component by index, consuming this expression
+	 * @tparam IndexType The countable index type
+	 * @param index The index value
+	 * @return Expr<int> representing the indexed component
+	 */
 	template <CountableType IndexType> Expr<int> operator[](IndexType index) && {
 		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
 		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
@@ -427,7 +447,9 @@ public:
 	}
 };
 
-// Specialization for IVec4 expressions with swizzle access
+/**
+ * @brief Expr specialization for Math::IVec4 with swizzle access, component constructors, and operators
+ */
 template <> class Expr<Math::IVec4> : public ExprBase {
 public:
 	using ValueType		= Math::IVec4;
@@ -442,12 +464,20 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
-	// Construct from same-type Var
+	/**
+	 * @brief Construct an IVec4 expression from a Var<IVec4>, cloning its expression tree
+	 * @param var The source Var<IVec4> to convert
+	 */
 	Expr(const Var<Math::IVec4> &var);
 
 	~Expr() = default;
 
-	// Subscript access
+	/**
+	 * @brief Rvalue-only subscript access: extract a component by index, consuming this expression
+	 * @tparam IndexType The countable index type
+	 * @param index The index value
+	 * @return Expr<int> representing the indexed component
+	 */
 	template <CountableType IndexType> Expr<int> operator[](IndexType index) && {
 		auto uniform = std::make_unique<Node::LoadUniformNode>(ValueToString(index));
 		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), std::move(uniform)));
@@ -1061,8 +1091,11 @@ public:
 }
 
 // Type aliases for integer vector expressions (defined after specializations)
+/** @brief Convenience alias for Expr<Math::IVec2> */
 using IVec2Expr = Expr<Math::IVec2>;
+/** @brief Convenience alias for Expr<Math::IVec3> */
 using IVec3Expr = Expr<Math::IVec3>;
+/** @brief Convenience alias for Expr<Math::IVec4> */
 using IVec4Expr = Expr<Math::IVec4>;
 
 } // namespace GPU::IR::Value

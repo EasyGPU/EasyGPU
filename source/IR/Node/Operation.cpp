@@ -1,7 +1,6 @@
-﻿/**
- * Operation.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+/**
+ * @file Operation.cpp
+ * @brief Implementation of arithmetic/logical operation IR nodes.
  */
 
 #include <IR/Node/Operation.h>

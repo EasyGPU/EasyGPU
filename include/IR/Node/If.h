@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * If.h:
- *      @Descripiton    :   The node for if-elif-else control flow
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file If.h
+ * @brief The node for if-elif-else control flow.
  */
+
 #ifndef EASYGPU_IF_H
 #define EASYGPU_IF_H
 

@@ -1,7 +1,6 @@
-﻿/**
- * Load.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file Load.cpp
+ * @brief Implementation of load IR nodes for reading from buffers and variables.
  */
 
 #include <IR/Node/Load.h>

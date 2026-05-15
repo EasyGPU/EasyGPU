@@ -1,7 +1,6 @@
 /**
- * For.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file For.cpp
+ * @brief Implementation of the for loop IR node.
  */
 
 #include <IR/Node/For.h>

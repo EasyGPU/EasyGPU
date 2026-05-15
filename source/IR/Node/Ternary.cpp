@@ -1,7 +1,6 @@
 /**
- * Ternary.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/8/2026
+ * @file Ternary.cpp
+ * @brief Implementation of ternary conditional IR node.
  */
 
 #include <IR/Node/Ternary.h>

@@ -1,7 +1,6 @@
 /**
- * If.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file IfFlow.cpp
+ * @brief Implementation of the if-elif-else flow control API.
  */
 
 #include <Flow/IfFlow.h>

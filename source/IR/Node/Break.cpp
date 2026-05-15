@@ -1,7 +1,6 @@
 /**
- * Break.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file Break.cpp
+ * @brief Implementation of the break statement IR node.
  */
 
 #include <IR/Node/Break.h>

@@ -1,6 +1,6 @@
 /**
  * @file Backend.cpp
- * @brief Backend factory implementation
+ * @brief Backend factory implementation.
  */
 
 #include <Backend/Backend.h>

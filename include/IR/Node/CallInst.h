@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * CallInst.h:
- *      @Descripiton    :   The intrinsic call node
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file CallInst.h
+ * @brief The intrinsic call node.
  */
+
 #ifndef EASYGPU_CALLINST_H
 #define EASYGPU_CALLINST_H
 

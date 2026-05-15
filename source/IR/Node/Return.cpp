@@ -1,7 +1,6 @@
 /**
- * Return.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file Return.cpp
+ * @brief Implementation of the return statement IR node.
  */
 
 #include <IR/Node/Return.h>

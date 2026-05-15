@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * SideEffectToken.h:
- *      @Descripiton    :   Token for ensuring side effects are recorded in the IR
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   3/6/2026
+ * @file SideEffectToken.h
+ * @brief Token for ensuring side effects are recorded in the IR.
  */
+
 #ifndef EASYGPU_SIDE_EFFECT_TOKEN_H
 #define EASYGPU_SIDE_EFFECT_TOKEN_H
 
@@ -17,6 +16,8 @@
 
 namespace GPU::IR::Value {
 /**
+ * @brief Token that commits void-returning callable side effects when destroyed
+ *
  * SideEffectToken ensures that void-returning callable side effects
  * are properly recorded in the IR even when the expression result is unused.
  *
@@ -31,18 +32,20 @@ namespace GPU::IR::Value {
 class SideEffectToken {
 public:
 	/**
-	 * Construct a token that will commit the given node on destruction
+	 * @brief Construct a token that will commit the given node on destruction
 	 * @param node The call node to commit (ownership transferred)
 	 */
 	explicit SideEffectToken(std::unique_ptr<Node::Node> node);
 
 	/**
-	 * Destructor commits the side effect if not already dismissed
+	 * @brief Destructor commits the side effect if not already dismissed
 	 */
 	~SideEffectToken();
 
-	// Move operations allowed
+	// Move operations
+	/// @brief Move-construct a SideEffectToken, transferring ownership
 	SideEffectToken(SideEffectToken &&other) noexcept;
+	/// @brief Move-assign a SideEffectToken, transferring ownership
 	SideEffectToken &operator=(SideEffectToken &&other) noexcept;
 
 	// Copy operations disabled (nodes are unique)
@@ -51,16 +54,16 @@ public:
 
 public:
 	/**
-	 * Dismiss the token, preventing the side effect from being committed
-	 * on destruction. This is called automatically when the token is
-	 * converted to bool.
+	 * @brief Dismiss the token, preventing the side effect from being committed
+	 *
+	 * This is called automatically when the token is converted to bool.
 	 */
 	void	 dismiss() const;
 
 	/**
-	 * Convert to bool, dismissing the token.
-	 * This allows usage like: if (A(b)) { ... }
-	 * or: (void)A(b);
+	 * @brief Convert to bool, dismissing the token
+	 *
+	 * This allows usage like: if (A(b)) { ... } or: (void)A(b);
 	 * @return true
 	 */
 	explicit operator bool() const;

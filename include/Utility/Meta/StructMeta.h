@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * StructMeta.h:
- *      @Descripiton    :   Structure reflection meta system for EASYGPU_STRUCT
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/13/2026
+ * @file StructMeta.h
+ * @brief Structure reflection meta system for EASYGPU_STRUCT.
  */
+
 #ifndef EASYGPU_STRUCT_META_H
 #define EASYGPU_STRUCT_META_H
 
@@ -1218,9 +1217,9 @@ inline void DispatchUploadUniformField(uint32_t program, const std::string &unif
 		[[nodiscard]] std::unique_ptr<Node::LoadLocalVariableNode> Load() const {                                      \
 			return std::make_unique<Node::LoadLocalVariableNode>(_varNode->VarName());                                 \
 		}                                                                                                              \
-		/* Check if this variable is an external reference (uniform, buffer element, etc.) */                            \
+		/* Check if this variable is an external reference (uniform, buffer element, etc.) */                          \
 		[[nodiscard]] bool IsExternal() const {                                                                        \
-			return _varNode && _varNode->IsExternal();                                                                   \
+			return _varNode && _varNode->IsExternal();                                                                 \
 		}                                                                                                              \
                                                                                                                        \
 	private:                                                                                                           \

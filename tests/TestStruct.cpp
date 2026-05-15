@@ -1,8 +1,8 @@
 /**
- * StructTest.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file TestStruct.cpp
+ * @brief Tests for struct types in GPU kernels.
  */
+
 #include <fstream>
 #include <iostream>
 #include <sstream>

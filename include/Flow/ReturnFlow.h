@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Return.h:
- *      @Descripiton    :   The return statement API for user-defined callable functions
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file ReturnFlow.h
+ * @brief The return statement API for user-defined callable functions.
  */
+
 #ifndef EASYGPU_FLOW_RETURN_H
 #define EASYGPU_FLOW_RETURN_H
 
@@ -15,8 +14,9 @@
 
 namespace GPU::Flow {
 /**
- * Return from a void callable function
- * This generates a GLSL return statement without a value
+ * @brief Return from a void callable function.
+ *
+ * This generates a GLSL return statement without a value.
  *
  * Example usage:
  *   Callable<void(float)> MyVoidFunc = [](Var<float> x) {

@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * DoWhile.h:
- *      @Descripiton    :   The do-while loop control flow API for users
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file DoWhileFlow.h
+ * @brief The do-while loop control flow API for users.
  */
+
 #ifndef EASYGPU_FLOW_DOWHILE_H
 #define EASYGPU_FLOW_DOWHILE_H
 
@@ -25,7 +24,10 @@
 namespace GPU::Flow {
 
 /**
- * Do-while loop API
+ * @brief Do-while loop control flow (body executes at least once).
+ * @param body The lambda containing the loop body code.
+ * @param condition The loop condition expression (Expr<bool>).
+ *
  * Usage:
  *   DoWhile([&]() {
  *       // loop body (executed at least once)

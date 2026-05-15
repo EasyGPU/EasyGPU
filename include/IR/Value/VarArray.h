@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * VarArray.h:
- *      @Descripiton    :   The array for variables
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/12/2026
+ * @file VarArray.h
+ * @brief The array for variables.
  */
+
 #ifndef EASYGPU_VARARRAY_H
 #define EASYGPU_VARARRAY_H
 
@@ -18,6 +17,7 @@
 #include <format>
 
 namespace GPU::IR::Value {
+/// @brief Convert a std::array to a GLSL array literal string
 template <ScalarType Type, int N> std::string ArrayToString(std::array<Type, N> Array) {
 	std::ostringstream oss;
 	oss << TypeShaderName<Type>() << "[](" << ValueToString<Type>(Array[0]);
@@ -30,8 +30,8 @@ template <ScalarType Type, int N> std::string ArrayToString(std::array<Type, N> 
 }
 
 /**
- * Fixed size array API for users
- * @tparam Type THe scalar type supported by GPU
+ * @brief Fixed-size array API for users
+ * @tparam Type The scalar type supported by GPU
  * @tparam N The size of the array
  */
 template <ScalarType Type, int N> class VarArray {
@@ -68,15 +68,18 @@ public:
 	}
 
 public:
+	/// @brief Access array element by index
 	template <CountableType T> Var<Type> operator[](T Index) {
 		return Var<Type>(std::format("{}[{}]", _node->VarName(), ValueToString(Index)));
 	}
 
+	/// @brief Access array element by expression index
 	Var<Type> operator[](ExprBase Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return Var<Type>(std::format("{}[{}]", _node->VarName(), exprStr));
 	}
 
+	/// @brief Access array element by expression index
 	template <ScalarType IndexT> Var<Type> operator[](Expr<IndexT> Index) {
 		std::string exprStr = Builder::Builder::Get().BuildNode(*Index.Node());
 		return Var<Type>(std::format("{}[{}]", _node->VarName(), exprStr));

@@ -1,8 +1,6 @@
 /**
- * Parallel Reduction Example
- *
- * Demonstrates workgroup-level parallel reduction using shared memory.
- * This computes the sum of all elements in an array efficiently.
+ * @file main.cpp
+ * @brief Parallel Reduction Example.
  */
 
 #include <GPU.h>

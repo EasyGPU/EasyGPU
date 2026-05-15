@@ -1,12 +1,8 @@
 /**
- * SDFRenderer:
- *      @Descripiton    :   Signed Distance Field path tracing renderer
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/15/2026
- *
- *  Credit: https://github.com/taichi-dev/taichi/blob/master/examples/rendering/sdf_renderer.py
- *  Ported from LuisaCompute test_sdf_renderer.cpp
+ * @file main.cpp
+ * @brief SDFRenderer.
  */
+
 #include <Callable/Callable.h>
 #include <Flow/BreakFlow.h>
 #include <Flow/ForFlow.h>

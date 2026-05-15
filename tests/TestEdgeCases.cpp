@@ -1,6 +1,6 @@
 /**
- * TestEdgeCases.cpp
- * Comprehensive edge-case and boundary tests for EasyGPU core runtime.
+ * @file TestEdgeCases.cpp
+ * @brief Comprehensive edge-case and boundary tests for EasyGPU core runtime.
  */
 
 #include <GPU.h>

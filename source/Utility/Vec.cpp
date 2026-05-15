@@ -1,7 +1,6 @@
-﻿/**
- * Vec.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+/**
+ * @file Vec.cpp
+ * @brief Implementation of GPU vector math types (Vec2, Vec3, Vec4).
  */
 
 #include <Utility/Vec.h>

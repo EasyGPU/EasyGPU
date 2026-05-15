@@ -1,3 +1,8 @@
+/**
+ * @file PixelBuffer.cpp
+ * @brief Implementation of pixel buffer for window rendering.
+ */
+
 #include <Window/PixelBuffer.h>
 
 namespace GPU::Window {

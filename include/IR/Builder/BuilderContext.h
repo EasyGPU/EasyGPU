@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * BuilderContext.h:
- *      @Descripiton    :   The context for the builder to bind
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file BuilderContext.h
+ * @brief The context for the builder to bind.
  */
+
 #ifndef EASYGPU_BUILDERCONTEXT_H
 #define EASYGPU_BUILDERCONTEXT_H
 

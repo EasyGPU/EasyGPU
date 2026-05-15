@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * LocalVariable.h:
- *      @Descripiton    :   The node for the local variable definition
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file LocalVariable.h
+ * @brief The node for the local variable definition.
  */
+
 #ifndef EASYGPU_LOCALVARIABLE_H
 #define EASYGPU_LOCALVARIABLE_H
 

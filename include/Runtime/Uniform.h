@@ -1,11 +1,10 @@
 #pragma once
 
 /**
- * Uniform.h:
- *      @Descripiton    :   The GPU uniform variable for compute shader
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/16/2026
+ * @file Uniform.h
+ * @brief The GPU uniform variable for compute shader.
  */
+
 #ifndef EASYGPU_UNIFORM_H
 #define EASYGPU_UNIFORM_H
 
@@ -27,7 +26,9 @@ namespace GPU::Runtime {
 template <typename T> class Uniform;
 
 /**
- * Type trait to get GLSL type name for uniform
+ * @brief Type trait to get the GLSL type name for a uniform variable.
+ * @tparam T The C++ type to map to a GLSL type name.
+ * @return The GLSL type name as a string literal.
  */
 template <typename T> constexpr const char *GetUniformGLSLTypeName() {
 	if constexpr (std::same_as<T, float>)

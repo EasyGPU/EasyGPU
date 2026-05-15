@@ -1,9 +1,8 @@
 /**
- * TestSlotPingPong.cpp:
- *      @Descripiton    :   Ping-pong algorithm tests using BufferSlot
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   3/6/2026
+ * @file TestSlotPingPong.cpp
+ * @brief Ping-pong algorithm tests using BufferSlot.
  */
+
 #include <GPU.h>
 #include <iostream>
 #include <vector>

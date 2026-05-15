@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * LoadLocalArray.h:
- *      @Descripiton    :   The load node for local array
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/11/2026
+ * @file LoadLocalArray.h
+ * @brief The load node for local array.
  */
+
 #ifndef EASYGPU_LOADLOCALARRAY_H
 #define EASYGPU_LOADLOCALARRAY_H
 

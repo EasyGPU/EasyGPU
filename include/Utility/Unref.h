@@ -1,17 +1,8 @@
 #pragma once
 
 /**
- * Unref.h:
- *      @Description   :   Helper function to create an independent copy of a GPU variable
- *      @Author        :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date          :   3/7/2026
- *
- * This function solves the "reference semantics" issue when initializing a Var from
- * buffer elements or other variables. Due to move constructor optimizations, direct
- * initialization like `Int val = buf[i]` may cause `val` to become an alias to `buf[i]`.
- *
- * Usage:
- *   Var<GameObject> obj = Unref(data[id]);  // Creates independent copy
+ * @file Unref.h
+ * @brief This function solves the "reference semantics" issue when initializing a Var from.
  */
 
 #include <IR/Value/Var.h>

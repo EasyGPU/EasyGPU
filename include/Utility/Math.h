@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * Math.h:
- *      @Descripiton    :   The math library for GPU programing
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file Math.h
+ * @brief The math library for GPU programing.
  */
+
 #ifndef EASYGPU_MATH_H
 #define EASYGPU_MATH_H
 
@@ -23,7 +22,8 @@
 
 namespace GPU::Math {
 // ============================================================================
-// Helper functions for building intrinsic calls
+/** @name Helper functions for building intrinsic calls */
+///@{
 // ============================================================================
 
 /**
@@ -54,7 +54,8 @@ inline std::unique_ptr<IR::Node::Node> WrapNode(const IR::Value::ExprBase &expr)
 }
 
 // ============================================================================
-// Common Helper for building parameter lists
+/** @name Common Helper for building parameter lists */
+///@{
 // ============================================================================
 
 namespace Detail {
@@ -163,9 +164,11 @@ template <typename T> using expr_t = IR::Value::Expr<ValueTypeOf_t<T>>;
 } // namespace Detail
 
 // ============================================================================
-// Trigonometric Functions
+/** @name Trigonometric Functions */
+///@{
 // ============================================================================
 
+/** @brief Computes the sine of each component. */
 // Sin
 inline IR::Value::Expr<float> Sin(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("sin", Detail::BuildParams(x));
@@ -180,6 +183,7 @@ inline IR::Value::Expr<Vec4> Sin(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("sin", Detail::BuildParams(x));
 }
 
+/** @brief Computes the cosine of each component. */
 // Cos
 inline IR::Value::Expr<float> Cos(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("cos", Detail::BuildParams(x));
@@ -194,6 +198,7 @@ inline IR::Value::Expr<Vec4> Cos(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("cos", Detail::BuildParams(x));
 }
 
+/** @brief Computes the tangent of each component. */
 // Tan
 inline IR::Value::Expr<float> Tan(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("tan", Detail::BuildParams(x));
@@ -208,6 +213,7 @@ inline IR::Value::Expr<Vec4> Tan(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("tan", Detail::BuildParams(x));
 }
 
+/** @brief Computes the arcsine of each component. */
 // Asin
 inline IR::Value::Expr<float> Asin(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("asin", Detail::BuildParams(x));
@@ -222,6 +228,7 @@ inline IR::Value::Expr<Vec4> Asin(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("asin", Detail::BuildParams(x));
 }
 
+/** @brief Computes the arccosine of each component. */
 // Acos
 inline IR::Value::Expr<float> Acos(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("acos", Detail::BuildParams(x));
@@ -236,6 +243,7 @@ inline IR::Value::Expr<Vec4> Acos(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("acos", Detail::BuildParams(x));
 }
 
+/** @brief Computes the arctangent of each component. */
 // Atan
 inline IR::Value::Expr<float> Atan(const IR::Value::Expr<float> &y_over_x) {
 	return MakeCall<float>("atan", Detail::BuildParams(y_over_x));
@@ -250,6 +258,7 @@ inline IR::Value::Expr<Vec4> Atan(const IR::Value::Expr<Vec4> &y_over_x) {
 	return MakeCall<Vec4>("atan", Detail::BuildParams(y_over_x));
 }
 
+/** @brief Computes the arctangent of y/x with sign handling. */
 // Atan2
 inline IR::Value::Expr<float> Atan2(const IR::Value::Expr<float> &y, const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("atan", Detail::BuildParams(y, x));
@@ -264,6 +273,7 @@ inline IR::Value::Expr<Vec4> Atan2(const IR::Value::Expr<Vec4> &y, const IR::Val
 	return MakeCall<Vec4>("atan", Detail::BuildParams(y, x));
 }
 
+/** @brief Computes the hyperbolic sine of each component. */
 // Sinh
 inline IR::Value::Expr<float> Sinh(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("sinh", Detail::BuildParams(x));
@@ -278,6 +288,7 @@ inline IR::Value::Expr<Vec4> Sinh(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("sinh", Detail::BuildParams(x));
 }
 
+/** @brief Computes the hyperbolic cosine of each component. */
 // Cosh
 inline IR::Value::Expr<float> Cosh(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("cosh", Detail::BuildParams(x));
@@ -292,6 +303,7 @@ inline IR::Value::Expr<Vec4> Cosh(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("cosh", Detail::BuildParams(x));
 }
 
+/** @brief Computes the hyperbolic tangent of each component. */
 // Tanh
 inline IR::Value::Expr<float> Tanh(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("tanh", Detail::BuildParams(x));
@@ -306,6 +318,7 @@ inline IR::Value::Expr<Vec4> Tanh(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("tanh", Detail::BuildParams(x));
 }
 
+/** @brief Computes the inverse hyperbolic sine of each component. */
 // Asinh
 inline IR::Value::Expr<float> Asinh(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("asinh", Detail::BuildParams(x));
@@ -320,6 +333,7 @@ inline IR::Value::Expr<Vec4> Asinh(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("asinh", Detail::BuildParams(x));
 }
 
+/** @brief Computes the inverse hyperbolic cosine of each component. */
 // Acosh
 inline IR::Value::Expr<float> Acosh(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("acosh", Detail::BuildParams(x));
@@ -334,6 +348,7 @@ inline IR::Value::Expr<Vec4> Acosh(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("acosh", Detail::BuildParams(x));
 }
 
+/** @brief Computes the inverse hyperbolic tangent of each component. */
 // Atanh
 inline IR::Value::Expr<float> Atanh(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("atanh", Detail::BuildParams(x));
@@ -348,6 +363,7 @@ inline IR::Value::Expr<Vec4> Atanh(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("atanh", Detail::BuildParams(x));
 }
 
+/** @brief Converts degrees to radians, component-wise. */
 // Radians (Degrees to Radians)
 inline IR::Value::Expr<float> Radians(const IR::Value::Expr<float> &Degrees) {
 	return MakeCall<float>("radians", Detail::BuildParams(Degrees));
@@ -362,6 +378,7 @@ inline IR::Value::Expr<Vec4> Radians(const IR::Value::Expr<Vec4> &Degrees) {
 	return MakeCall<Vec4>("radians", Detail::BuildParams(Degrees));
 }
 
+/** @brief Converts radians to degrees, component-wise. */
 // Degrees (Radians to Degrees)
 inline IR::Value::Expr<float> Degrees(const IR::Value::Expr<float> &Radians) {
 	return MakeCall<float>("degrees", Detail::BuildParams(Radians));
@@ -377,9 +394,11 @@ inline IR::Value::Expr<Vec4> Degrees(const IR::Value::Expr<Vec4> &Radians) {
 }
 
 // ============================================================================
-// Exponential Functions
+/** @name Exponential Functions */
+///@{
 // ============================================================================
 
+/** @brief Raises base to the power of exponent, component-wise. */
 // Pow
 inline IR::Value::Expr<float> Pow(const IR::Value::Expr<float> &base, const IR::Value::Expr<float> &Exp) {
 	return MakeCall<float>("pow", Detail::BuildParams(base, Exp));
@@ -394,6 +413,7 @@ inline IR::Value::Expr<Vec4> Pow(const IR::Value::Expr<Vec4> &base, const IR::Va
 	return MakeCall<Vec4>("pow", Detail::BuildParams(base, Exp));
 }
 
+/** @brief Pow function, generic type overload. */
 // Pow - Generic template versions
 template <typename Base, typename Exp> [[nodiscard]] inline auto Pow(Base &&base, Exp &&exp) {
 	using T = Detail::ValueTypeOf_t<Base>;
@@ -401,6 +421,7 @@ template <typename Base, typename Exp> [[nodiscard]] inline auto Pow(Base &&base
 		"pow", Detail::BuildParams(Detail::ToExpr(std::forward<Base>(base)), Detail::ToExpr(std::forward<Exp>(exp))));
 }
 
+/** @brief Computes the natural exponential of each component. */
 // Exp
 inline IR::Value::Expr<float> Exp(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("exp", Detail::BuildParams(x));
@@ -415,6 +436,7 @@ inline IR::Value::Expr<Vec4> Exp(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("exp", Detail::BuildParams(x));
 }
 
+/** @brief Computes the natural logarithm of each component. */
 // Log
 inline IR::Value::Expr<float> Log(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("log", Detail::BuildParams(x));
@@ -429,6 +451,7 @@ inline IR::Value::Expr<Vec4> Log(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("log", Detail::BuildParams(x));
 }
 
+/** @brief Computes 2 raised to the power of each component. */
 // Exp2
 inline IR::Value::Expr<float> Exp2(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("exp2", Detail::BuildParams(x));
@@ -443,6 +466,7 @@ inline IR::Value::Expr<Vec4> Exp2(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("exp2", Detail::BuildParams(x));
 }
 
+/** @brief Computes the base-2 logarithm of each component. */
 // Log2
 inline IR::Value::Expr<float> Log2(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("log2", Detail::BuildParams(x));
@@ -457,6 +481,7 @@ inline IR::Value::Expr<Vec4> Log2(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("log2", Detail::BuildParams(x));
 }
 
+/** @brief Computes the square root of each component. */
 // Sqrt
 inline IR::Value::Expr<float> Sqrt(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("sqrt", Detail::BuildParams(x));
@@ -471,6 +496,7 @@ inline IR::Value::Expr<Vec4> Sqrt(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("sqrt", Detail::BuildParams(x));
 }
 
+/** @brief Computes the inverse square root of each component. */
 // Inversesqrt
 inline IR::Value::Expr<float> Inversesqrt(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("inversesqrt", Detail::BuildParams(x));
@@ -486,9 +512,11 @@ inline IR::Value::Expr<Vec4> Inversesqrt(const IR::Value::Expr<Vec4> &x) {
 }
 
 // ============================================================================
-// Common Functions
+/** @name Common Functions */
+///@{
 // ============================================================================
 
+/** @brief Computes the absolute value of each component. */
 // Abs
 inline IR::Value::Expr<float> Abs(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("abs", Detail::BuildParams(x));
@@ -515,6 +543,7 @@ inline IR::Value::Expr<IVec4> Abs(const IR::Value::Expr<IVec4> &x) {
 	return MakeCall<IVec4>("abs", Detail::BuildParams(x));
 }
 
+/** @brief Computes the sign of each component (-1, 0, or +1). */
 // Sign
 inline IR::Value::Expr<float> Sign(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("sign", Detail::BuildParams(x));
@@ -541,6 +570,7 @@ inline IR::Value::Expr<IVec4> Sign(const IR::Value::Expr<IVec4> &x) {
 	return MakeCall<IVec4>("sign", Detail::BuildParams(x));
 }
 
+/** @brief Computes the floor of each component. */
 // Floor
 inline IR::Value::Expr<float> Floor(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("floor", Detail::BuildParams(x));
@@ -555,6 +585,7 @@ inline IR::Value::Expr<Vec4> Floor(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("floor", Detail::BuildParams(x));
 }
 
+/** @brief Truncates each component toward zero. */
 // Trunc
 inline IR::Value::Expr<float> Trunc(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("trunc", Detail::BuildParams(x));
@@ -569,6 +600,7 @@ inline IR::Value::Expr<Vec4> Trunc(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("trunc", Detail::BuildParams(x));
 }
 
+/** @brief Rounds each component to the nearest integer. */
 // Round
 inline IR::Value::Expr<float> Round(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("round", Detail::BuildParams(x));
@@ -583,6 +615,7 @@ inline IR::Value::Expr<Vec4> Round(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("round", Detail::BuildParams(x));
 }
 
+/** @brief Rounds each component to the nearest even integer. */
 // RoundEven
 inline IR::Value::Expr<float> RoundEven(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("roundEven", Detail::BuildParams(x));
@@ -597,6 +630,7 @@ inline IR::Value::Expr<Vec4> RoundEven(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("roundEven", Detail::BuildParams(x));
 }
 
+/** @brief Computes the ceiling of each component. */
 // Ceil
 inline IR::Value::Expr<float> Ceil(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("ceil", Detail::BuildParams(x));
@@ -611,6 +645,7 @@ inline IR::Value::Expr<Vec4> Ceil(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("ceil", Detail::BuildParams(x));
 }
 
+/** @brief Returns the fractional part of each component. */
 // Fract
 inline IR::Value::Expr<float> Fract(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("fract", Detail::BuildParams(x));
@@ -625,6 +660,7 @@ inline IR::Value::Expr<Vec4> Fract(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("fract", Detail::BuildParams(x));
 }
 
+/** @brief Computes the modulo (remainder) of x divided by y. */
 // Mod
 inline IR::Value::Expr<float> Mod(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y) {
 	return MakeCall<float>("mod", Detail::BuildParams(x, y));
@@ -651,6 +687,7 @@ inline IR::Value::Expr<Vec4> Mod(const IR::Value::Expr<Vec4> &x, float y) {
 	return MakeCall<Vec4>("mod", Detail::BuildParams(x, y));
 }
 
+/** @brief Computes the modulo (remainder), generic type overload. */
 // Mod - Generic template versions
 template <typename X, typename Y> [[nodiscard]] inline auto Mod(X &&x, Y &&y) {
 	using T = Detail::ValueTypeOf_t<X>;
@@ -658,6 +695,7 @@ template <typename X, typename Y> [[nodiscard]] inline auto Mod(X &&x, Y &&y) {
 					   Detail::BuildParams(Detail::ToExpr(std::forward<X>(x)), Detail::ToExpr(std::forward<Y>(y))));
 }
 
+/** @brief Returns the minimum of two values, component-wise. */
 // Min
 inline IR::Value::Expr<float> Min(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y) {
 	return MakeCall<float>("min", Detail::BuildParams(x, y));
@@ -702,6 +740,7 @@ inline IR::Value::Expr<IVec4> Min(const IR::Value::Expr<IVec4> &x, const IR::Val
 	return MakeCall<IVec4>("min", Detail::BuildParams(x, y));
 }
 
+/** @brief Returns the maximum of two values, component-wise. */
 // Max
 inline IR::Value::Expr<float> Max(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y) {
 	return MakeCall<float>("max", Detail::BuildParams(x, y));
@@ -746,6 +785,7 @@ inline IR::Value::Expr<IVec4> Max(const IR::Value::Expr<IVec4> &x, const IR::Val
 	return MakeCall<IVec4>("max", Detail::BuildParams(x, y));
 }
 
+/** @brief Returns the minimum of two values, generic type overload. */
 // Min - Generic template versions
 template <typename X, typename Y> [[nodiscard]] inline auto Min(X &&x, Y &&y) {
 	using T = Detail::ValueTypeOf_t<X>;
@@ -753,6 +793,7 @@ template <typename X, typename Y> [[nodiscard]] inline auto Min(X &&x, Y &&y) {
 					   Detail::BuildParams(Detail::ToExpr(std::forward<X>(x)), Detail::ToExpr(std::forward<Y>(y))));
 }
 
+/** @brief Returns the maximum of two values, generic type overload. */
 // Max - Generic template versions
 template <typename X, typename Y> [[nodiscard]] inline auto Max(X &&x, Y &&y) {
 	using T = Detail::ValueTypeOf_t<X>;
@@ -760,6 +801,7 @@ template <typename X, typename Y> [[nodiscard]] inline auto Max(X &&x, Y &&y) {
 					   Detail::BuildParams(Detail::ToExpr(std::forward<X>(x)), Detail::ToExpr(std::forward<Y>(y))));
 }
 
+/** @brief Clamps a value between min and max, component-wise. */
 // Clamp
 inline IR::Value::Expr<float> Clamp(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &minVal,
 									const IR::Value::Expr<float> &maxVal) {
@@ -806,6 +848,7 @@ inline IR::Value::Expr<IVec4> Clamp(const IR::Value::Expr<IVec4> &x, const IR::V
 	return MakeCall<IVec4>("clamp", Detail::BuildParams(x, minVal, maxVal));
 }
 
+/** @brief Clamps a value between min and max, generic type overload. */
 // Clamp - Generic template versions
 template <typename X, typename Min, typename Max> [[nodiscard]] inline auto Clamp(X &&x, Min &&minVal, Max &&maxVal) {
 	using T = Detail::ValueTypeOf_t<X>;
@@ -814,6 +857,7 @@ template <typename X, typename Min, typename Max> [[nodiscard]] inline auto Clam
 													Detail::ToExpr(std::forward<Max>(maxVal))));
 }
 
+/** @brief Linearly interpolates between two values, component-wise. */
 // Mix (lerp) - Expr versions
 inline IR::Value::Expr<float> Mix(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y,
 								  const IR::Value::Expr<float> &a) {
@@ -844,6 +888,7 @@ inline IR::Value::Expr<Vec4> Mix(const IR::Value::Expr<Vec4> &x, const IR::Value
 	return MakeCall<Vec4>("mix", Detail::BuildParams(x, y, a));
 }
 
+/** @brief Linearly interpolates, generic type overload. */
 // Mix (lerp) - Generic template versions accepting Expr/Var/scalar combinations
 template <typename X, typename Y, typename A> [[nodiscard]] inline auto Mix(X &&x, Y &&y, A &&a) {
 	using T = Detail::ValueTypeOf_t<X>;
@@ -852,6 +897,7 @@ template <typename X, typename Y, typename A> [[nodiscard]] inline auto Mix(X &&
 										   Detail::ToExpr(std::forward<A>(a))));
 }
 
+/** @brief Returns 0.0 if x < edge, 1.0 otherwise, component-wise. */
 // Step
 inline IR::Value::Expr<float> Step(const IR::Value::Expr<float> &edge, const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("step", Detail::BuildParams(edge, x));
@@ -878,6 +924,7 @@ inline IR::Value::Expr<Vec4> Step(float edge, const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("step", Detail::BuildParams(edge, x));
 }
 
+/** @brief Step function, generic type overload. */
 // Step - Generic template versions
 template <typename Edge, typename X> [[nodiscard]] inline auto Step(Edge &&edge, X &&x) {
 	using T = Detail::ValueTypeOf_t<X>;
@@ -885,6 +932,7 @@ template <typename Edge, typename X> [[nodiscard]] inline auto Step(Edge &&edge,
 		"step", Detail::BuildParams(Detail::ToExpr(std::forward<Edge>(edge)), Detail::ToExpr(std::forward<X>(x))));
 }
 
+/** @brief Hermite interpolation between two edges, component-wise. */
 // Smoothstep
 inline IR::Value::Expr<float> Smoothstep(const IR::Value::Expr<float> &edge0, const IR::Value::Expr<float> &edge1,
 										 const IR::Value::Expr<float> &x) {
@@ -915,6 +963,7 @@ inline IR::Value::Expr<Vec4> Smoothstep(float edge0, float edge1, const IR::Valu
 	return MakeCall<Vec4>("smoothstep", Detail::BuildParams(edge0, edge1, x));
 }
 
+/** @brief Smoothstep function, generic type overload. */
 // Smoothstep - Generic template versions
 template <typename E0, typename E1, typename X> [[nodiscard]] inline auto Smoothstep(E0 &&edge0, E1 &&edge1, X &&x) {
 	using T = Detail::ValueTypeOf_t<X>;
@@ -924,9 +973,11 @@ template <typename E0, typename E1, typename X> [[nodiscard]] inline auto Smooth
 }
 
 // ============================================================================
-// Geometric Functions
+/** @name Geometric Functions */
+///@{
 // ============================================================================
 
+/** @brief Computes the Euclidean length (magnitude) of a vector. */
 // Length
 inline IR::Value::Expr<float> Length(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("length", Detail::BuildParams(x));
@@ -941,6 +992,7 @@ inline IR::Value::Expr<float> Length(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<float>("length", Detail::BuildParams(x));
 }
 
+/** @brief Computes the Euclidean distance between two points. */
 // Distance
 inline IR::Value::Expr<float> Distance(const IR::Value::Expr<float> &p0, const IR::Value::Expr<float> &p1) {
 	return MakeCall<float>("distance", Detail::BuildParams(p0, p1));
@@ -955,6 +1007,7 @@ inline IR::Value::Expr<float> Distance(const IR::Value::Expr<Vec4> &p0, const IR
 	return MakeCall<float>("distance", Detail::BuildParams(p0, p1));
 }
 
+/** @brief Computes the dot product of two vectors. */
 // Dot
 inline IR::Value::Expr<float> Dot(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y) {
 	return MakeCall<float>("dot", Detail::BuildParams(x, y));
@@ -969,11 +1022,13 @@ inline IR::Value::Expr<float> Dot(const IR::Value::Expr<Vec4> &x, const IR::Valu
 	return MakeCall<float>("dot", Detail::BuildParams(x, y));
 }
 
+/** @brief Computes the cross product of two Vec3 vectors. */
 // Cross
 inline IR::Value::Expr<Vec3> Cross(const IR::Value::Expr<Vec3> &x, const IR::Value::Expr<Vec3> &y) {
 	return MakeCall<Vec3>("cross", Detail::BuildParams(x, y));
 }
 
+/** @brief Normalizes a vector to unit length. */
 // Normalize
 inline IR::Value::Expr<float> Normalize(const IR::Value::Expr<float> &x) {
 	return MakeCall<float>("normalize", Detail::BuildParams(x));
@@ -988,6 +1043,7 @@ inline IR::Value::Expr<Vec4> Normalize(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("normalize", Detail::BuildParams(x));
 }
 
+/** @brief Returns a vector facing in the direction of the reference. */
 // Faceforward
 inline IR::Value::Expr<float> Faceforward(const IR::Value::Expr<float> &N, const IR::Value::Expr<float> &I,
 										  const IR::Value::Expr<float> &Nref) {
@@ -1006,6 +1062,7 @@ inline IR::Value::Expr<Vec4> Faceforward(const IR::Value::Expr<Vec4> &N, const I
 	return MakeCall<Vec4>("faceforward", Detail::BuildParams(N, I, Nref));
 }
 
+/** @brief Computes the reflection direction for an incident vector. */
 // Reflect
 inline IR::Value::Expr<float> Reflect(const IR::Value::Expr<float> &I, const IR::Value::Expr<float> &N) {
 	return MakeCall<float>("reflect", Detail::BuildParams(I, N));
@@ -1020,6 +1077,7 @@ inline IR::Value::Expr<Vec4> Reflect(const IR::Value::Expr<Vec4> &I, const IR::V
 	return MakeCall<Vec4>("reflect", Detail::BuildParams(I, N));
 }
 
+/** @brief Computes the refraction direction using Snell's law. */
 // Refract
 inline IR::Value::Expr<float> Refract(const IR::Value::Expr<float> &I, const IR::Value::Expr<float> &N,
 									  const IR::Value::Expr<float> &eta) {
@@ -1051,9 +1109,11 @@ inline IR::Value::Expr<Vec4> Refract(const IR::Value::Expr<Vec4> &I, const IR::V
 }
 
 // ============================================================================
-// Vector Relational Functions
+/** @name Vector Relational Functions */
+///@{
 // ============================================================================
 
+/** @brief Performs component-wise less-than comparison. */
 // LessThan
 inline IR::Value::Expr<bool> LessThan(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
 	return MakeCall<bool>("lessThan", Detail::BuildParams(x, y));
@@ -1074,6 +1134,7 @@ inline IR::Value::Expr<bool> LessThan(const IR::Value::Expr<IVec4> &x, const IR:
 	return MakeCall<bool>("lessThan", Detail::BuildParams(x, y));
 }
 
+/** @brief Performs component-wise less-than-or-equal comparison. */
 // LessThanEqual
 inline IR::Value::Expr<bool> LessThanEqual(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
 	return MakeCall<bool>("lessThanEqual", Detail::BuildParams(x, y));
@@ -1094,6 +1155,7 @@ inline IR::Value::Expr<bool> LessThanEqual(const IR::Value::Expr<IVec4> &x, cons
 	return MakeCall<bool>("lessThanEqual", Detail::BuildParams(x, y));
 }
 
+/** @brief Performs component-wise greater-than comparison. */
 // GreaterThan
 inline IR::Value::Expr<bool> GreaterThan(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
 	return MakeCall<bool>("greaterThan", Detail::BuildParams(x, y));
@@ -1114,6 +1176,7 @@ inline IR::Value::Expr<bool> GreaterThan(const IR::Value::Expr<IVec4> &x, const 
 	return MakeCall<bool>("greaterThan", Detail::BuildParams(x, y));
 }
 
+/** @brief Performs component-wise greater-than-or-equal comparison. */
 // GreaterThanEqual
 inline IR::Value::Expr<bool> GreaterThanEqual(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
 	return MakeCall<bool>("greaterThanEqual", Detail::BuildParams(x, y));
@@ -1134,6 +1197,7 @@ inline IR::Value::Expr<bool> GreaterThanEqual(const IR::Value::Expr<IVec4> &x, c
 	return MakeCall<bool>("greaterThanEqual", Detail::BuildParams(x, y));
 }
 
+/** @brief Performs component-wise equality comparison. */
 // Equal
 inline IR::Value::Expr<bool> Equal(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
 	return MakeCall<bool>("equal", Detail::BuildParams(x, y));
@@ -1154,6 +1218,7 @@ inline IR::Value::Expr<bool> Equal(const IR::Value::Expr<IVec4> &x, const IR::Va
 	return MakeCall<bool>("equal", Detail::BuildParams(x, y));
 }
 
+/** @brief Performs component-wise inequality comparison. */
 // NotEqual
 inline IR::Value::Expr<bool> NotEqual(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
 	return MakeCall<bool>("notEqual", Detail::BuildParams(x, y));
@@ -1175,12 +1240,15 @@ inline IR::Value::Expr<bool> NotEqual(const IR::Value::Expr<IVec4> &x, const IR:
 }
 
 // ============================================================================
-// Sign Manipulation Functions
+/** @name Sign Manipulation Functions */
+///@{
 // ============================================================================
 
+/** @brief Returns a value with the magnitude of x and the sign of y. */
 // CopySign - Returns a value with the magnitude of x and the sign of y
-// GLSL: abs(x) * sign(y)
+/// @note Equivalent to GLSL: abs(x) * sign(y)
 
+/** @brief CopySign overload for float scalar. */
 // For float
 inline IR::Value::Expr<float> CopySign(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y) {
 	return Abs(x) * Sign(y);
@@ -1192,6 +1260,7 @@ inline IR::Value::Expr<float> CopySign(float x, const IR::Value::Expr<float> &y)
 	return Abs(IR::Value::Expr<float>(x)) * Sign(y);
 }
 
+/** @brief CopySign overload for Vec2. */
 // For Vec2
 inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, const IR::Value::Expr<Vec2> &y) {
 	return Abs(x) * Sign(y);
@@ -1203,6 +1272,7 @@ inline IR::Value::Expr<Vec2> CopySign(const IR::Value::Expr<Vec2> &x, float y) {
 	return MakeCall<Vec2>("abs", Detail::BuildParams(x)) * MakeCall<Vec2>("sign", Detail::BuildParams(y));
 }
 
+/** @brief CopySign overload for Vec3. */
 // For Vec3
 inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, const IR::Value::Expr<Vec3> &y) {
 	return Abs(x) * Sign(y);
@@ -1214,6 +1284,7 @@ inline IR::Value::Expr<Vec3> CopySign(const IR::Value::Expr<Vec3> &x, float y) {
 	return MakeCall<Vec3>("abs", Detail::BuildParams(x)) * MakeCall<Vec3>("sign", Detail::BuildParams(y));
 }
 
+/** @brief CopySign overload for Vec4. */
 // For Vec4
 inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, const IR::Value::Expr<Vec4> &y) {
 	return Abs(x) * Sign(y);
@@ -1226,106 +1297,140 @@ inline IR::Value::Expr<Vec4> CopySign(const IR::Value::Expr<Vec4> &x, float y) {
 }
 
 // ============================================================================
-// Type Cast Functions (Explicit conversion between types)
+/** @name Type Cast Functions */
+///@{
 // ============================================================================
 
+/** @name Scalar Type Casts */
 // -------------------- Scalar Type Casts --------------------
 
+/** @name ToFloat from Var */
 // ToFloat from Var (explicit overloads to avoid ambiguity)
+/** @brief Convert Var<float> to Expr<float> (identity). */
 inline IR::Value::Expr<float> ToFloat(const IR::Value::Var<float> &x) {
 	return ToFloat(IR::Value::Expr<float>(x.Load())); // Already float
 }
+/** @brief Convert Var<int> to Expr<float> (int to float cast). */
 inline IR::Value::Expr<float> ToFloat(const IR::Value::Var<int> &x) {
 	return MakeCall<float>("float", Detail::BuildParams(IR::Value::Expr<int>(x.Load())));
 }
+/** @brief Convert Var<bool> to Expr<float> (bool to float cast). */
 inline IR::Value::Expr<float> ToFloat(const IR::Value::Var<bool> &x) {
 	return MakeCall<float>("float", Detail::BuildParams(IR::Value::Expr<bool>(x.Load())));
 }
 
+/** @name ToFloat from Expr */
 // ToFloat from Expr
+/** @brief Move Expr<float> through (identity, no cast needed). */
 inline IR::Value::Expr<float> ToFloat(IR::Value::Expr<float> &&x) {
 	return std::move(x); // Already float, no conversion needed
 }
+/** @brief Cast Expr<int> to Expr<float>. */
 inline IR::Value::Expr<float> ToFloat(IR::Value::Expr<int> &&x) {
 	return MakeCall<float>("float", Detail::BuildParams(std::move(x)));
 }
+/** @brief Cast Expr<bool> to Expr<float>. */
 inline IR::Value::Expr<float> ToFloat(IR::Value::Expr<bool> &&x) {
 	return MakeCall<float>("float", Detail::BuildParams(std::move(x)));
 }
 
+/** @name ToInt from Var */
 // ToInt from Var (explicit overloads to avoid ambiguity)
+/** @brief Convert Var<int> to Expr<int> (identity). */
 inline IR::Value::Expr<int> ToInt(const IR::Value::Var<int> &x) {
 	return ToInt(IR::Value::Expr<int>(x.Load())); // Already int
 }
+/** @brief Convert Var<float> to Expr<int> (float to int cast). */
 inline IR::Value::Expr<int> ToInt(const IR::Value::Var<float> &x) {
 	return MakeCall<int>("int", Detail::BuildParams(IR::Value::Expr<float>(x.Load())));
 }
+/** @brief Convert Var<bool> to Expr<int> (bool to int cast). */
 inline IR::Value::Expr<int> ToInt(const IR::Value::Var<bool> &x) {
 	return MakeCall<int>("int", Detail::BuildParams(IR::Value::Expr<bool>(x.Load())));
 }
 
+/** @name ToInt from Expr */
 // ToInt from Expr
+/** @brief Move Expr<int> through (identity, no cast needed). */
 inline IR::Value::Expr<int> ToInt(IR::Value::Expr<int> &&x) {
 	return std::move(x); // Already int, no conversion needed
 }
+/** @brief Cast Expr<float> to Expr<int>. */
 inline IR::Value::Expr<int> ToInt(IR::Value::Expr<float> &&x) {
 	return MakeCall<int>("int", Detail::BuildParams(std::move(x)));
 }
+/** @brief Cast Expr<bool> to Expr<int>. */
 inline IR::Value::Expr<int> ToInt(IR::Value::Expr<bool> &&x) {
 	return MakeCall<int>("int", Detail::BuildParams(std::move(x)));
 }
 
+/** @name ToBool from Var */
 // ToBool from Var (explicit overloads to avoid ambiguity)
+/** @brief Convert Var<bool> to Expr<bool> (identity). */
 inline IR::Value::Expr<bool> ToBool(const IR::Value::Var<bool> &x) {
 	return ToBool(IR::Value::Expr<bool>(x.Load())); // Already bool
 }
+/** @brief Convert Var<float> to Expr<bool> (float to bool cast). */
 inline IR::Value::Expr<bool> ToBool(const IR::Value::Var<float> &x) {
 	return MakeCall<bool>("bool", Detail::BuildParams(IR::Value::Expr<float>(x.Load())));
 }
+/** @brief Convert Var<int> to Expr<bool> (int to bool cast). */
 inline IR::Value::Expr<bool> ToBool(const IR::Value::Var<int> &x) {
 	return MakeCall<bool>("bool", Detail::BuildParams(IR::Value::Expr<int>(x.Load())));
 }
 
+/** @name ToBool from Expr */
 // ToBool from Expr
+/** @brief Move Expr<bool> through (identity, no cast needed). */
 inline IR::Value::Expr<bool> ToBool(IR::Value::Expr<bool> &&x) {
 	return std::move(x); // Already bool, no conversion needed
 }
+/** @brief Cast Expr<float> to Expr<bool>. */
 inline IR::Value::Expr<bool> ToBool(IR::Value::Expr<float> &&x) {
 	return MakeCall<bool>("bool", Detail::BuildParams(std::move(x)));
 }
+/** @brief Cast Expr<int> to Expr<bool>. */
 inline IR::Value::Expr<bool> ToBool(IR::Value::Expr<int> &&x) {
 	return MakeCall<bool>("bool", Detail::BuildParams(std::move(x)));
 }
 
+/** @name Vector Type Casts to Float */
 // -------------------- Vector Type Casts (Float) --------------------
 
+/** @brief Converts IVec2 to Vec2. */
 // To Vec2
 inline IR::Value::Expr<Vec2> ToFloat(const IR::Value::Expr<IVec2> &x) {
 	return MakeCall<Vec2>("vec2", Detail::BuildParams(x));
 }
 
+/** @brief Converts IVec3 to Vec3. */
 // To Vec3
 inline IR::Value::Expr<Vec3> ToFloat(const IR::Value::Expr<IVec3> &x) {
 	return MakeCall<Vec3>("vec3", Detail::BuildParams(x));
 }
 
+/** @brief Converts IVec4 to Vec4. */
 // To Vec4
 inline IR::Value::Expr<Vec4> ToFloat(const IR::Value::Expr<IVec4> &x) {
 	return MakeCall<Vec4>("vec4", Detail::BuildParams(x));
 }
 
+/** @name Vector Type Casts to Int */
 // -------------------- Vector Type Casts (Int) --------------------
 
+/** @brief Converts Vec2 to IVec2. */
 // To IVec2
 inline IR::Value::Expr<IVec2> ToInt(const IR::Value::Expr<Vec2> &x) {
 	return MakeCall<IVec2>("ivec2", Detail::BuildParams(x));
 }
 
+/** @brief Converts Vec3 to IVec3. */
 // To IVec3
 inline IR::Value::Expr<IVec3> ToInt(const IR::Value::Expr<Vec3> &x) {
 	return MakeCall<IVec3>("ivec3", Detail::BuildParams(x));
 }
 
+/** @brief Converts Vec4 to IVec4. */
 // To IVec4
 inline IR::Value::Expr<IVec4> ToInt(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<IVec4>("ivec4", Detail::BuildParams(x));

@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 /**
- * LoadUniform.h:
- *      @Descripiton    :   The uniform load node
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/12/2026
+ * @file LoadUniform.h
+ * @brief The uniform load node.
  */
+
 #ifndef EASYGPU_LOADUNIFORM_H
 #define EASYGPU_LOADUNIFORM_H
 

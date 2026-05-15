@@ -1,6 +1,6 @@
 /**
  * @file OpenGLBackend.cpp
- * @brief OpenGL backend implementation
+ * @brief OpenGL backend implementation.
  */
 
 #include <Backend/OpenGLBackend.h>

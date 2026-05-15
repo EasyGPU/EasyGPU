@@ -2,8 +2,9 @@
 
 /**
  * @file PixelFormat.h
- * @brief Pixel format definitions for Texture (backend-agnostic)
+ * @brief Pixel format definitions for Texture (backend-agnostic).
  */
+
 #ifndef EASYGPU_PIXELFORMAT_H
 #define EASYGPU_PIXELFORMAT_H
 
@@ -14,8 +15,9 @@
 namespace GPU::Runtime {
 
 /**
- * Pixel format enumeration for textures
- * Matches common graphics API internal formats
+ * @brief Pixel format enumeration for textures.
+ *
+ * Matches common graphics API internal formats (OpenGL/Vulkan).
  */
 enum class PixelFormat {
 	// 8-bit unsigned normalized formats

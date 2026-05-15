@@ -497,6 +497,42 @@ Each thread should:
 
 ---
 
+---
+
+## Graphics & Rendering
+
+### Does EasyGPU support graphics rendering?
+
+Yes. EasyGPU provides a backend-agnostic graphics pipeline API supporting vertex and fragment shaders with offscreen rendering to textures.
+
+**Supported backends:**
+- **OpenGL**: FBO-based rendering (OpenGL 4.3+)
+- **Vulkan**: VK_KHR_dynamic_rendering (Vulkan 1.1+)
+
+Check support at runtime:
+
+```cpp
+if (backend->GetCaps().supportsGraphics) {
+    // Graphics pipeline is available
+}
+```
+
+The graphics API includes `CreateGraphicsPipeline`, `BeginRendering`, `EndRendering`, `Draw`, `SetViewport`, and `SetScissor`. See the [API Reference](api-reference.md#graphics-pipeline) for full details.
+
+### Can I pass large structs to shaders?
+
+Yes, use `UniformBuffer<T>` for structs larger than ~128 bytes. It uses GPU Uniform Buffer Objects (UBO) with std140 layout, supporting sizes up to 64KB+.
+
+```cpp
+EASYGPU_STRUCT(MyConfig, (Vec3, color), (float, exposure), (Mat4, transform));
+UniformBuffer<MyConfig> ubo(myConfigStruct);
+// Use in kernel: auto cfg = ubo.Load();
+```
+
+For small values (float, Vec3, Mat4), use `Uniform<T>` which uses push constants. See [UniformBuffer](api-reference.md#uniformbuffer).
+
+---
+
 ## Comparison with Other Libraries
 
 ### EasyGPU vs Taichi

@@ -1,7 +1,6 @@
 /**
- * TestAtomicAdvanced.cpp
- * Advanced atomic operation tests: large-scale contention, min/max, bit ops,
- * compare-and-swap, and shared-memory atomics.
+ * @file TestAtomicAdvanced.cpp
+ * @brief Advanced atomic operation tests: large-scale contention, min/max, bit ops,.
  */
 
 #include <GPU.h>

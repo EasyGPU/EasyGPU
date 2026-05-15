@@ -1,8 +1,8 @@
 /**
- * TestExpression.cpp:
- *      Comprehensive test suite for EasyGPU expression system
- *      Tests Var/Expr interactions, type conversions, operators, and complex expressions
+ * @file TestExpression.cpp
+ * @brief Comprehensive test suite for EasyGPU expression system.
  */
+
 #include <cassert>
 #include <cmath>
 #include <iostream>

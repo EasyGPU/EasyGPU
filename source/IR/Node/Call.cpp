@@ -1,7 +1,6 @@
 /**
- * Call.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/14/2026
+ * @file Call.cpp
+ * @brief Implementation of function call IR nodes.
  */
 
 #include <IR/Node/Call.h>

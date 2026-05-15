@@ -1,7 +1,6 @@
-﻿/**
- * MemberAccess.cpp:
- *      @Author         :   Margoo(qiuzhengyu@siggraph.org)
- *      @Date           :   2/13/2026
+/**
+ * @file MemberAccess.cpp
+ * @brief Implementation of struct member access IR node.
  */
 
 #include <IR/Node/MemberAccess.h>

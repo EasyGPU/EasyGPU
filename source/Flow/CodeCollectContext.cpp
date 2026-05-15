@@ -1,7 +1,6 @@
 /**
- * CodeCollectContext.cpp:
- *      @Author         :   Margoo(qiuzhengyu@sigraph.org)
- *      @Date           :   2/14/2026
+ * @file CodeCollectContext.cpp
+ * @brief Implementation of code collection context for flow control statements.
  */
 
 #include <Flow/CodeCollectContext.h>

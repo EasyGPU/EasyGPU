@@ -32,7 +32,7 @@ template <PixelFormat Format> class Texture3D;
 
 namespace GPU::IR::Value {
 /**
- * Texture reference class for DSL access
+ * @brief Texture reference class for DSL access
  * @tparam Format The pixel format of the texture
  *
  * Usage:
@@ -42,12 +42,14 @@ namespace GPU::IR::Value {
  */
 template <Runtime::PixelFormat Format> class TextureRef {
 public:
+	/// @brief Construct a TextureRef from name, binding, and dimensions
 	TextureRef(std::string textureName, uint32_t binding, uint32_t width, uint32_t height)
 		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height) {
 	}
 
 	/**
-	 * Constructor for function parameter references.
+	 * @brief Constructor for function parameter references
+	 *
 	 * Used when TextureRef is passed as a callable parameter.
 	 * Binding/width/height are not needed in function body since only the name is used.
 	 */
@@ -55,22 +57,27 @@ public:
 		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0) {
 	}
 
+	/// @brief Get the binding index of this texture
 	[[nodiscard]] uint32_t GetBinding() const {
 		return _binding;
 	}
 
+	/// @brief Get the name of the underlying texture
 	[[nodiscard]] const std::string &GetTextureName() const {
 		return _textureName;
 	}
 
+	/// @brief Get the texture width in pixels
 	[[nodiscard]] uint32_t GetWidth() const {
 		return _width;
 	}
 
+	/// @brief Get the texture height in pixels
 	[[nodiscard]] uint32_t GetHeight() const {
 		return _height;
 	}
 
+	/// @brief Get the pixel format of this texture
 	static constexpr Runtime::PixelFormat GetFormat() {
 		return Format;
 	}
@@ -81,7 +88,7 @@ public:
 	// =======================================================================
 
 	/**
-	 * Read pixel at integer coordinates
+	 * @brief Read pixel at integer coordinates
 	 * @param x X coordinate (0 to width-1)
 	 * @param y Y coordinate (0 to height-1)
 	 * @return Vec4 color value (automatically converted from format)
@@ -115,6 +122,7 @@ public:
 	}
 
 	// Literal integer versions
+	/// @brief Read pixel at literal integer coordinates
 	[[nodiscard]] Var<GPU::Math::Vec4> Read(int x, const Var<int> &y) const {
 		std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
 		std::string code = std::format("imageLoad({}, ivec2({}, {}))", _textureName, x, yStr);
@@ -150,7 +158,7 @@ public:
 	// =======================================================================
 
 	/**
-	 * Write pixel at integer coordinates
+	 * @brief Write pixel at integer coordinates
 	 * @param x X coordinate
 	 * @param y Y coordinate
 	 * @param color Color value (Vec4 or expression)
@@ -225,7 +233,7 @@ public:
 	// ========================================================================
 
 	/**
-	 * Write pixel at integer coordinates with IVec4 color
+	 * @brief Write pixel at integer coordinates with IVec4 color
 	 * @param x X coordinate
 	 * @param y Y coordinate
 	 * @param color Color value (IVec4 or expression) for integer texture formats
@@ -369,6 +377,7 @@ public:
 	// ========================================================================
 
 	// Literal integer coordinates
+	/// @brief Write pixel at literal integer coordinates
 	void Write(int x, const Var<int> &y, const Var<GPU::Math::Vec4> &color) {
 		std::string yStr	 = Builder::Builder::Get().BuildNode(*y.Load().get());
 		std::string colorStr = Builder::Builder::Get().BuildNode(*color.Load().get());
@@ -444,13 +453,11 @@ private:
 	uint32_t	_height;
 };
 
-/**
- * Type alias for convenience
- */
+/// @brief Convenience alias for TextureRef
 template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
 
 /**
- * 3D Texture reference class for DSL access
+ * @brief 3D Texture reference for DSL access
  * @tparam Format The pixel format of the texture
  *
  * Usage:
@@ -460,35 +467,44 @@ template <Runtime::PixelFormat Format> using image2d = TextureRef<Format>;
  */
 template <Runtime::PixelFormat Format> class TextureRef3D {
 public:
+	/// @brief Construct a TextureRef3D from name, binding, and dimensions
 	TextureRef3D(std::string textureName, uint32_t binding, uint32_t width, uint32_t height, uint32_t depth)
 		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height), _depth(depth) {
 	}
 
+	/// @brief Construct a TextureRef3D for function parameter references
 	explicit TextureRef3D(std::string textureName)
 		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0), _depth(0) {
 	}
 
+	/// @brief Get the binding index of this texture
 	[[nodiscard]] uint32_t GetBinding() const {
 		return _binding;
 	}
+	/// @brief Get the name of the underlying texture
 	[[nodiscard]] const std::string &GetTextureName() const {
 		return _textureName;
 	}
+	/// @brief Get the texture width in pixels
 	[[nodiscard]] uint32_t GetWidth() const {
 		return _width;
 	}
+	/// @brief Get the texture height in pixels
 	[[nodiscard]] uint32_t GetHeight() const {
 		return _height;
 	}
+	/// @brief Get the 3D texture depth in pixels
 	[[nodiscard]] uint32_t GetDepth() const {
 		return _depth;
 	}
+	/// @brief Get the pixel format of this texture
 	static constexpr Runtime::PixelFormat GetFormat() {
 		return Format;
 	}
 
 public:
 	// Read operations - imageLoad(texture, ivec3(x, y, z))
+	/// @brief Read voxel at integer coordinates
 	[[nodiscard]] Var<GPU::Math::Vec4> Read(const Var<int> &x, const Var<int> &y, const Var<int> &z) const {
 		std::string xStr = Builder::Builder::Get().BuildNode(*x.Load().get());
 		std::string yStr = Builder::Builder::Get().BuildNode(*y.Load().get());
@@ -503,6 +519,7 @@ public:
 	}
 
 	// Write operations - imageStore(texture, ivec3(x, y, z), value)
+	/// @brief Write voxel at integer coordinates
 	void Write(const Var<int> &x, const Var<int> &y, const Var<int> &z, const Var<GPU::Math::Vec4> &color) {
 		std::string xStr	 = Builder::Builder::Get().BuildNode(*x.Load().get());
 		std::string yStr	 = Builder::Builder::Get().BuildNode(*y.Load().get());
@@ -543,9 +560,7 @@ private:
 	uint32_t	_depth;
 };
 
-/**
- * Type alias for convenience
- */
+/// @brief Convenience alias for TextureRef3D
 template <Runtime::PixelFormat Format> using image3d = TextureRef3D<Format>;
 
 } // namespace GPU::IR::Value

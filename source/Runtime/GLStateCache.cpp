@@ -1,6 +1,6 @@
 /**
  * @file GLStateCache.cpp
- * @brief OpenGL state cache implementation
+ * @brief OpenGL state cache implementation.
  */
 
 #include <Runtime/GLStateCache.h>
