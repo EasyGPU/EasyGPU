@@ -23,6 +23,11 @@
 #include <Kernel/KernelProfiler.h>
 
 // =============================================================================
+// Automatic Differentiation
+// =============================================================================
+#include <AD/ADCore.h>
+
+// =============================================================================
 // Callable Functions
 // =============================================================================
 #include <Callable/Callable.h>
@@ -131,6 +136,9 @@ using namespace GPU::Utility;
 /// Parallel primitives: WorkgroupReduce, WorkgroupScanInclusive
 using namespace GPU::Parallel;
 
+/// Automatic differentiation: AD::Param, AD::Loss, ADKernel1D, AdjointInspector1D
+using namespace GPU::AD;
+
 /// Thread index utilities: LocalThreadId, WorkgroupId, GlobalThreadId
 using namespace GPU;
 
@@ -152,7 +160,7 @@ using Kernel2D			= Kernel::Kernel2D;
 /// Alias for Kernel1D
 using Kernel1D			= Kernel::Kernel1D;
 
-/// Alias for InspectorKernel3D
+/// Alias for InspectorKernel1D
 using InspectorKernel1D = Kernel::InspectorKernel1D;
 
 /// Alias for InspectorKernel2D
@@ -160,6 +168,18 @@ using InspectorKernel2D = Kernel::InspectorKernel2D;
 
 /// Alias for InspectorKernel3D
 using InspectorKernel3D = Kernel::InspectorKernel3D;
+
+/// Alias for ADKernel1D (GPU training with autograd)
+using ADKernel1D = AD::ADKernel1D;
+
+/// Alias for AdjointInspector1D (offline gradient code inspection)
+using AdjointInspector1D = AD::AdjointInspector1D;
+
+/// Alias for AdjointInspector2D
+using AdjointInspector2D = AD::AdjointInspector2D;
+
+/// Alias for AdjointInspector3D
+using AdjointInspector3D = AD::AdjointInspector3D;
 
 #ifdef _WIN32
 using FragmentKernel2D = Kernel::FragmentKernel2D;

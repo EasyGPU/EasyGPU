@@ -195,24 +195,22 @@ EasyGPU's reverse-mode autograd records every operation during the forward pass 
 
 ```cpp
 #include <GPU.h>
-#include <AD/ADKernel.h>
-using namespace GPU::AD;
 
 // y = w*x + b,  fit to noisy data
-ADKernel1D model([&](Var<int> &id) {
+ADKernel1D model([&](Int &id) {
     auto x_ref = buf_x.Bind();
     auto y_ref = buf_y.Bind();
 
-    Var<float> w, b;
-    w = AD::Param(W_ref[0]);    // trainable weight
-    b = AD::Param(W_ref[1]);    // trainable bias
+    Float w, b;
+    w = Param(W_ref[0]);    // trainable weight
+    b = Param(W_ref[1]);    // trainable bias
 
-    Var<float> x = x_ref[id];
-    Var<float> y_pred = w * x + b;
-    Var<float> diff = y_pred - y_ref[id];
-    Var<float> loss = diff * diff;
+    Float x = x_ref[id];
+    Float y_pred = w * x + b;
+    Float diff = y_pred - y_ref[id];
+    Float loss = diff * diff;
 
-    AD::Loss(loss);
+    Loss(loss);
 }, N);
 
 // One call = forward + backward + gradient download
@@ -247,7 +245,7 @@ Callable<Float(Float)> Sigmoid = [](Float &x) {
 };
 
 // Use inside AD kernel — gradient flows through the Callable automatically
-Var<float> activation = Sigmoid(logits);
+Float activation = Sigmoid(logits);
 ```
 
 **Real example — GPU Poetry Transformer:**
