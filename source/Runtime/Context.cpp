@@ -40,7 +40,6 @@ Backend::Backend *Context::GetBackend() {
 Context::~Context() {
 	DestroyBackend();
 	_destroyed = true;
-	_instance.release();
 }
 
 void Context::Initialize() {

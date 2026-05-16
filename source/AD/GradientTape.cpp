@@ -185,7 +185,9 @@ void GradientTape::RecordCompoundAssignment(const GPU::IR::Node::CompoundAssignm
 
 	auto code = node.Code();
 	if (code != GPU::IR::Node::CompoundAssignmentCode::AddAssign &&
-		code != GPU::IR::Node::CompoundAssignmentCode::SubAssign) {
+		code != GPU::IR::Node::CompoundAssignmentCode::SubAssign &&
+		code != GPU::IR::Node::CompoundAssignmentCode::MulAssign &&
+		code != GPU::IR::Node::CompoundAssignmentCode::DivAssign) {
 		return;
 	}
 
@@ -319,9 +321,12 @@ std::string GradientTape::TryExtractVarName(const GPU::IR::Node::Node &node) {
 	if (node.Type() == GPU::IR::Node::NodeType::Load) {
 		auto	   &loadNode = static_cast<const GPU::IR::Node::LoadNode &>(node);
 		std::string s = loadNode.Unwrap();
-		if (!s.empty() && s[0] != 'f' && s.find('(') == std::string::npos) {
-			return s;
-		}
+		if (s.empty()) return "";
+		// Filter GLSL type constructors: float(...), vec2(...), etc.
+		if (s.find('(') != std::string::npos) return "";
+		// Filter boolean literals
+		if (s == "true" || s == "false") return "";
+		return s;
 	}
 	return "";
 }

@@ -133,7 +133,7 @@ public:
 	 * Assignment from a expression
 	 * @param Value The expression to assign
 	 */
-	VarBase(Expr<Type> &Value) noexcept {
+	VarBase(Expr<Type> &Value) {
 		std::string name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
 		_node			 = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
@@ -284,7 +284,7 @@ public:
 	 * Assignment from a expression
 	 * @param Value The expression to assign
 	 */
-	VarBase &operator=(Expr<Type> Value) noexcept {
+	VarBase &operator=(Expr<Type> Value) {
 		auto lhs   = Load();
 		auto rhs   = Value.Release();
 

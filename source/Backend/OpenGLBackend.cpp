@@ -552,7 +552,10 @@ void OpenGLBackend::SetUniform(PipelineHandle pipeline, const std::string &name,
 
 	if (type == "float") {
 		glProgramUniform1f(it->second.glProgram, location, *static_cast<const float *>(data));
-	} else if (type == "int" || type == "bool") {
+	} else if (type == "bool") {
+		int val = *static_cast<const bool *>(data) ? 1 : 0;
+		glProgramUniform1i(it->second.glProgram, location, val);
+	} else if (type == "int") {
 		glProgramUniform1i(it->second.glProgram, location, *static_cast<const int *>(data));
 	} else if (type == "vec2") {
 		glProgramUniform2fv(it->second.glProgram, location, 1, static_cast<const float *>(data));

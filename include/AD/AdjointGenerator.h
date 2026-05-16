@@ -156,6 +156,9 @@ private:
 
 	// Reference to the main tape (for sub-tape access during Call processing)
 	const GradientTape *_tape = nullptr;
+
+	// Pre-built map: entry id → call index (for O(1) sub-tape lookup)
+	std::unordered_map<int32_t, int> _callIndexMap;
 };
 
 } // namespace GPU::AD

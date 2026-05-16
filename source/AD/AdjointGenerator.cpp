@@ -130,9 +130,17 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	};
 
 	// atan(x)  →  d_x += d_out / (1.0 + x*x)
+	// atan2(y, x)  →  d_y += d_out * x / (x*x + y*y);  d_x += d_out * (-y) / (x*x + y*y)
+	// GLSL uses 'atan' for both; dispatch on argument count.
 	_intrinsicRules["atan"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								 const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], std::format("({})/(1.0+({})*({}))", dOut, in[0], in[0]));
+		if (in.size() >= 2) {
+			std::string denom = std::format("({})*({})+({})*({})", in[0], in[0], in[1], in[1]);
+			gen->EmitAccumulate(in[0], std::format("({})*({})/({})", dOut, in[1], denom));
+			gen->EmitAccumulate(in[1], std::format("({})*(-({}))/({})", dOut, in[0], denom));
+		} else {
+			gen->EmitAccumulate(in[0], std::format("({})/(1.0+({})*({}))", dOut, in[0], in[0]));
+		}
 	};
 
 	// sinh(x)  →  d_x += d_out * cosh(x)
@@ -244,17 +252,6 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 		gen->EmitAccumulate(in[1], std::format("({})*step({},{})", dOut, in[0], in[1]));
 	};
 
-	// atan2(y, x)  →  d_y += d_out * x / (x*x + y*y);  d_x += d_out * (-y) / (x*x + y*y)
-	_intrinsicRules["atan"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
-								 const std::vector<std::string> &in) {
-		// Note: atan2 is called as "atan(y, x)" in GLSL
-		if (in.size() >= 2) {
-			std::string denom = std::format("({})*({})+({})*({})", in[0], in[0], in[1], in[1]);
-			gen->EmitAccumulate(in[0], std::format("({})*({})/({})", dOut, in[1], denom));
-			gen->EmitAccumulate(in[1], std::format("({})*(-({}))/({})", dOut, in[0], denom));
-		}
-	};
-
 	// mod(x, y)  →  d_x += d_out;  d_y += -d_out * trunc(x/y)
 	_intrinsicRules["mod"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								const std::vector<std::string> &in) {
@@ -286,14 +283,21 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 		gen->EmitAccumulate(in[2], std::format("({})*(({})-({}))", dOut, in[1], in[0]));
 	};
 
-	// smoothstep(e0, e1, x)  →  Hermite derivative
-	// t = clamp((x-e0)/(e1-e0), 0, 1);  dsmoothstep/dx = 6*t*(1-t)/(e1-e0)
+	// smoothstep(e0, e1, x)  →  Hermite derivatives w.r.t. all three inputs
+	// t = clamp((x-e0)/(e1-e0), 0, 1); deriv = 6*t*(1-t)
+	// dx  = d_out * deriv / (e1-e0)
+	// de0 = -d_out * deriv * (e1-x) / (e1-e0)^2
+	// de1 = -d_out * deriv * (x-e0) / (e1-e0)^2
 	_intrinsicRules["smoothstep"] = [](AdjointGenerator *gen, const TapeEntry &e,
 									   const std::string			  &dOut,
 									   const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[2],
-			std::format("({})*6.0*clamp((({})-({}))/(({})-({})),0.0,1.0)*(1.0-clamp((({})-({}))/(({})-({})),0.0,1.0))/(({})-({}))",
-				dOut, in[2], in[0], in[1], in[0], in[2], in[0], in[1], in[0], in[1], in[0]));
+		const auto &e0 = in[0], &e1 = in[1], &x = in[2];
+		std::string t  = std::format("clamp((({})-({}))/(({})-({})),0.0,1.0)", x, e0, e1, e0);
+		std::string df = std::format("6.0*{}*(1.0-{})", t, t);
+		std::string den = std::format("({})-({})", e1, e0);
+		gen->EmitAccumulate(x,  std::format("({})*{}/({})", dOut, df, den));
+		gen->EmitAccumulate(e0, std::format("-({})*{}*(({})-({}))/(({})*({}))", dOut, df, e1, x, den, den));
+		gen->EmitAccumulate(e1, std::format("-({})*{}*(({})-({}))/(({})*({}))", dOut, df, x, e0, den, den));
 	};
 
 	// =========================================================================
@@ -391,9 +395,14 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 		activeSet.insert(paramName);
 	}
 
-	// Filter: skip literal/constant names (e.g. "float(-1)", "3.14").
+	// Filter: skip literal/constant names (GLSL constructors, booleans).
 	auto isLiteral = [](const std::string &name) {
-		return name.empty() || name.find('(') != std::string::npos;
+		if (name.empty()) return true;
+		// GLSL type constructors: float(...), vec2(...), etc.
+		if (name.find('(') != std::string::npos) return true;
+		// Boolean literals
+		if (name == "true" || name == "false") return true;
+		return false;
 	};
 
 	// Iterate reverse until the active set stabilizes.
@@ -434,6 +443,17 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 		const auto &lossVar = *tape.LossVar();
 		std::string adjLoss = _adjTable.GetOrCreate(lossVar.name, lossVar.glslType);
 		EmitLine(std::format("{} = {}(1.0);", adjLoss, lossVar.glslType));
+	}
+
+	// Step 2.5: Build call index map for O(1) sub-tape lookup
+	_callIndexMap.clear();
+	{
+		int callIdx = 0;
+		for (int32_t i = 0; i < static_cast<int32_t>(tape.Size()); i++) {
+			if (tape[i].kind == TapeOpKind::Call) {
+				_callIndexMap[tape[i].id] = callIdx++;
+			}
+		}
 	}
 
 	// Step 3: Walk tape in reverse, generating adjoint statements
@@ -586,6 +606,24 @@ void AdjointGenerator::ProcessCompoundAssign(const TapeEntry &entry) {
 	case GPU::IR::Node::CompoundAssignmentCode::SubAssign:
 		EmitLine(std::format("{} += -({});", adjRhs, dLhs));
 		break;
+	case GPU::IR::Node::CompoundAssignmentCode::MulAssign: {
+		// Backprop through a *= b:
+		//   d_b += d_a_new * a_old = d_a * a / b
+		//   adj_a *= b  (transform d_a_new -> d_a_old)
+		EmitLine(std::format("{} += {} * {} / {};", adjRhs, dLhs,
+						 entry.output.name, rhs.name));
+		EmitLine(std::format("{} *= {};", dLhs, rhs.name));
+		break;
+	}
+	case GPU::IR::Node::CompoundAssignmentCode::DivAssign: {
+		// Backprop through a /= b:
+		//   d_b += d_a_new * (-a_old / b^2) = -d_a * a / b
+		//   adj_a /= b  (transform d_a_new -> d_a_old)
+		EmitLine(std::format("{} += -({} * {} / {});", adjRhs, dLhs,
+						 entry.output.name, rhs.name));
+		EmitLine(std::format("{} /= {};", dLhs, rhs.name));
+		break;
+	}
 	default:
 		break;
 	}
@@ -711,6 +749,12 @@ std::string AdjointGenerator::ZeroOf(const std::string &glslType) {
 	if (glslType == "mat2") return "mat2(0.0)";
 	if (glslType == "mat3") return "mat3(0.0)";
 	if (glslType == "mat4") return "mat4(0.0)";
+	if (glslType == "mat2x3") return "mat2x3(0.0)";
+	if (glslType == "mat2x4") return "mat2x4(0.0)";
+	if (glslType == "mat3x2") return "mat3x2(0.0)";
+	if (glslType == "mat3x4") return "mat3x4(0.0)";
+	if (glslType == "mat4x2") return "mat4x2(0.0)";
+	if (glslType == "mat4x3") return "mat4x3(0.0)";
 	return "0.0";
 }
 
@@ -725,17 +769,11 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	if (dOut.empty()) return;
 	if (!_tape) return;
 
-	// Find the matching sub-tape by counting Call entries
-	int callIndex = -1;
-	int count = 0;
-	for (int32_t i = 0; i < static_cast<int32_t>(_tape->Size()); i++) {
-		const auto &e = (*_tape)[i];
-		if (e.kind == TapeOpKind::Call) {
-			if (e.id == entry.id) { callIndex = count; break; }
-			count++;
-		}
-	}
-	if (callIndex < 0 || callIndex >= static_cast<int>(_tape->SubTapeCount())) return;
+	// O(1) sub-tape lookup via pre-built index map
+	auto mapIt = _callIndexMap.find(entry.id);
+	if (mapIt == _callIndexMap.end()) return;
+	int callIndex = mapIt->second;
+	if (callIndex >= static_cast<int>(_tape->SubTapeCount())) return;
 
 	const auto &subTape = _tape->SubTape(callIndex);
 	if (subTape.Size() == 0) return;
