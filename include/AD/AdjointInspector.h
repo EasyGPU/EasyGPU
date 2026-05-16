@@ -98,16 +98,18 @@ public:
 
 private:
 	/** Map C++ types to GLSL type strings. */
-	template <typename T> static std::string TypeName();
-	template <> static std::string TypeName<float>() { return "float"; }
-	template <> static std::string TypeName<int>() { return "int"; }
-	template <> static std::string TypeName<bool>() { return "bool"; }
-	template <> static std::string TypeName<Math::Vec2>() { return "vec2"; }
-	template <> static std::string TypeName<Math::Vec3>() { return "vec3"; }
-	template <> static std::string TypeName<Math::Vec4>() { return "vec4"; }
-	template <> static std::string TypeName<Math::IVec2>() { return "ivec2"; }
-	template <> static std::string TypeName<Math::IVec3>() { return "ivec3"; }
-	template <> static std::string TypeName<Math::IVec4>() { return "ivec4"; }
+	template <typename T> static std::string TypeName() {
+		if constexpr (std::is_same_v<T, float>) return "float";
+		else if constexpr (std::is_same_v<T, int>) return "int";
+		else if constexpr (std::is_same_v<T, bool>) return "bool";
+		else if constexpr (std::is_same_v<T, Math::Vec2>) return "vec2";
+		else if constexpr (std::is_same_v<T, Math::Vec3>) return "vec3";
+		else if constexpr (std::is_same_v<T, Math::Vec4>) return "vec4";
+		else if constexpr (std::is_same_v<T, Math::IVec2>) return "ivec2";
+		else if constexpr (std::is_same_v<T, Math::IVec3>) return "ivec3";
+		else if constexpr (std::is_same_v<T, Math::IVec4>) return "ivec4";
+		else return "float";
+	}
 
 	GradientTape &_tape;
 };

@@ -172,15 +172,6 @@ using InspectorKernel3D = Kernel::InspectorKernel3D;
 /// Alias for ADKernel1D (GPU training with autograd)
 using ADKernel1D = AD::ADKernel1D;
 
-/// Alias for AdjointInspector1D (offline gradient code inspection)
-using AdjointInspector1D = AD::AdjointInspector1D;
-
-/// Alias for AdjointInspector2D
-using AdjointInspector2D = AD::AdjointInspector2D;
-
-/// Alias for AdjointInspector3D
-using AdjointInspector3D = AD::AdjointInspector3D;
-
 #ifdef _WIN32
 using FragmentKernel2D = Kernel::FragmentKernel2D;
 #endif
