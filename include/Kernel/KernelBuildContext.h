@@ -398,6 +398,7 @@ public:
 	 */
 	std::string				 GenerateCallableBodies() override;
 
+
 public:
 	int WorkSizeX; /**< @brief Local work group size in the X dimension. */
 	int WorkSizeY; /**< @brief Local work group size in the Y dimension. */

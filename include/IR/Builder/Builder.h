@@ -38,6 +38,10 @@ class SharedMemoryNode;
 class AtomicOpNode;
 } // namespace GPU::IR::Node
 
+namespace GPU::AD {
+class GradientTape;
+} // namespace GPU::AD
+
 namespace GPU::IR::Builder {
 /**
  * The builder for the DSL, mainly takes charge of the node translating.
@@ -84,6 +88,29 @@ public:
 	 * @param IsStatement Whether this node is a statement or a expression
 	 */
 	void Build(const Node::Node &Node, bool IsStatement);
+
+	/**
+	 * Set the gradient tape for automatic differentiation recording.
+	 * When set, every Build() call also records the operation to the tape.
+	 * @param tape Pointer to the gradient tape, or nullptr to disable recording
+	 */
+	void SetGradientTape(GPU::AD::GradientTape *tape) { _gradientTape = tape; }
+
+	/**
+	 * Get the currently active gradient tape, or nullptr if none.
+	 */
+	GPU::AD::GradientTape *GetGradientTape() const { return _gradientTape; }
+
+	/**
+	 * Set whether the builder is currently generating a callable function body.
+	 * Called by KernelBuildContext::PushCallableBody / PopCallableBody.
+	 */
+	void SetInCallableBody(bool inBody) {
+		_inCallableBody = inBody;
+	}
+
+	/** Check if currently generating a callable function body. */
+	bool IsInCallableBody() const { return _inCallableBody; }
 
 public:
 	/**
@@ -248,6 +275,8 @@ private:
 private:
 	BuilderContext				*_context = nullptr;
 	std::stack<BuilderContext *> _contextStack; // Stack for nested kernel definitions
+	GPU::AD::GradientTape	   *_gradientTape = nullptr;
+		bool						_inCallableBody = false;
 };
 } // namespace GPU::IR::Builder
 

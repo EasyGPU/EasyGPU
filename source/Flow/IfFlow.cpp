@@ -5,6 +5,9 @@
 
 #include <Flow/IfFlow.h>
 
+#include <AD/GradientTape.h>
+#include <IR/Builder/Builder.h>
+
 #include <format>
 #include <stdexcept>
 
@@ -65,6 +68,16 @@ IfChain::IfChain(std::unique_ptr<IR::Node::Node> condition, std::vector<std::str
 }
 
 IfChain &IfChain::Elif(IR::Value::Expr<bool> &&condition, const std::function<void()> &body) {
+	auto &builder = IR::Builder::Builder::Get();
+
+	// Record elif branch marker on the gradient tape
+	if (auto *tape = builder.GetGradientTape()) {
+		builder.SetGradientTape(nullptr);
+		std::string condStr = builder.BuildNode(*condition.Node());
+		builder.SetGradientTape(tape);
+		tape->BeginElifBranch(condStr);
+	}
+
 	// Collect code for this elif branch
 	CodeCollectContext collectContext;
 	{
@@ -79,6 +92,13 @@ IfChain &IfChain::Elif(IR::Value::Expr<bool> &&condition, const std::function<vo
 }
 
 void IfChain::Else(const std::function<void()> &body) {
+	auto &builder = IR::Builder::Builder::Get();
+
+	// Record else branch marker on the gradient tape
+	if (auto *tape = builder.GetGradientTape()) {
+		tape->BeginElseBranch();
+	}
+
 	// Collect code for else branch
 	CodeCollectContext collectContext;
 	{
@@ -88,6 +108,10 @@ void IfChain::Else(const std::function<void()> &body) {
 
 	_elseCode = collectContext.ReleaseCollectedCode();
 
+	if (auto *tape = builder.GetGradientTape()) {
+		tape->EndIfChain();
+	}
+
 	// Finalize - emit the complete if statement
 	EmitIfStatement();
 }
@@ -95,6 +119,9 @@ void IfChain::Else(const std::function<void()> &body) {
 IfChain::~IfChain() {
 	// Only emit if we haven't already (i.e., no Else was called)
 	if (!_emitted && _originalContext) {
+		if (auto *tape = IR::Builder::Builder::Get().GetGradientTape()) {
+			tape->EndIfChain();
+		}
 		EmitIfStatement();
 	}
 }
@@ -180,6 +207,16 @@ IfChain If(IR::Value::Expr<bool> condition, const std::function<void()> &body) {
 	auto *originalContext = IR::Builder::Builder::Get().Context();
 	if (!originalContext) {
 		throw std::runtime_error("If() called outside of Kernel definition");
+	}
+
+	auto &builder = IR::Builder::Builder::Get();
+
+	// Record if branch marker on the gradient tape
+	if (auto *tape = builder.GetGradientTape()) {
+		builder.SetGradientTape(nullptr);
+		std::string condStr = builder.BuildNode(*condition.Node());
+		builder.SetGradientTape(tape);
+		tape->BeginIfBranch(condStr);
 	}
 
 	// Collect code for if branch

@@ -1,0 +1,585 @@
+#pragma once
+
+/**
+ * @file ADKernel.h
+ * @brief Clean, GPU-executable automatic differentiation kernel API.
+ *
+ * Usage:
+ *   ADKernel1D kernel([](Var<int>& id) {
+ *       auto W = buf_W[id];        // parameter buffer
+ *       auto x = buf_x[id];
+ *       auto y = W * x;
+ *       auto loss = y * y;
+ *       int iW = AD::Param(W);     // mark parameter, get index
+ *       AD::Loss(loss);            // mark scalar loss
+ *   }, N);
+ *   kernel.Forward(groups);        // run forward pass on GPU
+ *   kernel.Backward(groups);       // run forward+backward, write gradients
+ *   auto grad_W = kernel.Gradient(iW);  // download gradients
+ *
+ * Gradient buffer sharing:
+ *   Multiple parameters from the same source buffer (e.g. buf_W[0], buf_W[1])
+ *   share a single gradient SSBO with an interleaved layout to stay within
+ *   GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS (minimum 8 in OpenGL 4.3).
+ */
+
+#ifndef EASYGPU_AD_ADKERNEL_H
+#define EASYGPU_AD_ADKERNEL_H
+
+#include <AD/AdjointGenerator.h>
+#include <AD/GradientTape.h>
+
+#include <Backend/Backend.h>
+#include <IR/Builder/Builder.h>
+#include <IR/Value/Var.h>
+#include <Kernel/Kernel.h>
+#include <Runtime/Context.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <format>
+#include <functional>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+// Windows SDK defines MemoryBarrier as a macro — undefine to use the method name
+#ifdef MemoryBarrier
+#undef MemoryBarrier
+#endif
+
+namespace GPU::AD {
+
+// =============================================================================
+// GLSLTypeName — C++ type → GLSL type string
+// =============================================================================
+
+template <typename T> inline std::string GLSLTypeName() {
+	if constexpr (std::is_same_v<T, float>) return "float";
+	else if constexpr (std::is_same_v<T, int>) return "int";
+	else if constexpr (std::is_same_v<T, bool>) return "bool";
+	else if constexpr (std::is_same_v<T, Math::Vec2>) return "vec2";
+	else if constexpr (std::is_same_v<T, Math::Vec3>) return "vec3";
+	else if constexpr (std::is_same_v<T, Math::Vec4>) return "vec4";
+	else if constexpr (std::is_same_v<T, Math::IVec2>) return "ivec2";
+	else if constexpr (std::is_same_v<T, Math::IVec3>) return "ivec3";
+	else if constexpr (std::is_same_v<T, Math::IVec4>) return "ivec4";
+	else return "float";
+}
+
+// =============================================================================
+// Free functions: Param / Loss
+// =============================================================================
+
+/**
+ * Mark a Var<T> as a trainable parameter.
+ * Returns the parameter index for later gradient retrieval.
+ * Must be called inside a kernel lambda during ADKernel construction.
+ */
+template <typename T>
+inline int Param(const IR::Value::Var<T> &var) {
+	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
+	if (tape) {
+		int idx = static_cast<int>(tape->ParameterCount());
+		tape->RegisterParameter(var.VarName(), GLSLTypeName<T>());
+		return idx;
+	}
+	return -1;
+}
+
+/**
+ * Mark a Var<T> as the scalar loss.
+ * The loss receives a seed adjoint of 1.0 at the start of the backward pass.
+ */
+template <typename T>
+inline void Loss(const IR::Value::Var<T> &var) {
+	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
+	if (tape) {
+		tape->MarkLoss(var.VarName(), GLSLTypeName<T>());
+	}
+}
+
+// =============================================================================
+// GradBufGroup — describes a single gradient SSBO that may hold multiple params
+// =============================================================================
+
+struct GradBufGroup {
+	std::string baseName;  // sanitized base buffer name (e.g. "buf2")
+	int binding = 0;
+	int stride  = 1;       // number of interleaved params in this buffer
+};
+
+// =============================================================================
+// MergeForwardBackward — assemble combined forward+backward GLSL
+// =============================================================================
+
+/**
+ * Insert adjoint declarations, body, and gradient writebacks into the forward
+ * shader's main() function.  The forward intermediate values stay in scope,
+ * so no separate storage/reload is needed.
+ *
+ * Gradient buffers use an interleaved layout: for a group with stride S,
+ * thread i writes its S parameter gradients at positions [i*S .. i*S+S-1].
+ */
+inline std::string MergeForwardBackward(const std::string &forwardCode,
+										 const AdjointBody &body,
+										 int workSizeX, int workSizeY, int workSizeZ,
+										 const std::vector<GradBufGroup> &gradBufGroups) {
+	auto mainPos = forwardCode.find("void main()");
+	if (mainPos == std::string::npos)
+		throw std::runtime_error("MergeForwardBackward: 'void main()' not found");
+
+	auto bracePos = forwardCode.find('{', mainPos);
+	if (bracePos == std::string::npos)
+		throw std::runtime_error("MergeForwardBackward: main() body opening brace not found");
+
+	// Extract base name and constant index from "buf2[0]" → {"buf2", 0}
+	auto parseBufAccess = [](const std::string &name) -> std::pair<std::string, int> {
+		auto bpos = name.find('[');
+		if (bpos == std::string::npos) return {name, -1};
+		auto cpos = name.find(']', bpos);
+		std::string base = name.substr(0, bpos);
+		if (cpos != std::string::npos && cpos > bpos + 1) {
+			std::string idx = name.substr(bpos + 1, cpos - bpos - 1);
+			if (idx.find('(') == std::string::npos && idx.find('v') == std::string::npos) {
+				try { return {base, std::stoi(idx)}; } catch (...) { return {base, -1}; }
+			}
+		}
+		return {base, -1};
+	};
+
+	// Build base-name → {binding, stride} lookup
+	std::unordered_map<std::string, std::pair<int,int>> groupMap;
+	for (const auto &g : gradBufGroups) {
+		groupMap[g.baseName] = {g.binding, g.stride};
+	}
+
+	// Gradient buffer declarations (one per group, not per param)
+	std::string gradBufDecls;
+	for (const auto &g : gradBufGroups) {
+		gradBufDecls += std::format(
+			"layout(std430, binding = {}) buffer _ad_gradbuf_{} {{ float _ad_grad_{}_data[]; }};\n",
+			g.binding, g.baseName, g.baseName);
+	}
+
+	// Adjoint variable declarations
+	std::string adjDecls;
+	for (const auto &[adjName, glslType] : body.declarations) {
+		adjDecls += std::format("    {} {} = {}(0);\n", glslType, adjName, glslType);
+	}
+
+	// Adjoint body lines
+	std::string adjBody;
+	for (const auto &line : body.lines) {
+		adjBody += std::format("    {}\n", line);
+	}
+
+	// Gradient writebacks with interleaved layout
+	bool is1D = (workSizeY == 1 && workSizeZ == 1);
+	std::string writebacks;
+	for (const auto &[paramName, adjName] : body.writebacks) {
+		auto [baseName, index] = parseBufAccess(paramName);
+		auto it = groupMap.find(baseName);
+		if (it == groupMap.end()) continue;
+		int stride = it->second.second;
+		int offset = (index >= 0) ? index : 0;
+		if (is1D) {
+			writebacks += std::format(
+				"    _ad_grad_{}_data[gl_GlobalInvocationID.x * {} + {}] = {};\n",
+				baseName, stride, offset, adjName);
+		} else {
+			writebacks += std::format(
+				"    _ad_grad_{}_data[(gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x + gl_GlobalInvocationID.x) * {} + {}] = {};\n",
+				baseName, stride, offset, adjName);
+		}
+	}
+
+	// Find the closing brace of main() (last '}' in the code)
+	auto closePos = forwardCode.rfind('}');
+	if (closePos == std::string::npos || closePos <= bracePos)
+		throw std::runtime_error("MergeForwardBackward: main() closing brace not found");
+
+	std::string result;
+	result.reserve(forwardCode.size() + gradBufDecls.size() + adjDecls.size() +
+				   adjBody.size() + writebacks.size() + 200);
+
+	result += forwardCode.substr(0, mainPos);
+	result += gradBufDecls;
+	if (!gradBufDecls.empty()) result += "\n";
+	result += forwardCode.substr(mainPos, bracePos - mainPos + 1);
+	result += "\n";
+	result += adjDecls;
+	result += forwardCode.substr(bracePos + 1, closePos - bracePos - 1);
+
+	if (!adjBody.empty()) {
+		result += "\n    // === Backward pass (auto-generated) ===\n";
+		result += adjBody;
+	}
+	if (!writebacks.empty()) {
+		result += "\n    // --- Gradient writebacks ---\n";
+		result += writebacks;
+	}
+	result += forwardCode.substr(closePos);
+	return result;
+}
+
+// =============================================================================
+// ADKernel1D — 1D GPU-executable AD kernel
+// =============================================================================
+
+/**
+ * A 1D GPU kernel with automatic differentiation.
+ *
+ * Builds a Kernel1D during construction while recording the gradient tape,
+ * then generates a combined forward+backward GLSL shader.  Forward() dispatches
+ * the user's computation.  Backward() dispatches the combined shader which
+ * computes both the loss and its gradients in a single pass.
+ *
+ * Parameters from the same source buffer share a single interleaved gradient
+ * SSBO to minimise the number of shader storage blocks used.
+ */
+class ADKernel1D {
+public:
+	/**
+	 * Construct the AD kernel.
+	 *
+	 * @param func         The computation lambda: void(Var<int>& id)
+	 * @param elementCount Total number of GPU threads (determines gradient buffer size)
+	 * @param groupSize    Work group size (default 256)
+	 */
+	template <typename Func>
+	ADKernel1D(Func &&func, size_t elementCount, int groupSize = 256)
+		: _elementCount(elementCount), _workSizeX(groupSize) {
+
+		// Phase 1: Build forward kernel while recording gradient tape
+		IR::Builder::Builder::Get().SetGradientTape(&_tape);
+
+		_forwardKernel = std::make_unique<Kernel::Kernel1D>(
+			std::forward<Func>(func), groupSize);
+
+		// Keep tape active during GetCode() so callable body operations
+		// are recorded to sub-tapes via the sub-tape stack.
+		_forwardCode = _forwardKernel->GetCode();
+
+		IR::Builder::Builder::Get().SetGradientTape(nullptr);
+
+		// Phase 2: Record parameter → buffer mapping, group by source buffer
+		for (const auto &[paramName, paramType] : _tape.Parameters()) {
+			ParamMeta pm;
+			pm.varName  = paramName;
+			pm.glslType = paramType;
+			pm.count    = elementCount;
+			pm.gradHandle = Backend::INVALID_BUFFER_HANDLE;
+			_params.push_back(pm);
+		}
+
+		// Group params by source buffer base name, assign shared bindings
+		{
+			std::unordered_map<std::string, std::vector<int>> groups; // baseName → param indices
+			for (int i = 0; i < (int)_params.size(); i++) {
+				std::string base = ExtractBaseName(_params[i].varName);
+				groups[base].push_back(i);
+			}
+
+			for (auto &[baseName, indices] : groups) {
+				int binding = _nextGradBinding++;
+				int stride  = (int)indices.size();
+				for (int offset = 0; offset < stride; offset++) {
+					int pi = indices[offset];
+					_params[pi].gradBinding = binding;
+					_params[pi].gradOffset  = offset;
+					_params[pi].gradStride  = stride;
+				}
+			}
+		}
+
+		// Phase 3: Generate adjoint body
+		AdjointGenerator gen;
+		_body = gen.GenerateBody(_tape, true);
+
+		// Phase 4: Build grouped gradient buffer list for merge
+		std::vector<GradBufGroup> gradBufGroups;
+		{
+			std::unordered_set<int> seenBindings;
+			for (const auto &pm : _params) {
+				if (seenBindings.insert(pm.gradBinding).second) {
+					GradBufGroup gb;
+					gb.baseName = ExtractBaseName(pm.varName);
+					gb.binding  = pm.gradBinding;
+					gb.stride   = pm.gradStride;
+					gradBufGroups.push_back(gb);
+				}
+			}
+		}
+
+		// Phase 5: Merge forward + backward into combined GLSL
+		if (!_body.lines.empty() || !_body.declarations.empty()) {
+			_combinedCode = MergeForwardBackward(_forwardCode, _body,
+												 groupSize, 1, 1, gradBufGroups);
+		}
+	}
+
+	~ADKernel1D() {
+		ReleaseGradientBuffers();
+	}
+
+	// ---- Execution -------------------------------------------------------
+
+	/** Dispatch forward pass (just the user's computation). */
+	void Forward(int groupCount, bool sync = false) {
+		_forwardKernel->Dispatch(groupCount, sync);
+	}
+
+	/**
+	 * Dispatch the combined forward+backward pass.
+	 * Computes loss and writes gradients to internal gradient buffers.
+	 */
+	void Backward(int groupCount, bool sync = false) {
+		if (_combinedCode.empty()) return;
+		EnsureGradientBuffers();
+		ExecuteCombinedDispatch(groupCount, sync);
+	}
+
+	/**
+	 * Download the gradient for a parameter by index.
+	 * Returns a vector of floats with elementCount entries.
+	 * For grouped buffers, extracts the correct interleaved slice.
+	 */
+	std::vector<float> Gradient(int paramIndex) const {
+		if (paramIndex < 0 || paramIndex >= (int)_params.size()) return {};
+		const auto &pm = _params[paramIndex];
+		if (pm.gradHandle == Backend::INVALID_BUFFER_HANDLE) return {};
+
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend) return {};
+
+		if (pm.gradStride == 1) {
+			// Fast path: param has its own buffer
+			std::vector<float> data(pm.count);
+			backend->DownloadBuffer(pm.gradHandle, 0, pm.count * sizeof(float), data.data());
+			return data;
+		}
+
+		// Shared buffer: download full group, extract interleaved slice
+		size_t totalFloats = pm.count * pm.gradStride;
+		std::vector<float> full(totalFloats);
+		backend->DownloadBuffer(pm.gradHandle, 0, totalFloats * sizeof(float), full.data());
+
+		std::vector<float> data(pm.count);
+		for (size_t i = 0; i < pm.count; i++) {
+			data[i] = full[i * pm.gradStride + pm.gradOffset];
+		}
+		return data;
+	}
+
+	/**
+	 * Download the gradient for a parameter by variable name.
+	 */
+	std::vector<float> Gradient(const std::string &paramVarName) const {
+		for (int i = 0; i < (int)_params.size(); ++i) {
+			if (_params[i].varName == paramVarName)
+				return Gradient(i);
+		}
+		return {};
+	}
+
+	// ---- Debugging -------------------------------------------------------
+
+	std::string ForwardCode() const { return _forwardCode; }
+	std::string CombinedCode() const { return _combinedCode; }
+	const GradientTape &Tape() const { return _tape; }
+	size_t ParameterCount() const { return _params.size(); }
+	const auto &Params() const { return _params; }
+
+private:
+	struct ParamMeta {
+		std::string varName;
+		std::string glslType;
+		size_t      count = 0;
+		int         gradBinding = 0;
+		int         gradOffset  = 0;   // offset within the interleaved group
+		int         gradStride  = 1;   // number of params in the group
+		Backend::BufferHandle gradHandle = 0;
+	};
+
+	/** Extract the base buffer name from a var name like "buf2[0]" → "buf2". */
+	static std::string ExtractBaseName(const std::string &varName) {
+		auto bpos = varName.find('[');
+		if (bpos == std::string::npos) return varName;
+		return varName.substr(0, bpos);
+	}
+
+	void EnsureGradientBuffers() {
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend) return;
+
+		// Track which bindings already have a buffer
+		std::unordered_set<int> created;
+		for (auto &pm : _params) {
+			if (pm.gradHandle != Backend::INVALID_BUFFER_HANDLE) continue;
+			if (!created.insert(pm.gradBinding).second) {
+				// Buffer already exists for this group — reuse handle
+				for (const auto &other : _params) {
+					if (other.gradBinding == pm.gradBinding &&
+						other.gradHandle != Backend::INVALID_BUFFER_HANDLE) {
+						pm.gradHandle = other.gradHandle;
+						break;
+					}
+				}
+				continue;
+			}
+
+			Backend::BufferDesc desc;
+			desc.sizeInBytes = pm.count * pm.gradStride * sizeof(float);
+			desc.mode  = Backend::BufferMode::ReadWrite;
+			desc.initialData  = nullptr;
+
+			Backend::BufferHandle handle = backend->CreateBuffer(desc);
+			// Assign handle to all params in this group
+			for (auto &pm2 : _params) {
+				if (pm2.gradBinding == pm.gradBinding) {
+					pm2.gradHandle = handle;
+				}
+			}
+		}
+	}
+
+	void ReleaseGradientBuffers() {
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend) return;
+		std::unordered_set<Backend::BufferHandle> released;
+		for (auto &pm : _params) {
+			if (pm.gradHandle != Backend::INVALID_BUFFER_HANDLE &&
+				released.insert(pm.gradHandle).second) {
+				backend->DestroyBuffer(pm.gradHandle);
+				pm.gradHandle = Backend::INVALID_BUFFER_HANDLE;
+			}
+		}
+		// Clear all handles (others in same group still have the stale value)
+		for (auto &pm : _params) {
+			pm.gradHandle = Backend::INVALID_BUFFER_HANDLE;
+		}
+	}
+
+	void ExecuteCombinedDispatch(int groupCount, bool sync) {
+		Runtime::AutoInitContext();
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend) throw std::runtime_error("Backend not available");
+
+		// Compile combined pipeline (cached)
+		if (_combinedPipeline == Backend::INVALID_PIPELINE_HANDLE) {
+			_combinedPipeline = CompileCombinedPipeline(backend);
+		}
+
+		backend->BindPipeline(_combinedPipeline);
+
+		// Collect all buffer bindings: forward buffers + gradient buffers
+		std::vector<Backend::ResourceBinding> bindings;
+
+		// Forward buffer bindings (from the original kernel context)
+		const auto &runtimeBufs = _forwardKernel->GetContext().GetRuntimeBufferBindings();
+		for (const auto &[binding, handle] : runtimeBufs) {
+			Backend::ResourceBinding rb;
+			rb.binding = binding;
+			rb.type    = Backend::BindingType::Buffer;
+			rb.buffer  = static_cast<Backend::BufferHandle>(handle);
+			bindings.push_back(rb);
+		}
+
+		// Gradient buffer bindings (deduplicated by binding)
+		std::unordered_set<int> bound;
+		for (const auto &pm : _params) {
+			if (pm.gradHandle != Backend::INVALID_BUFFER_HANDLE &&
+				bound.insert(pm.gradBinding).second) {
+				Backend::ResourceBinding rb;
+				rb.binding = static_cast<uint32_t>(pm.gradBinding);
+				rb.type    = Backend::BindingType::Buffer;
+				rb.buffer  = pm.gradHandle;
+				bindings.push_back(rb);
+			}
+		}
+
+		if (!bindings.empty()) {
+			backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
+		}
+
+		backend->Dispatch(groupCount, 1, 1);
+
+		if (sync) {
+			backend->MemoryBarrier(Backend::BarrierType::All);
+		}
+	}
+
+	Backend::PipelineHandle CompileCombinedPipeline(Backend::Backend *backend) {
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type       = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode = _combinedCode;
+		shaderDesc.entryPoint = "main";
+
+		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+		if (shader == Backend::INVALID_SHADER_HANDLE)
+			throw std::runtime_error("ADKernel1D: failed to compile combined shader");
+
+		Backend::PipelineDesc pipeDesc;
+		pipeDesc.computeShader    = shader;
+		pipeDesc.workGroupSizeX   = static_cast<uint32_t>(_workSizeX);
+		pipeDesc.workGroupSizeY   = 1;
+		pipeDesc.workGroupSizeZ   = 1;
+		pipeDesc.pushConstantSize = 0;
+
+		// Forward buffer bindings from the original kernel context
+		const auto &bufInfos = _forwardKernel->GetContext().GetBufferInfos();
+		for (const auto &bi : bufInfos) {
+			Backend::ResourceLayoutEntry entry;
+			entry.binding  = bi.binding;
+			entry.type     = Backend::BindingType::Buffer;
+			entry.readOnly = (bi.mode == Backend::BUFFER_MODE_READ_ONLY);
+			pipeDesc.resources.push_back(entry);
+		}
+
+		// Gradient buffer bindings (deduplicated by binding)
+		std::unordered_set<int> added;
+		for (const auto &pm : _params) {
+			if (added.insert(pm.gradBinding).second) {
+				Backend::ResourceLayoutEntry entry;
+				entry.binding  = static_cast<uint32_t>(pm.gradBinding);
+				entry.type     = Backend::BindingType::Buffer;
+				entry.readOnly = false;
+				pipeDesc.resources.push_back(entry);
+			}
+		}
+
+		Backend::PipelineHandle pipeline = backend->CreatePipeline(pipeDesc);
+		backend->DestroyShader(shader);
+
+		if (pipeline == Backend::INVALID_PIPELINE_HANDLE)
+			throw std::runtime_error("ADKernel1D: failed to create combined pipeline");
+
+		return pipeline;
+	}
+
+	// ---- Data members ----------------------------------------------------
+	size_t _elementCount;
+	int    _workSizeX;
+
+	std::unique_ptr<Kernel::Kernel1D> _forwardKernel;
+	std::string _forwardCode;
+	std::string _combinedCode;
+
+	GradientTape _tape;
+	AdjointBody  _body;
+
+	std::vector<ParamMeta> _params;
+	int _nextGradBinding = 10;
+
+	Backend::PipelineHandle _combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+};
+
+} // namespace GPU::AD
+
+#endif // EASYGPU_AD_ADKERNEL_H

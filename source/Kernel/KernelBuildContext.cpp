@@ -6,6 +6,7 @@
 #include <Kernel/KernelBuildContext.h>
 #include <Kernel/ShaderCache.h>
 
+#include <AD/GradientTape.h>
 #include <IR/Builder/Builder.h>
 #include <Runtime/BufferSlot.h>
 #include <Runtime/Context.h>
@@ -93,15 +94,17 @@ std::string KernelBuildContext::GetCompleteCode() {
 		std::string				savedCallableBody	= std::move(_currentCallableBody);
 		bool					savedInCallableBody = _inCallableBody;
 		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
+			auto				  &builder				= IR::Builder::Builder::Get();
+			bool					savedBuilderCallable = builder.IsInCallableBody();
 
 		// Clear state for pre-execution
 		_currentCallableBody.clear();
 		_inCallableBody = false;
+			builder.SetInCallableBody(false);
 		while (!_callableBodyStack.empty()) {
 			_callableBodyStack.pop();
 		}
 
-		auto &builder	  = IR::Builder::Builder::Get();
 		auto *prevContext = builder.Context();
 		builder.Bind(*this);
 
@@ -126,6 +129,7 @@ std::string KernelBuildContext::GetCompleteCode() {
 		_currentCallableBody = std::move(savedCallableBody);
 		_inCallableBody		 = savedInCallableBody;
 		_callableBodyStack	 = std::move(savedBodyStack);
+		builder.SetInCallableBody(savedBuilderCallable);
 	}
 
 	// ===================================================================
@@ -356,17 +360,34 @@ void KernelBuildContext::PushCallableBody() {
 	_callableBodyStack.push(_currentCallableBody);
 	_currentCallableBody.clear();
 	_inCallableBody = true;
+	IR::Builder::Builder::Get().SetInCallableBody(true);
+	// If gradient tape is active, push a sub-tape for callable body recording
+	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
+	if (tape) {
+		tape->PushSubTape();
+	}
 }
 
 void KernelBuildContext::PopCallableBody() {
 	_callableBodies.push_back(std::move(_currentCallableBody));
 	_currentCallableBody.clear();
 	_inCallableBody = false;
+	IR::Builder::Builder::Get().SetInCallableBody(false);
+	// Pop the sub-tape that was pushed in PushCallableBody
+	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
+	if (tape) {
+		tape->PopSubTape();
+	}
 
 	if (!_callableBodyStack.empty()) {
 		_currentCallableBody = _callableBodyStack.top();
 		_callableBodyStack.pop();
 		_inCallableBody = true;
+		IR::Builder::Builder::Get().SetInCallableBody(true);
+		// Push new sub-tape for the restored callable body
+		if (tape) {
+			tape->PushSubTape();
+		}
 	}
 }
 

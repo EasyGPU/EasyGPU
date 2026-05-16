@@ -461,7 +461,8 @@ Now that you have the basics:
 1. **[Tutorial](tutorial.md)** - Complete walkthrough with more examples
 2. **[API Reference](api-reference.md)** - Full API documentation
 3. **[Patterns](patterns.md)** - Common solutions and techniques
-4. **[FAQ](faq.md)** - Troubleshooting and common questions
+4. **[Automatic Differentiation](autodiff.md)** - Compute gradients of GPU kernels
+5. **[FAQ](faq.md)** - Troubleshooting and common questions
 
 ## Quick Reference Card
 

@@ -312,6 +312,14 @@ public:
 		return _varNode && _varNode->IsExternal();
 	}
 
+	/**
+	 * Get the GLSL variable name of this variable.
+	 * Returns the name assigned by the Builder context (e.g., "v0", "v1").
+	 */
+	[[nodiscard]] std::string VarName() const {
+		return _varNode ? _varNode->VarName() : "";
+	}
+
 public:
 	// VarBase op VarBase -> Expr<Type>
 	template <ScalarType T> friend Expr<T> operator+(const VarBase<T> &lhs, const VarBase<T> &rhs);

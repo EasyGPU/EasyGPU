@@ -39,6 +39,7 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 - [Vector Types](#vector-types)
 - [Matrix Types](#matrix-types)
 - [Callable](#callable)
+- [Automatic Differentiation](#automatic-differentiation)
 - [Structs](#structs)
 - [Textures](#textures)
 - [Texture Samplers](#texture-samplers)
@@ -1824,6 +1825,497 @@ ExprBase::NotUse(B(MakeFloat(5.0f), result));  // Explicitly preserve side-effec
 
 ---
 
+## Automatic Differentiation
+
+Reverse-mode automatic differentiation. Records operations during the forward pass and generates adjoint (gradient) GLSL code. See [Automatic Differentiation](autodiff.md) for the full guide.
+
+### Class Overview
+
+| Class | GPU Required | Purpose |
+|:------|:-------------|:--------|
+| `AdjointInspector1D/2D/3D` | No | Inspect forward + backward GLSL, debug gradients |
+| `AdjointKernel1D/2D/3D` | Yes | Combined forward+backward shader, single dispatch |
+| `ADKernel1D` | Yes | Separate Forward/Backward calls, gradient download |
+
+---
+
+### AdjointInspector1D
+
+Offline inspection and validation. Builds a forward kernel, records the tape, and generates backward GLSL — all without a GPU.
+
+```cpp
+template <typename Func>
+class AdjointInspector1D {
+public:
+    /** @brief Construct the inspector. Func signature: void(Var<int>& id, AdjointContext& ctx) */
+    AdjointInspector1D(Func&& func, int workSizeX = 256);
+
+    /** @brief Get the forward-pass GLSL source. */
+    std::string GetForwardCode() const;
+
+    /** @brief Get the backward-pass GLSL source. */
+    std::string GetBackwardCode() const;
+
+    /** @brief Get a text summary of all tape entries. */
+    std::string GetTapeSummary() const;
+
+    /** @brief Print the tape summary to stdout. */
+    void PrintTape();
+
+    /** @brief Check if backward code was generated. */
+    bool HasBackwardCode() const;
+
+    /** @brief Access the underlying gradient tape. */
+    const GradientTape& Tape() const;
+
+    /** @brief Access the adjoint table (forward var → adjoint var mapping). */
+    const AdjointTable& Adjoints() const;
+};
+```
+
+**Example:**
+
+```cpp
+AD::AdjointInspector1D inspector([](Var<int>& i, auto& ctx) {
+    Var<float> w; w = 2.0f;
+    Var<float> x; x = 3.0f;
+    Var<float> y = w * x;
+    Var<float> loss = y * y;
+
+    ctx.RegisterParameter(w);
+    ctx.MarkLoss(loss);
+});
+
+std::string forward  = inspector.GetForwardCode();
+std::string backward = inspector.GetBackwardCode();
+inspector.PrintTape();  // Debug: see every recorded operation
+```
+
+### AdjointInspector2D
+
+```cpp
+template <typename Func>
+class AdjointInspector2D {
+public:
+    /** @brief Func signature: void(Var<int>& idX, Var<int>& idY, AdjointContext& ctx) */
+    AdjointInspector2D(Func&& func, int workSizeX = 16, int workSizeY = 16);
+
+    std::string GetForwardCode() const;
+    std::string GetBackwardCode() const;
+    std::string GetTapeSummary() const;
+    void        PrintTape();
+    bool        HasBackwardCode() const;
+};
+```
+
+### AdjointInspector3D
+
+```cpp
+template <typename Func>
+class AdjointInspector3D {
+public:
+    /** @brief Func signature: void(Var<int>& idX, Var<int>& idY, Var<int>& idZ, AdjointContext& ctx) */
+    AdjointInspector3D(Func&& func, int workSizeX = 8, int workSizeY = 8, int workSizeZ = 4);
+
+    std::string GetForwardCode() const;
+    std::string GetBackwardCode() const;
+    std::string GetTapeSummary() const;
+    void        PrintTape();
+    bool        HasBackwardCode() const;
+};
+```
+
+---
+
+### AdjointContext
+
+Passed to the kernel lambda. Provides methods to register parameters and mark the loss.
+
+```cpp
+class AdjointContext {
+public:
+    // ── Recommended: pass Var<T> directly, type is deduced ──
+    template <typename T> void RegisterParameter(const Var<T>& var);
+    template <typename T> void MarkLoss(const Var<T>& var);
+
+    // ── String-based overloads (advanced / dynamic-name use) ──
+    void RegisterParameter(const std::string& name, const std::string& glslType);
+    template <typename T> void RegisterParameter(const std::string& name);
+    void MarkLoss(const std::string& name, const std::string& glslType);
+    template <typename T> void MarkLoss(const std::string& name);
+
+    // ── Access underlying tape ──
+    GradientTape& Tape();
+};
+```
+
+| Method | Use |
+|:-------|:----|
+| `ctx.RegisterParameter(var)` | Register `Var<T>` as trainable parameter (recommended) |
+| `ctx.RegisterParameter("v3", "float")` | Register by explicit name + type string |
+| `ctx.MarkLoss(var)` | Mark `Var<T>` as scalar loss (recommended) |
+| `ctx.MarkLoss("v5", "float")` | Mark loss by explicit name + type string |
+
+**Example:**
+
+```cpp
+Var<float> w; w = 2.0f;
+Var<Vec3> v;  v = MakeFloat3(1, 2, 3);
+
+ctx.RegisterParameter(w);    // float parameter
+ctx.RegisterParameter(v);    // vec3 parameter
+ctx.MarkLoss(loss);          // float loss
+```
+
+---
+
+### Free Functions: AD::Param / AD::Loss
+
+Used with `ADKernel1D`. Must be called inside the kernel lambda during construction.
+
+```cpp
+/** @brief Mark a Var<T> as a trainable parameter. Returns the parameter index (0, 1, ...). */
+template <typename T>
+int AD::Param(const Var<T>& var);
+
+/** @brief Mark a Var<T> as the scalar loss. */
+template <typename T>
+void AD::Loss(const Var<T>& var);
+```
+
+**Example:**
+
+```cpp
+AD::ADKernel1D kernel([](Var<int>& i) {
+    auto x = buf_x[i];
+    auto w = buf_w[i];
+    auto b = buf_b[i];
+
+    auto y_pred = w * x + b;
+    auto diff   = y_pred - y_true;
+    auto loss   = diff * diff;
+
+    int iw = AD::Param(w);   // returns 0
+    int ib = AD::Param(b);   // returns 1
+    AD::Loss(loss);
+}, N);
+```
+
+---
+
+### ADKernel1D
+
+GPU-executable training kernel. Wraps a `Kernel1D` and generates a combined forward+backward shader with gradient buffer management.
+
+```cpp
+class ADKernel1D {
+public:
+    /** @brief Construct the AD kernel.
+     *  @param func         The computation lambda: void(Var<int>& id)
+     *  @param elementCount Total number of GPU threads
+     *  @param groupSize    Work group size (default 256)
+     */
+    template <typename Func>
+    ADKernel1D(Func&& func, size_t elementCount, int groupSize = 256);
+
+
+    // ── Execution ──────────────────────────────────────────────
+
+    /** @brief Dispatch forward pass only (user's computation). */
+    void Forward(int groupCount, bool sync = false);
+
+    /** @brief Dispatch combined forward+backward pass. Computes loss and writes gradients. */
+    void Backward(int groupCount, bool sync = false);
+
+
+    // ── Gradient download ─────────────────────────────────────
+
+    /** @brief Download gradient for a parameter by index (matching AD::Param() call order).
+     *  @return std::vector<float> with elementCount entries.
+     */
+    std::vector<float> Gradient(int paramIndex) const;
+
+    /** @brief Download gradient for a parameter by its GLSL variable name. */
+    std::vector<float> Gradient(const std::string& paramVarName) const;
+
+
+    // ── Debugging ─────────────────────────────────────────────
+
+    /** @brief Get the forward-only GLSL source. */
+    std::string ForwardCode() const;
+
+    /** @brief Get the combined forward+backward GLSL source. */
+    std::string CombinedCode() const;
+
+    /** @brief Access the gradient tape. */
+    const GradientTape& Tape() const;
+
+    /** @brief Number of registered parameters. */
+    size_t ParameterCount() const;
+};
+```
+
+**Full training example:**
+
+```cpp
+Buffer<float> buf_x(xData);
+Buffer<float> buf_y(yData);
+Buffer<float> buf_w(N);  // weight parameter
+Buffer<float> buf_b(N);  // bias parameter
+
+AD::ADKernel1D kernel([](Var<int>& i) {
+    auto x      = buf_x[i];
+    auto y_true = buf_y[i];
+    auto w      = buf_w[i];
+    auto b      = buf_b[i];
+
+    auto y_pred = w * x + b;
+    auto loss   = (y_pred - y_true) * (y_pred - y_true);
+
+    AD::Param(w);
+    AD::Param(b);
+    AD::Loss(loss);
+}, N);
+
+// Training loop
+for (int epoch = 0; epoch < 100; epoch++) {
+    kernel.Backward(4, true);           // Forward + backward in one dispatch
+    auto grad_w = kernel.Gradient(0);   // ∂loss/∂w
+    auto grad_b = kernel.Gradient(1);   // ∂loss/∂b
+    // ... SGD update on CPU ...
+}
+```
+
+> ⚠️ **Gradient buffer sharing**: Multiple parameters from the same source buffer (e.g., `buf_W[0]`, `buf_W[1]`) share a single gradient SSBO with an interleaved layout. `Gradient(index)` automatically extracts the correct slice. This keeps shader storage block usage within `GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS`.
+
+---
+
+### AdjointKernel1D / 2D / 3D
+
+GPU-executable combined forward+backward kernels. Similar to `AdjointInspector` but produces a single merged shader for GPU dispatch.
+
+```cpp
+template <typename Func>
+class AdjointKernel1D {
+public:
+    /** @brief Func signature: void(Var<int>& id, AdjointContext& ctx) */
+    AdjointKernel1D(Func&& func, int workSizeX = 256);
+
+    std::string GetForwardCode() const;
+    std::string GetCombinedCode() const;
+    std::string GetBackwardBodyCode() const;
+    const GradientTape& Tape() const;
+    const AdjointBody& Body() const;
+    const std::vector<GradBuffer>& GradBuffers() const;
+    bool HasCombinedCode() const;
+};
+
+template <typename Func>
+class AdjointKernel2D {
+public:
+    AdjointKernel2D(Func&& func, int workSizeX = 16, int workSizeY = 16);
+    // ... same methods as AdjointKernel1D
+};
+
+template <typename Func>
+class AdjointKernel3D {
+public:
+    AdjointKernel3D(Func&& func, int workSizeX = 8, int workSizeY = 8, int workSizeZ = 4);
+    // ... same methods as AdjointKernel1D
+};
+```
+
+---
+
+### GradientTape (Low-Level)
+
+The Wengert list that records every differentiable operation during the forward pass.
+
+```cpp
+class GradientTape {
+public:
+    // ── Recording ──────────────────────────────────────────
+    void Record(const Node& node, bool isStatement);
+    void RecordRemapped(const TapeEntry& entry);
+
+    // ── Parameter & loss management ────────────────────────
+    void RegisterParameter(const std::string& name, const std::string& glslType);
+    bool IsParameter(const std::string& name) const;
+    void MarkLoss(const std::string& name, const std::string& glslType);
+    const std::optional<TapeVar>& LossVar() const;
+
+    // ── Variable queries ───────────────────────────────────
+    bool IsActive(const std::string& name) const;
+    const std::string* GetVarType(const std::string& name) const;
+    size_t ParameterCount() const;
+    const auto& Parameters() const;  // → unordered_map<string, string>
+
+    // ── Control flow markers ───────────────────────────────
+    void BeginIfBranch(const std::string& condExpr);
+    void BeginElifBranch(const std::string& condExpr);
+    void BeginElseBranch();
+    void EndIfChain();
+    void BeginForLoop(const std::string& varName, const std::string& start,
+                      const std::string& end, const std::string& step);
+    void EndForLoop();
+
+    // ── Sub-tape support (Callable body recording) ─────────
+    void PushSubTape();
+    int  PopSubTape();       // returns sub-tape index
+    size_t SubTapeCount() const;
+    const GradientTape& SubTape(int index) const;
+
+    // ── Access ─────────────────────────────────────────────
+    size_t Size() const;
+    const TapeEntry& operator[](int32_t i) const;
+    const auto& Entries() const;  // → vector<TapeEntry>
+    static bool IsActive();       // tape active on the Builder?
+};
+```
+
+---
+
+### AdjointGenerator (Low-Level)
+
+Walks a tape in reverse and generates adjoint GLSL code.
+
+```cpp
+class AdjointGenerator {
+public:
+    /** @brief Generate complete backward-pass GLSL (with #version, layout, main). */
+    std::string Generate(const GradientTape& tape, bool writeBackParams = true);
+
+    /** @brief Generate adjoint body parts for merging into an existing shader. */
+    AdjointBody GenerateBody(const GradientTape& tape, bool writeBackParams = true);
+
+    /** @brief Get the adjoint table after generation. */
+    const AdjointTable& GetAdjointTable() const;
+};
+```
+
+---
+
+### Supporting Types
+
+#### AdjointBody
+
+```cpp
+struct AdjointBody {
+    std::vector<std::pair<std::string, std::string>> declarations;  // (adjName, glslType)
+    std::vector<std::string> lines;                                  // adjoint accumulation statements
+    std::vector<std::pair<std::string, std::string>> writebacks;     // (paramName, adjName)
+    std::string callableAdjointFunctions;                            // adjoint function definitions
+};
+```
+
+#### AdjointTable
+
+Maps forward variable names to adjoint (gradient) variable names.
+
+```cpp
+class AdjointTable {
+public:
+    std::string GetOrCreate(const std::string& varName, const std::string& glslType);
+    std::string Get(const std::string& varName) const;
+    bool Has(const std::string& varName) const;
+    std::vector<std::pair<std::string, std::string>> AllDeclarations() const;
+    void Clear();
+    static std::string MakeAdjointName(const std::string& varName);  // "v5" → "d_v5"
+};
+```
+
+#### TapeEntry
+
+A single recorded operation on the tape.
+
+```cpp
+struct TapeVar {
+    std::string name;        // GLSL variable name (e.g., "v5", "buf0[v3]")
+    std::string glslType;    // GLSL type (e.g., "float", "vec3")
+    bool        isParameter;
+};
+
+enum class TapeOpKind : uint8_t {
+    BinaryOp,          // v = a + b, a * b, a / b, a - b
+    UnaryOp,           // v = -a
+    Intrinsic1,        // v = sin(x), sqrt(x), exp(x) ...
+    Intrinsic2,        // v = pow(a,b), atan2(y,x) ...
+    Intrinsic3,        // v = clamp(x,lo,hi), mix(a,b,t) ...
+    Ternary,           // v = cond ? a : b
+    CompoundAssign,    // v += a, v *= a ...
+    Call,              // v = callable_func(args...)
+    Return,            // return v
+    ControlFlowBegin,  // Entering if / for block
+    ControlFlowEnd,    // Leaving if / for block
+    Loss,              // Scalar loss marker
+};
+
+enum class ControlFlowKind : uint8_t {
+    IfBranch,    // if(condition)
+    ElifBranch,  // else if(condition)
+    ElseBranch,  // else
+    ForLoop,     // for(start, end, step)
+};
+
+struct TapeEntry {
+    int32_t                    id;
+    TapeOpKind                 kind;
+    TapeVar                    output;
+    std::vector<TapeVar>       inputs;
+
+    // Operation-specific metadata
+    OperationCode              binaryOp;        // for BinaryOp/UnaryOp
+    CompoundAssignmentCode     compoundOp;      // for CompoundAssign
+    std::string                intrinsicName;   // for Intrinsic1/2/3
+    std::string                callableFuncName; // for Call
+    int                        callableIndex;    // for Call: sub-tape index
+
+    // Control flow metadata (ControlFlowBegin only)
+    ControlFlowKind            controlFlowKind;
+    std::string                conditionVarName;
+    std::string                forVarName;
+    std::string                forStart;
+    std::string                forEnd;
+    std::string                forStep;
+};
+```
+
+#### GradBuffer
+
+Tracks a gradient buffer associated with a registered parameter (used by `AdjointKernel1D/2D/3D`).
+
+```cpp
+struct GradBuffer {
+    std::string         paramName;
+    std::string         glslType;
+    uint32_t            binding;
+    uint32_t            count;
+    BufferHandle        handle;
+    bool                allocated;
+};
+```
+
+---
+
+### Supported Differentiable Operations
+
+| Category | Operations | Gradient Rule |
+|:---------|:-----------|:--------------|
+| Arithmetic | `+`, `-`, `*`, `/`, `-x` | Standard calculus rules |
+| Compound | `+=`, `-=` | Accumulated adjoint |
+| Trig | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2` | Standard trig derivatives |
+| Hyperbolic | `sinh`, `cosh`, `tanh` | Standard hyperbolic derivatives |
+| Exp/Log | `exp`, `log`, `exp2`, `log2` | Standard exp/log derivatives |
+| Power/Root | `pow`, `sqrt`, `inversesqrt` | Standard power/root derivatives |
+| Other | `abs`, `min`, `max`, `clamp`, `mix`, `smoothstep` | Subgradient where applicable |
+| Vector | `dot`, `cross`, `length`, `distance`, `normalize`, `reflect`, `refract` | Vector calculus rules |
+| Control Flow | `If`/`Else`, `For` | Reversed in backward pass |
+| Callable | User-defined functions | Sub-tape recording + inline |
+
+**Zero-gradient operations** (skipped by the tape): `floor`, `ceil`, `trunc`, `round`, `sign`, `step`, `faceforward`, `floatBitsToInt`, `intBitsToFloat`, `floatBitsToUint`, `uintBitsToFloat`.
+
+---
+
 ## SideEffectToken
 
 Internal token class used by `Callable<void>` to ensure side-effects are recorded.
@@ -2994,5 +3486,6 @@ Kernel2D kernel([](Int x, Int y) {
 ## See Also
 
 - [Parallel Primitives Guide](parallel-primitives.md) - Detailed usage patterns and examples
+- [Automatic Differentiation](autodiff.md) - Compute gradients of GPU kernels
 - [Tutorial](tutorial.md) - Learn GPU programming basics
 - [Common Patterns](patterns.md) - Solutions to common tasks

@@ -372,6 +372,17 @@ add_library(EasyGPU STATIC
     include/Utility/Meta/StructMeta.h
     include/Utility/Meta/Std430Layout.h
     
+    # Automatic Differentiation
+    include/AD/TapeEntry.h
+    include/AD/GradientTape.h
+    source/AD/GradientTape.cpp
+    include/AD/AdjointTable.h
+    source/AD/AdjointTable.cpp
+    include/AD/AdjointGenerator.h
+    source/AD/AdjointGenerator.cpp
+    include/AD/AdjointInspector.h
+    include/AD/ADCore.h
+
     # Benchmark
     include/Benchmark/Benchmark.h
     source/Benchmark/Benchmark.cpp
@@ -459,6 +470,8 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestMathPrecision.cpp
         tests/TestMatrixFull.cpp
         tests/TestUniformAdvanced.cpp
+        tests/TestADCore.cpp
+        tests/TestADStress.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})
@@ -488,8 +501,11 @@ if(EASYGPU_BUILD_EXAMPLES)
         examples/image_processing/color_filter/main.cpp
         examples/image_processing/gaussian_blur/main.cpp
         examples/image_processing/box_filter/main.cpp
+        examples/ad_linear_regression/main.cpp
+        examples/ad_transformer/main.cpp
+        examples/ad_poetry/main.cpp
     )
-    
+
     set(EASYGPU_EXAMPLE_NAMES
         hello_world
         mandelbrot
@@ -502,6 +518,9 @@ if(EASYGPU_BUILD_EXAMPLES)
         color_filter
         gaussian_blur
         box_filter
+        ad_linear_regression
+        ad_transformer
+        ad_poetry
     )
     
     list(LENGTH EASYGPU_EXAMPLE_SOURCES example_count)

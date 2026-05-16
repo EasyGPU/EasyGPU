@@ -533,6 +533,38 @@ For small values (float, Vec3, Mat4), use `Uniform<T>` which uses push constants
 
 ---
 
+## Automatic Differentiation
+
+### Does EasyGPU support automatic differentiation?
+
+Yes. EasyGPU provides reverse-mode automatic differentiation that records operations during the forward pass and generates gradient (adjoint) GLSL code automatically. No hand-written derivatives needed.
+
+```cpp
+AD::AdjointInspector1D inspector([](Var<int>& i, auto& ctx) {
+    Var<float> w; w = 2.0f;
+    Var<float> x; x = 3.0f;
+    Var<float> y = w * x;
+    Var<float> loss = y * y;
+
+    ctx.RegisterParameter(w);
+    ctx.MarkLoss(loss);
+});
+
+std::cout << inspector.GetBackwardCode();  // Auto-generated gradient code
+```
+
+See [Automatic Differentiation](autodiff.md) for the complete guide.
+
+### Can I train models directly on GPU?
+
+Yes. `ADKernel1D` provides a complete training workflow: define parameters with `AD::Param()`, mark the loss with `AD::Loss()`, and call `Backward()` to compute gradients in a single GPU dispatch.
+
+### What operations are differentiable?
+
+Arithmetic (+, -, *, /), ~30 intrinsic functions (sin, cos, exp, log, pow, sqrt, etc.), vector operations (dot, cross, length, normalize, distance, reflect, refract), user-defined Callables, and control flow (if/else, for loops). See [Supported Operations](autodiff.md#supported-operations) for the full list.
+
+---
+
 ## Comparison with Other Libraries
 
 ### EasyGPU vs Taichi
@@ -541,7 +573,7 @@ For small values (float, Vec3, Mat4), use `Uniform<T>` which uses push constants
 |:--|:--|:--|
 | Language | C++ | Python/C++ |
 | JIT compilation | No | Yes |
-| Differentiable | No | Yes |
+| Differentiable | Yes | Yes |
 | Backend | OpenGL or Vulkan | LLVM/CUDA/Vulkan/Metal |
 | Setup | Minimal | Requires Python |
 

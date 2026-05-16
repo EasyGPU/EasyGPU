@@ -21,7 +21,7 @@ from typing import List, Tuple
 
 def get_project_root() -> Path:
     """Get the project root directory (where this script is located)."""
-    return Path(__file__).parent.absolute()
+    return Path(__file__).parent.parent.absolute()
 
 
 def find_source_files(project_root: Path) -> List[Path]:
@@ -52,7 +52,8 @@ def check_clang_format(project_root: Path) -> Tuple[bool, str]:
         result = subprocess.run(
             ["clang-format", "--version"],
             capture_output=True,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
         return True, result.stdout.strip()

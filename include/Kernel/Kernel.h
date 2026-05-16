@@ -256,6 +256,8 @@ public:
 	 */
 	std::string GetCode();
 
+	const KernelBuildContext &GetContext() const { return _context; }
+
 private:
 	KernelBuildContext _context;
 	std::string		   _name = "Kernel1D";
@@ -312,6 +314,8 @@ public:
 	 * @return The full GLSL compute shader source.
 	 */
 	std::string GetCode();
+
+	const KernelBuildContext &GetContext() const { return _context; }
 
 private:
 	KernelBuildContext _context;
@@ -374,6 +378,8 @@ public:
 	 * @return The full GLSL compute shader source.
 	 */
 	std::string GetCode();
+
+	const KernelBuildContext &GetContext() const { return _context; }
 
 private:
 	KernelBuildContext _context;

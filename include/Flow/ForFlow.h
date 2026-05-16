@@ -8,6 +8,8 @@
 #ifndef EASYGPU_FLOW_FOR_H
 #define EASYGPU_FLOW_FOR_H
 
+#include <AD/GradientTape.h>
+
 #include <Flow/CodeCollectContext.h>
 #include <Flow/IfFlow.h>
 
@@ -54,11 +56,21 @@ inline void ForImpl(GPU::IR::Value::Expr<int> &&start, GPU::IR::Value::Expr<int>
 	// Create loop variable
 	GPU::IR::Value::Var<int> loopVar(varName);
 
+	// Record for loop markers on the gradient tape
+	auto &builder = GPU::IR::Builder::Builder::Get();
+	if (auto *tape = builder.GetGradientTape()) {
+		tape->BeginForLoop(varName, startStr, endStr, stepStr);
+	}
+
 	// Collect code for loop body
 	CodeCollectContext		 collectContext;
 	{
 		ScopedCodeCollect guard(collectContext);
 		body(loopVar);
+	}
+
+	if (auto *tape = builder.GetGradientTape()) {
+		tape->EndForLoop();
 	}
 
 	// Build for loop code with support for both positive and negative step values.

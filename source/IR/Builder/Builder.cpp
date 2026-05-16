@@ -5,6 +5,7 @@
 
 #include <IR/Builder/Builder.h>
 
+#include <AD/GradientTape.h>
 #include <IR/Node/ArrayAccess.h>
 #include <IR/Node/AtomicOp.h>
 #include <IR/Node/Break.h>
@@ -75,6 +76,12 @@ void Builder::Build(const Node::Node &Node, bool IsStatement) {
 		} else {
 			_context->PushTranslatedCode(BuildNode(Node));
 		}
+	}
+
+	// Gradient tape recording: after normal GLSL emission, record the
+	// operation for later backward-pass generation.
+	if (_gradientTape) {
+		_gradientTape->Record(Node, IsStatement);
 	}
 }
 

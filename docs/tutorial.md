@@ -1620,4 +1620,5 @@ int main() {
 Next steps:
 - Review [API Reference](api-reference.md) for complete function list
 - Explore [Patterns](patterns.md) for common algorithms
+- Learn [Automatic Differentiation](autodiff.md) for gradient computation
 - Check [FAQ](faq.md) for troubleshooting

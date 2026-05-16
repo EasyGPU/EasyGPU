@@ -73,13 +73,16 @@ std::string FragmentBuildContext::GetCompleteCode() {
 		bool					savedInCallableBody = _inCallableBody;
 		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
 
+
+		auto &builder	  = IR::Builder::Builder::Get();
+		bool savedBuilderCallable = builder.IsInCallableBody();
 		_currentCallableBody.clear();
 		_inCallableBody = false;
+		builder.SetInCallableBody(false);
 		while (!_callableBodyStack.empty()) {
 			_callableBodyStack.pop();
 		}
 
-		auto &builder	  = IR::Builder::Builder::Get();
 		auto *prevContext = builder.Context();
 		builder.Bind(*this);
 
@@ -101,6 +104,7 @@ std::string FragmentBuildContext::GetCompleteCode() {
 		_currentCallableBody = std::move(savedCallableBody);
 		_inCallableBody		 = savedInCallableBody;
 		_callableBodyStack	 = std::move(savedBodyStack);
+		builder.SetInCallableBody(savedBuilderCallable);
 	}
 
 	std::ostringstream oss;
@@ -142,13 +146,16 @@ std::string FragmentBuildContext::GetFragmentShaderSource() {
 		bool					savedInCallableBody = _inCallableBody;
 		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
 
-		_currentCallableBody.clear();
-		_inCallableBody = false;
-		while (!_callableBodyStack.empty()) {
-			_callableBodyStack.pop();
-		}
 
 		auto &builder	  = IR::Builder::Builder::Get();
+		bool savedBuilderCallable = builder.IsInCallableBody();
+			_callableBodyStack.pop();
+		while (!_callableBodyStack.empty()) {
+		_currentCallableBody.clear();
+		_inCallableBody = false;
+		builder.SetInCallableBody(false);
+		}
+
 		auto *prevContext = builder.Context();
 		builder.Bind(*this);
 
@@ -170,6 +177,7 @@ std::string FragmentBuildContext::GetFragmentShaderSource() {
 		_currentCallableBody = std::move(savedCallableBody);
 		_inCallableBody		 = savedInCallableBody;
 		_callableBodyStack	 = std::move(savedBodyStack);
+		builder.SetInCallableBody(savedBuilderCallable);
 	}
 
 	std::ostringstream oss;
