@@ -11,6 +11,7 @@ Lightweight C++20 Embedded DSL for GPU Compute
 [![OpenGL](https://img.shields.io/badge/OpenGL-4.3+-green.svg)](https://www.opengl.org/)
 [![Vulkan](https://img.shields.io/badge/Vulkan-1.1+-red.svg)](https://www.vulkan.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
+[![Autograd](https://img.shields.io/badge/Autograd-Reverse--Mode-blue.svg)](docs/autodiff.md)
 
 [Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Examples](#examples) · [API Reference](docs/api-reference.md)
 
@@ -23,6 +24,7 @@ Lightweight C++20 Embedded DSL for GPU Compute
 - [Overview](#overview)
 - [Concept](#concept)
 - [Features](#features)
+  - [Automatic Differentiation](#automatic-differentiation--gpu-gradients-zero-hand-written-math)
 - [Quick Start](#quick-start)
 - [Examples](#examples)
 - [Best Practices](#best-practices)
@@ -36,7 +38,9 @@ Lightweight C++20 Embedded DSL for GPU Compute
 
 EasyGPU is an embedded domain-specific language (eDSL) for GPU programming that allows writing compute kernels in standard C++20. No shader language knowledge required.
 
-Today, that simplicity is no longer tied to a single graphics API. EasyGPU now ships with both an OpenGL compute backend and a Vulkan compute backend, so the same kernel code can target a lightweight OpenGL path or a modern Vulkan path without changing the DSL.
+EasyGPU now ships with **reverse-mode automatic differentiation** — write your forward pass once and get GPU gradients for free. No hand-written derivatives, no dual-codebase synchronization. Train models, fit curves, and solve inverse problems entirely on the GPU.
+
+The same DSL runs on both an OpenGL compute backend and a Vulkan compute backend, so you can target a lightweight OpenGL path or a modern Vulkan path without changing a line of kernel code.
 
 ```cpp
 #include <GPU.h>
@@ -64,6 +68,12 @@ int main() {
 - No graphics programming background required — works with arrays, not just triangles
 - Full IDE support: autocomplete, type checking, compile-time error detection
 - 10 lines of code for your first working GPU kernel
+
+**For ML practitioners and researchers:**
+- Reverse-mode autograd that runs entirely on the GPU — no Python required
+- Record the forward pass in C++, get combined forward+backward GLSL automatically
+- 30+ differentiable intrinsics (sin, cos, exp, log, pow, sqrt...), vector ops, control flow
+- Train tiny models, fit curves, and compute gradients without leaving C++
 
 **For experienced developers:**
 - Zero vendor lock-in (OpenGL 4.3+ or Vulkan 1.1+, cross-platform)
@@ -168,6 +178,91 @@ cmake -S . -B build_vk -DEASYGPU_BACKEND=Vulkan
 ```
 
 For projects that want a simple on-ramp, OpenGL remains a great default. For projects that want a modern compute stack, Vulkan is now a first-class path rather than an experimental branch.
+
+### Automatic Differentiation — GPU Gradients, Zero Hand-Written Math
+
+EasyGPU's reverse-mode autograd records every operation during the forward pass and generates the backward pass automatically. The forward and backward passes are merged into a single GPU shader — one dispatch computes both your loss and its gradients. No dual-codebase synchronization, no hand-derived adjoints, no context switching between C++ and GLSL.
+
+**Three API levels for different needs:**
+
+| API | Use Case | GPU Execution |
+|:----|:---------|:--------------|
+| `AdjointInspector1D` | Inspect generated backward GLSL | Offline only |
+| `AdjointKernel1D` | Get combined forward+backward shader | Compile, no built-in training |
+| `ADKernel1D` | End-to-end GPU training | Dispatch, download gradients, update |
+
+**Quick example — linear regression in 20 lines:**
+
+```cpp
+#include <GPU.h>
+#include <AD/ADKernel.h>
+using namespace GPU::AD;
+
+// y = w*x + b,  fit to noisy data
+ADKernel1D model([&](Var<int> &id) {
+    auto x_ref = buf_x.Bind();
+    auto y_ref = buf_y.Bind();
+
+    Var<float> w, b;
+    w = AD::Param(W_ref[0]);    // trainable weight
+    b = AD::Param(W_ref[1]);    // trainable bias
+
+    Var<float> x = x_ref[id];
+    Var<float> y_pred = w * x + b;
+    Var<float> diff = y_pred - y_ref[id];
+    Var<float> loss = diff * diff;
+
+    AD::Loss(loss);
+}, N);
+
+// One call = forward + backward + gradient download
+model.Backward(groups, true);
+auto grad_w = model.Gradient(0);  // ∂loss/∂w
+auto grad_b = model.Gradient(1);  // ∂loss/∂b
+```
+
+**What makes it work:**
+
+1. **Gradient tape** — Every `+`, `*`, `Exp()`, `Max()`, `Sin()`... is recorded during the forward pass
+2. **Adjoint generation** — The tape is walked backwards, applying the chain rule to emit adjoint GLSL
+3. **Combined shader** — Forward and backward code are merged into a single compute shader; gradients flow directly into SSBOs
+4. **Zero-copy gradient download** — `ADKernel1D::Gradient(p)` maps the GPU gradient buffer for CPU readback
+
+**30+ differentiable operations, out of the box:**
+
+| Category | Operations |
+|:---------|:-----------|
+| Arithmetic | `+`, `-`, `*`, `/` |
+| Transcendental | `Sin`, `Cos`, `Tan`, `Exp`, `Log`, `Pow`, `Sqrt`, `Abs`, `Floor`, `Ceil`, `Round` |
+| Trigonometry | `Asin`, `Acos`, `Atan`, `Sinh`, `Cosh`, `Tanh` |
+| Vector | `Dot`, `Cross`, `Length`, `Normalize`, `Distance`, `Reflect`, `Refract` |
+| Activation | `Max` (ReLU), `Clamp`, `Smoothstep`, `Step`, `Sign` |
+| Control flow | `If`/`Else`, `For` loops — gradients flow through branches correctly |
+
+**Callables are differentiable too:**
+
+```cpp
+Callable<Float(Float)> Sigmoid = [](Float &x) {
+    Return(MakeFloat(1.0f) / (MakeFloat(1.0f) + Exp(-x)));
+};
+
+// Use inside AD kernel — gradient flows through the Callable automatically
+Var<float> activation = Sigmoid(logits);
+```
+
+**Real example — GPU Poetry Transformer:**
+
+A 4D self-attention model (86 parameters) trained on 2,513 windows of classic poetry. Learns to predict the next character from the previous four — entirely on the GPU, entirely through the AD system.
+
+```
+Step    0: loss=3.93
+Step 5000: loss=1.00   "the " -> "buhbuh...jjig;lljhaou jfbsy..."
+Step 40000: loss=0.93  "the " -> "jjig;lljhaou jfbsyiihcuzjfcw;librx;ljfcv"
+```
+
+All gradients verified against central finite differences (rel_err < 1e-3 on all 86 parameters). See [`examples/ad_poetry/`](examples/ad_poetry/main.cpp) for the full source.
+
+[Learn AD from scratch →](docs/autodiff.md) · [AD API Reference →](docs/api-reference.md#automatic-differentiation)
 
 ### Unified Language
 
@@ -574,6 +669,14 @@ g++ -std=c++20 hello_gpu.cpp -lEasyGPU -lGL -o hello_gpu
 | Advanced | [parallel_reduction](examples/parallel_reduction/main.cpp) | Shared memory, parallel reduce |
 | Advanced | [histogram](examples/histogram/main.cpp) | Atomic operations, shared memory |
 
+### Automatic Differentiation Examples
+
+| Level | Example | Topics |
+|:------|:--------|:-------|
+| Beginner | [ad_linear_regression](examples/ad_linear_regression/main.cpp) | AD basics, Param/Loss, gradient tape |
+| Intermediate | [ad_transformer](examples/ad_transformer/main.cpp) | Self-attention, softmax AD, multi-parameter |
+| Advanced | [ad_poetry](examples/ad_poetry/main.cpp) | Full training loop, RMSprop, scaled attention, 86-param transformer |
+
 ### Parallel Primitives Examples
 
 | Level | Example | Topics |
@@ -732,6 +835,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [Getting Started](docs/getting-started.md)
 - [Tutorial](docs/tutorial.md)
 - [API Reference](docs/api-reference.md)
+- [Automatic Differentiation](docs/autodiff.md) — Complete AD guide: tape recording, adjoint generation, GPU training
 - [Texture3D Guide](docs/texture3d.md) — Volumetric textures and 3D compute
 - [Window Component](docs/window.md) — Cross-platform window for interactive visualization
 - [Shader Cache](docs/shader-cache.md) — Automatic kernel compilation caching
