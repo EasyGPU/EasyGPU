@@ -84,6 +84,7 @@ class TensorRef {
 	static constexpr size_t TotalSize = (Dims * ...);
 
 public:
+	TensorRef() = default;
 	explicit TensorRef(IR::Value::BufferRef<T> ref) : ref_(std::move(ref)) {}
 
 	/** Direct flat index access (same as BufferRef). */
