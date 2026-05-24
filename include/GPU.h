@@ -28,6 +28,11 @@
 #include <AD/ADCore.h>
 
 // =============================================================================
+// Neural Network Training Utilities (Tensor, Adam, SGD, RMSprop)
+// =============================================================================
+#include <NN/NN.h>
+
+// =============================================================================
 // Callable Functions
 // =============================================================================
 #include <Callable/Callable.h>
@@ -138,6 +143,9 @@ using namespace GPU::Parallel;
 
 /// Automatic differentiation: AD::Param, AD::Loss, ADKernel1D, AdjointInspector1D
 using namespace GPU::AD;
+
+/// Neural network training: Tensor, Adam, SGD, RMSprop
+using namespace GPU::NN;
 
 /// Thread index utilities: LocalThreadId, WorkgroupId, GlobalThreadId
 using namespace GPU;
