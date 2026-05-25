@@ -16,6 +16,9 @@
 #include <IR/Value/BufferRef.h>
 #include <IR/Value/Var.h>
 #include <Utility/Helpers.h>
+#include <Utility/Math.h>
+
+#include <Flow/ForFlow.h>
 
 namespace GPU::NN {
 
@@ -63,6 +66,56 @@ inline IR::Value::Var<float> L1Loss(const IR::Value::Var<float> &pred,
 									 const IR::Value::Var<float> &target) {
 	IR::Value::Var<float> diff = pred - target;
 	return GPU::Math::Abs(diff);
+}
+
+/**
+ * Cross-entropy loss for classification.
+ *
+ *   loss = -log(softmax(logits)[target])
+ *
+ * Uses the log-sum-exp trick for numerical stability:
+ *   loss = -(logits[target] - maxLogit - log(sum(exp(logits[i] - maxLogit))))
+ *
+ * @param logits     Buffer containing logits [numClasses] at current offset
+ * @param numClasses Number of output classes
+ * @param targetId   Index of the correct class
+ * @return Var<float> scalar cross-entropy loss
+ */
+inline IR::Value::Var<float> CrossEntropyLoss(const IR::Value::BufferRef<float> &logits,
+												int numClasses,
+												const IR::Value::Var<int> &targetId) {
+	// Stable log-softmax: find max logit first
+	IR::Value::Var<float> maxLogit = MakeFloat(-1e9f);
+	GPU::Flow::For(MakeInt(0), MakeInt(numClasses), [&](IR::Value::Var<int> &i) {
+		maxLogit = GPU::Math::Max(maxLogit, logits[i]);
+	});
+
+	// Sum of exp(logit - max)
+	IR::Value::Var<float> sumExp = MakeFloat(0.0f);
+	GPU::Flow::For(MakeInt(0), MakeInt(numClasses), [&](IR::Value::Var<int> &i) {
+		sumExp = sumExp + GPU::Math::Exp(logits[i] - maxLogit);
+	});
+
+	// Negative log-likelihood for the target class
+	IR::Value::Var<float> loss = -(logits[targetId] - maxLogit - GPU::Math::Log(sumExp));
+	return loss;
+}
+
+/** Overload with explicit buffer offset. */
+inline IR::Value::Var<float> CrossEntropyLoss(const IR::Value::BufferRef<float> &logits,
+												int numClasses,
+												const IR::Value::Var<int> &targetId,
+												const IR::Value::Expr<int> &offset) {
+	IR::Value::Var<float> maxLogit = MakeFloat(-1e9f);
+	GPU::Flow::For(MakeInt(0), MakeInt(numClasses), [&](IR::Value::Var<int> &i) {
+		maxLogit = GPU::Math::Max(maxLogit, logits[offset + i]);
+	});
+	IR::Value::Var<float> sumExp = MakeFloat(0.0f);
+	GPU::Flow::For(MakeInt(0), MakeInt(numClasses), [&](IR::Value::Var<int> &i) {
+		sumExp = sumExp + GPU::Math::Exp(logits[offset + i] - maxLogit);
+	});
+	IR::Value::Var<float> loss = -(logits[offset + targetId] - maxLogit - GPU::Math::Log(sumExp));
+	return loss;
 }
 
 } // namespace GPU::NN

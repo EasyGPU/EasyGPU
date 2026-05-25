@@ -505,6 +505,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         examples/ad_linear_regression/main.cpp
         examples/ad_transformer/main.cpp
         examples/ad_poetry/main.cpp
+        examples/ad_gpt_demo/main.cpp
     )
 
     set(EASYGPU_EXAMPLE_NAMES
@@ -522,6 +523,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         ad_linear_regression
         ad_transformer
         ad_poetry
+        ad_gpt_demo
     )
     
     list(LENGTH EASYGPU_EXAMPLE_SOURCES example_count)
