@@ -535,7 +535,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         add_executable(${example_name} ${example_source})
         target_link_libraries(${example_name} PRIVATE EasyGPU)
         if(MSVC)
-            target_compile_options(${example_name} PRIVATE /Zc:preprocessor)
+            target_compile_options(${example_name} PRIVATE /Zc:preprocessor /bigobj)
         endif()
     endforeach()
     
