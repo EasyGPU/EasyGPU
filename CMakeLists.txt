@@ -472,6 +472,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestUniformAdvanced.cpp
         tests/TestADCore.cpp
         tests/TestADStress.cpp
+        tests/TestNN.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})

@@ -51,7 +51,12 @@ struct StrideAt<I, D0, Rest...> : StrideAt<I - 1, Rest...> {};
 
 template <size_t D0, size_t... Rest>
 struct StrideAt<0, D0, Rest...> {
-	static constexpr size_t value = (Rest * ...);
+	static constexpr size_t value = (1 * ... * Rest);
+};
+
+template <size_t D0>
+struct StrideAt<0, D0> {
+	static constexpr size_t value = 1;
 };
 
 template <size_t I>
@@ -145,7 +150,7 @@ private:
 
 	template <typename F, size_t... Is>
 	void ForEachImpl(F &&f, std::index_sequence<Is...>) {
-		(f(ref_[static_cast<int>(Is)]), ...);
+		([&] { auto elem = ref_[static_cast<int>(Is)]; f(elem); }(), ...);
 	}
 
 	IR::Value::BufferRef<T> ref_;
