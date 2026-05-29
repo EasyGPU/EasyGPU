@@ -504,7 +504,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         examples/image_processing/box_filter/main.cpp
         examples/ad_linear_regression/main.cpp
         examples/ad_transformer/main.cpp
-        examples/ad_poetry/main.cpp
+        examples/ad_gpt_poet_demo/main.cpp
         examples/ad_gpt_demo/main.cpp
     )
 
@@ -522,7 +522,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         box_filter
         ad_linear_regression
         ad_transformer
-        ad_poetry
+        ad_gpt_poet_demo
         ad_gpt_demo
     )
     

@@ -137,6 +137,7 @@ public:
 	 * @param texture The 2D texture to attach
 	 */
 	void Attach(Texture2D<Format> &texture) {
+		_texture	   = &texture;
 		_textureHandle = texture.GetHandle();
 		_width		   = texture.GetWidth();
 		_height		   = texture.GetHeight();
@@ -146,6 +147,7 @@ public:
 	 * Detach the current texture
 	 */
 	void Detach() {
+		_texture = nullptr;
 		_textureHandle = Backend::INVALID_TEXTURE_HANDLE;
 		_width = _height = 0;
 	}
@@ -163,7 +165,7 @@ public:
 	 * @return Pointer to the attached texture, or nullptr if not attached
 	 */
 	Texture2D<Format> *GetAttached() const {
-		return nullptr;
+		return _texture;
 	}
 
 	/**
@@ -244,6 +246,7 @@ public:
 	}
 
 private:
+	Texture2D<Format>   *_texture		  = nullptr;
 	Backend::TextureHandle _textureHandle = Backend::INVALID_TEXTURE_HANDLE; // Currently attached texture handle
 	uint32_t			   _width		  = 0;
 	uint32_t			   _height		  = 0;

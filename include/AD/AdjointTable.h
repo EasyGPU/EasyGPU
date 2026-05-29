@@ -61,11 +61,27 @@ public:
 	 */
 	static std::string MakeAdjointName(const std::string &varName);
 
+	/**
+	 * Set the array size for a buffer-type adjoint.
+	 * Buffer adjoints are declared as arrays (float grad_buf[N]) so that
+	 * per-element gradient indexing works with both constant and variable indices.
+	 */
+	void SetArraySize(const std::string &adjName, size_t arraySize);
+
+	/**
+	 * Get the array size for an adjoint name, or 0 if it's a scalar.
+	 */
+	size_t GetArraySize(const std::string &adjName) const;
+
 private:
 	// Forward var name -> adjoint var name
 	std::unordered_map<std::string, std::string> _map;
-	// Adjoint var name -> GLSL type
+	// Base buffer name -> adjoint name (e.g. "buf5" -> "grad_buf5")
+	std::unordered_map<std::string, std::string> _baseMap;
+	// Adjoint var name -> GLSL type (element type for arrays)
 	std::unordered_map<std::string, std::string> _types;
+	// Adjoint var name -> array size (0 = scalar)
+	std::unordered_map<std::string, size_t> _arraySizes;
 	// Insertion order tracking for deterministic declarations
 	std::vector<std::string> _insertionOrder;
 };

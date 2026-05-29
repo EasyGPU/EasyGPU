@@ -4,7 +4,7 @@
 
 # EasyGPU
 
-Lightweight C++20 Embedded DSL for GPU Compute
+C++20 Embedded DSL for GPU Compute, Autograd & Neural Networks
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-orange.svg)](https://en.cppreference.com/w/cpp/20)
@@ -25,6 +25,7 @@ Lightweight C++20 Embedded DSL for GPU Compute
 - [Concept](#concept)
 - [Features](#features)
   - [Automatic Differentiation](#automatic-differentiation--gpu-gradients-zero-hand-written-math)
+  - [Neural Network Training](#neural-network-training--tensor--optimizer)
 - [Quick Start](#quick-start)
 - [Examples](#examples)
 - [Best Practices](#best-practices)
@@ -248,19 +249,75 @@ Callable<Float(Float)> Sigmoid = [](Float &x) {
 Float activation = Sigmoid(logits);
 ```
 
-**Real example — GPU Poetry Transformer:**
+**Real example — GPT Name Generator & Poetry Transformer:**
 
-A 4D self-attention model (86 parameters) trained on 2,513 windows of classic poetry. Learns to predict the next character from the previous four — entirely on the GPU, entirely through the AD system.
+A character-level GPT (TransformerBlock + CausalSelfAttention) that trains entirely on GPU through the EasyGPU AD engine. Two demos ship with the project:
 
-```
-Step    0: loss=3.93
-Step 5000: loss=1.00   "the " -> "buhbuh...jjig;lljhaou jfbsy..."
-Step 40000: loss=0.93  "the " -> "jjig;lljhaou jfbsyiihcuzjfcw;librx;ljfcv"
-```
+- **Name Generator** (`ad_gpt_demo`) — 1-layer transformer (16-dim, 4 heads, ~7K params) on Karpathy's `names.txt` dataset (~32K names). Learns to generate novel names character by character. Full training loop: Tensor, Adam optimizer, gradient buffer sharing, CPU inference.
 
-All gradients verified against central finite differences (rel_err < 1e-3 on all 86 parameters). See [`examples/ad_poetry/`](examples/ad_poetry/main.cpp) for the full source.
+- **Poetry Generator** (`ad_gpt_poet_demo`) — Same architecture on an embedded Shakespeare sonnet corpus. 16-dim embeddings, 4 heads, vocab size 36. Continuous-text language modeling with checkpoint save/load.
+
+Zero hand-written derivatives. The AD engine generates all backward-pass GLSL from the forward DSL, merges both passes into a single compute shader, and writes per-parameter gradients directly to shared SSBOs. See [`examples/ad_gpt_demo/`](examples/ad_gpt_demo/main.cpp) and [`examples/ad_gpt_poet_demo/`](examples/ad_gpt_poet_demo/main.cpp).
 
 [Learn AD from scratch →](docs/autodiff.md) · [AD API Reference →](docs/api-reference.md#automatic-differentiation)
+
+### Neural Network Training — Tensor + Optimizer
+
+Building on the AD engine, EasyGPU provides a full NN training stack: compile-time-shaped tensors, built-in optimizers, and composable layers — all running through the same AD kernel.
+
+**Three pillars of NN training in EasyGPU:**
+
+| Component | Purpose | API |
+|:----------|:--------|:----|
+| `Tensor<T, Dims...>` | Multi-dimensional weight containers with CPU/GPU sync | `.Bind()`, `.ForEachParam()`, `.Upload()`, `.Download()` |
+| `Adam` / `SGD` / `RMSprop` | Optimizers with weight decay, gradient clipping | `.AddTensor(t)`, `.Step(kernel)` |
+| Layers | Reusable building blocks (Linear, Attention, Transformer...) | `.Setup()`, `.Forward(...)` |
+
+**Full GPT training in under 70 lines:**
+
+```cpp
+#include <GPU.h>
+#include <NN/NN.h>
+using namespace GPU::NN;
+
+// Model components
+TokenEmbedding<float, 27, 16>     tokEmb;
+PositionalEmbedding<float, 16, 16> posEmb;
+TransformerBlock<float, 16, 16, 4> transformer(batchSize);
+Tensor<float, 27, 16>             lmHead;
+
+// Adam optimizer — registers all parameters in 6 lines
+Adam adam(0.001f, 0.85f, 0.99f);
+adam.AddTensor(tokEmb.Weight());
+adam.AddTensor(posEmb.Weight());
+adam.AddTensor(transformer.Attention().Weights());
+adam.AddTensor(transformer.FC1());
+adam.AddTensor(transformer.FC2());
+adam.AddTensor(lmHead);
+
+// AD kernel with 4192 parameters
+ADKernel1D kernel([&](Var<int> &batchIdx) {
+    // ... forward pass: embeddings → attention → MLP → logits → loss
+    AD::Loss(totalLoss);
+}, batchSize);
+
+// Training loop — 3 lines per step
+for (int step = 0; step < 5000; step++) {
+    kernel.Forward(groups, true);
+    kernel.Backward(groups, true);
+    adam.Step(kernel);  // download gradients, update weights, upload
+}
+```
+
+**Key design decisions:**
+- **Tensor `ForEachParam()`** compiles down to per-element `AD::Param()` calls — no manual index bookkeeping
+- **Adam `Step()`** calls `DownloadAllGradients()`, averages per-thread gradients, applies Adam update per scalar, and uploads — all in one call
+- **Gradient buffer sharing** packs all parameters from one source buffer into an interleaved gradient SSBO, staying within `GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS`
+- **Layers are purely structural** — no virtual dispatch, no runtime graph. `Setup()` registers parameters, `Forward()` emits DSL code. The compiler inlines everything.
+
+See [`ad_gpt_demo`](examples/ad_gpt_demo/main.cpp) for a full name-generating transformer and [`ad_gpt_poet_demo`](examples/ad_gpt_poet_demo/main.cpp) for poetry generation.
+
+[NN API Reference →](docs/api-reference.md#neural-network)
 
 ### Unified Language
 
@@ -673,7 +730,8 @@ g++ -std=c++20 hello_gpu.cpp -lEasyGPU -lGL -o hello_gpu
 |:------|:--------|:-------|
 | Beginner | [ad_linear_regression](examples/ad_linear_regression/main.cpp) | AD basics, Param/Loss, gradient tape |
 | Intermediate | [ad_transformer](examples/ad_transformer/main.cpp) | Self-attention, softmax AD, multi-parameter |
-| Advanced | [ad_poetry](examples/ad_poetry/main.cpp) | Full training loop, RMSprop, scaled attention, 86-param transformer |
+| Advanced | [ad_gpt_demo](examples/ad_gpt_demo/main.cpp) | GPT name generator: Tensor, Adam, CausalSelfAttention, CPU inference |
+| Advanced | [ad_gpt_poet_demo](examples/ad_gpt_poet_demo/main.cpp) | GPT poetry: embedded sonnets, checkpoint save/load |
 
 ### Parallel Primitives Examples
 
@@ -833,7 +891,8 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [Getting Started](docs/getting-started.md)
 - [Tutorial](docs/tutorial.md)
 - [API Reference](docs/api-reference.md)
-- [Automatic Differentiation](docs/autodiff.md) — Complete AD guide: tape recording, adjoint generation, GPU training
+- [Automatic Differentiation](docs/autodiff.md) — Complete AD guide: tape recording, adjoint generation, GPU training, NN integration
+- [API Reference](docs/api-reference.md#neural-network) — Neural Network API: Tensor, Optimizer (Adam/SGD/RMSprop), Layers, Loss, Checkpoint
 - [Texture3D Guide](docs/texture3d.md) — Volumetric textures and 3D compute
 - [Window Component](docs/window.md) — Cross-platform window for interactive visualization
 - [Shader Cache](docs/shader-cache.md) — Automatic kernel compilation caching

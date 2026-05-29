@@ -118,6 +118,11 @@ public:
 	/** Pop the current sub-tape and store it. Returns the index of the stored sub-tape. */
 	int PopSubTape();
 
+	/** Deep-copy all sub-tapes from another tape (recursively).
+	 *  Used for name-remapped tape copies during nested callable adjoint
+	 *  generation to preserve sub-sub-tape structure. */
+	void CloneSubTapesFrom(const GradientTape &src);
+
 	/** Get the number of recorded sub-tapes. */
 	size_t SubTapeCount() const { return _subTapes.size(); }
 
@@ -142,10 +147,10 @@ public:
 	const std::string *GetVarType(const std::string &name) const;
 
 	/** Get all registered parameter names and their types. */
-	const auto &Parameters() const { return _parameters; }
+	const auto &Parameters() const { return _paramList; }
 
 	/** Get the number of registered parameters. */
-	size_t ParameterCount() const { return _parameters.size(); }
+	size_t ParameterCount() const { return _paramList.size(); }
 
 private:
 	// ---- Internal: node analysis -----------------------------------------
@@ -186,6 +191,9 @@ private:
 
 	// Registered parameters (name -> GLSL type)
 	std::unordered_map<std::string, std::string> _parameters;
+
+	// Ordered parameter list preserving registration order
+	std::vector<std::pair<std::string, std::string>> _paramList;
 
 	// The scalar loss variable
 	std::optional<TapeVar> _lossVar;

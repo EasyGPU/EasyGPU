@@ -662,6 +662,89 @@ auto grad_b  = kernel.Gradient(3);
 auto grad_b = kernel.Gradient("v42");  // GLSL variable name
 ```
 
+### Batch Gradient Download
+
+For models with many parameters, calling `Gradient(i)` in a loop re-downloads shared gradient buffers multiple times. Use `DownloadAllGradients()` for efficient batch download:
+
+```cpp
+// ❌ Slow — downloads each shared buffer once per parameter in the group
+for (size_t i = 0; i < kernel.ParameterCount(); i++) {
+    auto grad_i = kernel.Gradient(i);  // redundant downloads
+}
+
+// ✅ Fast — each shared buffer downloaded exactly once
+auto allGrads = kernel.DownloadAllGradients();
+for (size_t i = 0; i < allGrads.size(); i++) {
+    const auto &grad_i = allGrads[i];  // already in CPU memory
+}
+```
+
+`DownloadAllGradients()` uses an internal cache map: each unique gradient buffer handle is downloaded once, then per-parameter slices are extracted from the cached data. This is what `Adam::Step()` uses internally.
+
+---
+
+## Training with NN Components
+
+The AD engine integrates with the NN module (`include/NN/`) to eliminate boilerplate. Tensor, Optimizer, and Layers are designed to work with `ADKernel1D`:
+
+### Tensor + AD::Param
+
+`Tensor<T, Dims...>::ForEachParam()` registers every scalar element as a trainable parameter:
+
+```cpp
+Tensor<float, 128, 64> W(xavierData);
+
+// Inside kernel lambda — 8192 AD::Param calls, one line
+auto W_ref = W.Bind();
+W_ref.ForEachParam([](auto &w) { AD::Param(w); });
+```
+
+`ForEachParam` uses `std::index_sequence` + fold expressions to unroll at compile time. Each `AD::Param(w)` call records the scalar's GLSL variable name on the gradient tape and returns its index. The AD kernel groups parameters from the same source buffer into shared interleaved gradient SSBOs automatically.
+
+### Optimizer + ADKernel1D
+
+Optimizers consume gradients directly from the AD kernel:
+
+```cpp
+Adam adam(0.001f);
+adam.AddTensor(W);           // register weights
+adam.AddTensor(b);           // register biases
+
+for (int step = 0; step < 1000; step++) {
+    kernel.Forward(groups, true);   // forward pass
+    kernel.Backward(groups, true);  // forward + backward, write gradients to GPU
+    adam.Step(kernel);              // download → aggregate → update → upload
+}
+```
+
+`Adam::Step(kernel)` internally:
+1. Calls `kernel.DownloadAllGradients()` — one download per shared buffer group
+2. Averages per-thread gradients for each scalar parameter
+3. Applies Adam update rule (bias-corrected moments, weight decay, gradient clipping)
+4. Uploads updated weights back to GPU buffers
+
+The optimizer tracks per-parameter `m` and `v` state vectors, matching the AD kernel's scalar parameter count exactly. This avoids the common pitfall of averaging gradients across entire tensors.
+
+### Layers
+
+Layers provide `Setup()` (register parameters) and `Forward()` (emit DSL code):
+
+```cpp
+// Outside kernel — construct with Xavier-initialized weights
+Linear<float, 784, 128> fc1(42);
+ReLU<float> relu(128);
+Linear<float, 128, 10>  fc2(123);
+
+// Inside kernel lambda
+fc1.Setup(); fc2.Setup(); relu.Setup();  // register all parameters
+// ... use Forward() in the computation:
+fc1.Forward(input, threadId, hidden);
+relu.Forward(hidden, threadId, activated);
+fc2.Forward(activated, threadId, output);
+```
+
+See [API Reference](api-reference.md#neural-network) for the full NN API.
+
 ---
 
 ## Limitations
@@ -799,6 +882,11 @@ public:
     void Backward(int groupCount, bool sync = false);
     std::vector<float> Gradient(int paramIndex) const;
     std::vector<float> Gradient(const std::string& paramVarName) const;
+
+    /** Batch-download all parameter gradients efficiently.
+     *  Shared gradient buffers are downloaded once and cached,
+     *  avoiding redundant transfers for interleaved groups. */
+    std::vector<std::vector<float>> DownloadAllGradients() const;
 
     std::string ForwardCode() const;
     std::string CombinedCode() const;

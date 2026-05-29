@@ -28,9 +28,17 @@
 #include <AD/ADCore.h>
 
 // =============================================================================
-// Neural Network Training Utilities (Tensor, Adam, SGD, RMSprop)
+// Neural Network Training (Tensor, Optimizer, Layers, Loss, Transformer)
 // =============================================================================
-#include <NN/NN.h>
+#include <NN/Attention.h>
+#include <NN/Checkpoint.h>
+#include <NN/Embedding.h>
+#include <NN/Layers.h>
+#include <NN/Loss.h>
+#include <NN/Normalization.h>
+#include <NN/Optimizer.h>
+#include <NN/Tensor.h>
+#include <NN/Transformer.h>
 
 // =============================================================================
 // Callable Functions

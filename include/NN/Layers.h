@@ -117,7 +117,8 @@ public:
 		GPU::Flow::For(MakeInt(0), MakeInt(kOut), [&](IR::Value::Var<int> &o) {
 			IR::Value::Var<T> sum = biasRef_[o];
 			GPU::Flow::For(MakeInt(0), MakeInt(kIn), [&](IR::Value::Var<int> &i) {
-				sum += weightRef_(o, i) * input[threadId * kIn + i];
+				IR::Value::Var<T> prod = weightRef_(o, i) * input[threadId * kIn + i];
+				sum = sum + prod;
 			});
 			output[threadId * kOut + o] = sum;
 		});

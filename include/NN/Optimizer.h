@@ -32,6 +32,56 @@
 
 namespace GPU::NN {
 
+namespace detail {
+
+inline void ApplyAdamUpdate(float *weight, const float *grad, float *m, float *v,
+                            size_t size, float lr, float beta1, float beta2,
+                            float eps, int step, float weightDecay, float gradClip) {
+    const double biasCorr1 = 1.0 - std::pow(beta1, step);
+    const double biasCorr2 = 1.0 - std::pow(beta2, step);
+
+    for (size_t i = 0; i < size; ++i) {
+        double g = static_cast<double>(grad[i]);
+        if (weightDecay > 0.0f) g += 2.0 * weightDecay * static_cast<double>(weight[i]);
+        if (gradClip > 0.0f) g = std::clamp(g, -static_cast<double>(gradClip), static_cast<double>(gradClip));
+
+        m[i] = beta1 * m[i] + (1.0f - beta1) * static_cast<float>(g);
+        v[i] = beta2 * v[i] + (1.0f - beta2) * static_cast<float>(g * g);
+
+        const double mHat = static_cast<double>(m[i]) / biasCorr1;
+        const double vHat = static_cast<double>(v[i]) / biasCorr2;
+        weight[i] -= static_cast<float>(lr * mHat / (std::sqrt(vHat) + eps));
+    }
+}
+
+inline void ApplySGDUpdate(float *weight, const float *grad, float *m,
+                           size_t size, float lr, float momentum,
+                           float weightDecay, float gradClip) {
+    for (size_t i = 0; i < size; ++i) {
+        double g = static_cast<double>(grad[i]);
+        if (weightDecay > 0.0f) g += 2.0 * weightDecay * static_cast<double>(weight[i]);
+        if (gradClip > 0.0f) g = std::clamp(g, -static_cast<double>(gradClip), static_cast<double>(gradClip));
+
+        m[i] = momentum * m[i] + static_cast<float>(g);
+        weight[i] -= lr * m[i];
+    }
+}
+
+inline void ApplyRMSpropUpdate(float *weight, const float *grad, float *m,
+                               size_t size, float lr, float beta, float eps,
+                               float weightDecay, float gradClip) {
+    for (size_t i = 0; i < size; ++i) {
+        double g = static_cast<double>(grad[i]);
+        if (weightDecay > 0.0f) g += 2.0 * weightDecay * static_cast<double>(weight[i]);
+        if (gradClip > 0.0f) g = std::clamp(g, -static_cast<double>(gradClip), static_cast<double>(gradClip));
+
+        m[i] = beta * m[i] + (1.0f - beta) * static_cast<float>(g * g);
+        weight[i] -= lr * static_cast<float>(g) / (std::sqrt(m[i] + eps));
+    }
+}
+
+} // namespace detail
+
 // =============================================================================
 // Parameter state
 // =============================================================================
@@ -87,40 +137,27 @@ public:
 	void Step(AD::ADKernel1D &kernel) {
 		step_++;
 
-		double biasCorr1 = 1.0 - std::pow(beta1_, step_);
-		double biasCorr2 = 1.0 - std::pow(beta2_, step_);
-		double lr = lr_ / biasCorr1;  // combine lr and m bias correction
+		auto allGrads = kernel.DownloadAllGradients();
 
-		for (int i = 0; i < static_cast<int>(params_.size()); i++) {
-			auto &ps = params_[i];
-			auto grad = kernel.Gradient(i);
-
-			// Mean gradient across GPU threads
-			double meanGrad = 0.0;
-			for (size_t j = 0; j < grad.size(); j++)
-				meanGrad += static_cast<double>(grad[j]);
-			meanGrad /= static_cast<double>(grad.size());
+		int paramIdx = 0;
+		for (auto &ps : params_) {
+			std::vector<float> meanGrad(ps.size, 0.0f);
 
 			for (size_t j = 0; j < ps.size; j++) {
-				double g = meanGrad;
+				if (paramIdx >= static_cast<int>(allGrads.size())) {
+					throw std::runtime_error("Adam gradient count does not match registered parameters");
+				}
 
-				// Weight decay (L2 regularization): add 2*wd*w to gradient
-				if (weightDecay_ > 0.0f)
-					g += 2.0 * weightDecay_ * static_cast<double>(ps.data[j]);
-
-				// Gradient clipping
-				if (gradClip_ > 0.0f)
-					g = std::clamp(g, -static_cast<double>(gradClip_),
-					                  static_cast<double>(gradClip_));
-
-				// Adam update
-				ps.m[j] = beta1_ * ps.m[j] + (1.0f - beta1_) * static_cast<float>(g);
-				ps.v[j] = beta2_ * ps.v[j] + (1.0f - beta2_) * static_cast<float>(g * g);
-
-				double mHat = static_cast<double>(ps.m[j]) / biasCorr1;
-				double vHat = static_cast<double>(ps.v[j]) / biasCorr2;
-				ps.data[j] -= static_cast<float>(lr * mHat / (std::sqrt(vHat) + eps_));
+				const auto &grad = allGrads[paramIdx++];
+				double g = 0.0;
+				for (float sampleGrad : grad) {
+					g += static_cast<double>(sampleGrad);
+				}
+				meanGrad[j] = grad.empty() ? 0.0f : static_cast<float>(g / static_cast<double>(grad.size()));
 			}
+
+			detail::ApplyAdamUpdate(ps.data, meanGrad.data(), ps.m.data(), ps.v.data(),
+				ps.size, lr_, beta1_, beta2_, eps_, step_, weightDecay_, gradClip_);
 
 			if (ps.buffer)
 				ps.buffer->Upload(ps.data, ps.size);
@@ -171,16 +208,18 @@ public:
 	void Step(AD::ADKernel1D &kernel) {
 		step_++;
 
-		for (int i = 0; i < static_cast<int>(params_.size()); i++) {
-			auto &ps = params_[i];
-			auto grad = kernel.Gradient(i);
+		auto allGrads = kernel.DownloadAllGradients();
 
-			double meanGrad = 0.0;
-			for (size_t j = 0; j < grad.size(); j++)
-				meanGrad += static_cast<double>(grad[j]);
-			meanGrad /= static_cast<double>(grad.size());
-
+		int paramIdx = 0;
+		for (auto &ps : params_) {
 			for (size_t j = 0; j < ps.size; j++) {
+				const auto &grad = allGrads[paramIdx];
+
+				double meanGrad = 0.0;
+				for (size_t g = 0; g < grad.size(); g++)
+					meanGrad += static_cast<double>(grad[g]);
+				meanGrad /= static_cast<double>(grad.size());
+
 				double g = meanGrad;
 				if (weightDecay_ > 0.0f)
 					g += 2.0 * weightDecay_ * static_cast<double>(ps.data[j]);
@@ -191,6 +230,8 @@ public:
 				// SGD with momentum
 				ps.m[j] = momentum_ * ps.m[j] + static_cast<float>(g);
 				ps.data[j] -= lr_ * ps.m[j];
+
+				paramIdx++;
 			}
 
 			if (ps.buffer)
@@ -243,16 +284,18 @@ public:
 	void Step(AD::ADKernel1D &kernel) {
 		step_++;
 
-		for (int i = 0; i < static_cast<int>(params_.size()); i++) {
-			auto &ps = params_[i];
-			auto grad = kernel.Gradient(i);
+		auto allGrads = kernel.DownloadAllGradients();
 
-			double meanGrad = 0.0;
-			for (size_t j = 0; j < grad.size(); j++)
-				meanGrad += static_cast<double>(grad[j]);
-			meanGrad /= static_cast<double>(grad.size());
-
+		int paramIdx = 0;
+		for (auto &ps : params_) {
 			for (size_t j = 0; j < ps.size; j++) {
+				const auto &grad = allGrads[paramIdx];
+
+				double meanGrad = 0.0;
+				for (size_t g = 0; g < grad.size(); g++)
+					meanGrad += static_cast<double>(grad[g]);
+				meanGrad /= static_cast<double>(grad.size());
+
 				double g = meanGrad;
 				if (weightDecay_ > 0.0f)
 					g += 2.0 * weightDecay_ * static_cast<double>(ps.data[j]);
@@ -264,6 +307,8 @@ public:
 				ps.m[j] = beta_ * ps.m[j] + (1.0f - beta_) * static_cast<float>(g * g);
 				ps.data[j] -= lr_ * static_cast<float>(g) /
 				              (std::sqrt(ps.m[j] + eps_));
+
+				paramIdx++;
 			}
 
 			if (ps.buffer)

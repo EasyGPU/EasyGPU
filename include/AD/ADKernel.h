@@ -39,6 +39,7 @@
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -165,27 +166,95 @@ inline std::string MergeForwardBackward(const std::string &forwardCode,
 			g.binding, g.baseName, g.baseName);
 	}
 
-	// Adjoint variable declarations
+	auto adjBaseName = [](const std::string &name) {
+		auto bpos = name.find('[');
+		return bpos == std::string::npos ? name : name.substr(0, bpos);
+	};
+
+	std::unordered_map<std::string, std::pair<std::string, int>> paramAdjArrays;
+	for (const auto &[paramName, adjName] : body.writebacks) {
+		auto [baseName, index] = parseBufAccess(paramName);
+		auto it = groupMap.find(baseName);
+		if (it != groupMap.end()) {
+			paramAdjArrays[adjBaseName(adjName)] = {baseName, it->second.second};
+		}
+	}
+
+	// Adjoint variable declarations.
+	// Parameter adjoint arrays must stay local to each invocation; otherwise
+	// multiple GPU threads race on the same grad_bufN[index] slot before the
+	// per-thread gradient writeback happens. Large activation adjoints remain
+	// in the shared SSBO pool because their indices already include thread ids.
 	std::string adjDecls;
+	std::vector<std::string> adjArrayNames;
 	for (const auto &[adjName, glslType] : body.declarations) {
-		adjDecls += std::format("    {} {} = {}(0);\n", glslType, adjName, glslType);
+		auto bracketPos = glslType.find('[');
+		if (bracketPos != std::string::npos) {
+			if (!paramAdjArrays.count(adjName)) {
+				adjArrayNames.push_back(adjName);
+			}
+		} else {
+			adjDecls += std::format("    {} {} = {}(0);\n", glslType, adjName, glslType);
+		}
+	}
+	if (!adjArrayNames.empty()) {
+		gradBufDecls += "layout(std430, binding = 20) buffer _adj_pool {\n";
+		for (size_t ai = 0; ai < adjArrayNames.size(); ai++) {
+			const std::string &adjNm = adjArrayNames[ai];
+			// Extract array size from body.declarations (e.g. "float[1024]" → "[1024]")
+			std::string arrSize;
+			for (const auto &[dName, dType] : body.declarations) {
+				if (dName == adjNm) {
+					size_t ob = dType.find('[');
+					size_t cb = dType.find(']', ob);
+					if (ob != std::string::npos && cb != std::string::npos) {
+						arrSize = dType.substr(ob, cb - ob + 1);
+					}
+					break;
+				}
+			}
+			// Last member can be unsized; all others need explicit sizes
+			bool isLast = (ai == adjArrayNames.size() - 1);
+			if (isLast || arrSize.empty()) {
+				gradBufDecls += std::format("    float {}[];\n", adjNm);
+			} else {
+				gradBufDecls += std::format("    float {}{};\n", adjNm, arrSize);
+			}
+		}
+		gradBufDecls += "};\n";
 	}
 
 	// Adjoint body lines
 	std::string adjBody;
 	for (const auto &line : body.lines) {
-		adjBody += std::format("    {}\n", line);
+		std::string rewritten = line;
+		for (const auto &[adjBase, info] : paramAdjArrays) {
+			const auto &[bufBase, stride] = info;
+			std::string from = adjBase + "[";
+			std::string to = std::format("_ad_grad_{}_data[gl_GlobalInvocationID.x * {} + ",
+				bufBase, stride);
+			size_t pos = 0;
+			while ((pos = rewritten.find(from, pos)) != std::string::npos) {
+				rewritten.replace(pos, from.size(), to);
+				pos += to.size();
+			}
+		}
+		adjBody += std::format("    {}\n", rewritten);
 	}
 
-	// Gradient writebacks with interleaved layout
+	// Gradient writebacks with interleaved layout.
+	// Use sequential group offset per base name (matching CPU gradOffset),
+	// NOT the buffer element index from parseBufAccess.
 	bool is1D = (workSizeY == 1 && workSizeZ == 1);
 	std::string writebacks;
+	std::unordered_map<std::string, int> baseWritebackCount;
 	for (const auto &[paramName, adjName] : body.writebacks) {
+		if (paramAdjArrays.count(adjBaseName(adjName))) continue;
 		auto [baseName, index] = parseBufAccess(paramName);
 		auto it = groupMap.find(baseName);
 		if (it == groupMap.end()) continue;
 		int stride = it->second.second;
-		int offset = (index >= 0) ? index : 0;
+		int offset = baseWritebackCount[baseName]++;
 		if (is1D) {
 			writebacks += std::format(
 				"    _ad_grad_{}_data[gl_GlobalInvocationID.x * {} + {}] = {};\n",
@@ -202,17 +271,123 @@ inline std::string MergeForwardBackward(const std::string &forwardCode,
 	if (closePos == std::string::npos || closePos <= bracePos)
 		throw std::runtime_error("MergeForwardBackward: main() closing brace not found");
 
+	std::string forwardBody = forwardCode.substr(bracePos + 1,
+		closePos - bracePos - 1);
+
+	// Hoist forward temporary variable declarations (v1, v2, ...) to
+	// function scope so the backward code can reference them even when
+	// they were originally declared inside for/if blocks.
+	std::string hoistedDecls;
+	std::string strippedBody;
+	strippedBody.reserve(forwardBody.size());
+	hoistedDecls.reserve(forwardBody.size() / 4);
+
+	// Pass 1: hoist uninitialized declarations (int v10; without =)
+	{
+		size_t lineStart = 0;
+		while (lineStart < forwardBody.size()) {
+			size_t lineEnd = forwardBody.find('\n', lineStart);
+			if (lineEnd == std::string::npos) lineEnd = forwardBody.size();
+			size_t lineLen = lineEnd - lineStart;
+			std::string_view line(forwardBody.data() + lineStart, lineLen);
+
+			bool isHoistable = false;
+			size_t pos = 0;
+			while (pos < lineLen && (line[pos] == ' ' || line[pos] == '\t')) pos++;
+			auto checkType = [&](const char* typeName, size_t len) {
+				if (pos + len < lineLen && line.compare(pos, len, typeName) == 0
+					&& line[pos + len] == ' ') {
+					size_t nameStart = pos + len + 1;
+					if (nameStart < lineLen && line[nameStart] == 'v') {
+						size_t j = nameStart + 1;
+						while (j < lineLen && line[j] >= '0' && line[j] <= '9') j++;
+						if (j < lineLen && line[j] == ';') {
+							bool hasEq = false;
+							for (size_t k = nameStart; k < j; k++) {
+								if (line[k] == '=') { hasEq = true; break; }
+							}
+							if (!hasEq) isHoistable = true;
+						}
+					}
+				}
+			};
+			static const char* types[] = {"float","int","bool","uint","vec2","vec3","vec4",
+				"ivec2","ivec3","ivec4","bvec2","bvec3","bvec4",
+				"mat4","mat3","mat2"};
+			for (const char* t : types) {
+				if (isHoistable) break;
+				checkType(t, std::char_traits<char>::length(t));
+			}
+
+			if (isHoistable) {
+				hoistedDecls += line;
+				hoistedDecls += '\n';
+			} else {
+				strippedBody += line;
+				strippedBody += '\n';
+			}
+			lineStart = lineEnd + 1;
+		}
+	}
+
+	// Pass 2: hoist for-loop variable declarations (including comma-separated).
+	// Transform "for (type vNN = ..." -> "type vNN;" + "for (vNN = ..."
+	{
+		const char* forTypes[] = {"int","float","bool","uint"};
+		for (const char* ft : forTypes) {
+			size_t searchPos = 0;
+			std::string pattern = std::string("for (") + ft + " v";
+			while ((searchPos = strippedBody.find(pattern, searchPos)) != std::string::npos) {
+				// Find the first variable name
+				size_t vStart = searchPos + pattern.size() - 1;
+				size_t vEnd = vStart + 1;
+				while (vEnd < strippedBody.size() && strippedBody[vEnd] >= '0' && strippedBody[vEnd] <= '9')
+					vEnd++;
+				std::string varName = strippedBody.substr(vStart, vEnd - vStart);
+				// Collect ALL comma-separated variable names
+				std::vector<std::string> allVars;
+				allVars.push_back(varName);
+				size_t cursor = vEnd;
+				while (cursor < strippedBody.size() && strippedBody[cursor] != ';') {
+					if (strippedBody[cursor] == ',') {
+						cursor++;
+						while (cursor < strippedBody.size() && (strippedBody[cursor] == ' ' || strippedBody[cursor] == '\t'))
+							cursor++;
+						if (cursor < strippedBody.size() && strippedBody[cursor] == 'v') {
+							size_t cvEnd = cursor + 1;
+							while (cvEnd < strippedBody.size() && strippedBody[cvEnd] >= '0' && strippedBody[cvEnd] <= '9')
+								cvEnd++;
+							allVars.push_back(strippedBody.substr(cursor, cvEnd - cursor));
+							cursor = cvEnd;
+						}
+					}
+					cursor++;
+				}
+				// Hoist all collected variables
+				for (const auto &v : allVars) {
+					hoistedDecls += std::string(ft) + " " + v + ";\n";
+				}
+				// Remove "type " from the for-init
+				size_t typeStart = searchPos + 5; // skip "for ("
+				size_t typeLen = strlen(ft);
+				strippedBody.erase(typeStart, typeLen + 1); // +1 for space after type
+				searchPos++; // move past
+			}
+		}
+	}
+
 	std::string result;
 	result.reserve(forwardCode.size() + gradBufDecls.size() + adjDecls.size() +
-				   adjBody.size() + writebacks.size() + 200);
+				   adjBody.size() + writebacks.size() + hoistedDecls.size() + 200);
 
 	result += forwardCode.substr(0, mainPos);
 	result += gradBufDecls;
 	if (!gradBufDecls.empty()) result += "\n";
 	result += forwardCode.substr(mainPos, bracePos - mainPos + 1);
 	result += "\n";
+	if (!hoistedDecls.empty()) result += hoistedDecls;
 	result += adjDecls;
-	result += forwardCode.substr(bracePos + 1, closePos - bracePos - 1);
+	result += strippedBody;
 
 	if (!adjBody.empty()) {
 		result += "\n    // === Backward pass (auto-generated) ===\n";
@@ -278,7 +453,7 @@ public:
 
 		// Group params by source buffer base name, assign shared bindings
 		{
-			std::unordered_map<std::string, std::vector<int>> groups; // baseName → param indices
+			std::map<std::string, std::vector<int>> groups; // baseName → param indices (deterministic order)
 			for (int i = 0; i < (int)_params.size(); i++) {
 				std::string base = ExtractBaseName(_params[i].varName);
 				groups[base].push_back(i);
@@ -300,6 +475,108 @@ public:
 		AdjointGenerator gen;
 		_body = gen.GenerateBody(_tape, true);
 
+		// Phase 3.5: Fix adjoint declarations for buffers that are used as
+		// arrays but declared as scalars (because they lack registered params).
+		{
+			// Collect adjoint names used with array indexing in backward body
+			std::unordered_map<std::string, size_t> adjMaxIdx;
+			for (const auto &line : _body.lines) {
+				size_t pos = 0;
+				while (pos < line.size()) {
+					auto bstart = line.find('[', pos);
+					if (bstart == std::string::npos) break;
+					size_t idEnd = bstart;
+					while (idEnd > 0 && line[idEnd-1] == ' ') idEnd--;
+					size_t idStart = idEnd;
+					while (idStart > 0 && (std::isalnum(static_cast<unsigned char>(line[idStart-1])) || line[idStart-1] == '_'))
+						idStart--;
+					std::string arrName = line.substr(idStart, idEnd - idStart);
+					auto bend = line.find(']', bstart);
+					if (bend != std::string::npos) {
+						std::string idxStr = line.substr(bstart + 1, bend - bstart - 1);
+						try {
+							size_t idx = std::stoull(idxStr);
+							if (idx + 1 > adjMaxIdx[arrName]) adjMaxIdx[arrName] = idx + 1;
+						} catch (...) {
+							// Non-constant index: estimate from int(N) literals
+							// and per-thread stride for gl_GlobalInvocationID.x
+							size_t maxConst = 0;
+							size_t cp = 0;
+							while (cp < idxStr.size()) {
+								auto ip = idxStr.find("int(", cp);
+								if (ip == std::string::npos) break;
+								ip += 4;
+								auto ie = idxStr.find(')', ip);
+								if (ie != std::string::npos) {
+									std::string ns = idxStr.substr(ip, ie - ip);
+									try {
+										size_t val = std::stoull(ns);
+										if (val > maxConst) maxConst = val;
+									} catch (...) {}
+									cp = ie + 1;
+								} else break;
+							}
+							size_t maxStride = 0;
+							auto gidPos = idxStr.find("gl_GlobalInvocationID.x");
+							if (gidPos != std::string::npos) {
+								// Extract the first int(N) after thread ID as per-thread stride.
+								// Skip nested [...] sections.
+								size_t sp = gidPos;
+								int depth = 0;
+								while (sp < idxStr.size() && maxStride == 0) {
+									char c = idxStr[sp];
+									if (c == '[') depth++;
+									else if (c == ']') { if (depth > 0) depth--; }
+									else if (depth == 0 && c == '(' && sp + 4 < idxStr.size() && idxStr.substr(sp, 5) == "(int(") {
+										sp += 5;
+										auto me = idxStr.find(')', sp);
+										if (me != std::string::npos) {
+											try { maxStride = std::stoull(idxStr.substr(sp, me - sp)); } catch (...) {}
+											sp = me;
+										}
+									}
+									sp++;
+								}
+							}
+							// Conservative estimate: base + threads*stride + maxConst padding
+							size_t est = maxConst + (_elementCount > 0 ? _elementCount : 64) * maxStride + maxConst + 4096;
+							// Cap at 500K elements (2 MB per array) to prevent GPU OOM
+							if (est > 500000) est = 500000;
+							if (est > adjMaxIdx[arrName]) adjMaxIdx[arrName] = est;
+						}
+					}
+					pos = bend + 1;
+				}
+			}
+			// Fix scalar declarations to array types where needed
+			for (auto &[adjName, glslType] : _body.declarations) {
+				if (glslType.find('[') == std::string::npos && adjMaxIdx.count(adjName)) {
+					size_t arrSize = adjMaxIdx[adjName];
+					if (arrSize <= 1) arrSize = _elementCount > 0 ? _elementCount : 1024;
+					glslType = std::format("{}[{}]", glslType, arrSize);
+				}
+			}
+			// Track adjoint arrays for combined pool allocation (offsets, not bindings)
+			{
+				size_t runningOffset = 0;
+				for (const auto &[adjName2, glslType2] : _body.declarations) {
+					auto bracketPos2 = glslType2.find('[');
+					if (bracketPos2 != std::string::npos) {
+						std::string sizeStr = glslType2.substr(bracketPos2 + 1, glslType2.size() - bracketPos2 - 2);
+						try {
+							AdjArrayMeta am;
+							am.adjName = adjName2;
+							am.offset = runningOffset;
+							am.size = std::stoull(sizeStr);
+							runningOffset += am.size;
+							_adjArrays.push_back(am);
+						} catch (...) {}
+					}
+				}
+				_adjPoolSize = runningOffset;
+			}
+		}
+
 		// Phase 4: Build grouped gradient buffer list for merge
 		std::vector<GradBufGroup> gradBufGroups;
 		{
@@ -319,6 +596,20 @@ public:
 		if (!_body.lines.empty() || !_body.declarations.empty()) {
 			_combinedCode = MergeForwardBackward(_forwardCode, _body,
 												 groupSize, 1, 1, gradBufGroups);
+
+			// Insert thread ID bounds guard so threads beyond elementCount
+			// do not read/write past undersized input/adjoint buffers.
+			{
+				auto mainPos = _combinedCode.find("void main()");
+				if (mainPos != std::string::npos) {
+					auto bracePos = _combinedCode.find("{", mainPos);
+					if (bracePos != std::string::npos) {
+						std::string guard = "\n    if (gl_GlobalInvocationID.x >= " +
+							std::to_string(_elementCount) + ") return;\n";
+						_combinedCode.insert(bracePos + 1, guard);
+					}
+				}
+			}
 		}
 	}
 
@@ -340,6 +631,28 @@ public:
 	void Backward(int groupCount, bool sync = false) {
 		if (_combinedCode.empty()) return;
 		EnsureGradientBuffers();
+		// Parameter adjoints use the gradient output buffers as per-thread
+		// accumulators, so they must be cleared before every backward pass.
+		{
+			std::unordered_set<Backend::BufferHandle> cleared;
+			size_t dispThreads = ((_elementCount + _workSizeX - 1) / _workSizeX) * _workSizeX;
+			for (const auto &pm : _params) {
+				if (pm.gradHandle == Backend::INVALID_BUFFER_HANDLE) continue;
+				if (!cleared.insert(pm.gradHandle).second) continue;
+				static std::vector<float> zeroGrad;
+				zeroGrad.resize(dispThreads * pm.gradStride, 0.0f);
+				auto *be = Runtime::Context::GetBackend();
+				if (be) be->UploadBuffer(pm.gradHandle, 0,
+					zeroGrad.size() * sizeof(float), zeroGrad.data());
+			}
+		}
+		// Zero adjoint pool to prevent accumulation between dispatches
+		if (_adjPoolHandle != Backend::INVALID_BUFFER_HANDLE && _adjPoolSize > 0) {
+			static std::vector<float> zeroBuf;
+			zeroBuf.resize(_adjPoolSize, 0.0f);
+			auto *be = Runtime::Context::GetBackend();
+			if (be) be->UploadBuffer(_adjPoolHandle, 0, _adjPoolSize * sizeof(float), zeroBuf.data());
+		}
 		ExecuteCombinedDispatch(groupCount, sync);
 	}
 
@@ -376,6 +689,40 @@ public:
 	}
 
 	/**
+	 * Download all parameter gradients in one efficient batch.
+	 * Shared gradient buffers are downloaded only once and cached,
+	 * avoiding redundant transfers for interleaved groups.
+	 */
+	std::vector<std::vector<float>> DownloadAllGradients() const {
+		std::vector<std::vector<float>> result(_params.size());
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend) return result;
+
+		std::unordered_map<Backend::BufferHandle, std::vector<float>> cache;
+
+		for (size_t i = 0; i < _params.size(); i++) {
+			const auto &pm = _params[i];
+			if (pm.gradHandle == Backend::INVALID_BUFFER_HANDLE) continue;
+
+			if (pm.gradStride == 1) {
+				result[i].resize(pm.count);
+				backend->DownloadBuffer(pm.gradHandle, 0, pm.count * sizeof(float), result[i].data());
+			} else {
+				auto &cached = cache[pm.gradHandle];
+				if (cached.empty()) {
+					size_t totalFloats = pm.count * pm.gradStride;
+					cached.resize(totalFloats);
+					backend->DownloadBuffer(pm.gradHandle, 0, totalFloats * sizeof(float), cached.data());
+				}
+				result[i].resize(pm.count);
+				for (size_t j = 0; j < pm.count; j++)
+					result[i][j] = cached[j * pm.gradStride + pm.gradOffset];
+			}
+		}
+		return result;
+	}
+
+	/**
 	 * Download the gradient for a parameter by variable name.
 	 */
 	std::vector<float> Gradient(const std::string &paramVarName) const {
@@ -405,6 +752,12 @@ private:
 		Backend::BufferHandle gradHandle = 0;
 	};
 
+	struct AdjArrayMeta {
+		std::string adjName;
+		size_t      offset = 0;   // offset (in floats) into the combined adjoint pool
+		size_t      size = 0;
+	};
+
 	/** Extract the base buffer name from a var name like "buf2[0]" → "buf2". */
 	static std::string ExtractBaseName(const std::string &varName) {
 		auto bpos = varName.find('[');
@@ -416,6 +769,15 @@ private:
 		Runtime::Context::GetInstance().MakeCurrent();
 		auto *backend = Runtime::Context::GetBackend();
 		if (!backend) return;
+
+		// Allocate combined adjoint pool SSBO
+		if (_adjPoolHandle == Backend::INVALID_BUFFER_HANDLE && _adjPoolSize > 0) {
+			Backend::BufferDesc desc;
+			desc.sizeInBytes = _adjPoolSize * sizeof(float);
+			desc.mode  = Backend::BufferMode::ReadWrite;
+			desc.initialData  = nullptr;
+			_adjPoolHandle = backend->CreateBuffer(desc);
+		}
 
 		// Track which bindings already have a buffer
 		std::unordered_set<int> created;
@@ -434,7 +796,9 @@ private:
 			}
 
 			Backend::BufferDesc desc;
-			desc.sizeInBytes = pm.count * pm.gradStride * sizeof(float);
+			// Size for ALL dispatched threads (elementCount is rounded up to workgroup size)
+			size_t dispThreads = ((_elementCount + _workSizeX - 1) / _workSizeX) * _workSizeX;
+			desc.sizeInBytes = dispThreads * pm.gradStride * sizeof(float);
 			desc.mode  = Backend::BufferMode::ReadWrite;
 			desc.initialData  = nullptr;
 
@@ -462,6 +826,11 @@ private:
 		// Clear all handles (others in same group still have the stale value)
 		for (auto &pm : _params) {
 			pm.gradHandle = Backend::INVALID_BUFFER_HANDLE;
+		}
+		// Release combined adjoint pool SSBO
+		if (_adjPoolHandle != Backend::INVALID_BUFFER_HANDLE) {
+			backend->DestroyBuffer(_adjPoolHandle);
+			_adjPoolHandle = Backend::INVALID_BUFFER_HANDLE;
 		}
 	}
 
@@ -502,6 +871,15 @@ private:
 				rb.buffer  = pm.gradHandle;
 				bindings.push_back(rb);
 			}
+		}
+
+		// Combined adjoint pool SSBO binding
+		if (_adjPoolHandle != Backend::INVALID_BUFFER_HANDLE) {
+			Backend::ResourceBinding rb;
+			rb.binding = 20;
+			rb.type    = Backend::BindingType::Buffer;
+			rb.buffer  = _adjPoolHandle;
+			bindings.push_back(rb);
 		}
 
 		if (!bindings.empty()) {
@@ -554,6 +932,15 @@ private:
 			}
 		}
 
+		// Combined adjoint pool SSBO
+		if (!_adjArrays.empty()) {
+			Backend::ResourceLayoutEntry entry;
+			entry.binding  = 20;
+			entry.type     = Backend::BindingType::Buffer;
+			entry.readOnly = false;
+			pipeDesc.resources.push_back(entry);
+		}
+
 		Backend::PipelineHandle pipeline = backend->CreatePipeline(pipeDesc);
 		backend->DestroyShader(shader);
 
@@ -576,6 +963,9 @@ private:
 
 	std::vector<ParamMeta> _params;
 	int _nextGradBinding = 10;
+	std::vector<AdjArrayMeta> _adjArrays;
+	size_t _adjPoolSize = 0;
+	Backend::BufferHandle _adjPoolHandle = Backend::INVALID_BUFFER_HANDLE;
 
 	Backend::PipelineHandle _combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
 };

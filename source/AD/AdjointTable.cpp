@@ -14,15 +14,55 @@ std::string AdjointTable::GetOrCreate(const std::string &varName, const std::str
 	if (it != _map.end()) return it->second;
 
 	std::string adjName = MakeAdjointName(varName);
+
 	_map[varName] = adjName;
-	_types[adjName] = glslType;
-	_insertionOrder.push_back(adjName);
+
+	// Also index by base buffer name for variable-indexed lookups
+	auto bpos = varName.find('[');
+	if (bpos != std::string::npos) {
+		std::string base = varName.substr(0, bpos);
+		if (!_baseMap.count(base)) {
+			_baseMap[base] = adjName;
+		}
+	}
+
+	// Only track this adjoint for declaration if it hasn't been seen before.
+	// Multiple forward varNames (e.g., buf1[idx1], buf1[idx2]) can map to the
+	// same adjoint name (e.g., "grad_buf1"), and it should be declared once.
+	if (!_types.count(adjName)) {
+		_types[adjName] = glslType;
+		_insertionOrder.push_back(adjName);
+	}
 	return adjName;
 }
 
 std::string AdjointTable::Get(const std::string &varName) const {
 	auto it = _map.find(varName);
-	return it != _map.end() ? it->second : "";
+	if (it == _map.end()) {
+		// Fall back to base-name matching for buffer-type names with
+		// variable indices (e.g. buf5[v115*16+v116] -> lookup "buf5")
+		auto bpos = varName.find('[');
+		if (bpos != std::string::npos) {
+			std::string base = varName.substr(0, bpos);
+			auto baseIt = _baseMap.find(base);
+			if (baseIt == _baseMap.end()) return "";
+			std::string adjBase = baseIt->second;
+			auto epos = varName.rfind(']');
+			std::string idxExpr = varName.substr(bpos + 1, epos - bpos - 1);
+			return adjBase + "[" + idxExpr + "]";
+		}
+		return "";
+	}
+	// For buffer-type names (containing [...]), reconstruct the array-indexed
+	// adjoint reference so callers get the full expression like grad_buf[0]
+	// or grad_buf[tokenId*E+d] without needing to parse the index themselves.
+	auto bpos = varName.find('[');
+	if (bpos != std::string::npos) {
+		auto epos = varName.rfind(']');
+		std::string idxExpr = varName.substr(bpos + 1, epos - bpos - 1);
+		return it->second + "[" + idxExpr + "]";
+	}
+	return it->second;
 }
 
 bool AdjointTable::Has(const std::string &varName) const {
@@ -34,31 +74,42 @@ std::vector<std::pair<std::string, std::string>> AdjointTable::AllDeclarations()
 	for (const auto &adjName : _insertionOrder) {
 		auto typeIt = _types.find(adjName);
 		if (typeIt != _types.end()) {
-			decls.emplace_back(adjName, typeIt->second);
+			auto sizeIt = _arraySizes.find(adjName);
+			if (sizeIt != _arraySizes.end() && sizeIt->second > 0) {
+				// Array adjoint for buffer parameters
+				decls.emplace_back(adjName,
+					std::format("{}[{}]", typeIt->second, sizeIt->second));
+			} else {
+				decls.emplace_back(adjName, typeIt->second);
+			}
 		}
 	}
 	return decls;
 }
 
+void AdjointTable::SetArraySize(const std::string &adjName, size_t arraySize) {
+	_arraySizes[adjName] = arraySize;
+}
+
+size_t AdjointTable::GetArraySize(const std::string &adjName) const {
+	auto it = _arraySizes.find(adjName);
+	return it != _arraySizes.end() ? it->second : 0;
+}
+
 void AdjointTable::Clear() {
 	_map.clear();
+	_baseMap.clear();
 	_types.clear();
 	_insertionOrder.clear();
 }
 
 std::string AdjointTable::MakeAdjointName(const std::string &varName) {
-	// Buffer element access "buf2[0]" -> "grad_buf2_0" (include constant index
-	// to disambiguate multiple parameters from the same buffer).
+	// Buffer element access "buf2[0]" or "buf2[expr]" -> "grad_buf2"
+	// All accesses to the same buffer share a single adjoint array.
+	// Index expressions are preserved in the generated GLSL code by
+	// reconstructing "grad_buf2[index]" from the base name and index.
 	if (auto bracketPos = varName.find('['); bracketPos != std::string::npos) {
-		auto closePos = varName.find(']', bracketPos);
-		std::string base = varName.substr(0, bracketPos);
-		if (closePos != std::string::npos && closePos > bracketPos + 1) {
-			std::string idx = varName.substr(bracketPos + 1, closePos - bracketPos - 1);
-			if (idx.find('(') == std::string::npos && idx.find('v') == std::string::npos) {
-				return "grad_" + base + "_" + idx;
-			}
-		}
-		return "grad_" + base;
+		return "grad_" + varName.substr(0, bracketPos);
 	}
 	// Swizzle access "v3.xyz" -> "d_v3_xyz"
 	std::string sanitized;

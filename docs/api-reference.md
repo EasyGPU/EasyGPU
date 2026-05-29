@@ -40,6 +40,7 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 - [Matrix Types](#matrix-types)
 - [Callable](#callable)
 - [Automatic Differentiation](#automatic-differentiation)
+- [Neural Network](#neural-network)
 - [Structs](#structs)
 - [Textures](#textures)
 - [Texture Samplers](#texture-samplers)
@@ -2313,6 +2314,595 @@ struct GradBuffer {
 | Callable | User-defined functions | Sub-tape recording + inline |
 
 **Zero-gradient operations** (skipped by the tape): `floor`, `ceil`, `trunc`, `round`, `sign`, `step`, `faceforward`, `floatBitsToInt`, `intBitsToFloat`, `floatBitsToUint`, `uintBitsToFloat`.
+
+---
+
+## Neural Network
+
+The NN module (`include/NN/NN.h`) provides Tensor, Optimizer, Layers, and Loss functions that integrate with the AD engine. All classes live in `namespace GPU::NN`.
+
+Include the umbrella header:
+
+```cpp
+#include <NN/NN.h>
+using namespace GPU::NN;
+```
+
+### Class Overview
+
+| Class | Purpose |
+|:------|:--------|
+| `Tensor<T, Dims...>` | Multi-dimensional weight container, GPU sync, batch param registration |
+| `TensorRef<T, Dims...>` | DSL-side tensor handle (returned by `Tensor::Bind()`) |
+| `Adam` | Adam optimizer with bias correction, weight decay, gradient clipping |
+| `SGD` | SGD with momentum, weight decay, gradient clipping |
+| `RMSprop` | RMSprop with moving average, weight decay, gradient clipping |
+| `Linear<T, In, Out>` | Fully-connected layer with Xavier init |
+| `ReLU<T>` / `Sigmoid<T>` / `Tanh<T>` | Activation layers |
+| `Sequential<T, Layers...>` | Compile-time layer pipeline |
+| `MSELoss` / `CrossEntropyLoss` | Loss functions for scalar and multi-class outputs |
+| `TokenEmbedding<T, V, E>` | Learned token embedding lookup |
+| `PositionalEmbedding<T, B, E>` | Learned positional embedding |
+| `RMSNorm<T, Dim>` | Root-mean-square normalization (GPT-style) |
+| `CausalSelfAttention<T, E, H>` | Multi-head causal self-attention |
+| `TransformerBlock<T, B, E, H>` | Pre-norm transformer block (attention + MLP) |
+| `SaveWeights` / `LoadWeights` | Checkpoint save/load to binary files |
+
+---
+
+### Tensor
+
+`Tensor<T, Dims...>` wraps a `Buffer<T>` with multi-dimensional indexing, CPU/GPU synchronization, and batch parameter registration. The shape is fixed at compile time.
+
+```cpp
+template <typename T, size_t... Dims>
+class Tensor {
+public:
+    /// Default constructor — zero-initialized.
+    Tensor();
+
+    /// Construct from flat vector data.
+    explicit Tensor(const std::vector<T>& data, BufferMode mode = ReadWrite);
+
+    /// Construct from vector (rvalue, move).
+    explicit Tensor(std::vector<T>&& data, BufferMode mode = ReadWrite);
+
+    // ── CPU access ──────────────────────────────────────
+
+    /// Raw pointer to CPU data.
+    T* Data();
+    const T* Data() const;
+
+    /// Multi-dimensional CPU indexing: W(i, j), tok(id, dim)
+    template <typename... Indices>
+    T& operator()(Indices... indices);
+
+    /// Total number of elements (= Dims[0] * Dims[1] * ...).
+    static constexpr size_t Size();
+
+    // ── GPU synchronization ─────────────────────────────
+
+    /// Upload CPU data to GPU buffer.
+    void Upload();
+
+    /// Download GPU data to CPU buffer.
+    void Download();
+
+    // ── DSL integration ─────────────────────────────────
+
+    /// Bind for use inside a kernel lambda. Returns TensorRef<T, Dims...>.
+    auto Bind();
+
+    /// Access the underlying Buffer<T> (for manual GPU I/O).
+    Buffer<T>& GetBuffer();
+    const Buffer<T>& GetBuffer() const;
+
+    // ── Move semantics ──────────────────────────────────
+
+    Tensor(Tensor&& other) noexcept;
+    Tensor& operator=(Tensor&& other) noexcept;
+
+    // Non-copyable (single owner of GPU buffer)
+    Tensor(const Tensor&) = delete;
+    Tensor& operator=(const Tensor&) = delete;
+};
+```
+
+**Example:**
+
+```cpp
+// Create a weight matrix
+std::vector<float> data(128 * 64);
+// ... fill with Xavier init ...
+Tensor<float, 128, 64> W(data);
+
+// CPU access
+float val = W(3, 7);
+W(0, 1) = 0.5f;
+
+// Upload to GPU
+W.Upload();
+```
+
+---
+
+### TensorRef
+
+`TensorRef<T, Dims...>` is the DSL-side handle returned by `Tensor::Bind()`. It provides multi-dimensional indexing into kernel values and batch parameter registration.
+
+```cpp
+template <typename T, size_t... Dims>
+class TensorRef {
+public:
+    /// Multi-dimensional indexing. Returns Var<T> for scalar access,
+    /// Expr<int> for index arithmetic.
+    template <typename... Indices>
+    auto operator()(Indices... indices);
+
+    /// Register every scalar element as an AD parameter.
+    /// Compile-time unrolled via std::index_sequence + fold expression.
+    template <typename F>
+    void ForEachParam(F&& f);
+};
+```
+
+**Example:**
+
+```cpp
+// Inside kernel lambda
+auto W = weightTensor.Bind();
+auto b = biasTensor.Bind();
+
+// Multi-dimensional indexing
+Var<float> w = W(i, j);               // weightTensor[i * stride_j + j]
+Var<float> bias = b(k);
+
+// Batch parameter registration — 8192 AD::Param calls, one line
+W.ForEachParam([](auto &p) { AD::Param(p); });
+b.ForEachParam([](auto &p) { AD::Param(p); });
+```
+
+**Index computation:** `TensorRef::operator()` computes the flat offset at compile time using `StrideAt<I, Dims...>`. For `Tensor<float, 128, 64>`:
+- `W(i, j)` → `W[i * 64 + j]` (row-major layout)
+- `W(k)` → `W[k]` (flat indexing)
+
+---
+
+### Optimizers
+
+All optimizers live in `GPU::NN`. They manage per-parameter state (first/second moments for Adam, velocity for SGD, squared average for RMSprop) and handle gradient download, aggregation, update, and upload in a single `Step()` call.
+
+#### Adam
+
+```cpp
+class Adam {
+public:
+    /// @param lr    Learning rate (default 0.001)
+    /// @param beta1 First moment decay (default 0.9)
+    /// @param beta2 Second moment decay (default 0.999)
+    /// @param eps   Numerical stability (default 1e-8)
+    Adam(float lr = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f);
+
+    /// Enable L2 weight decay.
+    void SetWeightDecay(float wd);
+
+    /// Enable gradient clipping by value.
+    void SetGradClip(float clip);
+
+    /// Register a raw weight array as trainable.
+    void AddParameter(float* data, size_t size, Buffer<float>* buf = nullptr);
+
+    /// Register all elements of a Tensor as trainable parameters.
+    template <size_t... Dims>
+    void AddTensor(Tensor<float, Dims...>& tensor);
+
+    /// Execute one optimization step.
+    /// Downloads gradients via DownloadAllGradients(), aggregates per-thread
+    /// gradients, applies Adam update, and uploads weights to GPU buffers.
+    void Step(ADKernel1D& kernel);
+
+    int GetStep() const;
+    size_t ParameterCount() const;
+};
+```
+
+**Update rule:** For each scalar parameter (with per-thread gradient averaging):
+
+```
+m[t]   = beta1 * m[t-1] + (1 - beta1) * g
+v[t]   = beta2 * v[t-1] + (1 - beta2) * g²
+m_hat  = m[t] / (1 - beta1^step)
+v_hat  = v[t] / (1 - beta2^step)
+weight -= lr * m_hat / (sqrt(v_hat) + eps)
+```
+
+**Example:**
+
+```cpp
+Adam adam(0.001f, 0.9f, 0.999f);
+adam.SetWeightDecay(0.0001f);
+adam.SetGradClip(1.0f);
+
+adam.AddTensor(fc1.Weight());
+adam.AddTensor(fc1.Bias());
+adam.AddTensor(fc2.Weight());
+adam.AddTensor(fc2.Bias());
+
+// Training loop
+for (int step = 0; step < 1000; step++) {
+    kernel.Forward(groups, true);
+    kernel.Backward(groups, true);
+    adam.Step(kernel);  // download → aggregate → update → upload
+}
+```
+
+#### SGD
+
+```cpp
+class SGD {
+public:
+    /// @param lr       Learning rate (default 0.01)
+    /// @param momentum Momentum coefficient (0 = vanilla SGD)
+    SGD(float lr = 0.01f, float momentum = 0.0f);
+
+    void SetWeightDecay(float wd);
+    void SetGradClip(float clip);
+    void AddParameter(float* data, size_t size, Buffer<float>* buf = nullptr);
+    template <size_t... Dims> void AddTensor(Tensor<float, Dims...>& tensor);
+    void Step(ADKernel1D& kernel);
+    int GetStep() const;
+    size_t ParameterCount() const;
+};
+```
+
+**Update rule:** `v = momentum * v + g; weight -= lr * v`
+
+#### RMSprop
+
+```cpp
+class RMSprop {
+public:
+    /// @param lr   Learning rate (default 0.001)
+    /// @param beta Moving average decay (default 0.9)
+    /// @param eps  Numerical stability (default 1e-8)
+    RMSprop(float lr = 0.001f, float beta = 0.9f, float eps = 1e-8f);
+
+    void SetWeightDecay(float wd);
+    void SetGradClip(float clip);
+    void AddParameter(float* data, size_t size, Buffer<float>* buf = nullptr);
+    template <size_t... Dims> void AddTensor(Tensor<float, Dims...>& tensor);
+    void Step(ADKernel1D& kernel);
+    int GetStep() const;
+    size_t ParameterCount() const;
+};
+```
+
+**Update rule:** `sq = beta * sq + (1 - beta) * g²; weight -= lr * g / sqrt(sq + eps)`
+
+---
+
+### Layers
+
+All layers follow the same pattern: construct outside the kernel, call `Setup()` inside the kernel to register parameters, call `Forward()` to emit DSL code.
+
+#### Linear
+
+Fully-connected layer: `y = xW + b`. Weights initialized with Xavier uniform, biases initialized to zero.
+
+```cpp
+template <typename T, size_t InFeatures, size_t OutFeatures>
+class Linear {
+public:
+    /// Construct with Xavier-initialized weights and zero biases.
+    Linear(unsigned initSeed = 42);
+
+    /// Register weights and biases as AD parameters.
+    void Setup();
+
+    /// Forward pass. Reads input from inBuf starting at offset, writes to outBuf.
+    void Forward(const BufferRef<T>& inBuf, const Var<int>& threadId,
+                 const BufferRef<T>& outBuf, int inOffset = 0, int outOffset = 0);
+
+    /// Forward pass with explicit offset expressions.
+    void Forward(const BufferRef<T>& inBuf, const Expr<int>& inOff,
+                 const BufferRef<T>& outBuf, const Expr<int>& outOff);
+
+    Tensor<T, InFeatures, OutFeatures>& Weight();
+    Tensor<T, OutFeatures>& Bias();
+    static constexpr size_t WeightSize = InFeatures * OutFeatures;
+    static constexpr size_t BiasSize   = OutFeatures;
+};
+```
+
+**Example:**
+
+```cpp
+Linear<float, 784, 128> fc1(42);  // 784→128 with Xavier init
+
+// In kernel:
+fc1.Setup();
+fc1.Forward(input, threadId, hidden);
+```
+
+#### Activation Layers
+
+```cpp
+template <typename T, size_t Dim = 0>
+class ReLU {
+public:
+    /// @param dim If > 0, activates exactly dim elements per sample. If 0, Dim is used.
+    explicit ReLU(size_t dim = Dim);
+
+    void Setup();  // no-op (no parameters)
+    void Forward(const BufferRef<T>& buf, const Var<int>& threadId,
+                 const BufferRef<T>& out, int offset = 0);
+    void Forward(const BufferRef<T>& buf, const Expr<int>& baseOff,
+                 const BufferRef<T>& out, const Expr<int>& outOff);
+};
+```
+
+`Sigmoid<T, Dim>` and `Tanh<T, Dim>` have the same API as `ReLU`.
+
+**Example:**
+
+```cpp
+ReLU<float, 128> relu;
+relu.Setup();
+relu.Forward(hidden, threadId, activated);
+```
+
+#### Sequential
+
+Compile-time layer pipeline. Composes multiple layers and forwards through them in order.
+
+```cpp
+template <typename T, typename... Layers>
+class Sequential {
+public:
+    Sequential(Layers&... layers);
+
+    /// Register all parameters from all layers.
+    void Setup();
+
+    /// Forward through all layers. First layer reads from inBuf,
+    /// intermediate results flow through internal buffers, final output
+    /// written to outBuf.
+    void Forward(const BufferRef<T>& inBuf, const Var<int>& threadId,
+                 const BufferRef<T>& outBuf, size_t dim);
+};
+```
+
+**Example:**
+
+```cpp
+Linear<float, 784, 128> fc1;
+ReLU<float, 128> relu;
+Linear<float, 128, 10> fc2;
+
+Sequential<float, Linear<float, 784, 128>, ReLU<float, 128>, Linear<float, 128, 10>>
+    mlp(fc1, relu, fc2);
+
+// In kernel — one Setup + one Forward
+mlp.Setup();
+mlp.Forward(input, threadId, output, 10);
+```
+
+---
+
+### Loss Functions
+
+Loss functions produce a `Var<float>` that you pass to `AD::Loss()`.
+
+#### MSELoss
+
+```cpp
+/// Mean Squared Error from buffers. Sums over outputDim elements per sample.
+Var<float> MSELoss(const BufferRef<float>& predBuf,
+                    const BufferRef<float>& targetBuf,
+                    const Var<int>& threadId,
+                    int outputDim);
+
+/// Scalar MSE: loss = (pred - target)²
+Var<float> MSELoss(const Var<float>& pred, const Var<float>& target);
+```
+
+#### CrossEntropyLoss
+
+```cpp
+/// Cross-entropy loss for multi-class classification (logits, not log-probabilities).
+/// Performs max-reduction → exp → sum → log → subtraction → negation.
+/// The targetId indexes into logits starting at logitsBase.
+Var<float> CrossEntropyLoss(const BufferRef<float>& logitsBuf,
+                              int vocabSize,
+                              const Var<int>& targetId,
+                              const Expr<int>& logitsBase);
+```
+
+**Example:**
+
+```cpp
+// Inside kernel — GPT-style next-token prediction
+Var<float> totalLoss = CrossEntropyLoss(data, vocabSize, targetId, logitsBase);
+AD::Loss(totalLoss);
+```
+
+---
+
+### Embeddings
+
+#### TokenEmbedding
+
+Learned embedding lookup by token ID. Shape: `[VocabSize, EmbedDim]`.
+
+```cpp
+template <typename T, size_t VocabSize, size_t EmbedDim>
+class TokenEmbedding {
+public:
+    TokenEmbedding(unsigned initSeed = 42);
+
+    void Setup();  // registers weight as AD parameters
+    void Forward(const Expr<int>& tokenId, const BufferRef<T>& out, const Expr<int>& outOffset);
+
+    Tensor<T, VocabSize, EmbedDim>& Weight();
+    static constexpr size_t TotalSize = VocabSize * EmbedDim;
+};
+```
+
+#### PositionalEmbedding
+
+Learned positional embedding. Shape: `[BlockSize, EmbedDim]`.
+
+```cpp
+template <typename T, size_t BlockSize, size_t EmbedDim>
+class PositionalEmbedding {
+public:
+    PositionalEmbedding(unsigned initSeed = 42);
+
+    void Setup();
+    void Forward(const Expr<int>& pos, const BufferRef<T>& out, const Expr<int>& outOffset);
+
+    Tensor<T, BlockSize, EmbedDim>& Weight();
+    static constexpr size_t TotalSize = BlockSize * EmbedDim;
+};
+```
+
+**Example:**
+
+```cpp
+TokenEmbedding<float, 27, 16>     tokEmb(42);
+PositionalEmbedding<float, 16, 16> posEmb(123);
+
+// In kernel:
+tokEmb.Setup();
+posEmb.Setup();
+// x[pos] = tokEmb[tokenId] + posEmb[pos]
+tokEmb.Forward(tokenId, data, pos * embedDim);
+posEmb.Forward(pos, data, pos * embedDim);
+```
+
+---
+
+### Normalization
+
+#### RMSNorm
+
+Root-mean-square normalization (GPT-2 style). No learnable parameters — purely structural.
+
+```cpp
+template <typename T, size_t Dim>
+class RMSNorm {
+public:
+    void Setup();  // no-op
+    void Forward(const BufferRef<T>& inBuf, const Var<int>& threadId,
+                 const BufferRef<T>& outBuf, int offset = 0);
+    void Forward(const BufferRef<T>& inBuf, const Expr<int>& inOff,
+                 const BufferRef<T>& outBuf, const Expr<int>& outOff);
+};
+```
+
+**Computation:** For input `x[0..dim-1]`: `rms = sqrt(mean(x²) + eps); out[i] = x[i] / rms`
+
+---
+
+### Attention
+
+#### CausalSelfAttention
+
+Multi-head causal self-attention (GPT-2 style). Weights packed into a single `[4, EmbedDim, EmbedDim]` tensor (Q, K, V, O) to minimize SSBO binding slots. Uses three-pass safe softmax (max reduction → exp-sum → weighted sum). No biases.
+
+```cpp
+template <typename T, size_t EmbedDim, size_t NumHeads>
+class CausalSelfAttention {
+    static constexpr size_t HeadDim = EmbedDim / NumHeads;  // must divide evenly
+
+public:
+    CausalSelfAttention(unsigned initSeed = 42);
+
+    void Setup();  // registers weight tensor as AD parameters
+
+    /// Forward pass for a single position in a sequence.
+    /// @param scratch  Single scratch buffer (holds K, V, AttnOut, MLP regions)
+    /// @param xOff     Offset of input (normalized residual) within scratch
+    /// @param kOff     Offset of K region
+    /// @param vOff     Offset of V region
+    /// @param aOff     Offset of AttnOut region
+    /// @param pos      Current position (0..blockSize-1)
+    /// @param offset   Base offset for this batch
+    void Forward(const BufferRef<T>& scratch,
+                 const Expr<int>& xOff, const Expr<int>& kOff,
+                 const Expr<int>& vOff, const Expr<int>& aOff,
+                 const Expr<int>& pos,  const Expr<int>& offset);
+
+    Tensor<T, 4, EmbedDim, EmbedDim>& Weights();
+    static constexpr size_t ParamCount = 4 * EmbedDim * EmbedDim;
+};
+```
+
+---
+
+### Transformer
+
+#### TransformerBlock
+
+Pre-norm transformer block (GPT-2 architecture): RMSNorm → Attention → +residual → RMSNorm → MLP(ReLU) → +residual. Uses a single scratch buffer internally to minimize SSBO bindings.
+
+```cpp
+template <typename T, size_t BlockSize, size_t EmbedDim, size_t NumHeads>
+class TransformerBlock {
+    static constexpr size_t MLPDim = 4 * EmbedDim;
+
+public:
+    /// @param batchSize Number of samples per batch (for scratch buffer sizing)
+    TransformerBlock(size_t batchSize, unsigned seed = 42);
+
+    void Setup();  // registers attention, fc1, fc2 parameters
+
+    /// Forward pass for a single position.
+    /// @param data     Main data buffer (input + output)
+    /// @param pos      Current position (0..blockSize-1)
+    /// @param seqBase  Base offset for this batch in the data buffer
+    void Forward(const BufferRef<T>& data, const Expr<int>& pos, const Expr<int>& seqBase);
+
+    CausalSelfAttention<T, EmbedDim, NumHeads>& Attention();
+    Tensor<T, EmbedDim, MLPDim>& FC1();  // MLP first linear layer
+    Tensor<T, MLPDim, EmbedDim>& FC2();  // MLP second linear layer
+    static constexpr size_t ParamCount = 4 * EmbedDim * EmbedDim + EmbedDim * MLPDim * 2;
+};
+```
+
+**Architecture:**
+```
+x = x + Attention(RMSNorm(x))    // attention with residual
+x = x + FC2(ReLU(FC1(RMSNorm(x))))  // MLP with residual
+```
+
+---
+
+### Checkpoint
+
+Save and load model weights to/from binary files.
+
+```cpp
+/// Save one or more tensors to a binary checkpoint file.
+/// File format: [numTensors: uint32] [size0: uint64] [data0...] [size1: uint64] [data1...] ...
+template <typename... Tensors>
+void SaveWeights(const std::string& path, Tensors&... tensors);
+
+/// Load one or more tensors from a binary checkpoint file.
+/// Throws std::runtime_error if sizes don't match.
+template <typename... Tensors>
+void LoadWeights(const std::string& path, Tensors&... tensors);
+```
+
+**Example:**
+
+```cpp
+// Save
+SaveWeights("model.bin", fc1.Weight(), fc1.Bias(), fc2.Weight(), fc2.Bias());
+
+// Load
+LoadWeights("model.bin", fc1.Weight(), fc1.Bias(), fc2.Weight(), fc2.Bias());
+```
 
 ---
 

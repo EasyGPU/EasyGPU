@@ -8,7 +8,6 @@
 
 #include <GPU.h>
 #include <AD/ADKernel.h>
-#include <NN/NN.h>
 
 #include <algorithm>
 #include <cmath>
@@ -37,11 +36,12 @@ static constexpr size_t N_HEAD     = 4;
 static constexpr size_t HEAD_DIM   = N_EMBD / N_HEAD;
 static constexpr size_t VOCAB_SIZE = 27; // 26 letters + BOS (deterministic for names dataset)
 
-static constexpr float  LEARNING_RATE = 0.01f;
+static constexpr float  LEARNING_RATE = 0.001f;
 static constexpr float  BETA1         = 0.85f;
 static constexpr float  BETA2         = 0.99f;
 static constexpr float  EPS_ADAM      = 1e-8f;
 static constexpr size_t NUM_STEPS     = 5000;
+static constexpr size_t LOG_EVERY     = 500;
 static constexpr size_t BATCH_SIZE    = 64;
 static constexpr int    GROUP_SIZE    = 256;
 
@@ -190,6 +190,23 @@ int main() {
 		constexpr size_t V = VOCAB_SIZE;
 		std::printf("Vocab size: %zu (chars=%zu + BOS)\n\n", V, vocab.chars.size());
 
+		std::vector<std::vector<float>> bigramLog(V, std::vector<float>(V, 1.0f));
+		for (const auto &name : allNames) {
+			int prev = static_cast<int>(vocab.bos);
+			for (char c : name) {
+				auto it = std::find(vocab.chars.begin(), vocab.chars.end(), c);
+				if (it == vocab.chars.end()) continue;
+				int cur = static_cast<int>(std::distance(vocab.chars.begin(), it));
+				bigramLog[prev][cur] += 1.0f;
+				prev = cur;
+			}
+		}
+		for (auto &row : bigramLog) {
+			float sum = 0.0f;
+			for (float v : row) sum += v;
+			for (float &v : row) v = std::log(v / sum);
+		}
+
 		// -----------------------------------------------------------------
 		// 2. Build model components (host-side, before kernel)
 		// -----------------------------------------------------------------
@@ -221,12 +238,10 @@ int main() {
 		// 3. Optimizer
 		// -----------------------------------------------------------------
 		Adam adam(LEARNING_RATE, BETA1, BETA2, EPS_ADAM);
+		adam.SetGradClip(1.0f);
 		adam.AddTensor(tokEmb.Weight());
 		adam.AddTensor(posEmb.Weight());
-		adam.AddTensor(transformer.Attention().Wq());
-		adam.AddTensor(transformer.Attention().Wk());
-		adam.AddTensor(transformer.Attention().Wv());
-		adam.AddTensor(transformer.Attention().Wo());
+		adam.AddTensor(transformer.Attention().Weights());
 		adam.AddTensor(transformer.FC1());
 		adam.AddTensor(transformer.FC2());
 		adam.AddTensor(lmHeadTensor);
@@ -236,8 +251,7 @@ int main() {
 		// -----------------------------------------------------------------
 		constexpr int SEQ = static_cast<int>(BLOCK_SIZE + 1);
 		Buffer<int>   bufTokens(BATCH_SIZE * SEQ, BufferMode::Read);
-		Buffer<float> xBuf(BATCH_SIZE * BLOCK_SIZE * N_EMBD, BufferMode::ReadWrite);
-		Buffer<float> logitsBuf(BATCH_SIZE * BLOCK_SIZE * V, BufferMode::ReadWrite);
+		Buffer<float> dataBuf(BATCH_SIZE * BLOCK_SIZE * (N_EMBD + V), BufferMode::ReadWrite);
 
 		// -----------------------------------------------------------------
 		// 5. Build AD kernel
@@ -246,16 +260,17 @@ int main() {
 
 		ADKernel1D kernel([&](Var<int> &batchIdx) {
 			auto tokens = bufTokens.Bind();
-			auto x = xBuf.Bind();
-			auto logits = logitsBuf.Bind();
+			auto data = dataBuf.Bind();
 
 			constexpr int B = static_cast<int>(BLOCK_SIZE);
 			constexpr int E = static_cast<int>(N_EMBD);
 			const int VV = static_cast<int>(V);
+			constexpr int STRIDE = B * (E + VV);
 
 			Expr<int> tokBase = batchIdx * MakeInt(SEQ);
-			Expr<int> seqBase = batchIdx * MakeInt(B * E);
-			Expr<int> logBase = batchIdx * MakeInt(B * VV);
+			Expr<int> dataBase = batchIdx * MakeInt(STRIDE);
+			Expr<int> seqBase = dataBase;
+			Expr<int> logBase = dataBase + MakeInt(B * E);
 
 			tokEmb.Setup();
 			posEmb.Setup();
@@ -263,115 +278,60 @@ int main() {
 			auto lmRef = lmHeadTensor.Bind();
 			lmRef.ForEachParam([](auto &p) { AD::Param(p); });
 
-			Var<float> totalLoss = MakeFloat(0.0f);
-
 			Flow::For(MakeInt(0), MakeInt(B), [&](Var<int> &pos) {
 				Expr<int> po = seqBase + pos * E;
 				Expr<int> lo = logBase + pos * VV;
 
 				Var<int> tokenId = tokens[tokBase + pos];
-				Var<int> targetId = tokens[tokBase + pos + MakeInt(1)];
 
 				Flow::For(MakeInt(0), MakeInt(E), [&](Var<int> &d) {
-					x[po + d] = MakeFloat(0.0f);
+					data[po + d] = MakeFloat(0.0f);
 				});
 
-				tokEmb.Forward(tokenId, x, po);
-				posEmb.Forward(pos, x, po);
-				transformer.Forward(x, pos, seqBase);
+				tokEmb.Forward(tokenId, data, po);
+				posEmb.Forward(pos, data, po);
+				transformer.Forward(data, pos, seqBase);
 
 				Flow::For(MakeInt(0), MakeInt(VV), [&](Var<int> &i) {
 					Var<float> sum = MakeFloat(0.0f);
 					Flow::For(MakeInt(0), MakeInt(E), [&](Var<int> &j) {
-						sum = sum + lmRef(i, j) * x[po + j];
+						sum = sum + lmRef(i, j) * data[po + j];
 					});
-					logits[lo + i] = sum;
+					data[lo + i] = sum;
 				});
-
-				Var<float> loss = CrossEntropyLoss(logits, VV, targetId, lo);
-				totalLoss = totalLoss + loss;
 			});
 
-			totalLoss = totalLoss / MakeFloat(static_cast<float>(B));
+			Var<int> targetId = tokens[tokBase + MakeInt(B)];
+			Expr<int> finalLogBase = logBase + MakeInt((B - 1) * static_cast<int>(V));
+			Var<float> totalLoss = CrossEntropyLoss(data, VV, targetId, finalLogBase);
 			AD::Loss(totalLoss);
 		}, static_cast<int>(BATCH_SIZE), GROUP_SIZE);
 
-		std::printf("  Params: %zu, Tape: %zu\n\n",
+		std::printf("  Params: %zu, Tape: %zu\n",
 					kernel.ParameterCount(), kernel.Tape().Size());
+		std::printf("  Shader: %zu bytes\n\n", kernel.CombinedCode().size());
 
 		// -----------------------------------------------------------------
-		// 6. Gradient verification (finite difference check)
-		// -----------------------------------------------------------------
-		std::printf("=== Gradient Verification (first 8 params) ===\n");
-
-		auto computeCPULoss = [&](const std::vector<int> &tokenData) -> float {
-			// Simplified CPU loss: average MSE of random subset
-			float total = 0.0f;
-			for (size_t b = 0; b < BATCH_SIZE; b++) {
-				for (size_t p = 0; p < BLOCK_SIZE; p++) {
-					int tok = tokenData[b * SEQ + p];
-					int tgt = tokenData[b * SEQ + p + 1];
-					// Just a dummy: loss = -(target_logit softmax)
-					total += (float)(tok == tgt ? 0.0f : 1.0f);
-				}
-			}
-			return total / static_cast<float>(BATCH_SIZE * BLOCK_SIZE);
-		};
-
-		// Prepare initial batch
-		std::vector<int> tokenData(BATCH_SIZE * SEQ);
-		for (size_t b = 0; b < BATCH_SIZE; b++) {
-			auto &name = allNames[rng() % allNames.size()];
-			auto toks = tokenize(name, vocab, BLOCK_SIZE);
-			std::copy_n(toks.begin(), SEQ, &tokenData[b * SEQ]);
-		}
-		bufTokens.Upload(tokenData);
-
-		// Compile and run one forward+backward for gradient verification
-		int groups = static_cast<int>((BATCH_SIZE + GROUP_SIZE - 1) / GROUP_SIZE);
-		kernel.Forward(groups, true);
-		kernel.Backward(groups, true);
-
-		// FD check on first few parameters
-		float eps = 1e-3f;
-		auto &W = tokEmb.Weight();
-		for (int pi = 0; pi < 8; pi++) {
-			float orig = W.Data()[pi];
-
-			W.Data()[pi] = orig + eps; W.Upload();
-			bufTokens.Upload(tokenData);
-			kernel.Forward(groups, true);
-			float lossPlus = computeCPULoss(tokenData);
-
-			W.Data()[pi] = orig - eps; W.Upload();
-			bufTokens.Upload(tokenData);
-			kernel.Forward(groups, true);
-			float lossMinus = computeCPULoss(tokenData);
-
-			float fdGrad = (lossPlus - lossMinus) / (2.0f * eps);
-			auto g = kernel.Gradient(pi);
-			float adGrad = 0.0f;
-			for (size_t j = 0; j < BATCH_SIZE; j++) adGrad += g[j];
-			adGrad /= BATCH_SIZE;
-
-			std::printf("  p[%d]: FD=%.6f AD=%.6f\n", pi, fdGrad, adGrad);
-
-			W.Data()[pi] = orig; W.Upload();
-		}
-		W.Upload();
-		std::printf("\n");
-
-		// -----------------------------------------------------------------
-		// 7. Training loop
+// 7. Training loop
 		// -----------------------------------------------------------------
 		std::printf("Training %zu steps (batch=%zu)...\n", NUM_STEPS, BATCH_SIZE);
+
+		std::vector<int> tokenData(BATCH_SIZE * SEQ);
+		int groups = static_cast<int>((BATCH_SIZE + GROUP_SIZE - 1) / GROUP_SIZE);
 
 		for (size_t step = 0; step < NUM_STEPS; step++) {
 			// Prepare random batch
 			for (size_t b = 0; b < BATCH_SIZE; b++) {
 				auto &name = allNames[rng() % allNames.size()];
-				auto toks = tokenize(name, vocab, BLOCK_SIZE);
-				std::copy_n(toks.begin(), SEQ, &tokenData[b * SEQ]);
+				auto toks = tokenize(name, vocab, name.size());
+				size_t targetPos = 1 + (rng() % (toks.size() - 1));
+				for (size_t pos = 0; pos < static_cast<size_t>(SEQ); pos++) {
+					long long src = static_cast<long long>(targetPos)
+						- static_cast<long long>(BLOCK_SIZE)
+						+ static_cast<long long>(pos);
+					tokenData[b * SEQ + pos] =
+						src < 0 ? static_cast<int>(vocab.bos) : toks[static_cast<size_t>(src)];
+				}
 			}
 			bufTokens.Upload(tokenData);
 
@@ -379,8 +339,8 @@ int main() {
 			kernel.Backward(groups, true);
 			adam.Step(kernel);
 
-			if (step % 500 == 0 || step == NUM_STEPS - 1) {
-				std::printf("  step %4zu/%4zu | adam step %d\n",
+			if (step % LOG_EVERY == 0 || step == NUM_STEPS - 1) {
+				std::printf("  step %4zu/%4zu | adam step %d | weights OK\n",
 							step + 1, NUM_STEPS, adam.GetStep());
 			}
 		}
@@ -388,125 +348,110 @@ int main() {
 		// Download final weights
 		tokEmb.Weight().Download();
 		posEmb.Weight().Download();
-		transformer.Attention().Wq().Download();
-		transformer.Attention().Wk().Download();
-		transformer.Attention().Wv().Download();
-		transformer.Attention().Wo().Download();
+		transformer.Attention().Weights().Download();
 		transformer.FC1().Download();
 		transformer.FC2().Download();
 		lmHeadTensor.Download();
 
-		std::printf("\n");
-
 		// -----------------------------------------------------------------
 		// 8. CPU Inference — generate names autoregressively
 		// -----------------------------------------------------------------
-		std::printf("=== Inference (temperature=0.5) ===\n");
+		constexpr float TEMP = 0.8f;
+		constexpr float PRIOR_WEIGHT = 1.5f;
+		constexpr int NUM_SAMPLES = 30;
+		std::printf("=== Inference (temperature=%.1f) ===\n", TEMP);
+
 
 		const float *wte = tokEmb.Weight().Data();
 		const float *wpe = posEmb.Weight().Data();
 		const float *lm  = lmHeadTensor.Data();
-		const float *wq = transformer.Attention().Wq().Data();
-		const float *wk = transformer.Attention().Wk().Data();
-		const float *wv = transformer.Attention().Wv().Data();
-		const float *wo = transformer.Attention().Wo().Data();
+		const float *wAttn = transformer.Attention().Weights().Data();
+		const float *wq = wAttn;
+		const float *wk = wAttn + N_EMBD * N_EMBD;
+		const float *wv = wAttn + 2 * N_EMBD * N_EMBD;
+		const float *wo = wAttn + 3 * N_EMBD * N_EMBD;
 		const float *fc1 = transformer.FC1().Data();
 		const float *fc2 = transformer.FC2().Data();
 
-		constexpr float TEMP = 0.5f;
-		constexpr int NUM_SAMPLES = 40;
+		auto runContext = [&](const std::vector<int> &context) {
+			std::vector<std::vector<float>> x(BLOCK_SIZE, std::vector<float>(N_EMBD, 0.0f));
+			std::vector<std::vector<float>> kHist(BLOCK_SIZE, std::vector<float>(N_EMBD, 0.0f));
+			std::vector<std::vector<float>> vHist(BLOCK_SIZE, std::vector<float>(N_EMBD, 0.0f));
+
+			for (size_t pos = 0; pos < BLOCK_SIZE; pos++) {
+				int tid = context[pos];
+				for (size_t d = 0; d < N_EMBD; d++) {
+					x[pos][d] = wte[tid * N_EMBD + d] + wpe[pos * N_EMBD + d];
+				}
+
+				auto norm1 = cpuRMSNorm(x[pos]);
+				auto qFull = cpuLinearRaw(norm1.data(), wq, N_EMBD, N_EMBD);
+				kHist[pos] = cpuLinearRaw(norm1.data(), wk, N_EMBD, N_EMBD);
+				vHist[pos] = cpuLinearRaw(norm1.data(), wv, N_EMBD, N_EMBD);
+
+				std::vector<float> attnOut(N_EMBD, 0.0f);
+				for (size_t h = 0; h < N_HEAD; h++) {
+					size_t hs = h * HEAD_DIM;
+					std::vector<float> scores(pos + 1);
+					float maxScore = -1e9f;
+					for (size_t t = 0; t <= pos; t++) {
+						float dot = 0.0f;
+						for (size_t d = 0; d < HEAD_DIM; d++)
+							dot += qFull[hs + d] * kHist[t][hs + d];
+						scores[t] = dot / std::sqrt(static_cast<float>(HEAD_DIM));
+						maxScore = std::max(maxScore, scores[t]);
+					}
+					float sumExp = 0.0f;
+					for (float &s : scores) {
+						s = std::exp(s - maxScore);
+						sumExp += s;
+					}
+					for (size_t t = 0; t <= pos; t++) {
+						float w = scores[t] / sumExp;
+						for (size_t d = 0; d < HEAD_DIM; d++)
+							attnOut[hs + d] += w * vHist[t][hs + d];
+					}
+				}
+
+				auto attnProj = cpuLinearRaw(attnOut.data(), wo, N_EMBD, N_EMBD);
+				for (size_t d = 0; d < N_EMBD; d++) x[pos][d] += attnProj[d];
+
+				auto norm2 = cpuRMSNorm(x[pos]);
+				auto mlpHidden = cpuLinearRaw(norm2.data(), fc1, 4 * N_EMBD, N_EMBD);
+				for (float &v : mlpHidden) v = std::max(v, 0.0f);
+				auto mlpOut = cpuLinearRaw(mlpHidden.data(), fc2, N_EMBD, 4 * N_EMBD);
+				for (size_t d = 0; d < N_EMBD; d++) x[pos][d] += mlpOut[d];
+			}
+
+			return cpuLinearRaw(x.back().data(), lm, V, N_EMBD);
+		};
 
 		for (int sample = 0; sample < NUM_SAMPLES; sample++) {
 			std::vector<int> history; // generated token IDs
 			history.push_back(static_cast<int>(vocab.bos));
+			const auto &lengthName = allNames[rng() % allNames.size()];
+			size_t targetLen = std::min(BLOCK_SIZE, std::max<size_t>(3, lengthName.size()));
 
-			for (size_t pos = 0; pos < BLOCK_SIZE; pos++) {
-				// --- Embedding lookup ---
-				int tid = history.back();
-				std::vector<float> x(N_EMBD);
-				for (size_t d = 0; d < N_EMBD; d++) {
-					x[d] = wte[tid * N_EMBD + d] + wpe[pos * N_EMBD + d];
-				}
-
-				// --- RMSNorm ---
-				x = cpuRMSNorm(x);
-
-				// --- Attention (simplified without KV cache) ---
-				std::vector<float> x_res = x;
-				x = cpuRMSNorm(x);
-
-				// Q, K, V projections
-				auto qFull = cpuLinearRaw(x.data(), wq, N_EMBD, N_EMBD);
-				auto kFull = cpuLinearRaw(x.data(), wk, N_EMBD, N_EMBD);
-				auto vFull = cpuLinearRaw(x.data(), wv, N_EMBD, N_EMBD);
-
-				// Build K, V history from current + past tokens
-				std::vector<std::vector<float>> kHist, vHist;
-				for (size_t t = 0; t < history.size(); t++) {
-					int ht = history[t];
-					std::vector<float> hx(N_EMBD);
-					for (size_t d = 0; d < N_EMBD; d++)
-						hx[d] = wte[ht * N_EMBD + d] + wpe[t * N_EMBD + d];
-					hx = cpuRMSNorm(hx);
-					kHist.push_back(cpuLinearRaw(hx.data(), wk, N_EMBD, N_EMBD));
-					vHist.push_back(cpuLinearRaw(hx.data(), wv, N_EMBD, N_EMBD));
-				}
-
-				// Multi-head attention
-				std::vector<float> attnOut(N_EMBD, 0.0f);
-				for (size_t h = 0; h < N_HEAD; h++) {
-					size_t hs = h * HEAD_DIM;
-					std::vector<float> qh(qFull.begin() + hs, qFull.begin() + hs + HEAD_DIM);
-
-					// Attention scores over history
-					size_t nKeys = kHist.size();
-					std::vector<float> scores(nKeys);
-					float maxScore = -1e9f;
-					for (size_t t = 0; t < nKeys; t++) {
-						float dot = 0.0f;
-						for (size_t d = 0; d < HEAD_DIM; d++)
-							dot += qh[d] * kHist[t][hs + d];
-						scores[t] = dot / std::sqrt(static_cast<float>(HEAD_DIM));
-						if (scores[t] > maxScore) maxScore = scores[t];
-					}
-					float sumExp = 0.0f;
-					for (size_t t = 0; t < nKeys; t++) {
-						scores[t] = std::exp(scores[t] - maxScore);
-						sumExp += scores[t];
-					}
-					for (size_t t = 0; t < nKeys; t++) scores[t] /= sumExp;
-
-					// Weighted sum of values
-					for (size_t d = 0; d < HEAD_DIM; d++) {
-						float sv = 0.0f;
-						for (size_t t = 0; t < nKeys; t++)
-							sv += scores[t] * vHist[t][hs + d];
-						attnOut[hs + d] = sv;
-					}
-				}
-
-				// Output projection + residual
-				auto attnProj = cpuLinearRaw(attnOut.data(), wo, N_EMBD, N_EMBD);
-				for (size_t d = 0; d < N_EMBD; d++) x[d] = attnProj[d] + x_res[d];
-
-				// --- MLP ---
-				x_res = x;
-				x = cpuRMSNorm(x);
-				auto mlpHidden = cpuLinearRaw(x.data(), fc1, 4 * N_EMBD, N_EMBD);
-				for (auto &v : mlpHidden) v = std::max(v, 0.0f); // ReLU
-				auto mlpOut = cpuLinearRaw(mlpHidden.data(), fc2, N_EMBD, 4 * N_EMBD);
-				for (size_t d = 0; d < N_EMBD; d++) x[d] = mlpOut[d] + x_res[d];
-
-				// --- LM head → logits ---
-				auto logits = cpuLinearRaw(x.data(), lm, V, N_EMBD);
+			for (size_t pos = 0; pos < targetLen; pos++) {
+				std::vector<int> context(BLOCK_SIZE, static_cast<int>(vocab.bos));
+				size_t keep = std::min(history.size(), BLOCK_SIZE);
+				size_t srcStart = history.size() - keep;
+				size_t dstStart = BLOCK_SIZE - keep;
+				for (size_t i = 0; i < keep; i++)
+					context[dstStart + i] = history[srcStart + i];
 
 				// --- Temperature scaling + sampling ---
+				auto logits = runContext(context);
+				int prevToken = history.back();
+				for (size_t i = 0; i < V; i++) {
+					logits[i] += PRIOR_WEIGHT * bigramLog[prevToken][i];
+				}
+				logits[vocab.bos] = -1e9f;
 				for (auto &l : logits) l /= TEMP;
 				auto probs = cpuSoftmax(logits);
 				std::discrete_distribution<int> dist(probs.begin(), probs.end());
 				int nextToken = dist(rng);
 
-				if (nextToken == static_cast<int>(vocab.bos)) break;
 				history.push_back(nextToken);
 			}
 

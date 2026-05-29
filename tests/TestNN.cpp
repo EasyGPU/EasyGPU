@@ -344,6 +344,24 @@ TEST(nn_adam_update_math)
 }
 END_TEST
 
+TEST(nn_adam_elementwise_update_matches_gradients)
+{
+	std::vector<float> weight = {1.0f, 2.0f};
+	std::vector<float> grad   = {0.5f, -0.25f};
+	std::vector<float> m(2, 0.0f);
+	std::vector<float> v(2, 0.0f);
+
+	GPU::NN::detail::ApplyAdamUpdate(weight.data(), grad.data(), m.data(), v.data(),
+		weight.size(), 0.1f, 0.9f, 0.999f, 1e-8f, 1, 0.0f, 0.0f);
+
+	// The update must use each element's own gradient, not a single averaged scalar.
+	ASSERT(std::abs(m[0] - 0.05f) < 1e-6f);
+	ASSERT(std::abs(m[1] - (-0.025f)) < 1e-6f);
+	ASSERT(std::abs(v[0] - 0.00025f) < 1e-6f);
+	ASSERT(std::abs(v[1] - 0.0000625f) < 1e-6f);
+}
+END_TEST
+
 TEST(nn_adam_bias_correction)
 {
 	// At t=1, bias correction = 1 - beta1 = 0.1 (for beta1=0.9)
@@ -786,51 +804,107 @@ END_TEST
 // These require an actual GPU backend (OpenGL/Vulkan).
 // =============================================================================
 
+TEST(nn_e2e_simple_gradient_nonzero)
+{
+	Tensor<float, 2> weight({1.0f, -1.0f});
+	Buffer<float> xBuf({2.0f, 3.0f}, BufferMode::Read);
+
+	ADKernel1D kernel([&](Var<int> &id) {
+		auto x = xBuf.Bind();
+		auto w = weight.Bind();
+		AD::Param(w[0]);
+		AD::Param(w[1]);
+		Var<float> y = w[0] * x[0] + w[1] * x[1];
+		Var<float> loss = y * y;
+		AD::Loss(loss);
+	}, 1, 256);
+
+	try {
+		kernel.Backward(1, true);
+		auto g = kernel.DownloadAllGradients();
+		ASSERT(g.size() == 2);
+		ASSERT(g[0].size() == 1);
+		ASSERT(g[1].size() == 1);
+		ASSERT(std::abs(g[0][0]) > 1e-6f || std::abs(g[1][0]) > 1e-6f);
+	} catch (const std::exception &e) {
+		// GPU backend may be unavailable in some environments; fail loudly here so the regression is visible.
+		throw std::runtime_error(std::string("GPU gradient regression failed: ") + e.what());
+	}
+}
+END_TEST
+
 TEST(nn_e2e_linear_regression_gpu)
 {
 	// Simple linear regression with ADKernel1D + Linear + Adam
-	constexpr size_t N = 100;
+	constexpr size_t N = 64;
 	constexpr size_t InDim = 1;
 	constexpr size_t OutDim = 1;
 
-	// Generate synthetic data: y = 2*x + 1 + noise
+	// Generate synthetic data: y = 2*x + 1
 	std::vector<float> xData(N * InDim), yData(N * OutDim);
-	std::mt19937 rng(42);
 	for (size_t i = 0; i < N; i++) {
-		xData[i] = std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng);
-		float noise = std::uniform_real_distribution<float>(-0.1f, 0.1f)(rng);
-		yData[i] = 2.0f * xData[i] + 1.0f + noise;
+		xData[i] = -1.0f + 2.0f * static_cast<float>(i) / static_cast<float>(N - 1);
+		yData[i] = 2.0f * xData[i] + 1.0f;
 	}
 
 	// Build model
 	Linear<float, InDim, OutDim> fc;
+	fc.Weight().Data()[0] = 0.0f;
+	fc.Bias().Data()[0] = 0.0f;
+	fc.Weight().Upload();
+	fc.Bias().Upload();
 
-	Adam optimizer(0.01f);
+	Adam optimizer(0.01f, 0.9f, 0.999f, 1e-6f);
 	optimizer.AddTensor(fc.Weight());
 	optimizer.AddTensor(fc.Bias());
 
 	// Create buffers
 	Buffer<float> bufX(xData, BufferMode::Read);
 	Buffer<float> bufY(yData, BufferMode::Read);
+	Buffer<float> bufPred(N * OutDim, BufferMode::ReadWrite);
 
 	// Build AD kernel
 	ADKernel1D kernel([&](Var<int> &id) {
 		auto x = bufX.Bind();
 		auto y = bufY.Bind();
+		auto pred = bufPred.Bind();
 		fc.Setup();
-		fc.Forward(x, id, y);  // hack: use y buffer as output for simplicity
-		// Actually, we need a separate output buffer. Let's redo...
+		fc.Forward(x, id, pred);
+		Var<float> loss = MSELoss(pred, y, id, static_cast<int>(OutDim));
+		AD::Loss(loss);
 	}, N);
 
-	// Quick smoke test: compile and run one backward pass
-	try {
-		int groups = static_cast<int>((N + 255) / 256);
-		kernel.Backward(groups, true);
-		ASSERT(true); // didn't crash
-	} catch (const std::exception &e) {
-		// GPU may not be available — skip gracefully
-		std::cout << "(GPU not available: " << e.what() << ") ";
+	int groups = static_cast<int>((N + 255) / 256);
+	kernel.Backward(groups, true);
+
+	auto grads = kernel.DownloadAllGradients();
+	ASSERT(grads.size() == 2);
+	ASSERT(grads[0].size() == N);
+	ASSERT(grads[1].size() == N);
+
+	double expectedW = 0.0;
+	double expectedB = 0.0;
+	double actualW = 0.0;
+	double actualB = 0.0;
+	for (size_t i = 0; i < N; i++) {
+		float pred = 0.0f;
+		float diff = pred - yData[i];
+		expectedW += 2.0 * diff * xData[i];
+		expectedB += 2.0 * diff;
+		actualW += grads[0][i];
+		actualB += grads[1][i];
 	}
+	expectedW /= static_cast<double>(N);
+	expectedB /= static_cast<double>(N);
+	actualW /= static_cast<double>(N);
+	actualB /= static_cast<double>(N);
+
+	ASSERT(std::abs(actualW - expectedW) < 1e-4);
+	ASSERT(std::abs(actualB - expectedB) < 1e-4);
+
+	optimizer.Step(kernel);
+	ASSERT(fc.Weight().Data()[0] > 0.0f);
+	ASSERT(fc.Bias().Data()[0] > 0.0f);
 }
 END_TEST
 
@@ -859,6 +933,7 @@ int main() {
 	test_nn_optimizer_multiple_tensors();
 
 	test_nn_adam_update_math();
+	test_nn_adam_elementwise_update_matches_gradients();
 	test_nn_adam_bias_correction();
 	test_nn_sgd_momentum_math();
 	test_nn_rmsprop_update_math();
@@ -887,6 +962,7 @@ int main() {
 	test_nn_checkpoint_single_tensor();
 	test_nn_checkpoint_size_mismatch_throws();
 
+	test_nn_e2e_simple_gradient_nonzero();
 	test_nn_e2e_linear_regression_gpu();
 
 	std::cout << "\n=== Results: " << pass_count << "/" << test_count << " passed ===\n";

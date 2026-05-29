@@ -7,7 +7,8 @@
  *   CausalSelfAttention<T, EmbedDim, NumHeads>
  *
  * Uses three-pass softmax (max reduction, exp-sum, weighted sum).
- * No biases (GPT-2 style). K and V are cached in dedicated buffers.
+ * No biases (GPT-2 style). All Q/K/V/O weights packed into a single 3D tensor
+ * to minimise GPU SSBO binding slots.
  */
 
 #ifndef EASYGPU_NN_ATTENTION_H
@@ -34,60 +35,50 @@ class CausalSelfAttention {
 	static_assert(EmbedDim % NumHeads == 0, "EmbedDim must be divisible by NumHeads");
 	static constexpr size_t HeadDim = EmbedDim / NumHeads;
 
+	// Weight tensor layout: [4][EmbedDim][EmbedDim]
+	//   layer 0 = Wq, layer 1 = Wk, layer 2 = Wv, layer 3 = Wo
+	static constexpr size_t NUM_LAYERS = 4;
+
 public:
 	CausalSelfAttention(unsigned initSeed = 42) {
-		std::vector<T> wQ(EmbedDim * EmbedDim);
-		std::vector<T> wK(EmbedDim * EmbedDim);
-		std::vector<T> wV(EmbedDim * EmbedDim);
-		std::vector<T> wO(EmbedDim * EmbedDim);
-
-		unsigned sQ = initSeed, sK = initSeed + 1, sV = initSeed + 2, sO = initSeed + 3;
+		std::vector<T> wData(NUM_LAYERS * EmbedDim * EmbedDim);
 		float range = std::sqrt(6.0f / static_cast<float>(2 * EmbedDim));
 
-		for (size_t j = 0; j < EmbedDim; j++) {
-			for (size_t i = 0; i < EmbedDim; i++) {
-				size_t idx = j * EmbedDim + i;
-				sQ = sQ * 1664525u + 1013904223u;
-				wQ[idx] = (static_cast<float>(sQ) / UINT32_MAX * 2.0f - 1.0f) * range;
-				sK = sK * 1664525u + 1013904223u;
-				wK[idx] = (static_cast<float>(sK) / UINT32_MAX * 2.0f - 1.0f) * range;
-				sV = sV * 1664525u + 1013904223u;
-				wV[idx] = (static_cast<float>(sV) / UINT32_MAX * 2.0f - 1.0f) * range;
-				sO = sO * 1664525u + 1013904223u;
-				wO[idx] = (static_cast<float>(sO) / UINT32_MAX * 2.0f - 1.0f) * range;
+		for (size_t l = 0; l < NUM_LAYERS; l++) {
+			unsigned s = initSeed + l;
+			for (size_t j = 0; j < EmbedDim; j++) {
+				for (size_t i = 0; i < EmbedDim; i++) {
+					s = s * 1664525u + 1013904223u;
+					size_t idx = l * EmbedDim * EmbedDim + j * EmbedDim + i;
+					wData[idx] = (static_cast<float>(s) / UINT32_MAX * 2.0f - 1.0f) * range;
+				}
 			}
 		}
-		wq_ = Tensor<T, EmbedDim, EmbedDim>(wQ);
-		wk_ = Tensor<T, EmbedDim, EmbedDim>(wK);
-		wv_ = Tensor<T, EmbedDim, EmbedDim>(wV);
-		wo_ = Tensor<T, EmbedDim, EmbedDim>(wO);
+		w_ = Tensor<T, NUM_LAYERS, EmbedDim, EmbedDim>(wData);
 	}
 
 	void Setup() {
-		wqRef_ = wq_.Bind();
-		wkRef_ = wk_.Bind();
-		wvRef_ = wv_.Bind();
-		woRef_ = wo_.Bind();
-		wqRef_.ForEachParam([](auto &p) { AD::Param(p); });
-		wkRef_.ForEachParam([](auto &p) { AD::Param(p); });
-		wvRef_.ForEachParam([](auto &p) { AD::Param(p); });
-		woRef_.ForEachParam([](auto &p) { AD::Param(p); });
+		wRef_ = w_.Bind();
+		wRef_.ForEachParam([](auto &p) { AD::Param(p); });
 	}
 
 	/**
 	 * Forward pass for a single position in a sequence.
 	 *
-	 * @param x       Residual stream, read-only at pos [batchSize * embedDim * blockSize]
-	 * @param kBuf    Key cache buffer, same layout — write K at pos, read K[0..pos]
-	 * @param vBuf    Value cache buffer, same layout — write V at pos, read V[0..pos]
-	 * @param attnOut Attention output buffer, write at pos
+	 * @param scratch Single scratch buffer holding all regions
+	 * @param xOff    Base offset of input (normalized residual) within scratch
+	 * @param kOff    Base offset of K region within scratch
+	 * @param vOff    Base offset of V region within scratch
+	 * @param aOff    Base offset of AttnOut region within scratch
 	 * @param pos     Current position (0..blockSize-1)
 	 * @param offset  Base offset for this batch = batchIdx * blockSize * embedDim
 	 */
-	void Forward(const IR::Value::BufferRef<T> &x,
-				 const IR::Value::BufferRef<T> &kBuf,
-				 const IR::Value::BufferRef<T> &vBuf,
-				 const IR::Value::BufferRef<T> &attnOut,
+	void Forward(const IR::Value::BufferRef<T> &scratch,
+				 const IR::Value::Expr<int> &xOff,
+				 const IR::Value::Expr<int> &kOff,
+				 const IR::Value::Expr<int> &vOff,
+				 const IR::Value::Expr<int> &aOff,
+				 const IR::Value::Expr<int> &dotsOff,
 				 const IR::Value::Var<int> &pos,
 				 const IR::Value::Expr<int> &offset) {
 		constexpr int E = static_cast<int>(EmbedDim);
@@ -95,69 +86,70 @@ public:
 		constexpr int HD = static_cast<int>(HeadDim);
 
 		IR::Value::Expr<int> po = offset + pos * E;
+		IR::Value::Expr<int> dotsBase = dotsOff + offset * MakeInt(4);
 
 		// --- Q/K/V projections for current position ---
-		// Q stored to local buffer (reuse attnOut as temp at pos)
-		// K, V stored to kBuf, vBuf
 		GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &o) {
 			IR::Value::Var<T> sq = MakeFloat(0.0f);
 			IR::Value::Var<T> sk = MakeFloat(0.0f);
 			IR::Value::Var<T> sv = MakeFloat(0.0f);
 			GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &i) {
-				IR::Value::Var<T> xi = x[po + i];
-				sq = sq + wqRef_(o, i) * xi;
-				sk = sk + wkRef_(o, i) * xi;
-				sv = sv + wvRef_(o, i) * xi;
+				IR::Value::Var<T> xi = scratch[xOff + po + i];
+				IR::Value::Var<T> p0 = wRef_(0, o, i) * xi;
+				IR::Value::Var<T> p1 = wRef_(1, o, i) * xi;
+				IR::Value::Var<T> p2 = wRef_(2, o, i) * xi;
+				sq = sq + p0;
+				sk = sk + p1;
+				sv = sv + p2;
 			});
-			kBuf[po + o] = sk;
-			vBuf[po + o] = sv;
-			attnOut[po + o] = sq; // temp store Q in attnOut
+			scratch[kOff + po + o] = sk;
+			scratch[vOff + po + o] = sv;
+			scratch[aOff + po + o] = sq;
 		});
 
-		// --- Attention per head ---
+		// --- Safe softmax: 3-pass with max, dot computed ONCE (stored) ---
 		IR::Value::Expr<int> endPos = pos + MakeInt(1);
 
 		GPU::Flow::For(MakeInt(0), MakeInt(H), [&](IR::Value::Var<int> &h) {
 			IR::Value::Expr<int> hs = h * MakeInt(HD);
 
-			// Pass 1: max logit over 0..pos
+			// Pass 1: compute dots, find max, store dots in unused part of scratch
+			// Store dots at kOff (Key region, above current position data)
 			IR::Value::Var<T> maxLogit = MakeFloat(-1e9f);
 			GPU::Flow::For(MakeInt(0), endPos, [&](IR::Value::Var<int> &t) {
 				IR::Value::Expr<int> to = offset + t * E;
 				IR::Value::Var<T> dot = MakeFloat(0.0f);
 				GPU::Flow::For(MakeInt(0), MakeInt(HD), [&](IR::Value::Var<int> &d) {
-					dot = dot + attnOut[po + hs + d] * kBuf[to + hs + d];
+					IR::Value::Var<T> qk = scratch[aOff + po + hs + d] * scratch[kOff + to + hs + d];
+					dot = dot + qk;
 				});
 				dot = dot / MakeFloat(std::sqrt(static_cast<float>(HD)));
+				scratch[dotsBase + h * endPos + t] = dot;
 				maxLogit = GPU::Math::Max(maxLogit, dot);
 			});
 
-			// Pass 2: sum exp(logit - max)
+			// Pass 2: exp(dot - max) and sum
 			IR::Value::Var<T> sumExp = MakeFloat(0.0f);
 			GPU::Flow::For(MakeInt(0), endPos, [&](IR::Value::Var<int> &t) {
-				IR::Value::Expr<int> to = offset + t * E;
-				IR::Value::Var<T> dot = MakeFloat(0.0f);
-				GPU::Flow::For(MakeInt(0), MakeInt(HD), [&](IR::Value::Var<int> &d) {
-					dot = dot + attnOut[po + hs + d] * kBuf[to + hs + d];
-				});
-				dot = dot / MakeFloat(std::sqrt(static_cast<float>(HD)));
-				sumExp = sumExp + GPU::Math::Exp(dot - maxLogit);
+				IR::Value::Var<T> dot_t = scratch[dotsBase + h * endPos + t];
+				IR::Value::Var<T> dm = dot_t - maxLogit;
+				IR::Value::Var<T> edm = GPU::Math::Exp(dm);
+				sumExp = sumExp + edm;
 			});
 
-			// Pass 3: weighted sum of values
+			// Pass 3: weighted sum
 			GPU::Flow::For(MakeInt(0), MakeInt(HD), [&](IR::Value::Var<int> &d) {
 				IR::Value::Var<T> sumV = MakeFloat(0.0f);
 				GPU::Flow::For(MakeInt(0), endPos, [&](IR::Value::Var<int> &t) {
 					IR::Value::Expr<int> to = offset + t * E;
-					IR::Value::Var<T> dot = MakeFloat(0.0f);
-					GPU::Flow::For(MakeInt(0), MakeInt(HD), [&](IR::Value::Var<int> &dd) {
-						dot = dot + attnOut[po + hs + dd] * kBuf[to + hs + dd];
-					});
-					dot = dot / MakeFloat(std::sqrt(static_cast<float>(HD)));
-					IR::Value::Var<T> weight = GPU::Math::Exp(dot - maxLogit) / sumExp;
-					sumV = sumV + weight * vBuf[to + hs + d];
+					IR::Value::Var<T> dot_t2 = scratch[dotsBase + h * endPos + t];
+					IR::Value::Var<T> dm2 = dot_t2 - maxLogit;
+					IR::Value::Var<T> edm2 = GPU::Math::Exp(dm2);
+					IR::Value::Var<T> weight = edm2 / sumExp;
+					IR::Value::Var<T> wv = weight * scratch[vOff + to + hs + d];
+					sumV = sumV + wv;
 				});
-				attnOut[po + hs + d] = sumV; // replace Q with attention output
+				scratch[aOff + po + hs + d] = sumV;
 			});
 		});
 
@@ -165,21 +157,20 @@ public:
 		GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &o) {
 			IR::Value::Var<T> sum = MakeFloat(0.0f);
 			GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &i) {
-				sum = sum + woRef_(o, i) * attnOut[po + i];
+				IR::Value::Var<T> wo = wRef_(3, o, i) * scratch[aOff + po + i];
+				sum = sum + wo;
 			});
-			attnOut[po + o] = sum;
+			scratch[aOff + po + o] = sum;
 		});
 	}
 
-	Tensor<T, EmbedDim, EmbedDim> &Wq() { return wq_; }
-	Tensor<T, EmbedDim, EmbedDim> &Wk() { return wk_; }
-	Tensor<T, EmbedDim, EmbedDim> &Wv() { return wv_; }
-	Tensor<T, EmbedDim, EmbedDim> &Wo() { return wo_; }
-	static constexpr size_t TotalSize = 4 * EmbedDim * EmbedDim;
+	Tensor<T, NUM_LAYERS, EmbedDim, EmbedDim> &Weights() { return w_; }
+	const Tensor<T, NUM_LAYERS, EmbedDim, EmbedDim> &Weights() const { return w_; }
+	static constexpr size_t TotalSize = NUM_LAYERS * EmbedDim * EmbedDim;
 
 private:
-	Tensor<T, EmbedDim, EmbedDim> wq_, wk_, wv_, wo_;
-	TensorRef<T, EmbedDim, EmbedDim> wqRef_, wkRef_, wvRef_, woRef_;
+	Tensor<T, NUM_LAYERS, EmbedDim, EmbedDim> w_;
+	TensorRef<T, NUM_LAYERS, EmbedDim, EmbedDim> wRef_;
 };
 
 } // namespace GPU::NN

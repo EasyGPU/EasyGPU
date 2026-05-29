@@ -80,6 +80,7 @@ private:
 	void ProcessEntry(const TapeEntry &entry);
 	void ProcessBinaryOp(const TapeEntry &entry);
 	void ProcessUnaryOp(const TapeEntry &entry);
+	void ProcessExpressionGradient(const TapeEntry &entry);
 	void ProcessIntrinsic1(const TapeEntry &entry);
 	void ProcessIntrinsic2(const TapeEntry &entry);
 	void ProcessIntrinsic3(const TapeEntry &entry);
@@ -106,8 +107,21 @@ private:
 	/** Emit: d_input += expression; */
 	void EmitAccumulate(const std::string &inputName, const std::string &gradExpr);
 
+	/** Save current adjoint of result to temp, zero it, return temp name.
+	 *  Correctly handles variable reassignment: when a variable is redefined,
+	 *  its gradient accumulator must be reset before propagating upstream. */
+	std::string SaveAndZeroAdjoint(const std::string &adjName, const std::string &glslType);
+
 	/** Build the adjoint variable name for a forward variable. */
 	std::string Adj(const std::string &varName);
+
+	/** Build transitive alias map from simple copy tape entries.
+	 *  Resolves chains like v95->v93->v91->v85 so backward code uses
+	 *  canonical loop variables instead of stale final-value aliases. */
+	void BuildAliasMap();
+
+	/** Replace alias variable names in an expression with their canonical names. */
+	std::string ResolveAliases(const std::string &expr) const;
 
 	/** Make a zero literal of the given GLSL type. */
 	static std::string ZeroOf(const std::string &glslType);
@@ -159,6 +173,12 @@ private:
 
 	// Pre-built map: entry id → call index (for O(1) sub-tape lookup)
 	std::unordered_map<int32_t, int> _callIndexMap;
+
+	// Counter for unique temp names in SaveAndZeroAdjoint
+	int _tmpCounter = 0;
+
+	// Alias map: alias variable → canonical variable (e.g. v95 → v85)
+	std::unordered_map<std::string, std::string> _aliasMap;
 };
 
 } // namespace GPU::AD

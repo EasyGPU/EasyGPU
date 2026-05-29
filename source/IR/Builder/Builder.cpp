@@ -18,6 +18,7 @@
 #include <IR/Node/If.h>
 #include <IR/Node/Increment.h>
 #include <IR/Node/Load.h>
+#include <IR/Node/LoadLocalVariable.h>
 #include <IR/Node/LocalVariable.h>
 #include <IR/Node/LocalVariableArray.h>
 #include <IR/Node/MemberAccess.h>
@@ -73,15 +74,12 @@ void Builder::Build(const Node::Node &Node, bool IsStatement) {
 	if (_context != nullptr) {
 		if (IsStatement) {
 			_context->PushTranslatedCode(std::format("{};\n", BuildNode(Node)));
+			if (_gradientTape) {
+				_gradientTape->Record(Node, IsStatement);
+			}
 		} else {
 			_context->PushTranslatedCode(BuildNode(Node));
 		}
-	}
-
-	// Gradient tape recording: after normal GLSL emission, record the
-	// operation for later backward-pass generation.
-	if (_gradientTape) {
-		_gradientTape->Record(Node, IsStatement);
 	}
 }
 
@@ -480,4 +478,7 @@ std::string Builder::BuildAtomicOp(const Node::AtomicOpNode &Node) {
 	}
 	return std::format("{}({}, {})", opName, BuildNode(*Node.Target()), BuildNode(*Node.Value()));
 }
+
+
+
 } // namespace GPU::IR::Builder

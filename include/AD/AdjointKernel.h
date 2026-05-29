@@ -33,6 +33,7 @@
 #include <Kernel/Kernel.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <format>
 #include <functional>
 #include <memory>
@@ -83,82 +84,156 @@ struct GradBuffer {
  * @param workSizeX/Y/Z Work group sizes
  */
 inline std::string
-MergeForwardBackward(const std::string						&forwardCode,
-					 const AdjointBody						&body,
-					 const std::vector<GradBuffer>			&gradBuffers,
-					 int workSizeX = 256, int workSizeY = 1, int workSizeZ = 1) {
+MergeForwardBackward(const std::string                  &forwardCode,
+                     const AdjointBody                  &body,
+                     const std::vector<GradBuffer>      &gradBuffers,
+                     int workSizeX = 256, int workSizeY = 1, int workSizeZ = 1) {
 
-	auto mainPos = forwardCode.find("void main()");
-	if (mainPos == std::string::npos) {
-		throw std::runtime_error("MergeForwardBackward: could not find 'void main()'");
-	}
+    auto mainPos = forwardCode.find("void main()");
+    if (mainPos == std::string::npos) {
+        throw std::runtime_error("MergeForwardBackward: could not find 'void main()'");
+    }
 
-	auto bracePos = forwardCode.find('{', mainPos);
-	if (bracePos == std::string::npos) {
-		throw std::runtime_error("MergeForwardBackward: could not find main() body opening brace");
-	}
+    auto bracePos = forwardCode.find('{', mainPos);
+    if (bracePos == std::string::npos) {
+        throw std::runtime_error("MergeForwardBackward: could not find main() body opening brace");
+    }
 
-	// Gradient buffer declarations
-	std::string gradBufDecls;
-	for (const auto &gb : gradBuffers) {
-		gradBufDecls += std::format(
-			"layout(std430, binding = {}) buffer grad_{} {{ {} _grad_{}_data[]; }};\n",
-			gb.binding, gb.paramName, gb.glslType, gb.paramName);
-	}
+    // Gradient buffer declarations
+    std::string gradBufDecls;
+    for (const auto &gb : gradBuffers) {
+        gradBufDecls += std::format(
+            "layout(std430, binding = {}) buffer grad_{} {{ {} _grad_{}_data[]; }};\n",
+            gb.binding, gb.paramName, gb.glslType, gb.paramName);
+    }
 
-	// Adjoint variable declarations
-	std::string adjDecls;
-	for (const auto &[adjName, glslType] : body.declarations) {
-		adjDecls += std::format("    {} {} = {}(0);\n", glslType, adjName, glslType);
-	}
-
-	// Adjoint body lines
-	std::string adjBody;
-	for (const auto &line : body.lines) {
-		adjBody += std::format("    {}\n", line);
-	}
-
-	// Gradient writebacks
-	bool is1D = (workSizeY == 1 && workSizeZ == 1);
-	std::string writebacks;
-	for (const auto &[paramName, adjName] : body.writebacks) {
-		for (const auto &gb : gradBuffers) {
-			if (gb.paramName == paramName) {
-				if (is1D) {
-					writebacks += std::format(
-						"    _grad_{}_data[gl_GlobalInvocationID.x] = {};\n",
-						gb.paramName, adjName);
-				} else {
-					writebacks += std::format(
-						"    _grad_{}_data[gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x + gl_GlobalInvocationID.x] = {};\n",
-						gb.paramName, adjName);
-				}
-				break;
+		// Adjoint variable declarations
+		std::string adjDecls;
+		for (const auto &[adjName, glslType] : body.declarations) {
+			auto bracketPos = glslType.find('[');
+			if (bracketPos != std::string::npos) {
+				// Array type: "float[432]" -> "    float grad_buf1[432];\n"
+				std::string baseType = glslType.substr(0, bracketPos);
+				std::string arraySpec = glslType.substr(bracketPos);
+				adjDecls += std::format("    {} {}{};\n", baseType, adjName, arraySpec);
+			} else {
+				adjDecls += std::format("    {} {} = {}(0);\n", glslType, adjName, glslType);
 			}
 		}
-	}
 
-	// Merge: prefix + gradBufs + main through opening brace + adjoint stuff + rest
-	std::string result;
-	result.reserve(forwardCode.size() + gradBufDecls.size() + adjDecls.size() +
-				   adjBody.size() + writebacks.size() + 200);
+    // Adjoint body lines
+    std::string adjBody;
+    for (const auto &line : body.lines) {
+        adjBody += std::format("    {}\n", line);
+    }
 
-	result += forwardCode.substr(0, mainPos);
-	result += gradBufDecls;
-	if (!gradBufDecls.empty()) result += "\n";
-	result += forwardCode.substr(mainPos, bracePos - mainPos + 1);
-	result += "\n";
-	result += adjDecls;
-	if (!adjDecls.empty()) result += "\n    // === Backward pass (auto-generated) ===\n";
-	result += adjBody;
-	if (!writebacks.empty()) {
-		result += "\n    // --- Gradient writebacks ---\n";
-		result += writebacks;
-	}
-	result += forwardCode.substr(bracePos + 1);
+    // Gradient writebacks
+    bool is1D = (workSizeY == 1 && workSizeZ == 1);
+    std::string writebacks;
+    for (const auto &[paramName, adjName] : body.writebacks) {
+        for (const auto &gb : gradBuffers) {
+            if (gb.paramName == paramName) {
+                if (is1D) {
+                    writebacks += std::format(
+                        "    _grad_{}_data[gl_GlobalInvocationID.x] = {};\n",
+                        gb.paramName, adjName);
+                } else {
+                    writebacks += std::format(
+                        "    _grad_{}_data[gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x + gl_GlobalInvocationID.x] = {};\n",
+                        gb.paramName, adjName);
+                }
+                break;
+            }
+        }
+    }
 
-	return result;
+    // Place backward code AFTER forward body so forward local variables
+    // are in scope when the backward code references them.
+    auto lastBrace = forwardCode.rfind('}');
+    std::string forwardBody = forwardCode.substr(bracePos + 1,
+        lastBrace - bracePos - 1);
+
+    // Hoist forward temporary variable declarations (v1, v2, ...) to
+    // function scope so the backward code can reference them even when
+    // they were originally declared inside for/if blocks.
+    std::string hoistedDecls;
+    std::string strippedBody;
+    strippedBody.reserve(forwardBody.size());
+    hoistedDecls.reserve(forwardBody.size() / 4);
+
+    size_t lineStart = 0;
+    while (lineStart < forwardBody.size()) {
+        size_t lineEnd = forwardBody.find('\n', lineStart);
+        if (lineEnd == std::string::npos) lineEnd = forwardBody.size();
+        size_t lineLen = lineEnd - lineStart;
+        std::string_view line(forwardBody.data() + lineStart, lineLen);
+
+        // Match "    float v123;" or "    int v456;" or "    bool v789;"
+        // The pattern: optional whitespace, type, space, 'v', digits, ';', optional whitespace
+        bool isHoistable = false;
+        size_t pos = 0;
+        // skip leading whitespace
+        while (pos < lineLen && (line[pos] == ' ' || line[pos] == '\t')) pos++;
+        // check for a GLSL scalar type followed by space
+        auto checkType = [&](const char* typeName, size_t len) {
+            if (pos + len < lineLen && line.compare(pos, len, typeName) == 0
+                && line[pos + len] == ' ') {
+                size_t nameStart = pos + len + 1;
+                if (nameStart < lineLen && line[nameStart] == 'v') {
+                    // check that remaining chars are digits then ';'
+                    size_t j = nameStart + 1;
+                    while (j < lineLen && line[j] >= '0' && line[j] <= '9') j++;
+                    if (j < lineLen && line[j] == ';') {
+                        // make sure no '=' before ';' (skip init lines)
+                        bool hasEq = false;
+                        for (size_t k = nameStart; k < j; k++) {
+                            if (line[k] == '=') { hasEq = true; break; }
+                        }
+                        if (!hasEq) isHoistable = true;
+                    }
+                }
+            }
+        };
+        static const char* types[] = {"float","int","bool","uint","vec2","vec3","vec4",
+                                         "ivec2","ivec3","ivec4","bvec2","bvec3","bvec4"};
+        for (const char* t : types) {
+            if (isHoistable) break;
+            checkType(t, std::char_traits<char>::length(t));
+        }
+
+        if (isHoistable) {
+            hoistedDecls += line;
+            hoistedDecls += '\n';
+        } else {
+            strippedBody += line;
+            strippedBody += '\n';
+        }
+        lineStart = lineEnd + 1;
+    }
+
+    std::string result;
+    result.reserve(forwardCode.size() + gradBufDecls.size() + adjDecls.size() +
+                   adjBody.size() + writebacks.size() + hoistedDecls.size() + 200);
+
+    result += forwardCode.substr(0, mainPos);
+    result += gradBufDecls;
+    if (!gradBufDecls.empty()) result += "\n";
+    result += forwardCode.substr(mainPos, bracePos - mainPos + 1);
+    result += "\n";
+    if (!hoistedDecls.empty()) result += hoistedDecls;
+    result += strippedBody;
+    if (!adjDecls.empty()) result += "    // === Backward pass (auto-generated) ===\n";
+    result += adjDecls;
+    result += adjBody;
+    if (!writebacks.empty()) {
+        result += "\n    // --- Gradient writebacks ---\n";
+        result += writebacks;
+    }
+    result += "\n}";
+
+    return result;
 }
+
 
 // =============================================================================
 // AdjointKernel1D — 1D GPU-executable AD kernel

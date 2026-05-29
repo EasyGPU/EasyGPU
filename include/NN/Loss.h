@@ -44,7 +44,8 @@ inline IR::Value::Var<float> MSELoss(const IR::Value::BufferRef<float> &predBuf,
 	IR::Value::Var<float> loss = MakeFloat(0.0f);
 	for (int d = 0; d < outputDim; d++) {
 		IR::Value::Var<float> diff = predBuf[threadId * outputDim + d] - targetBuf[threadId * outputDim + d];
-		loss = loss + diff * diff;
+		IR::Value::Var<float> diff2 = diff * diff;
+		loss = loss + diff2;
 	}
 	return loss;
 }
@@ -93,11 +94,16 @@ inline IR::Value::Var<float> CrossEntropyLoss(const IR::Value::BufferRef<float> 
 	// Sum of exp(logit - max)
 	IR::Value::Var<float> sumExp = MakeFloat(0.0f);
 	GPU::Flow::For(MakeInt(0), MakeInt(numClasses), [&](IR::Value::Var<int> &i) {
-		sumExp = sumExp + GPU::Math::Exp(logits[i] - maxLogit);
+		IR::Value::Var<float> diff = logits[i] - maxLogit;
+		IR::Value::Var<float> expVal = GPU::Math::Exp(diff);
+		sumExp = sumExp + expVal;
 	});
 
-	// Negative log-likelihood for the target class
-	IR::Value::Var<float> loss = -(logits[targetId] - maxLogit - GPU::Math::Log(sumExp));
+	// Negative log-likelihood for the target class (broken into simple ops)
+	IR::Value::Var<float> diff = logits[targetId] - maxLogit;
+	IR::Value::Var<float> logSum = GPU::Math::Log(sumExp);
+	IR::Value::Var<float> lossInput = diff - logSum;
+	IR::Value::Var<float> loss = -lossInput;
 	return loss;
 }
 
@@ -112,9 +118,14 @@ inline IR::Value::Var<float> CrossEntropyLoss(const IR::Value::BufferRef<float> 
 	});
 	IR::Value::Var<float> sumExp = MakeFloat(0.0f);
 	GPU::Flow::For(MakeInt(0), MakeInt(numClasses), [&](IR::Value::Var<int> &i) {
-		sumExp = sumExp + GPU::Math::Exp(logits[offset + i] - maxLogit);
+		IR::Value::Var<float> diff = logits[offset + i] - maxLogit;
+		IR::Value::Var<float> expVal = GPU::Math::Exp(diff);
+		sumExp = sumExp + expVal;
 	});
-	IR::Value::Var<float> loss = -(logits[offset + targetId] - maxLogit - GPU::Math::Log(sumExp));
+	IR::Value::Var<float> diff = logits[offset + targetId] - maxLogit;
+	IR::Value::Var<float> logSum = GPU::Math::Log(sumExp);
+	IR::Value::Var<float> lossInput = diff - logSum;
+	IR::Value::Var<float> loss = -lossInput;
 	return loss;
 }
 

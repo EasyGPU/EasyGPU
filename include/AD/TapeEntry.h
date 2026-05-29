@@ -36,6 +36,7 @@ struct TapeVar {
 enum class TapeOpKind : uint8_t {
 	BinaryOp,		   // v = a + b, a * b, a / b, a - b
 	UnaryOp,		   // v = -a
+	ExpressionGradient, // v = complex expression, with precomputed leaf gradient coefficients
 	Intrinsic1,		   // v = sin(x), sqrt(x), exp(x) ...  (1 parameter)
 	Intrinsic2,		   // v = pow(a,b), atan2(y,x) ...       (2 parameters)
 	Intrinsic3,		   // v = clamp(x,lo,hi), mix(a,b,t) ... (3 parameters)
@@ -73,6 +74,7 @@ struct TapeEntry {
 	std::string intrinsicName;
 	std::string callableFuncName;  // for Call: the mangled GLSL function name
 	int callableIndex = -1;       // for Call: index into the sub-tape list (assigned during body recording)
+	std::vector<std::string> inputGradExprs; // for ExpressionGradient: coefficient per input
 
 	// Control flow metadata (only valid for ControlFlowBegin)
 	ControlFlowKind controlFlowKind = ControlFlowKind::IfBranch;

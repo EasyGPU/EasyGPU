@@ -46,7 +46,8 @@ public:
 		IR::Value::Var<float> ms = MakeFloat(0.0f);
 		GPU::Flow::For(MakeInt(0), MakeInt(N), [&](IR::Value::Var<int> &d) {
 			IR::Value::Var<T> v = in[offset + d];
-			ms = ms + v * v;
+			IR::Value::Var<T> v2 = v * v;
+			ms = ms + v2;
 		});
 		ms = ms / MakeFloat(static_cast<float>(EmbedDim));
 
