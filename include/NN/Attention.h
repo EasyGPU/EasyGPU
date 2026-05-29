@@ -50,7 +50,7 @@ public:
 				for (size_t i = 0; i < EmbedDim; i++) {
 					s = s * 1664525u + 1013904223u;
 					size_t idx = l * EmbedDim * EmbedDim + j * EmbedDim + i;
-					wData[idx] = (static_cast<float>(s) / UINT32_MAX * 2.0f - 1.0f) * range;
+					wData[idx] = (static_cast<float>(static_cast<double>(s) / UINT32_MAX) * 2.0f - 1.0f) * range;
 				}
 			}
 		}

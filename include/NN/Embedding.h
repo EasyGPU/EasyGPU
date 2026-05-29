@@ -66,7 +66,7 @@ private:
 	static float XavierInit(unsigned &seed, size_t fanIn, size_t fanOut) {
 		float range = std::sqrt(6.0f / static_cast<float>(fanIn + fanOut));
 		seed = seed * 1664525u + 1013904223u;
-		float r = static_cast<float>(seed) / static_cast<float>(UINT32_MAX);
+		float r = static_cast<float>(static_cast<double>(seed) / UINT32_MAX);
 		return (r * 2.0f - 1.0f) * range;
 	}
 
@@ -114,7 +114,7 @@ private:
 	static float XavierInit(unsigned &seed, size_t fanIn, size_t fanOut) {
 		float range = std::sqrt(6.0f / static_cast<float>(fanIn + fanOut));
 		seed = seed * 1664525u + 1013904223u;
-		float r = static_cast<float>(seed) / static_cast<float>(UINT32_MAX);
+		float r = static_cast<float>(static_cast<double>(seed) / UINT32_MAX);
 		return (r * 2.0f - 1.0f) * range;
 	}
 

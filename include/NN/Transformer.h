@@ -71,12 +71,12 @@ public:
 		for (size_t j = 0; j < MLPDim; j++)
 			for (size_t i = 0; i < EmbedDim; i++) {
 				s1 = s1 * 1664525u + 1013904223u;
-				d1[j * EmbedDim + i] = (static_cast<float>(s1) / UINT32_MAX * 2.0f - 1.0f) * range;
+				d1[j * EmbedDim + i] = (static_cast<float>(static_cast<double>(s1) / UINT32_MAX) * 2.0f - 1.0f) * range;
 			}
 		for (size_t j = 0; j < EmbedDim; j++)
 			for (size_t i = 0; i < MLPDim; i++) {
 				s2 = s2 * 1664525u + 1013904223u;
-				d2[j * MLPDim + i] = (static_cast<float>(s2) / UINT32_MAX * 2.0f - 1.0f) * range;
+				d2[j * MLPDim + i] = (static_cast<float>(static_cast<double>(s2) / UINT32_MAX) * 2.0f - 1.0f) * range;
 			}
 
 		fc1W_ = Tensor<T, MLPDim, EmbedDim>(d1);

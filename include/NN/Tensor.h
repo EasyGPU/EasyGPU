@@ -150,7 +150,10 @@ private:
 
 	template <typename F, size_t... Is>
 	void ForEachImpl(F &&f, std::index_sequence<Is...>) {
-		([&] { auto elem = ref_[static_cast<int>(Is)]; f(elem); }(), ...);
+		for (size_t i = 0; i < TotalSize; i++) {
+			auto elem = ref_[static_cast<int>(i)];
+			f(elem);
+		}
 	}
 
 	IR::Value::BufferRef<T> ref_;
