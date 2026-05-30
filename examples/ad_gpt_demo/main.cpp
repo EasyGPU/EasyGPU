@@ -335,8 +335,7 @@ int main() {
 			}
 			bufTokens.Upload(tokenData);
 
-			kernel.Forward(groups, true);
-			kernel.Backward(groups, true);
+			kernel.Backward(groups, false);
 			adam.Step(kernel);
 
 			if (step % LOG_EVERY == 0 || step == NUM_STEPS - 1) {

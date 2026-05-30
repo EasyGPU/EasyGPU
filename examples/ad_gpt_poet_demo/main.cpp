@@ -525,7 +525,7 @@ int main() {
 			}
 			bufTokens.Upload(tokenData);
 
-			kernel.Backward(groups, true);
+			kernel.Backward(groups, step == 0);
 
 			if (step == 0) {
 				auto allG = kernel.DownloadAllGradients();

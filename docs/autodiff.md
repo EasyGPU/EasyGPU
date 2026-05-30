@@ -269,6 +269,9 @@ int main() {
 - `AD::Loss(var)` marks the scalar loss variable
 - `Backward()` runs the combined forward+backward shader, computing both loss and gradients
 - `Gradient(index)` downloads the gradient from GPU to a `std::vector<float>`
+- `Backward(groups, false)` dispatches asynchronously. Use this in training loops when the next operation is another GPU operation such as an optimizer step.
+
+> **Performance note:** Gradient and adjoint buffers are cleared by a small GPU clear kernel before the combined backward dispatch. Training loops no longer need to upload zero-filled CPU arrays just to reset gradients.
 
 ### AdjointKernel1D — Forward+Backward Combined
 
@@ -664,7 +667,7 @@ auto grad_b = kernel.Gradient("v42");  // GLSL variable name
 
 ### Batch Gradient Download
 
-For models with many parameters, calling `Gradient(i)` in a loop re-downloads shared gradient buffers multiple times. Use `DownloadAllGradients()` for efficient batch download:
+For inspection or custom CPU-side optimizers, calling `Gradient(i)` in a loop re-downloads shared gradient buffers multiple times. Use `DownloadAllGradients()` for efficient batch download:
 
 ```cpp
 // ❌ Slow — downloads each shared buffer once per parameter in the group
@@ -679,7 +682,9 @@ for (size_t i = 0; i < allGrads.size(); i++) {
 }
 ```
 
-`DownloadAllGradients()` uses an internal cache map: each unique gradient buffer handle is downloaded once, then per-parameter slices are extracted from the cached data. This is what `Adam::Step()` uses internally.
+`DownloadAllGradients()` uses an internal cache map: each unique gradient buffer handle is downloaded once, then per-parameter slices are extracted from the cached data.
+
+> **Note:** The built-in NN optimizers (`Adam`, `SGD`, `RMSprop`) do not use this CPU download path during normal training. They consume the AD gradient buffers directly on the GPU.
 
 ---
 
@@ -711,19 +716,20 @@ adam.AddTensor(W);           // register weights
 adam.AddTensor(b);           // register biases
 
 for (int step = 0; step < 1000; step++) {
-    kernel.Forward(groups, true);   // forward pass
-    kernel.Backward(groups, true);  // forward + backward, write gradients to GPU
-    adam.Step(kernel);              // download → aggregate → update → upload
+    kernel.Backward(groups, false); // forward + backward, write gradients to GPU
+    adam.Step(kernel);              // GPU aggregate + update
 }
 ```
 
 `Adam::Step(kernel)` internally:
-1. Calls `kernel.DownloadAllGradients()` — one download per shared buffer group
+1. Reads AD gradient buffers directly on the GPU
 2. Averages per-thread gradients for each scalar parameter
-3. Applies Adam update rule (bias-corrected moments, weight decay, gradient clipping)
-4. Uploads updated weights back to GPU buffers
+3. Updates flat optimizer state (`m`/`v`) in GPU buffers
+4. Applies Adam update to all registered tensor buffers in one combined dispatch when binding limits allow
 
 The optimizer tracks per-parameter `m` and `v` state vectors, matching the AD kernel's scalar parameter count exactly. This avoids the common pitfall of averaging gradients across entire tensors.
+
+`SGD` and `RMSprop` use the same GPU optimizer path. If a model exceeds the backend buffer binding limit, the optimizer automatically falls back to one GPU dispatch per tensor instead of downloading gradients to the CPU.
 
 ### Layers
 

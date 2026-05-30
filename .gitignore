@@ -90,3 +90,5 @@ generated/
 !.clang-format
 
 BUILD.md
+
+CMakeSettings.json

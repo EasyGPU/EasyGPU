@@ -48,9 +48,9 @@ int main() {
             If(idx < 2, [&]() {
                 output[idx] = 1.0f;
             });
-        }, 64);
+        }, 1);
 
-        kernel.Dispatch(1, true);
+        kernel.Dispatch(4, true);
         outputBuffer.Download(outputData);
         assert(std::abs(outputData[0] - 1.0f) < 0.01f);
         assert(std::abs(outputData[1] - 1.0f) < 0.01f);
@@ -76,9 +76,9 @@ int main() {
                 posGrad[poff + 1] = 1.0f;
                 posGrad[poff + 2] = 1.0f;
             });
-        }, 64);
+        }, 1);
 
-        kernel.Dispatch(1, true);
+        kernel.Dispatch(4, true);
         gradBuffer.Download(gradData);
         for (int j = 0; j < 12; j++) {
             assert(std::abs(gradData[j] - 1.0f) < 0.01f);
@@ -106,9 +106,9 @@ int main() {
                 posGrad[poff + 1] = 1.0f;
                 posGrad[poff + 2] = 1.0f;
             });
-        }, 64);
+        }, 1);
 
-        kernel.Dispatch(1, true);
+        kernel.Dispatch(4, true);
         gradBuffer.Download(gradData);
         for (int j = 0; j < 12; j++) {
             assert(std::abs(gradData[j] - 1.0f) < 0.01f);
@@ -133,9 +133,8 @@ int main() {
                 auto buf = slot.Bind();
                 buf[i] = 2.0f;
             });
-        }, 64);
-
-        kernel.Dispatch(1, true);
+        }, 1);
+        kernel.Dispatch(8, true);
         buffer.Download(data);
         for (int j = 0; j < 4; j++) {
             assert(std::abs(data[j] - 1.0f) < 0.01f);

@@ -631,27 +631,20 @@ public:
 	void Backward(int groupCount, bool sync = false) {
 		if (_combinedCode.empty()) return;
 		EnsureGradientBuffers();
-		// Parameter adjoints use the gradient output buffers as per-thread
-		// accumulators, so they must be cleared before every backward pass.
+		// Parameter adjoints use gradient output buffers as per-thread
+		// accumulators, so clear them on GPU before every backward pass.
 		{
 			std::unordered_set<Backend::BufferHandle> cleared;
 			size_t dispThreads = ((_elementCount + _workSizeX - 1) / _workSizeX) * _workSizeX;
 			for (const auto &pm : _params) {
 				if (pm.gradHandle == Backend::INVALID_BUFFER_HANDLE) continue;
 				if (!cleared.insert(pm.gradHandle).second) continue;
-				static std::vector<float> zeroGrad;
-				zeroGrad.resize(dispThreads * pm.gradStride, 0.0f);
-				auto *be = Runtime::Context::GetBackend();
-				if (be) be->UploadBuffer(pm.gradHandle, 0,
-					zeroGrad.size() * sizeof(float), zeroGrad.data());
+				ClearBufferGPU(pm.gradHandle, dispThreads * pm.gradStride);
 			}
 		}
-		// Zero adjoint pool to prevent accumulation between dispatches
+		// Zero adjoint pool to prevent accumulation between dispatches.
 		if (_adjPoolHandle != Backend::INVALID_BUFFER_HANDLE && _adjPoolSize > 0) {
-			static std::vector<float> zeroBuf;
-			zeroBuf.resize(_adjPoolSize, 0.0f);
-			auto *be = Runtime::Context::GetBackend();
-			if (be) be->UploadBuffer(_adjPoolHandle, 0, _adjPoolSize * sizeof(float), zeroBuf.data());
+			ClearBufferGPU(_adjPoolHandle, _adjPoolSize);
 		}
 		ExecuteCombinedDispatch(groupCount, sync);
 	}
@@ -741,6 +734,29 @@ public:
 	size_t ParameterCount() const { return _params.size(); }
 	const auto &Params() const { return _params; }
 
+	struct GradientParamInfo {
+		std::string varName;
+		size_t      sampleCount = 0;
+		int         gradOffset  = 0;
+		int         gradStride  = 1;
+		Backend::BufferHandle gradHandle = Backend::INVALID_BUFFER_HANDLE;
+	};
+
+	std::vector<GradientParamInfo> GradientParams() const {
+		std::vector<GradientParamInfo> out;
+		out.reserve(_params.size());
+		for (const auto &pm : _params) {
+			GradientParamInfo info;
+			info.varName     = pm.varName;
+			info.sampleCount = pm.count;
+			info.gradOffset  = pm.gradOffset;
+			info.gradStride  = pm.gradStride;
+			info.gradHandle  = pm.gradHandle;
+			out.push_back(std::move(info));
+		}
+		return out;
+	}
+
 private:
 	struct ParamMeta {
 		std::string varName;
@@ -756,6 +772,11 @@ private:
 		std::string adjName;
 		size_t      offset = 0;   // offset (in floats) into the combined adjoint pool
 		size_t      size = 0;
+	};
+
+	struct ClearPipeline {
+		Backend::ShaderHandle shader = Backend::INVALID_SHADER_HANDLE;
+		Backend::PipelineHandle pipeline = Backend::INVALID_PIPELINE_HANDLE;
 	};
 
 	/** Extract the base buffer name from a var name like "buf2[0]" → "buf2". */
@@ -832,6 +853,61 @@ private:
 			backend->DestroyBuffer(_adjPoolHandle);
 			_adjPoolHandle = Backend::INVALID_BUFFER_HANDLE;
 		}
+		for (auto &[_, cp] : _clearPipelines) {
+			if (cp.pipeline != Backend::INVALID_PIPELINE_HANDLE)
+				backend->DestroyPipeline(cp.pipeline);
+			if (cp.shader != Backend::INVALID_SHADER_HANDLE)
+				backend->DestroyShader(cp.shader);
+		}
+		_clearPipelines.clear();
+	}
+
+	void ClearBufferGPU(Backend::BufferHandle handle, size_t floatCount) {
+		if (handle == Backend::INVALID_BUFFER_HANDLE || floatCount == 0) return;
+
+		Runtime::AutoInitContext();
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend) throw std::runtime_error("Backend not available");
+
+		auto &cp = _clearPipelines[floatCount];
+		if (cp.pipeline == Backend::INVALID_PIPELINE_HANDLE) {
+			Backend::ShaderDesc shaderDesc;
+			shaderDesc.type = Backend::ShaderType::Compute;
+			shaderDesc.entryPoint = "main";
+			shaderDesc.sourceCode = std::format(R"GLSL(#version 430
+layout(local_size_x = 256) in;
+layout(std430, binding = 0) buffer ClearBuf {{ float data[]; }};
+void main() {{
+	uint i = gl_GlobalInvocationID.x;
+	if (i >= {}u) return;
+	data[i] = 0.0;
+}}
+)GLSL", floatCount);
+			cp.shader = backend->CreateShader(shaderDesc);
+
+			Backend::PipelineDesc pipeDesc;
+			pipeDesc.computeShader = cp.shader;
+			pipeDesc.workGroupSizeX = 256;
+			Backend::ResourceLayoutEntry entry;
+			entry.binding = 0;
+			entry.type = Backend::BindingType::Buffer;
+			entry.readOnly = false;
+			pipeDesc.resources.push_back(entry);
+			cp.pipeline = backend->CreatePipeline(pipeDesc);
+			if (cp.pipeline == Backend::INVALID_PIPELINE_HANDLE)
+				throw std::runtime_error("ADKernel1D: failed to create GPU clear pipeline");
+		}
+
+		backend->BindPipeline(cp.pipeline);
+		Backend::ResourceBinding rb;
+		rb.binding = 0;
+		rb.type = Backend::BindingType::Buffer;
+		rb.buffer = handle;
+		rb.readOnly = false;
+		backend->BindResources(&rb, 1);
+		backend->Dispatch(static_cast<uint32_t>((floatCount + 255) / 256), 1, 1);
+		backend->MemoryBarrier(Backend::BarrierType::Buffer);
 	}
 
 	void ExecuteCombinedDispatch(int groupCount, bool sync) {
@@ -888,9 +964,8 @@ private:
 
 		backend->Dispatch(groupCount, 1, 1);
 
-		if (sync) {
-			backend->MemoryBarrier(Backend::BarrierType::All);
-		}
+		backend->MemoryBarrier(Backend::BarrierType::All);
+		if (sync) backend->Finish();
 	}
 
 	Backend::PipelineHandle CompileCombinedPipeline(Backend::Backend *backend) {
@@ -968,6 +1043,7 @@ private:
 	Backend::BufferHandle _adjPoolHandle = Backend::INVALID_BUFFER_HANDLE;
 
 	Backend::PipelineHandle _combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+	std::unordered_map<size_t, ClearPipeline> _clearPipelines;
 };
 
 } // namespace GPU::AD

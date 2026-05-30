@@ -28,6 +28,7 @@
 #include <string>
 
 using namespace GPU;
+using namespace GPU::Kernel;
 using namespace GPU::IR::Value;
 using namespace GPU::Math;
 using namespace GPU::Runtime;
@@ -362,6 +363,62 @@ TEST(nn_adam_elementwise_update_matches_gradients)
 }
 END_TEST
 
+TEST(nn_gpu_adam_updates_on_device)
+{
+	Tensor<float, 2> weight({1.0f, -1.0f});
+	Buffer<float> xBuf({2.0f, 3.0f}, BufferMode::Read);
+
+	ADKernel1D kernel([&](Var<int> &id) {
+		(void)id;
+		auto x = xBuf.Bind();
+		auto w = weight.Bind();
+		AD::Param(w[0]);
+		AD::Param(w[1]);
+		Var<float> y = w[0] * x[0] + w[1] * x[1];
+		Var<float> loss = y * y;
+		AD::Loss(loss);
+	}, 1, 256);
+
+	GPUAdam optimizer(0.1f, 0.0f, 0.0f, 1e-8f);
+	optimizer.AddTensor(weight);
+
+	kernel.Backward(1, true);
+	optimizer.Step(kernel, true);
+	weight.Download();
+
+	ASSERT(std::abs(weight.Data()[0] - 1.1f) < 1e-4f);
+	ASSERT(std::abs(weight.Data()[1] - -0.9f) < 1e-4f);
+}
+END_TEST
+
+TEST(nn_adam_step_is_gpu_backed)
+{
+	Tensor<float, 2> weight({1.0f, -1.0f});
+	Buffer<float> xBuf({2.0f, 3.0f}, BufferMode::Read);
+
+	ADKernel1D kernel([&](Var<int> &id) {
+		(void)id;
+		auto x = xBuf.Bind();
+		auto w = weight.Bind();
+		AD::Param(w[0]);
+		AD::Param(w[1]);
+		Var<float> y = w[0] * x[0] + w[1] * x[1];
+		Var<float> loss = y * y;
+		AD::Loss(loss);
+	}, 1, 256);
+
+	Adam optimizer(0.1f, 0.0f, 0.0f, 1e-8f);
+	optimizer.AddTensor(weight);
+
+	kernel.Backward(1, true);
+	optimizer.Step(kernel);
+	weight.Download();
+
+	ASSERT(std::abs(weight.Data()[0] - 1.1f) < 1e-4f);
+	ASSERT(std::abs(weight.Data()[1] - -0.9f) < 1e-4f);
+}
+END_TEST
+
 TEST(nn_adam_bias_correction)
 {
 	// At t=1, bias correction = 1 - beta1 = 0.1 (for beta1=0.9)
@@ -406,6 +463,32 @@ TEST(nn_sgd_momentum_math)
 }
 END_TEST
 
+TEST(nn_sgd_step_is_gpu_backed)
+{
+	Tensor<float, 1> weight(std::vector<float>{1.0f});
+	Buffer<float> xBuf(std::vector<float>{2.0f}, BufferMode::Read);
+
+	ADKernel1D kernel([&](Var<int> &id) {
+		(void)id;
+		auto x = xBuf.Bind();
+		auto w = weight.Bind();
+		AD::Param(w[0]);
+		Var<float> y = w[0] * x[0];
+		Var<float> loss = y * y;
+		AD::Loss(loss);
+	}, 1, 256);
+
+	SGD optimizer(0.1f, 0.0f);
+	optimizer.AddTensor(weight);
+
+	kernel.Backward(1, true);
+	optimizer.Step(kernel);
+	weight.Download();
+
+	ASSERT(std::abs(weight.Data()[0] - 0.2f) < 1e-4f);
+}
+END_TEST
+
 TEST(nn_rmsprop_update_math)
 {
 	// RMSprop:
@@ -424,6 +507,32 @@ TEST(nn_rmsprop_update_math)
 	float expectedW = 1.0f - 0.1f * 0.5f / std::sqrt(0.025f + 1e-8f);
 	ASSERT(std::abs(v - expectedV) < 1e-6f);
 	ASSERT(std::abs(w - expectedW) < 1e-6f);
+}
+END_TEST
+
+TEST(nn_rmsprop_step_is_gpu_backed)
+{
+	Tensor<float, 1> weight(std::vector<float>{1.0f});
+	Buffer<float> xBuf(std::vector<float>{2.0f}, BufferMode::Read);
+
+	ADKernel1D kernel([&](Var<int> &id) {
+		(void)id;
+		auto x = xBuf.Bind();
+		auto w = weight.Bind();
+		AD::Param(w[0]);
+		Var<float> y = w[0] * x[0];
+		Var<float> loss = y * y;
+		AD::Loss(loss);
+	}, 1, 256);
+
+	RMSprop optimizer(0.1f, 0.0f, 1e-8f);
+	optimizer.AddTensor(weight);
+
+	kernel.Backward(1, true);
+	optimizer.Step(kernel);
+	weight.Download();
+
+	ASSERT(std::abs(weight.Data()[0] - 0.9f) < 1e-4f);
 }
 END_TEST
 
@@ -555,6 +664,43 @@ TEST(nn_linear_params_are_registered)
 	auto bw = inspector.GetBackwardCode();
 	// Should have adjoint declarations for weights and biases
 	CHECK_CONTAINS(bw, "d_");
+}
+END_TEST
+
+TEST(nn_fused_mlp2_forward_matches_cpu)
+{
+	constexpr size_t N = 2;
+	FusedMLP2<float, 2, 3, 1> mlp(42, FusedActivation::ReLU);
+
+	float *w1 = mlp.W1().Data();
+	w1[0] = 1.0f; w1[1] = 0.0f;
+	w1[2] = 0.0f; w1[3] = 1.0f;
+	w1[4] = 1.0f; w1[5] = 1.0f;
+	float *b1 = mlp.B1().Data();
+	b1[0] = 0.5f; b1[1] = -0.5f; b1[2] = 0.0f;
+	float *w2 = mlp.W2().Data();
+	w2[0] = 1.0f; w2[1] = 2.0f; w2[2] = -1.0f;
+	mlp.B2().Data()[0] = 0.25f;
+	mlp.W1().Upload();
+	mlp.B1().Upload();
+	mlp.W2().Upload();
+	mlp.B2().Upload();
+
+	Buffer<float> inBuf({2.0f, 3.0f, -1.0f, 4.0f}, BufferMode::Read);
+	Buffer<float> outBuf(N, BufferMode::ReadWrite);
+
+	Kernel1D kernel([&](Var<int> &id) {
+		auto in = inBuf.Bind();
+		auto out = outBuf.Bind();
+		mlp.Setup(false);
+		mlp.Forward(in, id, out);
+	}, 1);
+	kernel.Dispatch(static_cast<int>(N), true);
+
+	std::vector<float> out;
+	outBuf.Download(out);
+	ASSERT(std::abs(out[0] - 2.75f) < 1e-4f);
+	ASSERT(std::abs(out[1] - 4.25f) < 1e-4f);
 }
 END_TEST
 
@@ -903,6 +1049,8 @@ TEST(nn_e2e_linear_regression_gpu)
 	ASSERT(std::abs(actualB - expectedB) < 1e-4);
 
 	optimizer.Step(kernel);
+	fc.Weight().Download();
+	fc.Bias().Download();
 	ASSERT(fc.Weight().Data()[0] > 0.0f);
 	ASSERT(fc.Bias().Data()[0] > 0.0f);
 }
@@ -934,9 +1082,13 @@ int main() {
 
 	test_nn_adam_update_math();
 	test_nn_adam_elementwise_update_matches_gradients();
+	test_nn_gpu_adam_updates_on_device();
+	test_nn_adam_step_is_gpu_backed();
 	test_nn_adam_bias_correction();
 	test_nn_sgd_momentum_math();
+	test_nn_sgd_step_is_gpu_backed();
 	test_nn_rmsprop_update_math();
+	test_nn_rmsprop_step_is_gpu_backed();
 	test_nn_weight_decay_math();
 	test_nn_grad_clip_math();
 
@@ -945,6 +1097,7 @@ int main() {
 	test_nn_linear_reset();
 	test_nn_linear_setup_forward_inspector();
 	test_nn_linear_params_are_registered();
+	test_nn_fused_mlp2_forward_matches_cpu();
 
 	test_nn_relu_construct();
 	test_nn_relu_forward_inspector();

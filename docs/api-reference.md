@@ -2006,7 +2006,7 @@ AD::ADKernel1D kernel([](Var<int>& i) {
 
 ### ADKernel1D
 
-GPU-executable training kernel. Wraps a `Kernel1D` and generates a combined forward+backward shader with gradient buffer management.
+GPU-executable training kernel. Wraps a `Kernel1D` and generates a combined forward+backward shader with gradient buffer management. Gradient and adjoint buffers are cleared on the GPU before each backward dispatch.
 
 ```cpp
 class ADKernel1D {
@@ -2025,7 +2025,9 @@ public:
     /** @brief Dispatch forward pass only (user's computation). */
     void Forward(int groupCount, bool sync = false);
 
-    /** @brief Dispatch combined forward+backward pass. Computes loss and writes gradients. */
+    /** @brief Dispatch combined forward+backward pass. Computes loss and writes gradients.
+     *  @param sync If true, wait for GPU completion before returning.
+     */
     void Backward(int groupCount, bool sync = false);
 
 
@@ -2038,6 +2040,9 @@ public:
 
     /** @brief Download gradient for a parameter by its GLSL variable name. */
     std::vector<float> Gradient(const std::string& paramVarName) const;
+
+    /** @brief Batch-download all parameter gradients for inspection or custom CPU optimizers. */
+    std::vector<std::vector<float>> DownloadAllGradients() const;
 
 
     // ── Debugging ─────────────────────────────────────────────
@@ -2086,6 +2091,8 @@ for (int epoch = 0; epoch < 100; epoch++) {
     // ... SGD update on CPU ...
 }
 ```
+
+For NN training, prefer `kernel.Backward(groups, false)` followed by `Adam::Step(kernel)`, `SGD::Step(kernel)`, or `RMSprop::Step(kernel)`. The built-in optimizers consume the gradient buffers directly on the GPU, so the CPU download path above is mostly useful for debugging and custom experiments.
 
 > ⚠️ **Gradient buffer sharing**: Multiple parameters from the same source buffer (e.g., `buf_W[0]`, `buf_W[1]`) share a single gradient SSBO with an interleaved layout. `Gradient(index)` automatically extracts the correct slice. This keeps shader storage block usage within `GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS`.
 
@@ -2334,18 +2341,19 @@ using namespace GPU::NN;
 |:------|:--------|
 | `Tensor<T, Dims...>` | Multi-dimensional weight container, GPU sync, batch param registration |
 | `TensorRef<T, Dims...>` | DSL-side tensor handle (returned by `Tensor::Bind()`) |
-| `Adam` | Adam optimizer with bias correction, weight decay, gradient clipping |
-| `SGD` | SGD with momentum, weight decay, gradient clipping |
-| `RMSprop` | RMSprop with moving average, weight decay, gradient clipping |
+| `Adam` | GPU Adam optimizer with bias correction, weight decay, gradient clipping |
+| `SGD` | GPU SGD with momentum, weight decay, gradient clipping |
+| `RMSprop` | GPU RMSprop with moving average, weight decay, gradient clipping |
 | `Linear<T, In, Out>` | Fully-connected layer with Xavier init |
 | `ReLU<T>` / `Sigmoid<T>` / `Tanh<T>` | Activation layers |
 | `Sequential<T, Layers...>` | Compile-time layer pipeline |
+| `FusedMLP2<T, In, Hidden, Out>` | Two-layer MLP emitted as one shader block |
 | `MSELoss` / `CrossEntropyLoss` | Loss functions for scalar and multi-class outputs |
 | `TokenEmbedding<T, V, E>` | Learned token embedding lookup |
 | `PositionalEmbedding<T, B, E>` | Learned positional embedding |
 | `RMSNorm<T, Dim>` | Root-mean-square normalization (GPT-style) |
 | `CausalSelfAttention<T, E, H>` | Multi-head causal self-attention |
-| `TransformerBlock<T, B, E, H>` | Pre-norm transformer block (attention + MLP) |
+| `TransformerBlock<T, B, E, H>` | Pre-norm transformer block (attention + fused FFN) |
 | `SaveWeights` / `LoadWeights` | Checkpoint save/load to binary files |
 
 ---
@@ -2470,7 +2478,9 @@ b.ForEachParam([](auto &p) { AD::Param(p); });
 
 ### Optimizers
 
-All optimizers live in `GPU::NN`. They manage per-parameter state (first/second moments for Adam, velocity for SGD, squared average for RMSprop) and handle gradient download, aggregation, update, and upload in a single `Step()` call.
+All optimizers live in `GPU::NN`. They manage per-parameter state (first/second moments for Adam, velocity for SGD, squared average for RMSprop) and update registered tensors directly on the GPU in `Step()`.
+
+The optimizer state is flattened into one GPU buffer per state vector (`m`/`v`, velocity, or square average). When the backend binding limit allows, all registered tensor parameters are updated by a single combined compute dispatch. If the model uses too many tensor buffers for one dispatch, EasyGPU falls back to one GPU dispatch per tensor.
 
 #### Adam
 
@@ -2496,9 +2506,9 @@ public:
     template <size_t... Dims>
     void AddTensor(Tensor<float, Dims...>& tensor);
 
-    /// Execute one optimization step.
-    /// Downloads gradients via DownloadAllGradients(), aggregates per-thread
-    /// gradients, applies Adam update, and uploads weights to GPU buffers.
+    /// Execute one optimization step on the GPU.
+    /// Reads AD gradient buffers, aggregates per-thread gradients,
+    /// applies Adam update, and writes weights in place.
     void Step(ADKernel1D& kernel);
 
     int GetStep() const;
@@ -2530,9 +2540,8 @@ adam.AddTensor(fc2.Bias());
 
 // Training loop
 for (int step = 0; step < 1000; step++) {
-    kernel.Forward(groups, true);
-    kernel.Backward(groups, true);
-    adam.Step(kernel);  // download → aggregate → update → upload
+    kernel.Backward(groups, false);
+    adam.Step(kernel);  // GPU aggregate + update
 }
 ```
 
@@ -2686,6 +2695,40 @@ Sequential<float, Linear<float, 784, 128>, ReLU<float, 128>, Linear<float, 128, 
 mlp.Setup();
 mlp.Forward(input, threadId, output, 10);
 ```
+
+#### FusedMLP2
+
+Two-layer MLP block: `y = W2(activation(W1x + b1)) + b2`. Unlike `Sequential<Linear, Activation, Linear>`, `FusedMLP2` emits the hidden layer as shader-local values inside one block of DSL code, avoiding intermediate buffer traffic.
+
+```cpp
+enum class FusedActivation {
+    ReLU,
+    Tanh,
+    None
+};
+
+template <typename T, size_t InFeatures, size_t HiddenFeatures, size_t OutFeatures>
+class FusedMLP2 {
+public:
+    FusedMLP2(unsigned initSeed = 42,
+              FusedActivation activation = FusedActivation::ReLU);
+
+    void Reset(unsigned initSeed = 42);
+    void Setup(bool registerParams = true);
+
+    void Forward(const BufferRef<T>& input,
+                 const Var<int>& threadId,
+                 const BufferRef<T>& output);
+
+    Tensor<T, HiddenFeatures, InFeatures>& W1();
+    Tensor<T, HiddenFeatures>& B1();
+    Tensor<T, OutFeatures, HiddenFeatures>& W2();
+    Tensor<T, OutFeatures>& B2();
+    static constexpr size_t ParamCount();
+};
+```
+
+Use this when the MLP dimensions are small enough to keep the hidden activation in shader locals. For GPT-style blocks, `TransformerBlock` already uses an integrated FFN path.
 
 ---
 
@@ -2844,7 +2887,7 @@ public:
 
 #### TransformerBlock
 
-Pre-norm transformer block (GPT-2 architecture): RMSNorm → Attention → +residual → RMSNorm → MLP(ReLU) → +residual. Uses a single scratch buffer internally to minimize SSBO bindings.
+Pre-norm transformer block (GPT-2 architecture): RMSNorm → Attention → +residual → RMSNorm → MLP(ReLU) → +residual. Uses a single scratch buffer internally to minimize SSBO bindings and keeps the FFN path inside the Transformer block kernel.
 
 ```cpp
 template <typename T, size_t BlockSize, size_t EmbedDim, size_t NumHeads>
@@ -2864,8 +2907,8 @@ public:
     void Forward(const BufferRef<T>& data, const Expr<int>& pos, const Expr<int>& seqBase);
 
     CausalSelfAttention<T, EmbedDim, NumHeads>& Attention();
-    Tensor<T, EmbedDim, MLPDim>& FC1();  // MLP first linear layer
-    Tensor<T, MLPDim, EmbedDim>& FC2();  // MLP second linear layer
+    Tensor<T, MLPDim, EmbedDim>& FC1();  // MLP first linear layer
+    Tensor<T, EmbedDim, MLPDim>& FC2();  // MLP second linear layer
     static constexpr size_t ParamCount = 4 * EmbedDim * EmbedDim + EmbedDim * MLPDim * 2;
 };
 ```

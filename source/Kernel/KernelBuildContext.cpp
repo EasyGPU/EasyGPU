@@ -514,6 +514,13 @@ uint32_t KernelBuildContext::GetPushConstantSize() const {
 // ===================================================================
 
 void KernelBuildContext::RegisterBufferSlot(Runtime::BufferSlotBase *slot) {
+	auto existing = _bufferSlotBindings.find(slot);
+	if (existing != _bufferSlotBindings.end()) {
+		slot->SetBindingInfo(static_cast<int>(existing->second),
+							 std::format("buf_slot_{}", existing->second));
+		return;
+	}
+
 	uint32_t	binding	   = AllocateBindingSlot();
 	std::string bufferName = std::format("buf_slot_{}", binding);
 
@@ -527,6 +534,13 @@ void KernelBuildContext::RegisterBufferSlot(Runtime::BufferSlotBase *slot) {
 }
 
 void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
+	auto existing = _textureSlotBindings.find(slot);
+	if (existing != _textureSlotBindings.end()) {
+		slot->SetBindingInfo(static_cast<int>(existing->second),
+							 std::format("tex_slot_{}", existing->second));
+		return;
+	}
+
 	uint32_t	binding		= AllocateTextureBinding();
 	std::string textureName = std::format("tex_slot_{}", binding);
 

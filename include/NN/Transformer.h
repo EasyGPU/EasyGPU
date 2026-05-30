@@ -9,8 +9,9 @@
  * Pre-norm architecture (GPT-2 style): RMSNorm → Attention → +residual
  *                                     → RMSNorm → MLP (ReLU) → +residual
  *
- * Uses a single scratch buffer internally (instead of 4 separate buffers)
- * to minimize GPU SSBO binding slots.
+ * Uses a single scratch buffer internally and keeps the FFN inside the
+ * Transformer block kernel, so GPT does not route through a standalone
+ * Sequential/Linear MLP dispatch chain.
  */
 
 #ifndef EASYGPU_NN_TRANSFORMER_H
@@ -128,22 +129,21 @@ public:
 		// --- RMSNorm → MLP → residual add ---
 		norm2_.Forward(x, scratchRef_, aOff + po);
 
-		// MLP fc1: expand E → 4E with ReLU
-		GPU::Flow::For(MakeInt(0), MakeInt(M), [&](IR::Value::Var<int> &o) {
-			IR::Value::Var<T> sum = MakeFloat(0.0f);
+		// Fused block FFN: FC1 + ReLU + FC2 live inside the same Transformer
+		// kernel. The hidden vector is materialized once in scratch to keep the
+		// generated AD shader compact enough for real training runs.
+		GPU::Flow::For(MakeInt(0), MakeInt(M), [&](IR::Value::Var<int> &h) {
+			IR::Value::Var<T> hidden = MakeFloat(0.0f);
 			GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &i) {
-				IR::Value::Var<T> f1 = fc1Ref_(o, i) * scratchRef_[aOff + po + i];
-				sum = sum + f1;
+				hidden = hidden + fc1Ref_(h, i) * scratchRef_[aOff + po + i];
 			});
-			scratchRef_[mOff + poM + o] = GPU::Math::Max(sum, MakeFloat(0.0f));
+			scratchRef_[mOff + poM + h] = GPU::Math::Max(hidden, MakeFloat(0.0f));
 		});
 
-		// MLP fc2: contract 4E → E, add to residual
 		GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &o) {
 			IR::Value::Var<T> sum = MakeFloat(0.0f);
-			GPU::Flow::For(MakeInt(0), MakeInt(M), [&](IR::Value::Var<int> &i) {
-				IR::Value::Var<T> f2 = fc2Ref_(o, i) * scratchRef_[mOff + poM + i];
-				sum = sum + f2;
+			GPU::Flow::For(MakeInt(0), MakeInt(M), [&](IR::Value::Var<int> &h) {
+				sum = sum + fc2Ref_(o, h) * scratchRef_[mOff + poM + h];
 			});
 			x[po + o] = x[po + o] + sum;
 		});
