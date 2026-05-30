@@ -437,6 +437,9 @@ protected:
 	// Shared memory declarations
 	std::vector<std::string>								 _sharedMemoryDeclarations;
 
+	// Float atomic buffer tracking (buffer names needing int alias for CAS-loop fallback)
+	std::unordered_set<std::string>							 _floatAtomicBuffers;
+
 public:
 	// ===================================================================
 	// Shared Memory Support
@@ -453,6 +456,14 @@ public:
 	 * @return Vector of shared memory declaration strings.
 	 */
 	std::vector<std::string> GetSharedMemoryDeclarations() const override;
+
+public:
+	// ===================================================================
+	// Float Atomic Support
+	// ===================================================================
+
+	void RegisterFloatAtomicBuffer(const std::string &bufferName) override;
+	bool HasFloatAtomics() const { return !_floatAtomicBuffers.empty(); }
 
 public:
 	// ===================================================================

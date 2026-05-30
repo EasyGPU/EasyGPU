@@ -33,6 +33,16 @@ void FragmentBuildContext::GenerateCommonHeaders(std::ostringstream &oss) {
 	// Version directive
 	oss << GenerateHeader();
 
+	// Float atomic extensions for maximum GPU compatibility
+	if (!_floatAtomicBuffers.empty()) {
+		oss << "#ifdef GL_NV_shader_atomic_float\n"
+			<< "#extension GL_NV_shader_atomic_float : enable\n"
+			<< "#endif\n"
+			<< "#ifdef GL_EXT_shader_atomic_float\n"
+			<< "#extension GL_EXT_shader_atomic_float : enable\n"
+			<< "#endif\n\n";
+	}
+
 	// Output struct definitions
 	for (const auto &structDef : GetStructDefinitions()) {
 		oss << structDef;

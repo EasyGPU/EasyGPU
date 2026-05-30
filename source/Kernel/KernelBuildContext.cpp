@@ -73,6 +73,16 @@ std::string KernelBuildContext::GetCompleteCode() {
 	oss << "#version 430 core\n\n";
 #endif
 
+	// Float atomic extensions for maximum GPU compatibility
+	if (!_floatAtomicBuffers.empty()) {
+		oss << "#ifdef GL_NV_shader_atomic_float\n"
+			<< "#extension GL_NV_shader_atomic_float : enable\n"
+			<< "#endif\n"
+			<< "#ifdef GL_EXT_shader_atomic_float\n"
+			<< "#extension GL_EXT_shader_atomic_float : enable\n"
+			<< "#endif\n\n";
+	}
+
 	// Layout for compute shader
 	if (_dimension == 1) {
 		oss << std::format("layout(local_size_x = {}, local_size_y = {}, local_size_z = {}) in;\n\n", WorkSizeX,
@@ -260,6 +270,17 @@ std::string KernelBuildContext::GetBufferDeclarations() const {
 #endif
 		oss << std::format("    {} {}[];\n", buf.typeName, buf.bufferName);
 		oss << "};\n";
+
+		// Declare int alias SSBO for float buffers used in atomic CAS-loop fallback
+		if (_floatAtomicBuffers.count(buf.bufferName)) {
+#if defined(EASYGPU_BACKEND_VULKAN)
+			oss << std::format("layout(set=0, std430, binding={}) buffer {}_t_int {{\n", buf.binding, buf.bufferName);
+#else
+			oss << std::format("layout(std430, binding={}) buffer {}_t_int {{\n", buf.binding, buf.bufferName);
+#endif
+			oss << std::format("    int {}_int[];\n", buf.bufferName);
+			oss << "};\n";
+		}
 	}
 	return oss.str();
 }
@@ -549,6 +570,10 @@ uint32_t KernelBuildContext::GetTextureSlotBinding(Runtime::TextureSlotBase *slo
 
 void KernelBuildContext::PushSharedMemoryDeclaration(const std::string &declaration) {
 	_sharedMemoryDeclarations.push_back(declaration);
+}
+
+void KernelBuildContext::RegisterFloatAtomicBuffer(const std::string &bufferName) {
+	_floatAtomicBuffers.insert(bufferName);
 }
 
 std::vector<std::string> KernelBuildContext::GetSharedMemoryDeclarations() const {

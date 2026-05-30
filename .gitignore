@@ -1,7 +1,8 @@
 # Build directories
-build/
-build*/
-cmake-build-*/
+/build/
+/build*/
+/build-*/
+/cmake-build-*/
 out/
 bin/
 lib/
@@ -87,3 +88,5 @@ generated/
 
 # Ensure formatting config is tracked
 !.clang-format
+
+BUILD.md

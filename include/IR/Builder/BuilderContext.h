@@ -281,6 +281,13 @@ public:
 	}
 
 	/**
+	 * Register that a float buffer needs an int alias for atomic CAS-loop fallback.
+	 * @param bufferName The GLSL array name (e.g. "buf_slot_0")
+	 */
+	virtual void RegisterFloatAtomicBuffer(const std::string &bufferName) {
+	}
+
+	/**
 	 * Register a texture slot for dynamic binding at dispatch time
 	 * @param slot Pointer to the TextureSlotBase
 	 */
