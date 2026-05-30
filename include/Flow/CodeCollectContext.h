@@ -234,6 +234,19 @@ public:
 		if (_parentContext) _parentContext->RegisterBufferSlot(slot);
 	}
 
+	void RegisterTextureSlot(Runtime::TextureSlotBase *slot) override {
+		if (_parentContext) _parentContext->RegisterTextureSlot(slot);
+	}
+
+	void PushSharedMemoryDeclaration(const std::string &declaration) override {
+		if (_parentContext) _parentContext->PushSharedMemoryDeclaration(declaration);
+	}
+
+	std::vector<std::string> GetSharedMemoryDeclarations() const override {
+		if (_parentContext) return _parentContext->GetSharedMemoryDeclarations();
+		return {};
+	}
+
 private:
 	IR::Builder::BuilderContext *_parentContext;
 	std::vector<std::string>	 _collectedCode;
