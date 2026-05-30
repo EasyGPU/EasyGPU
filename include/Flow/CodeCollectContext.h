@@ -230,6 +230,10 @@ public:
 		if (_parentContext) _parentContext->RegisterFloatAtomicBuffer(bufferName);
 	}
 
+	void RegisterBufferSlot(Runtime::BufferSlotBase *slot) override {
+		if (_parentContext) _parentContext->RegisterBufferSlot(slot);
+	}
+
 private:
 	IR::Builder::BuilderContext *_parentContext;
 	std::vector<std::string>	 _collectedCode;

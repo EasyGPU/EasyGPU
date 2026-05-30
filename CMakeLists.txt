@@ -459,6 +459,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestFlowDoWhile.cpp
         tests/TestFlowFor.cpp
         tests/TestFlowIf.cpp
+        tests/TestIfBuffer.cpp
         tests/TestMath.cpp
         tests/TestEdgeCases.cpp
         tests/TestStressLargeScale.cpp
