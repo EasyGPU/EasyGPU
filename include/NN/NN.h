@@ -18,6 +18,7 @@
 #include <NN/Checkpoint.h>
 #include <NN/Embedding.h>
 #include <NN/FusedMLP.h>
+#include <NN/FusedMLPTraining.h>
 #include <NN/Layers.h>
 #include <NN/Loss.h>
 #include <NN/Normalization.h>

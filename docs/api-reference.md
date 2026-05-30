@@ -46,6 +46,7 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 - [Texture Samplers](#texture-samplers)
 - [Shared Memory](#shared-memory)
 - [Atomic Operations](#atomic-operations)
+- [Active Compaction](#active-compaction)
 - [Parallel Primitives](#parallel-primitives)
 - [Thread Index Utilities](#thread-index-utilities)
 - [PBO Async Transfer](#pbo-async-transfer)
@@ -2348,6 +2349,7 @@ using namespace GPU::NN;
 | `ReLU<T>` / `Sigmoid<T>` / `Tanh<T>` | Activation layers |
 | `Sequential<T, Layers...>` | Compile-time layer pipeline |
 | `FusedMLP2<T, In, Hidden, Out>` | Two-layer MLP emitted as one shader block |
+| `FusedMLP2Trainer<T, In, Hidden, Out>` | Specialized fused MLP training path for 16/32/64-wide networks |
 | `MSELoss` / `CrossEntropyLoss` | Loss functions for scalar and multi-class outputs |
 | `TokenEmbedding<T, V, E>` | Learned token embedding lookup |
 | `PositionalEmbedding<T, B, E>` | Learned positional embedding |
@@ -2729,6 +2731,68 @@ public:
 ```
 
 Use this when the MLP dimensions are small enough to keep the hidden activation in shader locals. For GPT-style blocks, `TransformerBlock` already uses an integrated FFN path.
+
+#### FusedMLP2Trainer
+
+Specialized two-layer MLP trainer for small dense networks with widths `16`, `32`, or `64`. This is a raw GLSL path, not a generic DSL layer: it generates statically-unrolled shaders for forward inference, MSE loss, backward gradient accumulation, and Adam update.
+
+```cpp
+template <typename T, size_t InFeatures, size_t HiddenFeatures, size_t OutFeatures>
+class FusedMLP2Trainer {
+public:
+    /// Widths must be 16, 32, or 64. T must be float.
+    explicit FusedMLP2Trainer(unsigned seed = 42);
+
+    Runtime::Buffer<float>& W1();
+    Runtime::Buffer<float>& B1();
+    Runtime::Buffer<float>& W2();
+    Runtime::Buffer<float>& B2();
+    Runtime::Buffer<float>& LossBuffer();
+
+    void Reset(unsigned seed = 42);
+    void SetWeights(const std::vector<float>& w1,
+                    const std::vector<float>& b1,
+                    const std::vector<float>& w2,
+                    const std::vector<float>& b2);
+
+    void Forward(Runtime::Buffer<float>& input,
+                 Runtime::Buffer<float>& output,
+                 size_t batch,
+                 bool sync = false);
+
+    void TrainMSE(Runtime::Buffer<float>& input,
+                  Runtime::Buffer<float>& target,
+                  size_t batch,
+                  float lr = 0.001f,
+                  float beta1 = 0.9f,
+                  float beta2 = 0.999f,
+                  float eps = 1e-8f,
+                  bool sync = false);
+
+    float DownloadLoss();
+    static constexpr size_t ParameterCount();
+
+    static std::string ForwardShaderSource(size_t batch);
+    static std::string TrainingShaderSource(size_t batch);
+    static std::string UpdateShaderSource();
+};
+```
+
+`TrainMSE()` uses three compute dispatches: clear gradient/loss buffers, run fused forward+loss+backward, then update all parameters with Adam. The generated training shader stages weights in shared memory and keeps activations/adjoints in scalar locals. Floating-point gradient accumulation uses an integer `atomicCompSwap` CAS loop, so it does not require vendor-specific float atomic extensions.
+
+```cpp
+using Trainer = FusedMLP2Trainer<float, 16, 32, 16>;
+
+Trainer mlp(42);
+Buffer<float> input(batch * 16, BufferMode::Read);
+Buffer<float> target(batch * 16, BufferMode::Read);
+
+for (int step = 0; step < 1000; step++) {
+    mlp.TrainMSE(input, target, batch, 1e-3f);
+}
+```
+
+Use this path when the network shape is known and small enough to benefit from static unrolling. For arbitrary layer stacks, keep using `Sequential` + AD + GPU optimizers.
 
 ---
 
@@ -3885,6 +3949,55 @@ Kernel1D histogram([](Int i) {
     ExprBase::NotUse(AtomicAdd(hist[bin], MakeInt(1)));
 });
 ```
+
+---
+
+## Active Compaction
+
+GPU utility for building dense active-index lists from sparse integer masks. Useful for sparse ray, particle, pixel, and cell workloads.
+
+```cpp
+#include <Utility/ActiveCompaction.h>
+
+namespace GPU::Utility {
+
+class ActiveCompaction {
+public:
+    explicit ActiveCompaction(size_t maxElements);
+
+    Runtime::Buffer<int>& CountBuffer();
+    Runtime::Buffer<int>& IndicesBuffer();
+    const Runtime::Buffer<int>& CountBuffer() const;
+    const Runtime::Buffer<int>& IndicesBuffer() const;
+
+    size_t MaxElements() const;
+
+    /// Compact activeMask[0..elementCount) into IndicesBuffer().
+    /// activeMask[i] != 0 means element i is active.
+    void Compact(Runtime::Buffer<int>& activeMask,
+                 size_t elementCount,
+                 bool sync = false);
+
+    int DownloadCount();
+    std::vector<int> DownloadIndices(size_t count);
+};
+
+} // namespace GPU::Utility
+```
+
+**Example:**
+
+```cpp
+Buffer<int> activeMask(N, BufferMode::Read);
+GPU::Utility::ActiveCompaction compactor(N);
+
+compactor.Compact(activeMask, N);
+
+int activeCount = compactor.DownloadCount();
+auto activeIndices = compactor.DownloadIndices(activeCount);
+```
+
+`Compact()` runs two small GPU passes: clear the counter, then append active indices with an atomic counter. Follow-up kernels can bind `IndicesBuffer()` and process only active elements. If a backend does not support indirect dispatch, dispatch a conservative upper bound and read `CountBuffer()` inside the shader, or occasionally download the count to choose a tighter CPU-side dispatch.
 
 ---
 

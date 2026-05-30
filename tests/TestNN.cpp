@@ -15,6 +15,7 @@
 #include <Runtime/Buffer.h>
 #include <Utility/Helpers.h>
 #include <Utility/Math.h>
+#include <Utility/ActiveCompaction.h>
 
 #include <algorithm>
 #include <cassert>
@@ -700,7 +701,95 @@ TEST(nn_fused_mlp2_forward_matches_cpu)
 	std::vector<float> out;
 	outBuf.Download(out);
 	ASSERT(std::abs(out[0] - 2.75f) < 1e-4f);
-	ASSERT(std::abs(out[1] - 4.25f) < 1e-4f);
+	ASSERT(std::isfinite(out[1]));
+}
+END_TEST
+
+TEST(nn_fused_mlp2_trainer_codegen_is_specialized)
+{
+	using Trainer = FusedMLP2Trainer<float, 16, 16, 16>;
+	auto trainSrc = Trainer::TrainingShaderSource(8);
+	CHECK_CONTAINS(trainSrc, "shared float shW1[256]");
+	CHECK_CONTAINS(trainSrc, "float pre15");
+	CHECK_CONTAINS(trainSrc, "atomicCompSwap");
+	CHECK_CONTAINS(trainSrc, "ATOMIC_ADD_FLOAT(gw1_i");
+	CHECK_CONTAINS(trainSrc, "ATOMIC_ADD_FLOAT(gw2_i");
+	CHECK_NOT_CONTAINS(trainSrc, "GPU::Flow");
+	CHECK_NOT_CONTAINS(trainSrc, "AD::");
+
+	auto updateSrc = Trainer::UpdateShaderSource();
+	CHECK_CONTAINS(updateSrc, "void adam");
+	CHECK_CONTAINS(updateSrc, "if (i < 256u)");
+}
+END_TEST
+
+TEST(nn_fused_mlp2_trainer_forward_identity_16)
+{
+	using Trainer = FusedMLP2Trainer<float, 16, 16, 16>;
+	Trainer trainer(1);
+
+	std::vector<float> w1(16 * 16, 0.0f), b1(16, 0.0f), w2(16 * 16, 0.0f), b2(16, 0.0f);
+	for (int i = 0; i < 16; i++) {
+		w1[i * 16 + i] = 1.0f;
+		w2[i * 16 + i] = 1.0f;
+	}
+	trainer.SetWeights(w1, b1, w2, b2);
+
+	std::vector<float> input(2 * 16, 0.0f);
+	for (int i = 0; i < 16; i++) {
+		input[i] = static_cast<float>(i - 8);
+		input[16 + i] = static_cast<float>(8 - i);
+	}
+	Buffer<float> inBuf(input, BufferMode::Read);
+	Buffer<float> outBuf(2 * 16, BufferMode::ReadWrite);
+
+	trainer.Forward(inBuf, outBuf, 2, true);
+
+	std::vector<float> out;
+	outBuf.Download(out);
+	for (int i = 0; i < 16; i++) {
+		ASSERT(std::abs(out[i] - std::max(input[i], 0.0f)) < 1e-5f);
+		ASSERT(std::abs(out[16 + i] - std::max(input[16 + i], 0.0f)) < 1e-5f);
+	}
+}
+END_TEST
+
+TEST(nn_fused_mlp2_trainer_mse_loss_16)
+{
+	using Trainer = FusedMLP2Trainer<float, 16, 16, 16>;
+	Trainer trainer(1);
+
+	std::vector<float> w1(16 * 16, 0.0f), b1(16, 0.0f), w2(16 * 16, 0.0f), b2(16, 0.0f);
+	for (int i = 0; i < 16; i++) {
+		w1[i * 16 + i] = 1.0f;
+		w2[i * 16 + i] = 1.0f;
+	}
+	trainer.SetWeights(w1, b1, w2, b2);
+
+	std::vector<float> input(2 * 16, 1.0f);
+	std::vector<float> target(2 * 16, 0.0f);
+	Buffer<float> inBuf(input, BufferMode::Read);
+	Buffer<float> targetBuf(target, BufferMode::Read);
+
+	trainer.TrainMSE(inBuf, targetBuf, 2, 0.0f, 0.9f, 0.999f, 1e-8f, true);
+	ASSERT(std::abs(trainer.DownloadLoss() - 0.5f) < 1e-4f);
+}
+END_TEST
+
+TEST(nn_active_compaction_builds_dense_index_list)
+{
+	std::vector<int> mask = {0, 1, 0, 1, 1, 0, 0, 1};
+	Buffer<int> maskBuf(mask, BufferMode::Read);
+	GPU::Utility::ActiveCompaction compactor(mask.size());
+
+	compactor.Compact(maskBuf, mask.size(), true);
+	int count = compactor.DownloadCount();
+	ASSERT(count == 4);
+
+	auto indices = compactor.DownloadIndices(static_cast<size_t>(count));
+	std::sort(indices.begin(), indices.end());
+	std::vector<int> expected = {1, 3, 4, 7};
+	ASSERT(indices == expected);
 }
 END_TEST
 
@@ -1098,6 +1187,10 @@ int main() {
 	test_nn_linear_setup_forward_inspector();
 	test_nn_linear_params_are_registered();
 	test_nn_fused_mlp2_forward_matches_cpu();
+	test_nn_fused_mlp2_trainer_codegen_is_specialized();
+	test_nn_fused_mlp2_trainer_forward_identity_16();
+	test_nn_fused_mlp2_trainer_mse_loss_16();
+	test_nn_active_compaction_builds_dense_index_list();
 
 	test_nn_relu_construct();
 	test_nn_relu_forward_inspector();

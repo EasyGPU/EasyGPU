@@ -12,6 +12,7 @@ High-performance GPU computing with workgroup-level cooperation.
 - [Atomic Operations](#atomic-operations)
   - [Supported Atomic Operations](#supported-atomic-operations)
   - [Atomic Usage Patterns](#atomic-usage-patterns)
+- [Active Compaction](#active-compaction)
 - [Parallel Primitives](#parallel-primitives)
   - [WorkgroupReduce](#workgroupreduce)
   - [WorkgroupScanInclusive](#workgroupscaninclusive)
@@ -160,6 +161,48 @@ Kernel1D findMax([&](Int i) {
 ```
 
 > **Note:** Use `ExprBase::NotUse()` to explicitly discard atomic return values when not needed. This avoids compiler warnings about unused return values.
+
+---
+
+## Active Compaction
+
+Active compaction turns a sparse mask into a dense list of indices:
+
+```
+mask:          [0, 1, 0, 1, 1, 0]
+activeIndices:    [1,    3, 4]
+activeCount:       3
+```
+
+This is useful for ray tracing, volume rendering, sparse simulation, and any workload where only a subset of pixels, rays, particles, or cells should run the expensive path. Instead of dispatching a heavy kernel over every element and branching inside the shader, compact the active set first, then process the dense active list.
+
+```cpp
+#include <Utility/ActiveCompaction.h>
+
+Buffer<int> activeMask(N, BufferMode::Read);  // 0 = inactive, nonzero = active
+GPU::Utility::ActiveCompaction compactor(N);
+
+// GPU pass: clears the counter, scans the mask, writes active indices
+compactor.Compact(activeMask, N);
+
+// Optional CPU readback when you want a tighter dispatch size
+int activeCount = compactor.DownloadCount();
+auto activeIndices = compactor.DownloadIndices(activeCount);
+```
+
+`ActiveCompaction` stores two buffers:
+
+| Buffer | Contents |
+|:-------|:---------|
+| `CountBuffer()` | One integer: number of active elements |
+| `IndicesBuffer()` | Dense list of active source indices |
+
+Follow-up kernels can bind `IndicesBuffer()` and use `activeIndices[i]` to recover the original element index. OpenGL does not provide CUDA-style dynamic parallelism here, so there are two common strategies:
+
+- Dispatch a conservative upper bound and have the shader return when `i >= activeCount`.
+- Occasionally download `CountBuffer()` and choose a tighter dispatch size on the CPU.
+
+The compaction itself uses an integer atomic counter and stays entirely on the GPU. It is intentionally simple and portable; for very large masks, hierarchical compaction can reduce counter contention further.
 
 ---
 
@@ -510,6 +553,27 @@ shared.GetSize()        // Get N (compile-time constant)
 [[nodiscard]] Expr<float> AtomicMax(const Expr<float>& target, float value);
 [[nodiscard]] Expr<float> AtomicExchange(const Expr<float>& target, const Expr<float>& value);
 [[nodiscard]] Expr<float> AtomicExchange(const Expr<float>& target, float value);
+```
+
+### ActiveCompaction
+
+```cpp
+#include <Utility/ActiveCompaction.h>
+
+class ActiveCompaction {
+public:
+    explicit ActiveCompaction(size_t maxElements);
+
+    Runtime::Buffer<int>& CountBuffer();
+    Runtime::Buffer<int>& IndicesBuffer();
+
+    void Compact(Runtime::Buffer<int>& activeMask,
+                 size_t elementCount,
+                 bool sync = false);
+
+    int DownloadCount();
+    std::vector<int> DownloadIndices(size_t count);
+};
 ```
 
 ### Parallel Primitives
