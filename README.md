@@ -28,6 +28,7 @@ C++20 Embedded DSL for GPU Compute, Autograd & Neural Networks
   - [Neural Network Training](#neural-network-training--tensor--optimizer)
 - [Quick Start](#quick-start)
 - [Examples](#examples)
+- [Ecosystem](#ecosystem)
 - [Best Practices](#best-practices)
 - [Documentation](#documentation)
 - [Building](#building)
@@ -795,6 +796,35 @@ Basic Monte Carlo ray tracer demonstrating struct handling and random number gen
 Signed distance field path tracer with support for complex lighting and materials. Demonstrates advanced Callable usage and reusable kernel functions.
 
 [View full example →](examples/sdf_renderer/main.cpp)
+
+---
+
+## Ecosystem
+
+### HashEncoder — Instant-NGP Style Hash Grid Encoding
+
+[![HashEncoder](https://img.shields.io/badge/EasyGPU-HashEncoder-blue.svg)](https://github.com/EasyGPU/HashEncoder)
+
+**[HashEncoder](https://github.com/EasyGPU/HashEncoder)** is an optional companion library for multi-resolution hash grid encoding, built on top of EasyGPU. It implements the core technique from NVIDIA's Instant Neural Graphics Primitives (Instant-NGP) — learnable feature grids indexed by spatial hash functions — entirely in C++ with EasyGPU's DSL.
+
+```cpp
+#include <HashEncoder/HashEncoder.h>
+
+// 16 levels, 2 features per level, hash table size 2^16, 3D input
+GPU::HashEncoder::HashGridEncoder<float, 16, 2, 65536, 3> encoder;
+
+// Encode 3D coordinates into learned features on GPU
+encoder.Encode(positions, features, count);
+```
+
+| Feature | Description |
+|:--------|:------------|
+| Multi-resolution grids | Configurable levels, features per level, and hash table size |
+| GPU-native | Encoding runs entirely on EasyGPU compute kernels |
+| Trainable | Backed by EasyGPU buffers — plug into AD training loops |
+| Instant-NGP compatible | Same hash encoding algorithm as the original paper |
+
+[HashEncoder on GitHub →](https://github.com/EasyGPU/HashEncoder)
 
 ---
 
