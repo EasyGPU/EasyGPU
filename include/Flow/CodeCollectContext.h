@@ -226,6 +226,10 @@ public:
 	 */
 	IR::Builder::CallableGenState  &GetCallableState(const void *callablePtr) override;
 
+	void RegisterFloatAtomicBuffer(const std::string &bufferName) override {
+		if (_parentContext) _parentContext->RegisterFloatAtomicBuffer(bufferName);
+	}
+
 private:
 	IR::Builder::BuilderContext *_parentContext;
 	std::vector<std::string>	 _collectedCode;
