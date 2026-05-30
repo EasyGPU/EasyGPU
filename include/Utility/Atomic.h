@@ -26,24 +26,21 @@ inline IR::Value::Expr<int> BuildAtomicIntOp(const std::string &opName, const st
 	return IR::Value::Expr<int>(std::make_unique<IR::Node::RawCodeNode>(atomicCode));
 }
 
-// Build float atomic with CAS-loop fallback for maximum GPU compatibility.
-// On GPUs with GL_NV_shader_atomic_float or GL_EXT_shader_atomic_float: uses the native
-// atomicAdd/atomicMin/atomicMax/atomicExchange. Otherwise: CAS loop via atomicCompSwap
-// on an int-aliased SSBO at the same binding.
+// Build float atomic via CAS loop on int-aliased SSBO for universal GPU compatibility.
+// Uses atomicCompSwap on int[] SSBO declared at same binding as the float[] target.
+// This approach works on all GLSL 4.30+ hardware without requiring any extensions.
 inline IR::Value::Expr<float> BuildAtomicFloatOp(const std::string &opName, const std::string &targetExpr,
 												 const std::string &valueExpr) {
-	// Extract buffer name from targetExpr (e.g. "buf_slot_0[expr]" → "buf_slot_0")
 	auto bracketPos = targetExpr.find('[');
 	if (bracketPos == std::string::npos) {
-		// Non-SSBO target (local/shared variable): use native atomic only
+		// Non-SSBO target (local/shared variable): emit native atomic call
 		std::string code = opName + "(" + targetExpr + ", " + valueExpr + ")";
 		return IR::Value::Expr<float>(std::make_unique<IR::Node::RawCodeNode>(code));
 	}
 
 	std::string bufName = targetExpr.substr(0, bracketPos);
-	std::string indexExpr = targetExpr.substr(bracketPos); // includes [...]
+	std::string indexExpr = targetExpr.substr(bracketPos);
 
-	// Register this buffer for int alias SSBO declaration
 	auto *ctx = IR::Builder::Builder::Get().Context();
 	if (ctx) {
 		ctx->RegisterFloatAtomicBuffer(bufName);
@@ -62,15 +59,11 @@ inline IR::Value::Expr<float> BuildAtomicFloatOp(const std::string &opName, cons
 	} else if (opName == "atomicExchange") {
 		casNewValExpr = valueExpr;
 	} else {
-		// Unknown op: emit native call only
 		return IR::Value::Expr<float>(std::make_unique<IR::Node::RawCodeNode>(
 			opName + "(" + targetExpr + ", " + valueExpr + ")"));
 	}
 
 	std::string code;
-	code += "#if defined(GL_NV_shader_atomic_float) || defined(GL_EXT_shader_atomic_float)\n";
-	code += "    " + opName + "(" + targetExpr + ", " + valueExpr + ");\n";
-	code += "#else\n";
 	code += "    {{\n";
 	code += "        int _atomic_old = floatBitsToInt(" + targetExpr + ");\n";
 	code += "        int _atomic_new;\n";
@@ -81,8 +74,7 @@ inline IR::Value::Expr<float> BuildAtomicFloatOp(const std::string &opName, cons
 	code += "            if (_atomic_prev == _atomic_old) break;\n";
 	code += "            _atomic_old = _atomic_prev;\n";
 	code += "        }\n";
-	code += "    }}\n";
-	code += "#endif\n";
+	code += "    }}";
 
 	return IR::Value::Expr<float>(std::make_unique<IR::Node::RawCodeNode>(code));
 }

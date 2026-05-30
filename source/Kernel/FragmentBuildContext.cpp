@@ -35,12 +35,8 @@ void FragmentBuildContext::GenerateCommonHeaders(std::ostringstream &oss) {
 
 	// Float atomic extensions for maximum GPU compatibility
 	if (!_floatAtomicBuffers.empty()) {
-		oss << "#ifdef GL_NV_shader_atomic_float\n"
-			<< "#extension GL_NV_shader_atomic_float : enable\n"
-			<< "#endif\n"
-			<< "#ifdef GL_EXT_shader_atomic_float\n"
-			<< "#extension GL_EXT_shader_atomic_float : enable\n"
-			<< "#endif\n\n";
+		oss << "#extension GL_NV_shader_atomic_float : enable\n"
+			<< "#extension GL_EXT_shader_atomic_float : enable\n\n";
 	}
 
 	// Output struct definitions
