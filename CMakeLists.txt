@@ -383,6 +383,22 @@ add_library(EasyGPU STATIC
     include/AD/AdjointInspector.h
     include/AD/ADCore.h
 
+    # Neural Network
+    include/NN/NN.h
+    include/NN/Tensor.h
+    include/NN/Layers.h
+    include/NN/Optimizer.h
+    source/NN/Optimizer.cpp
+    include/NN/Loss.h
+    include/NN/Normalization.h
+    include/NN/Embedding.h
+    include/NN/Attention.h
+    include/NN/Transformer.h
+    include/NN/Checkpoint.h
+    source/NN/Checkpoint.cpp
+    include/NN/FusedMLP.h
+    include/NN/FusedMLPTraining.h
+
     # Benchmark
     include/Benchmark/Benchmark.h
     source/Benchmark/Benchmark.cpp

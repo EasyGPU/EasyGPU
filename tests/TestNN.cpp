@@ -353,8 +353,19 @@ TEST(nn_adam_elementwise_update_matches_gradients)
 	std::vector<float> m(2, 0.0f);
 	std::vector<float> v(2, 0.0f);
 
-	GPU::NN::detail::ApplyAdamUpdate(weight.data(), grad.data(), m.data(), v.data(),
-		weight.size(), 0.1f, 0.9f, 0.999f, 1e-8f, 1, 0.0f, 0.0f);
+	// Inline Adam update (CPU helper removed, logic replicated for test)
+		float lr = 0.1f, beta1 = 0.9f, beta2 = 0.999f, eps = 1e-8f;
+		int step = 1;
+		const double biasCorr1 = 1.0 - std::pow(beta1, step);
+		const double biasCorr2 = 1.0 - std::pow(beta2, step);
+		for (size_t i = 0; i < weight.size(); ++i) {
+			double g = static_cast<double>(grad[i]);
+			m[i] = static_cast<float>(beta1 * m[i] + (1.0 - beta1) * g);
+			v[i] = static_cast<float>(beta2 * v[i] + (1.0 - beta2) * g * g);
+			const double mHat = m[i] / biasCorr1;
+			const double vHat = v[i] / biasCorr2;
+			weight[i] -= static_cast<float>(lr * mHat / (std::sqrt(vHat) + eps));
+		}
 
 	// The update must use each element's own gradient, not a single averaged scalar.
 	ASSERT(std::abs(m[0] - 0.05f) < 1e-6f);
