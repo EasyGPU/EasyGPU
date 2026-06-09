@@ -22,6 +22,8 @@
 #include <windows.h>
 
 #include <wincrypt.h>
+#elif defined(__APPLE__)
+#include <CommonCrypto/CommonDigest.h>
 #else
 #include <openssl/evp.h>
 #endif
@@ -51,6 +53,13 @@ public:
 			}
 			CryptReleaseContext(hProv, 0);
 		}
+#elif defined(__APPLE__)
+		// Apple CommonCrypto
+		CC_SHA256_CTX ctx;
+		CC_SHA256_Init(&ctx);
+		CC_SHA256_Update(&ctx, input.c_str(), input.size());
+		CC_SHA256_Final(hash, &ctx);
+		hashComputed = true;
 #else
 		// OpenSSL EVP API
 		EVP_MD_CTX *ctx = EVP_MD_CTX_new();

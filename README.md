@@ -10,7 +10,7 @@ C++20 Embedded DSL for GPU Compute, Autograd & Neural Networks
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-orange.svg)](https://en.cppreference.com/w/cpp/20)
 [![OpenGL](https://img.shields.io/badge/OpenGL-4.3+-green.svg)](https://www.opengl.org/)
 [![Vulkan](https://img.shields.io/badge/Vulkan-1.1+-red.svg)](https://www.vulkan.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![Autograd](https://img.shields.io/badge/Autograd-Reverse--Mode-blue.svg)](docs/autodiff.md)
 
 [Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Examples](#examples) · [API Reference](docs/api-reference.md)
@@ -85,11 +85,12 @@ int main() {
 
 ### Requirements
 
-- C++20 compatible compiler (GCC 11+, Clang 14+, MSVC 2022+)
+- C++20 compatible compiler (GCC 11+, Clang 14+, MSVC 2022+, Apple Clang 14+)
 - OpenGL 4.3+ or Vulkan 1.1+
 - CMake 3.21+ (optional)
 - **Windows:** No additional dependencies
 - **Linux:** X11 development libraries (`libx11-dev` on Ubuntu/Debian)
+- **macOS:** No additional dependencies — uses Cocoa/CoreGraphics (built-in)
 - **Vulkan builds:** Vulkan SDK with `glslang` / `SPIRV-Tools` libraries available to CMake
 
 ---
@@ -150,15 +151,16 @@ square.Dispatch(16, true);
 
 ### Cross-Platform Support
 
-Runs natively on Windows and Linux with zero code changes. The same kernel code works identically across platforms.
+Runs natively on Windows, Linux, and macOS with zero code changes. The same kernel code works identically across platforms.
 
 | Platform | Compute Kernels | Fragment Kernels | Backend |
 |:---------|:---------------|:-----------------|:--------|
 | **Windows** | ✅ Full support | ✅ Full support | WGL |
 | **Linux** | ✅ Full support | — | GLX |
+| **macOS** | ✅ Full support | — | Vulkan |
 
 ```cpp
-// This code runs identically on Windows and Linux
+// This code runs identically on Windows, Linux, and macOS
 Kernel1D transform([](Int i) {
     data[i] = Sqrt(data[i] * 2.0f);
 });
@@ -478,11 +480,11 @@ KernelProfiler::PrintReport(kernel);
 
 EasyGPU includes a lightweight, cross-platform window component for interactive GPU compute visualization. Built on top of [minifb](https://github.com/emoon/minifb), it provides a minimal footprint alternative to heavyweight frameworks like GLFW or SDL — the entire windowing layer adds less than 100KB to your binary.
 
-**Zero external dependencies.** The window component is self-contained and compiles out-of-the-box on both Windows and Linux. No need to hunt for system libraries or deal with complex linker flags.
+**Zero external dependencies.** The window component is self-contained and compiles out-of-the-box on Windows, Linux, and macOS. No need to hunt for system libraries or deal with complex linker flags.
 
-| Windows | Ubuntu |
-|:-------:|:------:|
-| <img src="docs/image/appwindow_windows.png" width="400"> | <img src="docs/image/appwindow_ubuntu.png" width="400"> |
+| Windows | Ubuntu | macOS |
+|:-------:|:------:|:-----:|
+| <img src="docs/image/appwindow_windows.png" width="260"> | <img src="docs/image/appwindow_ubuntu.png" width="260"> | *(Cocoa/CoreGraphics)* |
 
 ```cpp
 #include <GPU.h>
@@ -516,7 +518,7 @@ int main() {
 
 **Key Features:**
 - **Ultra-lightweight** — Based on minifb, minimal overhead (~100KB added)
-- **Truly cross-platform** — Identical API on Windows (Win32) and Linux (X11)
+- **Truly cross-platform** — Identical API on Windows (Win32), Linux (X11), and macOS (Cocoa/CoreGraphics)
 - **Zero external dependencies** — Self-contained, header-friendly implementation
 - **Event-driven input** — Keyboard, mouse, and resize events
 - **Dual rendering paths** — CPU `PixelBuffer` for software rendering, `TexturePresenter` for direct GPU display
@@ -936,10 +938,10 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 
 | Dependency | Required | Size | Purpose |
 |:-----------|:---------|:-----|:--------|
-| OpenGL 4.3+ | Yes | System | OpenGL compute backend |
-| Vulkan 1.1+ SDK | Vulkan builds | System | Vulkan compute backend |
-| X11 (Linux) | Yes | System | Windowing system |
-| GLAD | Yes | ~500KB (bundled) | OpenGL loader |
+| OpenGL 4.3+ | OpenGL builds | System | OpenGL compute backend |
+| Vulkan 1.1+ SDK | Vulkan builds | System | Vulkan compute backend (MoltenVK on macOS) |
+| X11 (Linux) | Linux only | System | Windowing system |
+| GLAD | OpenGL builds | ~500KB (bundled) | OpenGL loader |
 | stb_image | No | ~50KB (examples only) | Image I/O |
 
 ### Build Commands
@@ -982,6 +984,20 @@ cd build && ctest
 ```bash
 cmake -B build_vulkan -DEASYGPU_BACKEND=Vulkan -DEASYGPU_BUILD_FRAGMENT_TESTER=OFF
 cmake --build build_vulkan -j
+```
+
+**macOS (Vulkan backend):**
+```bash
+git clone https://github.com/easygpu/EasyGPU.git
+cd EasyGPU
+
+# macOS requires Vulkan backend (OpenGL is Linux/Windows only)
+# Install Vulkan SDK from https://vulkan.lunarg.com/
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DEASYGPU_BACKEND=Vulkan
+cmake --build build -j
+
+# Run tests
+cd build && ctest
 ```
 
 ### CMake Options

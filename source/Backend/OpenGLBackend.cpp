@@ -18,6 +18,14 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#elif defined(__APPLE__)
+// macOS: OpenGL backend is not supported — use Vulkan on macOS
+#ifdef __OBJC__
+#include <OpenGL/CGLTypes.h>
+#include <OpenGL/OpenGL.h>
+#else
+#error "OpenGL backend on macOS requires Objective-C (compile as .mm) — prefer using Vulkan backend instead"
+#endif
 #else
 // Linux: Use system X11/GLX headers directly
 #include <GL/glx.h>

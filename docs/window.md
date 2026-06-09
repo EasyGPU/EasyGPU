@@ -44,7 +44,7 @@ int main() {
 
 ## Features
 
-- **Cross-platform**: Windows (Win32) and Linux (X11) support
+- **Cross-platform**: Windows (Win32), Linux (X11), and macOS (Cocoa/CoreGraphics) support
 - **Simple API**: Modern C++20 design with minimal boilerplate
 - **Event-driven**: Keyboard, mouse, resize, and focus events
 - **CPU Rendering**: `PixelBuffer` for software-rendered graphics
@@ -329,6 +329,7 @@ Platform-specific requirements:
   ```bash
   sudo apt-get install libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
   ```
+- **macOS**: No additional dependencies. Uses Cocoa/CoreGraphics (built into macOS), no external frameworks required.
 
 ## Design Philosophy
 
@@ -336,7 +337,7 @@ The Window component follows EasyGPU's core principles:
 
 1. **Simplicity**: Minimal API surface, easy to learn
 2. **Modern C++**: RAII, move semantics, no raw pointers
-3. **Cross-platform**: Works on Windows and Linux without changes
+3. **Cross-platform**: Works on Windows, Linux, and macOS without changes
 4. **Non-intrusive**: Completely optional, doesn't affect core compute functionality
 5. **Performance**: Efficient event handling and presentation paths
 

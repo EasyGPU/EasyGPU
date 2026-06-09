@@ -92,6 +92,16 @@ if(EASYGPU_BUILD_WINDOW)
             third/minifb/src/windows/WinMiniFB.c
         )
         set(MINIFB_LIBS winmm)
+    elseif(APPLE)
+        list(APPEND MINIFB_SOURCES
+            third/minifb/src/macos/MacMiniFB.m
+            third/minifb/src/macos/OSXWindow.m
+            third/minifb/src/macos/OSXView.m
+        )
+        find_library(COCOA_LIB Cocoa)
+        find_library(COREGRAPHICS_LIB CoreGraphics)
+        find_library(COREVIDEO_LIB CoreVideo)
+        set(MINIFB_LIBS ${COCOA_LIB} ${COREGRAPHICS_LIB} ${COREVIDEO_LIB})
     elseif(UNIX AND NOT APPLE)
         list(APPEND MINIFB_SOURCES
             third/minifb/src/x11/X11MiniFB.c
@@ -99,13 +109,13 @@ if(EASYGPU_BUILD_WINDOW)
         # Core X11 is required
         find_package(X11 REQUIRED)
         set(MINIFB_LIBS ${X11_LIBRARIES} pthread)
-        
+
         # Optional X11 extensions - only link if available
         find_library(XCURSOR_LIB Xcursor)
         find_library(XRANDR_LIB Xrandr)
         find_library(XINERAMA_LIB Xinerama)
         find_library(XI_LIB Xi)
-        
+
         if(XCURSOR_LIB)
             list(APPEND MINIFB_LIBS ${XCURSOR_LIB})
         endif()
@@ -119,20 +129,24 @@ if(EASYGPU_BUILD_WINDOW)
             list(APPEND MINIFB_LIBS ${XI_LIB})
         endif()
     endif()
-    
+
     # Create minifb as an object library (linked into EasyGPUWindow)
     add_library(minifb STATIC ${MINIFB_SOURCES})
-    target_include_directories(minifb PUBLIC 
+    target_include_directories(minifb PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src
     )
-    
+
     if(WIN32)
-        target_include_directories(minifb PRIVATE 
+        target_include_directories(minifb PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/windows
         )
+    elseif(APPLE)
+        target_include_directories(minifb PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/macos
+        )
     elseif(UNIX AND NOT APPLE)
-        target_include_directories(minifb PRIVATE 
+        target_include_directories(minifb PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/x11
         )
     endif()

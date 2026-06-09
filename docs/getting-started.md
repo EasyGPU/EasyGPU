@@ -27,8 +27,8 @@ kernel.Dispatch(4, true);
 
 ## Prerequisites
 
-- **Operating System:** Windows or Linux
-- **Compiler:** GCC 11+, Clang 14+, or MSVC 2022+
+- **Operating System:** Windows, Linux, or macOS
+- **Compiler:** GCC 11+, Clang 14+, MSVC 2022+, or Apple Clang 14+
 - **C++ Standard:** C++20
 - **GPU:** Any GPU supporting OpenGL 4.3+ or Vulkan 1.1+
 - **Build System:** CMake 3.21+ (optional but recommended)
@@ -36,7 +36,8 @@ kernel.Dispatch(4, true);
 **Platform-Specific Requirements:**
 - **Windows:** Visual Studio 2022 or Build Tools, Windows SDK
 - **Linux:** X11 development libraries (`sudo apt-get install libx11-dev` on Ubuntu/Debian)
-- **Vulkan backend:** Vulkan SDK with `glslang` and `SPIRV-Tools` libraries discoverable by CMake
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`). No additional dependencies — Cocoa and CoreGraphics are built into the OS.
+- **Vulkan backend:** Vulkan SDK with `glslang` and `SPIRV-Tools` libraries discoverable by CMake. On macOS, the Vulkan SDK provides MoltenVK (Vulkan over Metal).
 
 ## Installation
 
@@ -155,7 +156,15 @@ cl /std:c++20 first_kernel.cpp opengl32.lib
 first_kernel.exe
 ```
 
-> **Note:** Direct one-file compilation is only suitable for the OpenGL path. The Vulkan backend (default) requires CMake to configure the Vulkan SDK, `glslang`, and `SPIRV-Tools` dependencies correctly.
+With CMake and Vulkan backend (macOS):
+```bash
+mkdir build && cd build
+cmake .. -DEASYGPU_BACKEND=Vulkan
+cmake --build .
+./first_kernel
+```
+
+> **Note:** Direct one-file compilation is only suitable for the OpenGL path. The Vulkan backend (default) requires CMake to configure the Vulkan SDK, `glslang`, and `SPIRV-Tools` dependencies correctly. On macOS, only the Vulkan backend is supported; OpenGL is available on Windows and Linux.
 
 ## Understanding the Basics
 
