@@ -167,19 +167,17 @@ transform.Dispatch(16, true);
 
 ### Dual Backends
 
-EasyGPU now supports two compute backends:
+EasyGPU supports two compute backends, switchable at CMake configure time with zero kernel code changes:
 
+- **Vulkan** *(default)* — Modern compute backend with explicit resource binding, push-constant uniforms, storage textures, sampled textures, profiler queries, and stronger long-term scalability
 - **OpenGL** — Minimal setup, excellent for teaching, rapid iteration, and existing GL applications
-- **Vulkan** — Modern compute backend with explicit resource binding, push-constant uniforms, storage textures, sampled textures, profiler queries, and stronger long-term scalability
-
-This is one of EasyGPU's biggest practical advantages: you keep the same C++ DSL, the same buffer and texture abstractions, and the same kernel code while switching the backend at CMake configure time.
 
 ```cmake
+cmake -S . -B build -DEASYGPU_BACKEND=Vulkan   # default
 cmake -S . -B build_gl -DEASYGPU_BACKEND=OpenGL
-cmake -S . -B build_vk -DEASYGPU_BACKEND=Vulkan
 ```
 
-For projects that want a simple on-ramp, OpenGL remains a great default. For projects that want a modern compute stack, Vulkan is now a first-class path rather than an experimental branch.
+For new projects, Vulkan is the recommended default. OpenGL remains available for users who need a lighter dependency footprint or are targeting existing GL applications.
 
 ### Automatic Differentiation — GPU Gradients, Zero Hand-Written Math
 
@@ -626,7 +624,7 @@ If you want OpenGL explicitly:
 cmake -S . -B build -DEASYGPU_BACKEND=OpenGL
 ```
 
-**Manual:** Copy `include/` to your project and link against OpenGL.
+**Manual:** Copy `include/` to your project, configure the backend via `#define EASYGPU_BACKEND_VULKAN` or `#define EASYGPU_BACKEND_OPENGL` before including GPU.h, and link against the corresponding API (Vulkan or OpenGL).
 
 ### Using EasyGPU in Your Own CMake Project
 
@@ -990,7 +988,7 @@ cmake --build build_vulkan -j
 
 | Option | Default | Description |
 |:-------|:--------|:------------|
-| `EASYGPU_BACKEND` | `OpenGL` | Backend API: `OpenGL` or `Vulkan` |
+| `EASYGPU_BACKEND` | `Vulkan` | Backend API: `OpenGL` or `Vulkan` |
 | `EASYGPU_BUILD_EXAMPLES` | `ON` | Build examples |
 | `EASYGPU_BUILD_TESTS` | `ON` | Build tests |
 | `EASYGPU_BUILD_FRAGMENT_TESTER` | `OFF` | Build the Windows FragmentKernel tester |

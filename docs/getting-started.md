@@ -6,7 +6,7 @@ This guide will get you running your first GPU program in under 10 minutes.
 
 EasyGPU is an embedded domain-specific language (eDSL) that lets you write GPU compute kernels using standard C++ syntax. Instead of learning GLSL or dealing with complex graphics APIs, you write GPU code that looks like regular C++.
 
-That same kernel code can now run through either the OpenGL compute backend or the Vulkan compute backend. For simple setup, OpenGL remains a good default. For a modern explicit compute stack, Vulkan is now fully supported as a first-class backend.
+That same kernel code can now run through either the Vulkan compute backend (default) or the OpenGL compute backend. For a modern explicit compute stack, Vulkan is the recommended default. For simple setup with minimal dependencies, OpenGL is also fully supported.
 
 **Traditional GPU programming:**
 ```cpp
@@ -56,7 +56,7 @@ FetchContent_MakeAvailable(easygpu)
 target_link_libraries(your_target EasyGPU)
 ```
 
-To select the Vulkan backend inside your own project:
+Vulkan is the default backend. If you want to explicitly configure it in your own project:
 
 ```cmake
 set(EASYGPU_BACKEND Vulkan CACHE STRING "EasyGPU backend" FORCE)
@@ -65,7 +65,7 @@ set(EASYGPU_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(EASYGPU_BUILD_FRAGMENT_TESTER OFF CACHE BOOL "" FORCE)
 ```
 
-To stay on OpenGL:
+To select the OpenGL backend instead:
 
 ```cmake
 set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
@@ -74,8 +74,8 @@ set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
 ### Method 2: Copy Headers
 
 1. Copy the `include/` directory to your project
-2. Add `#include <GPU.h>` to your source files
-3. Link with OpenGL (`-lGL` on Linux, `-lopengl32` on Windows)
+2. Add `#define EASYGPU_BACKEND_OPENGL` (or `EASYGPU_BACKEND_VULKAN`) before `#include <GPU.h>`
+3. Link with the corresponding API (`-lGL` on Linux, `-lopengl32` on Windows for OpenGL; Vulkan SDK libs for Vulkan)
 
 ## Your First Program
 
@@ -135,27 +135,27 @@ cmake --build .
 ./first_kernel
 ```
 
-With CMake and the Vulkan backend:
+With CMake and the OpenGL backend:
 ```bash
-mkdir build_vulkan && cd build_vulkan
-cmake .. -DEASYGPU_BACKEND=Vulkan -DEASYGPU_BUILD_FRAGMENT_TESTER=OFF
+mkdir build_opengl && cd build_opengl
+cmake .. -DEASYGPU_BACKEND=OpenGL -DEASYGPU_BUILD_FRAGMENT_TESTER=OFF
 cmake --build .
 ./first_kernel
 ```
 
-Direct compilation (Linux):
+Direct compilation with OpenGL backend (Linux):
 ```bash
 g++ -std=c++20 first_kernel.cpp -lGL -lX11 -o first_kernel
 ./first_kernel
 ```
 
-Direct compilation (Windows with MSVC):
+Direct compilation with OpenGL backend (Windows with MSVC):
 ```bash
 cl /std:c++20 first_kernel.cpp opengl32.lib
 first_kernel.exe
 ```
 
-> **Note:** Direct one-file compilation is suitable for the OpenGL path. The Vulkan backend is intended to be used through CMake so the Vulkan SDK, `glslang`, and `SPIRV-Tools` dependencies can be configured correctly.
+> **Note:** Direct one-file compilation is only suitable for the OpenGL path. The Vulkan backend (default) requires CMake to configure the Vulkan SDK, `glslang`, and `SPIRV-Tools` dependencies correctly.
 
 ## Understanding the Basics
 

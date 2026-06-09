@@ -46,7 +46,7 @@ FetchContent_MakeAvailable(easygpu)
 target_link_libraries(your_target EasyGPU)
 ```
 
-If you want to force the Vulkan backend:
+Vulkan is the default backend. To configure it explicitly in your project:
 
 ```cmake
 set(EASYGPU_BACKEND Vulkan CACHE STRING "EasyGPU backend" FORCE)
@@ -55,7 +55,7 @@ set(EASYGPU_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(EASYGPU_BUILD_FRAGMENT_TESTER OFF CACHE BOOL "" FORCE)
 ```
 
-If you want to force OpenGL instead:
+To select the OpenGL backend instead:
 
 ```cmake
 set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
@@ -90,13 +90,15 @@ If you are using the Vulkan backend, this question usually does not apply becaus
 
 ### Linker errors (undefined references)
 
-Make sure to link OpenGL:
+If using the OpenGL backend, make sure to link OpenGL:
 
 ```cmake
 target_link_libraries(your_target EasyGPU OpenGL::GL)
 ```
 
 On Linux: `target_link_libraries(your_target EasyGPU GL)`
+
+If using the Vulkan backend, ensure the Vulkan SDK and `glslang`/`SPIRV-Tools` libraries are discoverable by CMake (`VULKAN_SDK` environment variable).
 
 ---
 

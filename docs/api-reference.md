@@ -4,13 +4,13 @@ Complete reference for all EasyGPU classes and functions.
 
 ## Backend Selection
 
-EasyGPU supports both an OpenGL compute backend and a Vulkan compute backend.
+EasyGPU supports both a Vulkan compute backend (default) and an OpenGL compute backend.
 
 Select the backend at CMake configure time:
 
 ```bash
+cmake -S . -B build -DEASYGPU_BACKEND=Vulkan      # default
 cmake -S . -B build_gl -DEASYGPU_BACKEND=OpenGL
-cmake -S . -B build_vk -DEASYGPU_BACKEND=Vulkan
 ```
 
 In an embedding project that uses `FetchContent`, set the cache variable before `FetchContent_MakeAvailable`:
