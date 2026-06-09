@@ -19,7 +19,7 @@ option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualizatio
 option(EASYGPU_ENABLE_SHADER_CACHE "Enable shader binary caching for faster startup" ON)
 set(EASYGPU_SHADER_CACHE_DIR "" CACHE STRING "Directory for shader cache (empty = use default)")
 option(EASYGPU_BUILD_WINDOW_EXAMPLES "Build window examples" ON)
-set(EASYGPU_BACKEND "OpenGL" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
+set(EASYGPU_BACKEND "Vulkan" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
 set_property(CACHE EASYGPU_BACKEND PROPERTY STRINGS OpenGL Vulkan)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -52,18 +52,28 @@ include_directories(include third)
 # =============================================================================
 # Dependencies
 # =============================================================================
-# GLAD - OpenGL loader
-add_library(GLAD "third/GLAD/glad.c")
-target_include_directories(GLAD PUBLIC third)
+# GLAD - OpenGL loader (OpenGL backend only)
+if(EASYGPU_BACKEND STREQUAL "OpenGL")
+    add_library(GLAD "third/GLAD/glad.c")
+    target_include_directories(GLAD PUBLIC third)
+endif()
 
 # Platform-specific libraries
 if(WIN32)
-    set(EASYGPU_PLATFORM_LIBS opengl32 crypt32)
+    set(EASYGPU_PLATFORM_LIBS crypt32)
+    if(EASYGPU_BACKEND STREQUAL "OpenGL")
+        list(APPEND EASYGPU_PLATFORM_LIBS opengl32)
+    endif()
 elseif(UNIX AND NOT APPLE)
-    find_package(OpenGL REQUIRED)
+    if(EASYGPU_BACKEND STREQUAL "OpenGL")
+        find_package(OpenGL REQUIRED)
+    endif()
     find_package(X11 REQUIRED)
     find_package(OpenSSL REQUIRED)
-    set(EASYGPU_PLATFORM_LIBS ${OPENGL_LIBRARIES} ${X11_LIBRARIES} OpenSSL::Crypto)
+    set(EASYGPU_PLATFORM_LIBS ${X11_LIBRARIES} OpenSSL::Crypto)
+    if(EASYGPU_BACKEND STREQUAL "OpenGL")
+        list(APPEND EASYGPU_PLATFORM_LIBS ${OPENGL_LIBRARIES})
+    endif()
 endif()
 
 # =============================================================================
@@ -208,13 +218,13 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
     )
 endif()
 
-set(EASYGPU_BACKEND_SOURCES
-    include/Backend/OpenGLBackend.h
-    source/Backend/OpenGLBackend.cpp
-)
-
-if(EASYGPU_BACKEND STREQUAL "Vulkan")
-    list(APPEND EASYGPU_BACKEND_SOURCES
+if(EASYGPU_BACKEND STREQUAL "OpenGL")
+    set(EASYGPU_BACKEND_SOURCES
+        include/Backend/OpenGLBackend.h
+        source/Backend/OpenGLBackend.cpp
+    )
+elseif(EASYGPU_BACKEND STREQUAL "Vulkan")
+    set(EASYGPU_BACKEND_SOURCES
         include/Backend/VulkanBackend.h
         source/Backend/VulkanBackend.cpp
     )
@@ -409,7 +419,11 @@ add_library(EasyGPU STATIC
 )
 
 target_compile_features(EasyGPU PUBLIC cxx_std_20)
-target_link_libraries(EasyGPU PUBLIC GLAD ${EASYGPU_PLATFORM_LIBS})
+if(EASYGPU_BACKEND STREQUAL "OpenGL")
+    target_link_libraries(EasyGPU PUBLIC GLAD ${EASYGPU_PLATFORM_LIBS})
+else()
+    target_link_libraries(EasyGPU PUBLIC ${EASYGPU_PLATFORM_LIBS})
+endif()
 
 if(EASYGPU_BACKEND STREQUAL "Vulkan")
     target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_VULKAN)
