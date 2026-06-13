@@ -540,8 +540,7 @@ endif()
 # =============================================================================
 if(EASYGPU_BUILD_EXAMPLES)
     set(EASYGPU_EXAMPLE_SOURCES
-        examples/obj_renderer/main.cpp
-	    examples/hello_world/main.cpp
+        examples/hello_world/main.cpp
         examples/mandelbrot/main.cpp
         examples/julia_set/main.cpp
         examples/ray_tracing/main.cpp
@@ -559,7 +558,6 @@ if(EASYGPU_BUILD_EXAMPLES)
     )
 
     set(EASYGPU_EXAMPLE_NAMES
-        obj_renderer
         hello_world
         mandelbrot
         julia_set
@@ -587,9 +585,6 @@ if(EASYGPU_BUILD_EXAMPLES)
         target_link_libraries(${example_name} PRIVATE EasyGPU)
         if(MSVC)
             target_compile_options(${example_name} PRIVATE /Zc:preprocessor /bigobj)
-        endif()
-        if(${example_name} STREQUAL "obj_renderer")
-            target_link_libraries(${example_name} PRIVATE EasyGPUWindow)
         endif()
     endforeach()
     
@@ -652,6 +647,15 @@ if(EASYGPU_BUILD_WINDOW AND EASYGPU_BUILD_WINDOW_EXAMPLES)
         target_link_libraries(cornell_box_gi PRIVATE EasyGPU EasyGPUWindow)
         if(MSVC)
             target_compile_options(cornell_box_gi PRIVATE /Zc:preprocessor)
+        endif()
+    endif()
+
+    # OBJ Model Viewer — rasterization pipeline demo (requires EasyGPU + EasyGPUWindow)
+    if(TARGET EasyGPU AND TARGET EasyGPUWindow)
+        add_executable(obj_renderer examples/obj_renderer/main.cpp)
+        target_link_libraries(obj_renderer PRIVATE EasyGPU EasyGPUWindow)
+        if(MSVC)
+            target_compile_options(obj_renderer PRIVATE /Zc:preprocessor)
         endif()
     endif()
 endif()
