@@ -204,10 +204,10 @@ int main() {
 		// Check handles are 0 when detached
 		bool						   check2 = (bufSlot.GetHandle() == 0) && (texSlot.GetHandle() == 0);
 
-			std::vector<float>			   data(8, 1.0f);
-			std::vector<float>			   textureData(8 * 8, 1.0f);
-			Buffer<float>				   buf(data);
-			TextureR32F					   tex(8, 8, textureData.data());
+		std::vector<float>			   data(8, 1.0f);
+		std::vector<float>			   textureData(8 * 8, 1.0f);
+		Buffer<float>				   buf(data);
+		TextureR32F					   tex(8, 8, textureData.data());
 
 		bufSlot.Attach(buf);
 		texSlot.Attach(tex);

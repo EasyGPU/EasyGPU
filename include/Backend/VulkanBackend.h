@@ -460,7 +460,7 @@ private:
 	// Descriptor resources
 	VkDescriptorPool								 _descriptorPool		  = nullptr;
 	VkSampler										 _defaultSampler		  = nullptr;
-	VkSampler										 _mipmapSampler		  = nullptr;
+	VkSampler										 _mipmapSampler			  = nullptr;
 	VkPipelineCache									 _pipelineCache			  = nullptr;
 	std::vector<VkDescriptorSet>					 _inFlightDescriptorSets;
 

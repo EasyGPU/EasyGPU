@@ -346,7 +346,7 @@ The Window component follows EasyGPU's core principles:
 - Not a full GUI framework (no widgets, buttons, etc.)
 - Designed for compute visualization, not complex UIs
 - Single-window applications (multi-window support is limited)
-- No hardware-accelerated 3D rendering (use with FragmentKernel for that)
+- No hardware-accelerated 3D rendering (pair with [GraphicsPipeline](graphics-pipeline.md) for that; the older `FragmentKernel2D` is deprecated)
 
 ## See Also
 

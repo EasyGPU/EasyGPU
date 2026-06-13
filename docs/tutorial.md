@@ -1266,6 +1266,13 @@ You now understand:
 
 ## Real-Time Rendering with Fragment Kernels
 
+> **Deprecated.** The FragmentKernel2D API covered in this section is retained
+> for backward compatibility. New projects should use the
+> [Graphics Pipeline](graphics-pipeline.md) DSL instead — it is cross-platform
+> (Vulkan on Windows, Linux, macOS), supports vertex shaders, `Varying<T>`
+> interpolation, depth testing, and `VertexIndex()`/`FragmentCoord()` built-ins.
+> See the [Graphics Pipeline guide](graphics-pipeline.md) for equivalent examples.
+
 So far we've used **compute kernels** for data processing. For real-time graphics rendering, **fragment kernels** provide a more direct path to the screen.
 
 ### The Problem with Compute Rendering

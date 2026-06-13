@@ -179,7 +179,7 @@ unsigned int KernelProfiler::BeginQuery() {
 		return query;
 
 	std::lock_guard<std::recursive_mutex> lock(_mutex);
-	query = _nextCpuQuery++;
+	query				   = _nextCpuQuery++;
 	_cpuQueryStarts[query] = std::chrono::steady_clock::now();
 	return query;
 #else
@@ -206,7 +206,7 @@ void KernelProfiler::EndQuery(unsigned int queryId, const std::string &kernelNam
 
 	{
 		std::lock_guard<std::recursive_mutex> lock(_mutex);
-		auto it = _cpuQueryStarts.find(queryId);
+		auto								  it = _cpuQueryStarts.find(queryId);
 		if (it != _cpuQueryStarts.end()) {
 			backend->Finish();
 			double elapsedMs =
@@ -259,7 +259,7 @@ unsigned int KernelProfiler::BeginQueryOnCurrentContext() {
 		return query;
 
 	std::lock_guard<std::recursive_mutex> lock(_mutex);
-	query = _nextCpuQuery++;
+	query				   = _nextCpuQuery++;
 	_cpuQueryStarts[query] = std::chrono::steady_clock::now();
 	return query;
 #else
@@ -286,7 +286,7 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 
 	{
 		std::lock_guard<std::recursive_mutex> lock(_mutex);
-		auto it = _cpuQueryStarts.find(queryId);
+		auto								  it = _cpuQueryStarts.find(queryId);
 		if (it != _cpuQueryStarts.end()) {
 			backend->Finish();
 			double elapsedMs =

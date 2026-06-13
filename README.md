@@ -616,7 +616,7 @@ EasyGPU operates in **exclusive mode** by default, assuming it has sole ownershi
   - Use a separate OpenGL context, or
   - Call `GPU::Runtime::GetStateCache().Invalidate()` before returning to EasyGPU
 
-**FragmentKernel Lifecycle:**
+**FragmentKernel Lifecycle:** *(Deprecated — prefer [GraphicsPipeline](docs/graphics-pipeline.md) for new code)*
 ```cpp
 FragmentKernel2D kernel(...);
 kernel.Attach(hwnd);  // Context becomes current here

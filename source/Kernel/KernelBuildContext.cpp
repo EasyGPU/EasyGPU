@@ -611,8 +611,8 @@ std::string KernelBuildContext::RegisterUniformBuffer(const std::string &typeNam
 		return existing->second + "[0]";
 	}
 
-	auto		*uniformBuffer = static_cast<Runtime::UniformBufferBase *>(ubo);
-	uint32_t	 binding		  = AllocateBindingSlot();
+	auto	   *uniformBuffer = static_cast<Runtime::UniformBufferBase *>(ubo);
+	uint32_t	binding		  = AllocateBindingSlot();
 	std::string name		  = std::format("ubo_{}", binding);
 
 	RegisterBuffer(binding, typeName, name, Backend::BUFFER_MODE_READ_ONLY);

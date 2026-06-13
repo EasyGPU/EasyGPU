@@ -406,3 +406,42 @@ Ensure the pipeline was created with depth enabled. The `GraphicsPipeline` DSL c
 **"Pipeline push constant size exceeds device limit"**
 
 Your `Uniform<T>` struct is too large. Maximum push constant size varies by GPU (128 to 256 bytes). Reduce the struct size or use a read-only structured `UniformBuffer<T>` where supported by the shader path.
+
+---
+
+## Migrating from FragmentKernel2D
+
+`FragmentKernel2D` is **deprecated** in favor of `GraphicsPipeline`. The table
+below maps common patterns:
+
+| FragmentKernel2D | GraphicsPipeline equivalent |
+|:-----------------|:----------------------------|
+| `FragmentKernel2D("name", func, W, H)` | `GraphicsPipeline("name", vsFunc, fsFunc)` |
+| `kernel.Flush()` | `pipeline.Draw(rt, 3)` (3 = fullscreen triangle) |
+| `kernel.Attach(hwnd)` | `TexturePresenter(window).Present(rt)` |
+| `kernel.GetShaderSource()` | `pipeline.GetShaderSource()` |
+| `fragCoord, resolution` params | `VertexIndex()` + compute in VS |
+| Window-bound rendering | Render to `Texture2D`, present via `TexturePresenter` |
+| Windows only | Cross-platform (Vulkan on Windows/Linux/macOS) |
+
+**Quick port of a fullscreen fragment shader:**
+
+```cpp
+// Before (FragmentKernel2D)
+FragmentKernel2D kernel("Plasma", [&](Float2 fc, Float2 res, Float4 &fragColor) {
+    fragColor = MakeFloat4(Sin(fc.x * 0.01f), 0.5f, Cos(fc.y * 0.01f), 1.0f);
+}, W, H);
+
+// After (GraphicsPipeline)
+GraphicsPipeline pipeline("Plasma",
+    [&](Float4 &gl_Position) {
+        Int vid = VertexIndex();
+        Float x = ToFloat((vid & 1) << 2) - 1.0f;
+        Float y = ToFloat((vid & 2) << 1) - 1.0f;
+        gl_Position = MakeFloat4(x, y, 0.0f, 1.0f);
+    },
+    [&](Float4 &fragColor) {
+        Float4 fc = FragmentCoord();
+        fragColor = MakeFloat4(Sin(fc.x() * 0.01f), 0.5f, Cos(fc.y() * 0.01f), 1.0f);
+    });
+```

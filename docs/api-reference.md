@@ -221,9 +221,15 @@ Kernel1D::FullBarrier();       // Both barriers combined
 
 ## Fragment Kernels
 
-> **Platform Note:** Fragment kernels are currently only available on **Windows**. Linux support is under development. Compute APIs are shared across backends, but backend and driver behavior must still be qualified; see [Support Status](support-status.md).
+> **Deprecated.** Fragment kernels (`FragmentKernel2D`) are superseded by the
+> [Graphics Pipeline](#graphics-pipeline) DSL, which supports vertex+fragment
+> shaders, `Varying<T>` interpolation, depth testing, push-constant uniforms,
+> SSBO vertex data, `VertexIndex()`, and cross-platform rendering (Vulkan on
+> Windows, Linux, and macOS). See the [migration section](graphics-pipeline.md).
+> FragmentKernel2D is retained for backward compatibility but will not receive
+> new features.
 
-Fragment kernels use the GPU's rendering pipeline for direct pixel output to windows. Unlike compute kernels that require `Download()` to retrieve results, fragment kernels render directly to the screen with zero CPU-GPU transfer overhead.
+> **Platform Note:** Fragment kernels are currently only available on **Windows**. The Graphics Pipeline (above) is recommended for cross-platform work — it runs on Windows, Linux, and macOS via Vulkan.
 
 ### FragmentKernel2D
 

@@ -181,25 +181,25 @@ private:
 	void		 RecordExecution(const std::string &kernelName, int groupX, int groupY, int groupZ, double elapsedMs);
 
 private:
-	mutable std::recursive_mutex							   _mutex;
+	mutable std::recursive_mutex											_mutex;
 
-	bool													   _enabled = false;
+	bool																	_enabled = false;
 
 	// Query pool for timer queries
-	std::vector<unsigned int>								   _queryPool;
-	std::vector<unsigned int>								   _availableQueries;
-	static constexpr size_t									   MAX_QUERIES = 64;
+	std::vector<unsigned int>												_queryPool;
+	std::vector<unsigned int>												_availableQueries;
+	static constexpr size_t													MAX_QUERIES = 64;
 
 	// Profiling records (trace)
-	std::vector<KernelProfileRecord>						   _records;
+	std::vector<KernelProfileRecord>										_records;
 
 	// Aggregated statistics per kernel name
-	std::unordered_map<std::string, KernelProfilerQueryResult> _stats;
+	std::unordered_map<std::string, KernelProfilerQueryResult>				_stats;
 
 	// Track which thread started each query to prevent cross-thread use
-	std::unordered_map<unsigned int, std::thread::id>		   _queryOwners;
+	std::unordered_map<unsigned int, std::thread::id>						_queryOwners;
 	std::unordered_map<unsigned int, std::chrono::steady_clock::time_point> _cpuQueryStarts;
-	unsigned int											   _nextCpuQuery = 0x80000000u;
+	unsigned int															_nextCpuQuery = 0x80000000u;
 };
 
 // ===================================================================================

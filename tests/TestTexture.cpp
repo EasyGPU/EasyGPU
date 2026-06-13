@@ -80,8 +80,8 @@ END_TEST
 // Test 2: Mipmapped texture creation and automatic regeneration
 // =============================================================================
 TEST(texture_mipmaps)
-const int			 W = 64, H = 32;
-std::vector<uint8_t> pixels(W * H * 4, 255);
+const int					  W = 64, H = 32;
+std::vector<uint8_t>		  pixels(W * H * 4, 255);
 Texture2D<PixelFormat::RGBA8> tex(W, H, MipmapMode::Generate);
 ASSERT(tex.GetMipLevels() == 7);
 tex.Upload(pixels.data());

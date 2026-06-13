@@ -183,9 +183,9 @@ private:
 
 		Backend::BufferDesc desc;
 		desc.sizeInBytes = gpuSize;
-		desc.mode = Backend::BufferMode::Read;
+		desc.mode		 = Backend::BufferMode::Read;
 		desc.initialData = gpuData.data();
-		_uboHandle = backend->CreateBuffer(desc);
+		_uboHandle		 = backend->CreateBuffer(desc);
 	}
 
 	void Upload() {

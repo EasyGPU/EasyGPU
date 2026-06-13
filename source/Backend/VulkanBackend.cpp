@@ -332,31 +332,31 @@ void VulkanBackend::SelectPhysicalDevice() {
 		for (uint32_t i = 0; i < queueFamilyCount; ++i) {
 			if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
 				(queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
-				_physicalDevice				  = device;
-				_computeQueueFamilyIndex	  = i;
+				_physicalDevice				   = device;
+				_computeQueueFamilyIndex	   = i;
 
 				// Store capabilities
-				_caps.versionString			  = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
-												std::to_string(VK_VERSION_MINOR(props.apiVersion));
+				_caps.versionString			   = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
+												 std::to_string(VK_VERSION_MINOR(props.apiVersion));
 
-				VkPhysicalDeviceLimits limits = props.limits;
-				_caps.maxWorkGroupSizeX		  = limits.maxComputeWorkGroupSize[0];
-				_caps.maxWorkGroupSizeY		  = limits.maxComputeWorkGroupSize[1];
-				_caps.maxWorkGroupSizeZ		  = limits.maxComputeWorkGroupSize[2];
-				_caps.maxBufferBindings		  = limits.maxPerStageDescriptorStorageBuffers;
-				_caps.maxTextureBindings	  = limits.maxPerStageDescriptorStorageImages;
-				_caps.supportsComputeShaders  = true;
-				_caps.supportsGraphics		  = true;
-				_caps.supportsAsyncTransfer	  = false;
-				_caps.supportsMultiQueue	  = false;
+				VkPhysicalDeviceLimits limits  = props.limits;
+				_caps.maxWorkGroupSizeX		   = limits.maxComputeWorkGroupSize[0];
+				_caps.maxWorkGroupSizeY		   = limits.maxComputeWorkGroupSize[1];
+				_caps.maxWorkGroupSizeZ		   = limits.maxComputeWorkGroupSize[2];
+				_caps.maxBufferBindings		   = limits.maxPerStageDescriptorStorageBuffers;
+				_caps.maxTextureBindings	   = limits.maxPerStageDescriptorStorageImages;
+				_caps.supportsComputeShaders   = true;
+				_caps.supportsGraphics		   = true;
+				_caps.supportsAsyncTransfer	   = false;
+				_caps.supportsMultiQueue	   = false;
 				_caps.supportsTimestampQueries = queueFamilies[i].timestampValidBits != 0;
 #ifdef __APPLE__
 				// MoltenVK timestamp queries are not reliable across all supported
 				// macOS/GPU combinations. Use the profiler's synchronized CPU fallback.
 				_caps.supportsTimestampQueries = false;
 #endif
-				_timestampPeriod			  = limits.timestampPeriod;
-				_maxPushConstantSize		  = limits.maxPushConstantsSize;
+				_timestampPeriod	 = limits.timestampPeriod;
+				_maxPushConstantSize = limits.maxPushConstantsSize;
 				return;
 			}
 		}
@@ -364,28 +364,28 @@ void VulkanBackend::SelectPhysicalDevice() {
 		// Fallback: find any device with compute support (compute-only)
 		for (uint32_t i = 0; i < queueFamilyCount; ++i) {
 			if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
-				_physicalDevice				  = device;
-				_computeQueueFamilyIndex	  = i;
+				_physicalDevice				   = device;
+				_computeQueueFamilyIndex	   = i;
 
-				_caps.versionString			  = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
-												std::to_string(VK_VERSION_MINOR(props.apiVersion));
+				_caps.versionString			   = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
+												 std::to_string(VK_VERSION_MINOR(props.apiVersion));
 
-				VkPhysicalDeviceLimits limits = props.limits;
-				_caps.maxWorkGroupSizeX		  = limits.maxComputeWorkGroupSize[0];
-				_caps.maxWorkGroupSizeY		  = limits.maxComputeWorkGroupSize[1];
-				_caps.maxWorkGroupSizeZ		  = limits.maxComputeWorkGroupSize[2];
-				_caps.maxBufferBindings		  = limits.maxPerStageDescriptorStorageBuffers;
-				_caps.maxTextureBindings	  = limits.maxPerStageDescriptorStorageImages;
-				_caps.supportsComputeShaders  = true;
-				_caps.supportsGraphics		  = false;
-				_caps.supportsAsyncTransfer	  = false;
-				_caps.supportsMultiQueue	  = false;
+				VkPhysicalDeviceLimits limits  = props.limits;
+				_caps.maxWorkGroupSizeX		   = limits.maxComputeWorkGroupSize[0];
+				_caps.maxWorkGroupSizeY		   = limits.maxComputeWorkGroupSize[1];
+				_caps.maxWorkGroupSizeZ		   = limits.maxComputeWorkGroupSize[2];
+				_caps.maxBufferBindings		   = limits.maxPerStageDescriptorStorageBuffers;
+				_caps.maxTextureBindings	   = limits.maxPerStageDescriptorStorageImages;
+				_caps.supportsComputeShaders   = true;
+				_caps.supportsGraphics		   = false;
+				_caps.supportsAsyncTransfer	   = false;
+				_caps.supportsMultiQueue	   = false;
 				_caps.supportsTimestampQueries = queueFamilies[i].timestampValidBits != 0;
 #ifdef __APPLE__
 				_caps.supportsTimestampQueries = false;
 #endif
-				_timestampPeriod			  = limits.timestampPeriod;
-				_maxPushConstantSize		  = limits.maxPushConstantsSize;
+				_timestampPeriod	 = limits.timestampPeriod;
+				_maxPushConstantSize = limits.maxPushConstantsSize;
 				return;
 			}
 		}
@@ -526,10 +526,10 @@ void VulkanBackend::CreateDefaultSampler() {
 
 	CheckVkResult(vkCreateSampler(_device, &samplerInfo, nullptr, &_defaultSampler), "vkCreateSampler");
 
-	samplerInfo.magFilter	= VK_FILTER_LINEAR;
-	samplerInfo.minFilter	= VK_FILTER_LINEAR;
+	samplerInfo.magFilter  = VK_FILTER_LINEAR;
+	samplerInfo.minFilter  = VK_FILTER_LINEAR;
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.maxLod		= VK_LOD_CLAMP_NONE;
+	samplerInfo.maxLod	   = VK_LOD_CLAMP_NONE;
 	CheckVkResult(vkCreateSampler(_device, &samplerInfo, nullptr, &_mipmapSampler), "vkCreateSampler (mipmap)");
 }
 
@@ -1122,10 +1122,10 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 		throw std::runtime_error("Vulkan backend not initialized");
 	}
 
-	VkFormat		  format	= GetVkFormat(desc.format);
-	bool			  is3D		= desc.depth > 1;
-	uint32_t		  mipLevels = std::max(1u, desc.mipLevels);
-	uint32_t		  maxMipLevels = 1;
+	VkFormat format		  = GetVkFormat(desc.format);
+	bool	 is3D		  = desc.depth > 1;
+	uint32_t mipLevels	  = std::max(1u, desc.mipLevels);
+	uint32_t maxMipLevels = 1;
 	for (uint32_t size = std::max(desc.width, desc.height); size > 1; size /= 2)
 		++maxMipLevels;
 	if (mipLevels > maxMipLevels)
@@ -1178,7 +1178,7 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	VkImageView sampledView = nullptr;
 	if (mipLevels > 1) {
 		viewInfo.subresourceRange.levelCount = mipLevels;
-		result = vkCreateImageView(_device, &viewInfo, nullptr, &sampledView);
+		result								 = vkCreateImageView(_device, &viewInfo, nullptr, &sampledView);
 		CheckVkResult(result, "vkCreateImageView (sampled mip chain)");
 	}
 
@@ -1247,7 +1247,7 @@ void VulkanBackend::GenerateMipmaps(TextureHandle texture) {
 	auto						it = _textures.find(texture);
 	if (it == _textures.end())
 		throw std::runtime_error("Invalid texture handle");
-	TextureInfo				   &info = it->second;
+	TextureInfo &info = it->second;
 	if (info.mipLevels <= 1)
 		return;
 	if (info.depth > 1)
@@ -1266,29 +1266,29 @@ void VulkanBackend::GenerateMipmaps(TextureHandle texture) {
 	int32_t mipHeight = static_cast<int32_t>(info.height);
 	for (uint32_t level = 1; level < info.mipLevels; ++level) {
 		VkImageMemoryBarrier barrier{};
-		barrier.sType							 = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		barrier.image							 = info.image;
-		barrier.srcQueueFamilyIndex				 = VK_QUEUE_FAMILY_IGNORED;
-		barrier.dstQueueFamilyIndex				 = VK_QUEUE_FAMILY_IGNORED;
-		barrier.subresourceRange.aspectMask		 = VK_IMAGE_ASPECT_COLOR_BIT;
-		barrier.subresourceRange.baseMipLevel	 = level - 1;
-		barrier.subresourceRange.levelCount		 = 1;
-		barrier.subresourceRange.baseArrayLayer	 = 0;
-		barrier.subresourceRange.layerCount		 = 1;
-		barrier.oldLayout						 = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		barrier.newLayout						 = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		barrier.srcAccessMask					 = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier.dstAccessMask					 = VK_ACCESS_TRANSFER_READ_BIT;
+		barrier.sType							= VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.image							= info.image;
+		barrier.srcQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask		= VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel	= level - 1;
+		barrier.subresourceRange.levelCount		= 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount		= 1;
+		barrier.oldLayout						= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.newLayout						= VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		barrier.srcAccessMask					= VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask					= VK_ACCESS_TRANSFER_READ_BIT;
 		vkCmdPipelineBarrier(_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
 							 nullptr, 0, nullptr, 1, &barrier);
 
-		int32_t nextWidth  = std::max(1, mipWidth / 2);
-		int32_t nextHeight = std::max(1, mipHeight / 2);
+		int32_t		nextWidth  = std::max(1, mipWidth / 2);
+		int32_t		nextHeight = std::max(1, mipHeight / 2);
 		VkImageBlit blit{};
 		blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level - 1, 0, 1};
-		blit.srcOffsets[1]  = {mipWidth, mipHeight, 1};
+		blit.srcOffsets[1]	= {mipWidth, mipHeight, 1};
 		blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level, 0, 1};
-		blit.dstOffsets[1]  = {nextWidth, nextHeight, 1};
+		blit.dstOffsets[1]	= {nextWidth, nextHeight, 1};
 		vkCmdBlitImage(_commandBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, info.image,
 					   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
@@ -1940,17 +1940,16 @@ void VulkanBackend::TransitionTexture(TextureInfo &info, VkImageLayout newLayout
 		return;
 	}
 
-	VkImageMemoryBarrier barrier			= {};
-	barrier.sType							= VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout						= info.currentLayout;
-	barrier.newLayout						= newLayout;
-	barrier.srcQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
-	barrier.image							= info.image;
-	barrier.subresourceRange.aspectMask		=
-		(info.vkFormat == VK_FORMAT_D16_UNORM || info.vkFormat == VK_FORMAT_D32_SFLOAT)
-			? VK_IMAGE_ASPECT_DEPTH_BIT
-			: VK_IMAGE_ASPECT_COLOR_BIT;
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType				 = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout			 = info.currentLayout;
+	barrier.newLayout			 = newLayout;
+	barrier.srcQueueFamilyIndex	 = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex	 = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image				 = info.image;
+	barrier.subresourceRange.aspectMask =
+		(info.vkFormat == VK_FORMAT_D16_UNORM || info.vkFormat == VK_FORMAT_D32_SFLOAT) ? VK_IMAGE_ASPECT_DEPTH_BIT
+																						: VK_IMAGE_ASPECT_COLOR_BIT;
 	barrier.subresourceRange.baseMipLevel	= 0;
 	barrier.subresourceRange.levelCount		= info.mipLevels;
 	barrier.subresourceRange.baseArrayLayer = 0;
@@ -2086,9 +2085,9 @@ void VulkanBackend::UpdateDescriptorSet(const DescriptorSetCache &cache) {
 
 			VkDescriptorImageInfo imageInfo = {};
 			imageInfo.sampler				= textureIt->second.mipLevels > 1 ? _mipmapSampler : _defaultSampler;
-			imageInfo.imageView				=
+			imageInfo.imageView =
 				textureIt->second.sampledView ? textureIt->second.sampledView : textureIt->second.view;
-			imageInfo.imageLayout			= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			imageInfos.push_back(imageInfo);
 
 			VkWriteDescriptorSet write = {};

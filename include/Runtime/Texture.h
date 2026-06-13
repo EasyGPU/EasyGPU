@@ -780,7 +780,7 @@ private:
 	std::unique_ptr<PBOPool> _downloadPool;
 	PBOBuffer				*_currentUploadPBO	 = nullptr;
 	PBOBuffer				*_currentDownloadPBO = nullptr;
-	std::shared_ptr<void>	 _lifetimeToken = std::make_shared<int>(0);
+	std::shared_ptr<void>	 _lifetimeToken		 = std::make_shared<int>(0);
 };
 
 /** @brief Convenience typedef for RGBA8 2D texture. */
@@ -1127,7 +1127,7 @@ private:
 	std::unique_ptr<PBOPool> _downloadPool;
 	PBOBuffer				*_currentUploadPBO	 = nullptr;
 	PBOBuffer				*_currentDownloadPBO = nullptr;
-	std::shared_ptr<void>	 _lifetimeToken = std::make_shared<int>(0);
+	std::shared_ptr<void>	 _lifetimeToken		 = std::make_shared<int>(0);
 };
 
 /** @brief Convenience typedef for RGBA8 3D texture. */

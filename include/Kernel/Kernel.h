@@ -127,7 +127,7 @@ public:
 	bool		Validate() {
 		return Compile();
 	}
-	bool		Validate(std::string &errorMessage) {
+	bool Validate(std::string &errorMessage) {
 		return Compile(errorMessage);
 	}
 
@@ -182,7 +182,7 @@ public:
 	bool		Validate() {
 		return Compile();
 	}
-	bool		Validate(std::string &errorMessage) {
+	bool Validate(std::string &errorMessage) {
 		return Compile(errorMessage);
 	}
 
@@ -233,7 +233,7 @@ public:
 	bool		Validate() {
 		return Compile();
 	}
-	bool		Validate(std::string &errorMessage) {
+	bool Validate(std::string &errorMessage) {
 		return Compile(errorMessage);
 	}
 

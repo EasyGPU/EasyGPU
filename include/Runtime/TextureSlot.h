@@ -288,7 +288,7 @@ public:
 	 * @param texture The 3D texture to attach.
 	 */
 	void Attach(Texture3D<Format> &texture) {
-		_texture = &texture;
+		_texture	   = &texture;
 		_lifetimeToken = texture.GetLifetimeToken();
 	}
 
@@ -376,7 +376,7 @@ public:
 	}
 
 private:
-	Texture3D<Format> *_texture = nullptr;
+	Texture3D<Format>  *_texture = nullptr;
 	std::weak_ptr<void> _lifetimeToken;
 
 	friend class KernelBuildContext;

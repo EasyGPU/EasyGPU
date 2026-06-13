@@ -55,7 +55,8 @@ private:
  */
 class ShaderGuard {
 public:
-	ShaderGuard(Backend::Backend &backend, Backend::ShaderHandle shader) : _backend(backend), _shader(shader) {}
+	ShaderGuard(Backend::Backend &backend, Backend::ShaderHandle shader) : _backend(backend), _shader(shader) {
+	}
 
 	~ShaderGuard() {
 		if (_shader != Backend::INVALID_SHADER_HANDLE) {
@@ -69,7 +70,7 @@ public:
 	ShaderGuard &operator=(ShaderGuard &&)		= delete;
 
 private:
-	Backend::Backend		&_backend;
+	Backend::Backend	 &_backend;
 	Backend::ShaderHandle _shader;
 };
 
@@ -135,14 +136,14 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 	Backend::PipelineHandle pipeline = context.GetCachedPipeline();
 	if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
 		// Get the complete shader code
-		std::string shaderSource	= context.GetCompleteCode();
+		std::string			shaderSource = context.GetCompleteCode();
 
 		// Vulkan pipeline cache data accelerates pipeline creation but does not
 		// replace the shader module required by vkCreateComputePipelines.
 		Backend::ShaderDesc shaderDesc;
-		shaderDesc.type			 = Backend::ShaderType::Compute;
-		shaderDesc.sourceCode	 = shaderSource;
-		shaderDesc.entryPoint	 = "main";
+		shaderDesc.type				 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode		 = shaderSource;
+		shaderDesc.entryPoint		 = "main";
 
 		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
 		if (shader == Backend::INVALID_SHADER_HANDLE) {
@@ -238,7 +239,6 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 					context.SetCachedBinaryFormat(format);
 				}
 			}
-
 		}
 
 		// Cache the pipeline handle for future dispatches in this session

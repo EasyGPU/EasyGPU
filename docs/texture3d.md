@@ -102,9 +102,13 @@ kernel.Dispatch(64, true);
 - **OpenGL**: Uses `GL_TEXTURE_3D` with `glTexImage3D` / `glTexSubImage3D`
 - **Vulkan**: Uses `VK_IMAGE_TYPE_3D` with `vkCmdCopyBufferToImage`
 
-## Sampling (Fragment Kernel)
+## Sampling (Fragment Shader)
 
-`Texture3D` also supports sampler binding for fragment kernels:
+> **Deprecated path.** `FragmentKernel2D` is superseded by
+> [GraphicsPipeline](graphics-pipeline.md). `BindSampler()` works identically
+> in both APIs.
+
+`Texture3D` also supports sampler binding for fragment shaders:
 
 ```cpp
 Texture3D<PixelFormat::RGBA8> tex(64, 64, 64);

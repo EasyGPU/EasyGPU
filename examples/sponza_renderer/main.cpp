@@ -181,18 +181,18 @@ public:
 			// linear filtering cannot blend in the atlas background.
 			for (int y = 0; y < slotSize; ++y) {
 				for (int x = 0; x < slotSize; ++x) {
-					int sampleX = std::clamp(x - ATLAS_GUTTER, 0, inner - 1);
-					int sampleY = std::clamp(y - ATLAS_GUTTER, 0, inner - 1);
+					int	  sampleX = std::clamp(x - ATLAS_GUTTER, 0, inner - 1);
+					int	  sampleY = std::clamp(y - ATLAS_GUTTER, 0, inner - 1);
 					// Bilinear sampling from source texture
-					float fx = float(sampleX) * float(tw) / float(inner);
-					float fy = float(sampleY) * float(th) / float(inner);
+					float fx	  = float(sampleX) * float(tw) / float(inner);
+					float fy	  = float(sampleY) * float(th) / float(inner);
 					int	  ix = int(fx), iy = int(fy);
 					float u = fx - float(ix), v = fy - float(iy);
 					int	  x1  = std::min(ix + 1, tw - 1);
 					int	  y1  = std::min(iy + 1, th - 1);
 					int	  dst = (((mat->atlasSlot / ATLAS_GRID) * slotSize + y) * ATLAS_SIZE +
-							   (mat->atlasSlot % ATLAS_GRID) * slotSize + x) *
-							  4;
+								 (mat->atlasSlot % ATLAS_GRID) * slotSize + x) *
+								4;
 					for (int c = 0; c < 4; ++c) {
 						float v00 = pixels[(iy * tw + ix) * 4 + c];
 						float v10 = pixels[(iy * tw + x1) * 4 + c];
@@ -477,30 +477,29 @@ int main(int argc, char **argv) {
 		GraphicsPipeline pipeline(
 			"Sponza",
 			[&](Float4 &gl_Position) {
-				Int	 vid	= VertexIndex();
-				auto buf	= vb.Bind();
-				auto u		= ubo.Load();
-				auto vert	= buf[vid];
-				gl_Position = u.mvp() * MakeFloat4(vert.pos(), 1.f);
-				vN			= Float3(Normalize(vert.normal()));
-				vUV			= Float2(MakeFloat2(vert.uv().x(), vert.uv().y()));
-				vAtlasTransform =
-					Float4(MakeFloat4(vert.atlasTransform().x(), vert.atlasTransform().y(),
-									 vert.atlasTransform().z(), vert.atlasTransform().w()));
+				Int	 vid		= VertexIndex();
+				auto buf		= vb.Bind();
+				auto u			= ubo.Load();
+				auto vert		= buf[vid];
+				gl_Position		= u.mvp() * MakeFloat4(vert.pos(), 1.f);
+				vN				= Float3(Normalize(vert.normal()));
+				vUV				= Float2(MakeFloat2(vert.uv().x(), vert.uv().y()));
+				vAtlasTransform = Float4(MakeFloat4(vert.atlasTransform().x(), vert.atlasTransform().y(),
+													vert.atlasTransform().z(), vert.atlasTransform().w()));
 			},
 			[&](Float4 &fragColor) {
 				Float3 N	 = Float3(Normalize(Float3(vN)));
 				Float2 tiled = Fract(Float2(vUV));
 				Float4 atlas = vAtlasTransform;
 				Float2 uv	 = MakeFloat2(atlas.x() + tiled.x() * atlas.z(), atlas.y() + tiled.y() * atlas.w());
-				Float2 scale	 = MakeFloat2(atlas.z(), atlas.w());
+				Float2 scale = MakeFloat2(atlas.z(), atlas.w());
 				Float2 dx	 = Ddx(Float2(vUV)) * scale;
 				Float2 dy	 = Ddy(Float2(vUV)) * scale;
 				Float  lit	 = Max(Dot(N, MakeFloat3(0.3f, 0.6f, 0.4f)), 0.2f);
 
-				auto   tx  = tex.BindSampler();
-				Float4 tc  = tx.SampleGrad(uv, dx, dy);
-				fragColor  = MakeFloat4(tc.x() * lit, tc.y() * lit, tc.z() * lit, 1.f);
+				auto   tx	 = tex.BindSampler();
+				Float4 tc	 = tx.SampleGrad(uv, dx, dy);
+				fragColor	 = MakeFloat4(tc.x() * lit, tc.y() * lit, tc.z() * lit, 1.f);
 			});
 
 		std::cout << "Pipeline ready.  WASD=move  Mouse=look  ESC=exit\n";

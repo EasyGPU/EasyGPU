@@ -233,8 +233,8 @@ int main() {
 
 		// Test 6: Allocate and generate a complete mip chain
 		{
-			const uint32_t W = 64, H = 32;
-			std::vector<uint8_t> pixels(W * H * 4, 255);
+			const uint32_t			  W = 64, H = 32;
+			std::vector<uint8_t>	  pixels(W * H * 4, 255);
 
 			GPU::Backend::TextureDesc texDesc;
 			texDesc.width	  = W;

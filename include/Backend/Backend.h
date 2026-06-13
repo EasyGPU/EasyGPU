@@ -210,15 +210,15 @@ inline bool HasFlag(BarrierType flags, BarrierType flag) {
 /** @brief Backend capability information queried after initialization. */
 struct BackendCaps {
 	std::string versionString;
-	uint32_t	maxWorkGroupSizeX	   = 0;
-	uint32_t	maxWorkGroupSizeY	   = 0;
-	uint32_t	maxWorkGroupSizeZ	   = 0;
-	uint32_t	maxBufferBindings	   = 0;
-	uint32_t	maxTextureBindings	   = 0;
-	bool		supportsComputeShaders = false;
-	bool		supportsGraphics	   = false;
-	bool		supportsAsyncTransfer  = false;
-	bool		supportsMultiQueue	   = false;
+	uint32_t	maxWorkGroupSizeX		 = 0;
+	uint32_t	maxWorkGroupSizeY		 = 0;
+	uint32_t	maxWorkGroupSizeZ		 = 0;
+	uint32_t	maxBufferBindings		 = 0;
+	uint32_t	maxTextureBindings		 = 0;
+	bool		supportsComputeShaders	 = false;
+	bool		supportsGraphics		 = false;
+	bool		supportsAsyncTransfer	 = false;
+	bool		supportsMultiQueue		 = false;
 	bool		supportsTimestampQueries = false;
 };
 
@@ -386,7 +386,7 @@ public:
 	virtual void		  UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 										const void *data)												  = 0;
 	/** @brief Generate all mip levels from level zero. */
-	virtual void		  GenerateMipmaps(TextureHandle texture)											  = 0;
+	virtual void		  GenerateMipmaps(TextureHandle texture)										  = 0;
 	/**
 	 * @brief Upload voxel data to a 3D texture region.
 	 * @param texture Texture handle.

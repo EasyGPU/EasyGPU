@@ -129,10 +129,10 @@ public:
 	 * @param buffer The buffer to attach
 	 */
 	void Attach(Buffer<T> &buffer) {
-		_bufferHandle = buffer.GetHandle();
-		_bufferPtr	  = &buffer;
+		_bufferHandle  = buffer.GetHandle();
+		_bufferPtr	   = &buffer;
 		_lifetimeToken = buffer.GetLifetimeToken();
-		_mode		  = static_cast<int>(buffer.GetMode());
+		_mode		   = static_cast<int>(buffer.GetMode());
 	}
 
 	/**

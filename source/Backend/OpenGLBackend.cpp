@@ -168,10 +168,10 @@ BackendCaps OpenGLBackend::GetCaps() const {
 	caps.maxBufferBindings = static_cast<uint32_t>(maxBindings);
 
 	glGetIntegerv(GL_MAX_IMAGE_UNITS, &maxBindings);
-	caps.maxTextureBindings	   = static_cast<uint32_t>(maxBindings);
+	caps.maxTextureBindings		  = static_cast<uint32_t>(maxBindings);
 
-	caps.supportsAsyncTransfer = caps.supportsComputeShaders;
-	caps.supportsMultiQueue	   = false;
+	caps.supportsAsyncTransfer	  = caps.supportsComputeShaders;
+	caps.supportsMultiQueue		  = false;
 	caps.supportsTimestampQueries = true;
 
 	return caps;
@@ -279,14 +279,14 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 	}
 
 	auto [internalFormat, format, type] = GetGLPixelFormat(desc.format);
-	uint32_t mipLevels				 = std::max(1u, desc.mipLevels);
-	uint32_t maxMipLevels				 = 1;
+	uint32_t mipLevels					= std::max(1u, desc.mipLevels);
+	uint32_t maxMipLevels				= 1;
 	for (uint32_t size = std::max(desc.width, desc.height); size > 1; size /= 2)
 		++maxMipLevels;
 	if (mipLevels > maxMipLevels)
 		throw std::invalid_argument("Texture mip level count exceeds its dimensions");
 
-	uint32_t glHandle					= 0;
+	uint32_t glHandle = 0;
 	glGenTextures(1, &glHandle);
 	if (glHandle == 0) {
 		throw std::runtime_error("Failed to create OpenGL texture");
@@ -295,8 +295,7 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 	bool is3D = desc.depth > 1;
 	if (is3D) {
 		glBindTexture(GL_TEXTURE_3D, glHandle);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER,
-						mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, mipLevels > 1 ? GL_LINEAR : GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(mipLevels - 1));
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -307,8 +306,7 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 		glBindTexture(GL_TEXTURE_3D, 0);
 	} else {
 		glBindTexture(GL_TEXTURE_2D, glHandle);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-						mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mipLevels > 1 ? GL_LINEAR : GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(mipLevels - 1));
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
