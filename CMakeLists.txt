@@ -59,7 +59,10 @@ endif()
 # GLAD - OpenGL loader (OpenGL backend only)
 if(EASYGPU_BACKEND STREQUAL "OpenGL")
     add_library(GLAD "third/GLAD/glad.c")
-    target_include_directories(GLAD PUBLIC third)
+    target_include_directories(GLAD PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
 endif()
 
 # Platform-specific libraries
