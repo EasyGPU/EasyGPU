@@ -60,10 +60,10 @@ int main() {
 			BufferSlot<float>  outputSlot;
 
 			Kernel1D		   kernel([&](Int i) {
-				  auto in  = inputSlot.Bind();
-				  auto out = outputSlot.Bind();
-				  out[i]   = in[i] * 2.0f;
-			  });
+				auto in	 = inputSlot.Bind();
+				auto out = outputSlot.Bind();
+				out[i]	 = in[i] * 2.0f;
+			});
 
 			std::vector<float> input	= {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
 			std::vector<float> expected = {2.0f, 4.0f, 6.0f, 8.0f, 10.0f};
@@ -105,10 +105,10 @@ int main() {
 			BufferSlot<float>  outputSlot;
 
 			Kernel1D		   kernel([&](Int i) {
-				  auto in  = inputSlot.Bind();
-				  auto out = outputSlot.Bind();
-				  out[i]   = in[i] + 10.0f;
-			  });
+				auto in	 = inputSlot.Bind();
+				auto out = outputSlot.Bind();
+				out[i]	 = in[i] + 10.0f;
+			});
 
 			std::vector<float> data1 = {1.0f, 2.0f, 3.0f};
 			std::vector<float> data2 = {100.0f, 200.0f, 300.0f};
@@ -151,10 +151,10 @@ int main() {
 			BufferSlot<float>  writeSlot;
 
 			Kernel1D		   accumulate([&](Int i) {
-				  auto src = readSlot.Bind();
-				  auto dst = writeSlot.Bind();
-				  dst[i]   = src[i] + 1.0f;
-			  });
+				auto src = readSlot.Bind();
+				auto dst = writeSlot.Bind();
+				dst[i]	 = src[i] + 1.0f;
+			});
 
 			std::vector<float> pingData(5, 0.0f);
 			std::vector<float> pongData(5, 0.0f);
@@ -196,11 +196,11 @@ int main() {
 			BufferSlot<float>  slotC;
 
 			Kernel1D		   kernel([&](Int i) {
-				  auto a = slotA.Bind();
-				  auto b = slotB.Bind();
-				  auto c = slotC.Bind();
-				  c[i]	 = a[i] + b[i];
-			  });
+				auto a = slotA.Bind();
+				auto b = slotB.Bind();
+				auto c = slotC.Bind();
+				c[i]   = a[i] + b[i];
+			});
 
 			std::vector<float> dataA = {1.0f, 2.0f, 3.0f};
 			std::vector<float> dataB = {10.0f, 20.0f, 30.0f};
@@ -239,10 +239,10 @@ int main() {
 			BufferSlot<float>  outputSlot;
 
 			Kernel1D		   kernel([&](Int i) {
-				  auto in  = inputSlot.Bind();
-				  auto out = outputSlot.Bind();
-				  out[i]   = in[i] * 3.14159f;
-			  });
+				auto in	 = inputSlot.Bind();
+				auto out = outputSlot.Bind();
+				out[i]	 = in[i] * 3.14159f;
+			});
 
 			std::vector<float> input(N);
 			for (size_t i = 0; i < N; ++i)
@@ -289,11 +289,11 @@ int main() {
 			BufferSlot<Vec4>  outputSlot;
 
 			Kernel1D		  kernel([&](Int i) {
-				 auto in  = inputSlot.Bind();
-				 auto out = outputSlot.Bind();
-				 auto v	  = in[i];
-				 out[i]	  = MakeFloat4(v.x() * 2.0f, v.y() * 2.0f, v.z() * 2.0f, v.w() * 2.0f);
-			 });
+				auto in	 = inputSlot.Bind();
+				auto out = outputSlot.Bind();
+				auto v	 = in[i];
+				out[i]	 = MakeFloat4(v.x() * 2.0f, v.y() * 2.0f, v.z() * 2.0f, v.w() * 2.0f);
+			});
 
 			std::vector<Vec4> input = {Vec4(1.0f, 2.0f, 3.0f, 4.0f), Vec4(5.0f, 6.0f, 7.0f, 8.0f)};
 			std::vector<Vec4> result(2);

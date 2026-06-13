@@ -47,14 +47,14 @@ namespace GPU::Benchmark {
  */
 struct BenchmarkConfig {
 	/** Number of warm-up dispatches executed before measurement begins. */
-	int	 warmupIterations   = 5;
+	int	 warmupIterations	= 5;
 
 	/** Number of measured dispatches whose timing is recorded. */
 	int	 measuredIterations = 20;
 
 	/** Issue a GPU-side finish (glFinish / vkQueueWaitIdle) after each dispatch
 	 * for accurate per-dispatch timing rather than pipelined measurement. */
-	bool syncAfterEach	   = true;
+	bool syncAfterEach		= true;
 
 	/**
 	 * @brief Construct a benchmark config with defaults.
@@ -78,22 +78,22 @@ struct BenchmarkConfig {
  * computed from per-iteration wall-clock timings.
  */
 struct BenchmarkResult {
-	std::string			   name;			  ///< Human-readable benchmark name.
-	int					   warmupCount		  = 0;  ///< Number of warm-up runs executed.
-	int					   measuredCount	  = 0;  ///< Number of measured runs.
-	double				   minMs			  = 0.0;  ///< Minimum iteration time in milliseconds.
-	double				   maxMs			  = 0.0;  ///< Maximum iteration time in milliseconds.
-	double				   avgMs			  = 0.0;  ///< Mean iteration time in milliseconds.
-	double				   medianMs			  = 0.0;  ///< Median iteration time in milliseconds.
-	double				   stddevMs			  = 0.0;  ///< Sample standard deviation in milliseconds.
-	double				   totalMs			  = 0.0;  ///< Sum of all measured iteration times.
-	std::vector<double>	   individualTimesMs; ///< Per-iteration timing in milliseconds.
+	std::string			name;				 ///< Human-readable benchmark name.
+	int					warmupCount	  = 0;	 ///< Number of warm-up runs executed.
+	int					measuredCount = 0;	 ///< Number of measured runs.
+	double				minMs		  = 0.0; ///< Minimum iteration time in milliseconds.
+	double				maxMs		  = 0.0; ///< Maximum iteration time in milliseconds.
+	double				avgMs		  = 0.0; ///< Mean iteration time in milliseconds.
+	double				medianMs	  = 0.0; ///< Median iteration time in milliseconds.
+	double				stddevMs	  = 0.0; ///< Sample standard deviation in milliseconds.
+	double				totalMs		  = 0.0; ///< Sum of all measured iteration times.
+	std::vector<double> individualTimesMs;	 ///< Per-iteration timing in milliseconds.
 
 	/**
 	 * @brief Compute statistics from raw timing data.
 	 * @param timesMs Vector of per-iteration times in milliseconds.
 	 */
-	void ComputeFromTimes(const std::vector<double> &timesMs) {
+	void				ComputeFromTimes(const std::vector<double> &timesMs) {
 		individualTimesMs = timesMs;
 		measuredCount	  = static_cast<int>(timesMs.size());
 
@@ -104,10 +104,10 @@ struct BenchmarkResult {
 		std::vector<double> sorted = timesMs;
 		std::sort(sorted.begin(), sorted.end());
 
-		minMs	= sorted.front();
-		maxMs	= sorted.back();
-		totalMs = std::accumulate(sorted.begin(), sorted.end(), 0.0);
-		avgMs	= totalMs / static_cast<double>(sorted.size());
+		minMs		   = sorted.front();
+		maxMs		   = sorted.back();
+		totalMs		   = std::accumulate(sorted.begin(), sorted.end(), 0.0);
+		avgMs		   = totalMs / static_cast<double>(sorted.size());
 
 		// Median
 		const size_t n = sorted.size();
@@ -121,11 +121,11 @@ struct BenchmarkResult {
 		if (n > 1) {
 			double variance = 0.0;
 			for (double t : sorted) {
-				const double diff = t - avgMs;
-				variance += diff * diff;
+				const double diff  = t - avgMs;
+				variance		  += diff * diff;
 			}
 			variance /= static_cast<double>(n - 1);
-			stddevMs = std::sqrt(variance);
+			stddevMs  = std::sqrt(variance);
 		}
 	}
 };
@@ -156,8 +156,7 @@ public:
 	 * @param func  Callable that performs one GPU dispatch / operation.
 	 * @param config  Iteration and synchronisation settings.
 	 */
-	void RunAndRecord(const std::string &name, std::function<void()> func,
-					  const BenchmarkConfig &config = {}) {
+	void RunAndRecord(const std::string &name, std::function<void()> func, const BenchmarkConfig &config = {}) {
 		std::vector<double> timesMs;
 		timesMs.reserve(config.measuredIterations);
 
@@ -182,10 +181,9 @@ public:
 				Runtime::Context::GetBackend()->Finish();
 			}
 
-			const auto t1 = std::chrono::high_resolution_clock::now();
+			const auto	 t1 = std::chrono::high_resolution_clock::now();
 			const double elapsedMs =
-				static_cast<double>(
-					std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count()) /
+				static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count()) /
 				1'000'000.0;
 			timesMs.push_back(elapsedMs);
 		}
@@ -215,7 +213,7 @@ public:
 	/**
 	 * @brief Print formatted benchmark results to stdout.
 	 */
-	void PrintResults() const;
+	void					  PrintResults() const;
 
 	/**
 	 * @brief Get formatted benchmark results as a string.
@@ -271,7 +269,7 @@ public:
 	 * @brief Run all registered benchmarks in registration order.
 	 * @param config Iteration and synchronisation settings applied to every benchmark.
 	 */
-	void Run(const BenchmarkConfig &config = {});
+	void											  Run(const BenchmarkConfig &config = {});
 
 	/**
 	 * @brief Get all benchmark results (available after Run()).
@@ -292,7 +290,7 @@ public:
 	/**
 	 * @brief Print formatted suite results to stdout.
 	 */
-	void PrintResults() const;
+	void					  PrintResults() const;
 
 	/**
 	 * @brief Get formatted suite results as a string.
@@ -302,12 +300,12 @@ public:
 
 private:
 	struct Entry {
-		std::string			   name;
-		std::function<void()>  func;
+		std::string			  name;
+		std::function<void()> func;
 	};
 
-	std::string				   _name;
-	std::vector<Entry>		   _entries;
+	std::string					 _name;
+	std::vector<Entry>			 _entries;
 	std::vector<BenchmarkResult> _results;
 };
 

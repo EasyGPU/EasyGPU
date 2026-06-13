@@ -222,15 +222,15 @@ Runtime::Buffer<float> inputBuffer(input);
 Runtime::Buffer<float> outputBuffer(N);
 
 Kernel::Kernel1D	   kernel(
-		  [&, N](Var<int> &id) {
-		  auto		 in	 = inputBuffer.Bind();
-		  auto		 out = outputBuffer.Bind();
+	[&, N](Var<int> &id) {
+		auto	   in  = inputBuffer.Bind();
+		auto	   out = outputBuffer.Bind();
 
-		  // Compute absolute value using ternary
-		  Var<float> val = in[id];
-		  out[id]		 = Select(val < 0.0f, Expr<float>(-val), Expr<float>(val));
-		  },
-		  static_cast<int>(N));
+		// Compute absolute value using ternary
+		Var<float> val = in[id];
+		out[id]		   = Select(val < 0.0f, Expr<float>(-val), Expr<float>(val));
+	},
+	static_cast<int>(N));
 
 kernel.Dispatch(1, true);
 outputBuffer.Download(output);
@@ -256,19 +256,19 @@ Runtime::Buffer<float> bufferMax(N);
 Runtime::Buffer<float> bufferMin(N);
 
 Kernel::Kernel1D	   kernel(
-		  [&, N](Var<int> &id) {
-		  auto		 bufA	= bufferA.Bind();
-		  auto		 bufB	= bufferB.Bind();
-		  auto		 bufMax = bufferMax.Bind();
-		  auto		 bufMin = bufferMin.Bind();
+	[&, N](Var<int> &id) {
+		auto	   bufA	  = bufferA.Bind();
+		auto	   bufB	  = bufferB.Bind();
+		auto	   bufMax = bufferMax.Bind();
+		auto	   bufMin = bufferMin.Bind();
 
-		  Var<float> valA	= bufA[id];
-		  Var<float> valB	= bufB[id];
+		Var<float> valA	  = bufA[id];
+		Var<float> valB	  = bufB[id];
 
-		  bufMax[id]		= Select(valA > valB, Expr<float>(valA), Expr<float>(valB));
-		  bufMin[id]		= Select(valA < valB, Expr<float>(valA), Expr<float>(valB));
-		  },
-		  static_cast<int>(N));
+		bufMax[id]		  = Select(valA > valB, Expr<float>(valA), Expr<float>(valB));
+		bufMin[id]		  = Select(valA < valB, Expr<float>(valA), Expr<float>(valB));
+	},
+	static_cast<int>(N));
 
 kernel.Dispatch(1, true);
 bufferMax.Download(maxResult);
@@ -291,17 +291,17 @@ Runtime::Buffer<float> inputBuffer(input);
 Runtime::Buffer<float> outputBuffer(N);
 
 Kernel::Kernel1D	   kernel(
-		  [&, N](Var<int> &id) {
-		  auto		 in		 = inputBuffer.Bind();
-		  auto		 out	 = outputBuffer.Bind();
+	[&, N](Var<int> &id) {
+		auto	   in	   = inputBuffer.Bind();
+		auto	   out	   = outputBuffer.Bind();
 
-		  Var<float> val	 = in[id];
-		  // Clamp to [0, 1] range using nested ternary
-		  Var<float> clamped = Select(val < 0.0f, Expr<float>(MakeFloat(0.0f)),
-										  Select(val > 1.0f, Expr<float>(MakeFloat(1.0f)), Expr<float>(val)));
-		  out[id]			 = clamped;
-		  },
-		  static_cast<int>(N));
+		Var<float> val	   = in[id];
+		// Clamp to [0, 1] range using nested ternary
+		Var<float> clamped = Select(val < 0.0f, Expr<float>(MakeFloat(0.0f)),
+									Select(val > 1.0f, Expr<float>(MakeFloat(1.0f)), Expr<float>(val)));
+		out[id]			   = clamped;
+	},
+	static_cast<int>(N));
 
 kernel.Dispatch(1, true);
 outputBuffer.Download(output);

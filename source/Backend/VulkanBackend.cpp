@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <iostream>
 #include <unordered_set>
 
 // glslang includes for GLSL to SPIR-V compilation
@@ -92,11 +93,11 @@ static std::mutex g_glslangMutex;
 static int		  g_glslangRefCount = 0;
 
 static void		  InitializeGlslang() {
-	  std::lock_guard<std::mutex> lock(g_glslangMutex);
-	  if (g_glslangRefCount == 0) {
-		  glslang::InitializeProcess();
-	  }
-	  ++g_glslangRefCount;
+	std::lock_guard<std::mutex> lock(g_glslangMutex);
+	if (g_glslangRefCount == 0) {
+		glslang::InitializeProcess();
+	}
+	++g_glslangRefCount;
 }
 
 static void ShutdownGlslang() {
@@ -312,26 +313,27 @@ void VulkanBackend::SelectPhysicalDevice() {
 	std::vector<VkPhysicalDevice> devices(deviceCount);
 	vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
 
-	// Select the first device that supports compute
+	// Select the first device that supports both graphics and compute (preferred)
 	for (auto device : devices) {
 		VkPhysicalDeviceProperties props;
 		vkGetPhysicalDeviceProperties(device, &props);
 
-		// Check for compute queue family
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
 		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
+		// First pass: look for a queue family with both graphics and compute
 		for (uint32_t i = 0; i < queueFamilyCount; ++i) {
-			if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
-				_physicalDevice			 = device;
-				_computeQueueFamilyIndex = i;
+			if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+				(queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+				_physicalDevice				  = device;
+				_computeQueueFamilyIndex	  = i;
 
 				// Store capabilities
-				_caps.versionString		 = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
-									  std::to_string(VK_VERSION_MINOR(props.apiVersion));
+				_caps.versionString			  = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
+												std::to_string(VK_VERSION_MINOR(props.apiVersion));
 
 				VkPhysicalDeviceLimits limits = props.limits;
 				_caps.maxWorkGroupSizeX		  = limits.maxComputeWorkGroupSize[0];
@@ -340,6 +342,32 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.maxBufferBindings		  = limits.maxPerStageDescriptorStorageBuffers;
 				_caps.maxTextureBindings	  = limits.maxPerStageDescriptorStorageImages;
 				_caps.supportsComputeShaders  = true;
+				_caps.supportsGraphics		  = true;
+				_caps.supportsAsyncTransfer	  = false;
+				_caps.supportsMultiQueue	  = false;
+				_timestampPeriod			  = limits.timestampPeriod;
+				_maxPushConstantSize		  = limits.maxPushConstantsSize;
+				return;
+			}
+		}
+
+		// Fallback: find any device with compute support (compute-only)
+		for (uint32_t i = 0; i < queueFamilyCount; ++i) {
+			if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+				_physicalDevice				  = device;
+				_computeQueueFamilyIndex	  = i;
+
+				_caps.versionString			  = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
+												std::to_string(VK_VERSION_MINOR(props.apiVersion));
+
+				VkPhysicalDeviceLimits limits = props.limits;
+				_caps.maxWorkGroupSizeX		  = limits.maxComputeWorkGroupSize[0];
+				_caps.maxWorkGroupSizeY		  = limits.maxComputeWorkGroupSize[1];
+				_caps.maxWorkGroupSizeZ		  = limits.maxComputeWorkGroupSize[2];
+				_caps.maxBufferBindings		  = limits.maxPerStageDescriptorStorageBuffers;
+				_caps.maxTextureBindings	  = limits.maxPerStageDescriptorStorageImages;
+				_caps.supportsComputeShaders  = true;
+				_caps.supportsGraphics		  = false;
 				_caps.supportsAsyncTransfer	  = false;
 				_caps.supportsMultiQueue	  = false;
 				_timestampPeriod			  = limits.timestampPeriod;
@@ -369,21 +397,41 @@ void VulkanBackend::CreateDevice() {
 	deviceFeatures.shaderStorageImageReadWithoutFormat	= supportedFeatures.shaderStorageImageReadWithoutFormat;
 	deviceFeatures.shaderStorageImageWriteWithoutFormat = supportedFeatures.shaderStorageImageWriteWithoutFormat;
 
-	VkDeviceCreateInfo createInfo						= {};
-	createInfo.sType									= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	createInfo.queueCreateInfoCount						= 1;
-	createInfo.pQueueCreateInfos						= &queueCreateInfo;
-	createInfo.pEnabledFeatures							= &deviceFeatures;
-	createInfo.enabledExtensionCount					= 0;
-	createInfo.enabledLayerCount						= 0;
+	// Enable dynamic rendering feature (VK_KHR_dynamic_rendering)
+	VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures = {};
+	dynamicRenderingFeatures.sType			  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+	dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
 
-	VkResult result = vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device);
+	// Device extensions
+	const char		  *deviceExtensions[]	  = {VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
+	bool			   hasDynamicRendering	  = true; // Assume supported; if not, graphics won't work
+
+	VkDeviceCreateInfo createInfo			  = {};
+	createInfo.sType						  = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pNext						  = &dynamicRenderingFeatures;
+	createInfo.queueCreateInfoCount			  = 1;
+	createInfo.pQueueCreateInfos			  = &queueCreateInfo;
+	createInfo.pEnabledFeatures				  = &deviceFeatures;
+	createInfo.enabledExtensionCount		  = _caps.supportsGraphics ? 1u : 0u;
+	createInfo.ppEnabledExtensionNames		  = _caps.supportsGraphics ? deviceExtensions : nullptr;
+	createInfo.enabledLayerCount			  = 0;
+
+	VkResult result							  = vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device);
 	CheckVkResult(result, "vkCreateDevice");
 
-	// Get the compute queue
+	// Get the queue (works for both graphics and compute)
 	vkGetDeviceQueue(_device, _computeQueueFamilyIndex, 0, &_computeQueue);
-}
 
+	// Load dynamic rendering function pointers (may fail gracefully if not supported)
+	if (_caps.supportsGraphics) {
+		_vkCmdBeginRenderingKHR = (PFN_vkCmdBeginRenderingKHR)vkGetDeviceProcAddr(_device, "vkCmdBeginRenderingKHR");
+		_vkCmdEndRenderingKHR	= (PFN_vkCmdEndRenderingKHR)vkGetDeviceProcAddr(_device, "vkCmdEndRenderingKHR");
+		if (!_vkCmdBeginRenderingKHR || !_vkCmdEndRenderingKHR) {
+			// Dynamic rendering not available, disable graphics
+			_caps.supportsGraphics = false;
+		}
+	}
+}
 void VulkanBackend::CreateCommandPool() {
 	VkCommandPoolCreateInfo poolInfo = {};
 	poolInfo.sType					 = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -412,28 +460,34 @@ void VulkanBackend::CreateCommandPool() {
 }
 
 void VulkanBackend::CreateDescriptorPool() {
-	VkDescriptorPoolSize poolSizes[3]	= {};
+	VkDescriptorPoolSize poolSizes[3]		   = {};
 
 	// Storage buffers
-	poolSizes[0].type					= VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[0].descriptorCount		= MAX_BUFFER_BINDINGS * MAX_DESCRIPTOR_SETS;
+	poolSizes[0].type						   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	poolSizes[0].descriptorCount			   = MAX_BUFFER_BINDINGS * MAX_DESCRIPTOR_SETS;
 
 	// Storage images
-	poolSizes[1].type					= VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	poolSizes[1].descriptorCount		= MAX_TEXTURE_BINDINGS * MAX_DESCRIPTOR_SETS;
+	poolSizes[1].type						   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	poolSizes[1].descriptorCount			   = MAX_TEXTURE_BINDINGS * MAX_DESCRIPTOR_SETS;
 
 	// Sampled textures use combined image samplers.
-	poolSizes[2].type					= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[2].descriptorCount		= MAX_TEXTURE_BINDINGS * MAX_DESCRIPTOR_SETS;
+	poolSizes[2].type						   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[2].descriptorCount			   = MAX_TEXTURE_BINDINGS * MAX_DESCRIPTOR_SETS;
+	// Uniform buffers (for UBO support)
+	VkDescriptorPoolSize poolSizeUBO		   = {};
+	poolSizeUBO.type						   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizeUBO.descriptorCount				   = MAX_BUFFER_BINDINGS * MAX_DESCRIPTOR_SETS;
 
-	VkDescriptorPoolCreateInfo poolInfo = {};
-	poolInfo.sType						= VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount				= 3;
-	poolInfo.pPoolSizes					= poolSizes;
-	poolInfo.maxSets					= MAX_DESCRIPTOR_SETS;
-	poolInfo.flags						= VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	VkDescriptorPoolSize	   allPoolSizes[4] = {poolSizes[0], poolSizes[1], poolSizes[2], poolSizeUBO};
 
-	VkResult result						= vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_descriptorPool);
+	VkDescriptorPoolCreateInfo poolInfo		   = {};
+	poolInfo.sType							   = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount					   = 4;
+	poolInfo.pPoolSizes						   = allPoolSizes;
+	poolInfo.maxSets						   = MAX_DESCRIPTOR_SETS;
+	poolInfo.flags							   = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+	VkResult result							   = vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_descriptorPool);
 	CheckVkResult(result, "vkCreateDescriptorPool");
 }
 
@@ -1061,8 +1115,8 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	imageInfo.format			= format;
 	imageInfo.tiling			= VK_IMAGE_TILING_OPTIMAL;
 	imageInfo.initialLayout		= VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-					  VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	imageInfo.usage		  = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+							VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageInfo.samples	  = VK_SAMPLE_COUNT_1_BIT;
 
@@ -1808,7 +1862,11 @@ void VulkanBackend::BindPipeline(PipelineHandle pipeline) {
 
 	EnsureCommandBuffer();
 
-	vkCmdBindPipeline(_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, it->second.pipeline);
+	if (it->second.isGraphics) {
+		vkCmdBindPipeline(_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, it->second.pipeline);
+	} else {
+		vkCmdBindPipeline(_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, it->second.pipeline);
+	}
 
 	_currentPipeline = pipeline;
 }
@@ -1841,8 +1899,9 @@ void VulkanBackend::SetUniformData(PipelineHandle pipeline, const void *data, si
 	}
 
 	EnsureCommandBuffer();
-	vkCmdPushConstants(_commandBuffer, it->second.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(size),
-					   data);
+	VkShaderStageFlags pushStages = it->second.isGraphics ? (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+														  : VK_SHADER_STAGE_COMPUTE_BIT;
+	vkCmdPushConstants(_commandBuffer, it->second.layout, pushStages, 0, static_cast<uint32_t>(size), data);
 }
 
 // =============================================================================
@@ -2100,8 +2159,9 @@ void VulkanBackend::BindResources(const ResourceBinding *bindings, uint32_t coun
 	DescriptorSetCache *cache = FindOrCreateDescriptorSet(bindings, count);
 
 	// Bind descriptor set
-	vkCmdBindDescriptorSets(_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineInfo.layout, 0, 1, &cache->set, 0,
-							nullptr);
+	VkPipelineBindPoint bindPoint =
+		pipelineInfo.isGraphics ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE;
+	vkCmdBindDescriptorSets(_commandBuffer, bindPoint, pipelineInfo.layout, 0, 1, &cache->set, 0, nullptr);
 }
 
 // =============================================================================
@@ -2127,13 +2187,15 @@ void VulkanBackend::MemoryBarrier(BarrierType barrierType) {
 		return;
 	}
 
-	VkPipelineStageFlags srcStage	   = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-	VkPipelineStageFlags dstStage	   = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	VkPipelineStageFlags srcStage =
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkPipelineStageFlags dstStage =
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-	VkMemoryBarrier		 memoryBarrier = {};
-	memoryBarrier.sType				   = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-	memoryBarrier.srcAccessMask		   = 0;
-	memoryBarrier.dstAccessMask		   = 0;
+	VkMemoryBarrier memoryBarrier = {};
+	memoryBarrier.sType			  = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	memoryBarrier.srcAccessMask	  = 0;
+	memoryBarrier.dstAccessMask	  = 0;
 
 	if (HasFlag(barrierType, BarrierType::Buffer)) {
 		memoryBarrier.srcAccessMask |= VK_ACCESS_SHADER_WRITE_BIT;
@@ -2423,6 +2485,576 @@ uint32_t VulkanBackend::GetPipelineCacheFormat() const {
 
 Backend *CreateVulkanBackend() {
 	return new VulkanBackend();
+}
+
+// =============================================================================
+// Graphics Pipeline Support
+// =============================================================================
+
+PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc &desc) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_initialized) {
+		throw std::runtime_error("Vulkan backend not initialized");
+	}
+	if (!_caps.supportsGraphics) {
+		throw std::runtime_error("Graphics pipeline not supported on this device");
+	}
+
+	// Validate shaders
+	auto vsIt = _shaders.find(desc.vertexShader);
+	if (vsIt == _shaders.end())
+		throw std::runtime_error("Invalid vertex shader handle");
+	auto fsIt = _shaders.find(desc.fragmentShader);
+	if (fsIt == _shaders.end())
+		throw std::runtime_error("Invalid fragment shader handle");
+
+	if (desc.pushConstantSize > _maxPushConstantSize) {
+		throw std::runtime_error("Pipeline push constant size exceeds device limit");
+	}
+
+	// Create descriptor set layout for resources
+	std::vector<ResourceLayoutEntry> sortedResources = desc.resources;
+	std::sort(sortedResources.begin(), sortedResources.end());
+	sortedResources.erase(std::unique(sortedResources.begin(), sortedResources.end()), sortedResources.end());
+
+	std::vector<VkDescriptorSetLayoutBinding> bindings;
+	for (const auto &entry : sortedResources) {
+		if (entry.type == BindingType::Buffer && entry.binding >= MAX_BUFFER_BINDINGS) {
+			throw std::runtime_error("Buffer binding exceeds Vulkan backend cache limits");
+		}
+		if ((entry.type == BindingType::Texture || entry.type == BindingType::Sampler) &&
+			entry.binding >= MAX_TEXTURE_BINDINGS) {
+			throw std::runtime_error("Texture binding exceeds Vulkan backend cache limits");
+		}
+		VkDescriptorSetLayoutBinding binding = {};
+		binding.binding						 = entry.binding;
+		binding.descriptorType				 = GetVkDescriptorType(entry);
+		binding.descriptorCount				 = 1;
+		binding.stageFlags					 = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding.pImmutableSamplers			 = nullptr;
+		bindings.push_back(binding);
+	}
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType						   = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount					   = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings					   = bindings.data();
+
+	VkDescriptorSetLayout descriptorSetLayout  = nullptr;
+	VkResult			  result = vkCreateDescriptorSetLayout(_device, &layoutInfo, nullptr, &descriptorSetLayout);
+	CheckVkResult(result, "vkCreateDescriptorSetLayout");
+
+	// Create pipeline layout
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+	pipelineLayoutInfo.sType					  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount			  = bindings.empty() ? 0u : 1u;
+	pipelineLayoutInfo.pSetLayouts				  = bindings.empty() ? nullptr : &descriptorSetLayout;
+
+	VkPushConstantRange pushConstantRange		  = {};
+	if (desc.pushConstantSize != 0) {
+		pushConstantRange.stageFlags			  = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		pushConstantRange.offset				  = 0;
+		pushConstantRange.size					  = desc.pushConstantSize;
+		pipelineLayoutInfo.pushConstantRangeCount = 1;
+		pipelineLayoutInfo.pPushConstantRanges	  = &pushConstantRange;
+	}
+
+	VkPipelineLayout pipelineLayout = nullptr;
+	result							= vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+	if (result != VK_SUCCESS) {
+		vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, nullptr);
+		throw std::runtime_error(std::string("vkCreatePipelineLayout failed: ") + VkResultToString(result));
+	}
+
+	// Shader stages
+	VkPipelineShaderStageCreateInfo vsStage			 = {};
+	vsStage.sType									 = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vsStage.stage									 = VK_SHADER_STAGE_VERTEX_BIT;
+	vsStage.module									 = vsIt->second.module;
+	vsStage.pName									 = "main";
+
+	VkPipelineShaderStageCreateInfo fsStage			 = {};
+	fsStage.sType									 = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fsStage.stage									 = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fsStage.module									 = fsIt->second.module;
+	fsStage.pName									 = "main";
+
+	VkPipelineShaderStageCreateInfo		 stages[]	 = {vsStage, fsStage};
+
+	// Vertex input state
+	VkPipelineVertexInputStateCreateInfo vertexInput = {};
+	vertexInput.sType								 = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+	std::vector<VkVertexInputBindingDescription>   vertexBindings;
+	std::vector<VkVertexInputAttributeDescription> vertexAttribs;
+
+	if (!desc.vertexLayout.empty()) {
+		VkVertexInputBindingDescription bindingDesc = {};
+		bindingDesc.binding							= 0;
+		bindingDesc.inputRate						= VK_VERTEX_INPUT_RATE_VERTEX;
+
+		// Calculate stride from last entry's offset + size
+		uint32_t stride								= 0;
+		for (const auto &entry : desc.vertexLayout) {
+			uint32_t size = 4; // Default float size
+			switch (entry.format) {
+			case PixelFormat::R32F:
+				size = 4;
+				break;
+			case PixelFormat::RG32F:
+				size = 8;
+				break;
+			case PixelFormat::RGBA32F:
+				size = 12;
+				break; // vec3
+			case PixelFormat::RGBA8:
+				size = 16;
+				break; // vec4
+			default:
+				size = 16;
+				break;
+			}
+			stride = std::max(stride, entry.offset + size);
+		}
+		bindingDesc.stride = stride;
+		vertexBindings.push_back(bindingDesc);
+
+		for (const auto &entry : desc.vertexLayout) {
+			VkVertexInputAttributeDescription attr = {};
+			attr.location						   = entry.location;
+			attr.binding						   = 0;
+			attr.format							   = GetVkFormat(entry.format);
+			attr.offset							   = entry.offset;
+			vertexAttribs.push_back(attr);
+		}
+	}
+
+	vertexInput.vertexBindingDescriptionCount			 = static_cast<uint32_t>(vertexBindings.size());
+	vertexInput.pVertexBindingDescriptions				 = vertexBindings.data();
+	vertexInput.vertexAttributeDescriptionCount			 = static_cast<uint32_t>(vertexAttribs.size());
+	vertexInput.pVertexAttributeDescriptions			 = vertexAttribs.data();
+
+	// Input assembly
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+	inputAssembly.sType									 = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	switch (desc.topology) {
+	case PrimitiveTopology::PointList:
+		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+		break;
+	case PrimitiveTopology::LineList:
+		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+		break;
+	case PrimitiveTopology::LineStrip:
+		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+		break;
+	case PrimitiveTopology::TriangleList:
+		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		break;
+	case PrimitiveTopology::TriangleStrip:
+		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		break;
+	case PrimitiveTopology::TriangleFan:
+		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+		break;
+	}
+	inputAssembly.primitiveRestartEnable			   = VK_FALSE;
+
+	// Viewport state (dynamic)
+	VkPipelineViewportStateCreateInfo viewportState	   = {};
+	viewportState.sType								   = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount						   = 1;
+	viewportState.scissorCount						   = 1;
+
+	// Rasterization
+	VkPipelineRasterizationStateCreateInfo rasterizer  = {};
+	rasterizer.sType								   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable						   = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable				   = VK_FALSE;
+	rasterizer.polygonMode							   = VK_POLYGON_MODE_FILL;
+	rasterizer.cullMode								   = VK_CULL_MODE_NONE;
+	rasterizer.frontFace							   = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizer.depthBiasEnable						   = VK_FALSE;
+	rasterizer.lineWidth							   = 1.0f;
+
+	// Multisampling
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	multisampling.sType								   = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.rasterizationSamples				   = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.minSampleShading					   = 1.0f;
+
+	// Depth/stencil
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+	depthStencil.sType								   = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencil.depthTestEnable					   = desc.depthTestEnable ? VK_TRUE : VK_FALSE;
+	depthStencil.depthWriteEnable					   = desc.depthWriteEnable ? VK_TRUE : VK_FALSE;
+	depthStencil.depthCompareOp						   = VK_COMPARE_OP_LESS;
+	depthStencil.depthBoundsTestEnable				   = VK_FALSE;
+	depthStencil.stencilTestEnable					   = VK_FALSE;
+
+	// Color blend
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.blendEnable						 = VK_FALSE;
+	colorBlendAttachment.colorWriteMask =
+		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+	colorBlending.sType								  = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.logicOpEnable						  = VK_FALSE;
+	colorBlending.attachmentCount					  = 1;
+	colorBlending.pAttachments						  = &colorBlendAttachment;
+
+	// Dynamic state
+	VkDynamicState					 dynamicStates[]  = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+	VkPipelineDynamicStateCreateInfo dynamicState	  = {};
+	dynamicState.sType								  = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicState.dynamicStateCount					  = 2;
+	dynamicState.pDynamicStates						  = dynamicStates;
+
+	// Dynamic rendering
+	VkFormat						 colorFormat	  = GetVkFormat(desc.colorAttachmentFormat);
+	VkPipelineRenderingCreateInfoKHR renderingInfo	  = {};
+	renderingInfo.sType								  = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+	renderingInfo.colorAttachmentCount				  = 1;
+	renderingInfo.pColorAttachmentFormats			  = &colorFormat;
+	if (desc.depthTestEnable) {
+		renderingInfo.depthAttachmentFormat = VK_FORMAT_D16_UNORM;
+	}
+
+	VkGraphicsPipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType						  = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.pNext						  = &renderingInfo;
+	pipelineInfo.stageCount					  = 2;
+	pipelineInfo.pStages					  = stages;
+	pipelineInfo.pVertexInputState			  = &vertexInput;
+	pipelineInfo.pInputAssemblyState		  = &inputAssembly;
+	pipelineInfo.pViewportState				  = &viewportState;
+	pipelineInfo.pRasterizationState		  = &rasterizer;
+	pipelineInfo.pMultisampleState			  = &multisampling;
+	pipelineInfo.pDepthStencilState			  = &depthStencil;
+	pipelineInfo.pColorBlendState			  = &colorBlending;
+	pipelineInfo.pDynamicState				  = &dynamicState;
+	pipelineInfo.layout						  = pipelineLayout;
+	pipelineInfo.renderPass					  = nullptr;
+	pipelineInfo.subpass					  = 0;
+
+	VkPipeline pipeline						  = nullptr;
+	result = vkCreateGraphicsPipelines(_device, _pipelineCache, 1, &pipelineInfo, nullptr, &pipeline);
+	if (result != VK_SUCCESS) {
+		vkDestroyPipelineLayout(_device, pipelineLayout, nullptr);
+		vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, nullptr);
+		throw std::runtime_error(std::string("vkCreateGraphicsPipelines failed: ") + VkResultToString(result));
+	}
+
+	PipelineHandle handle = _nextPipelineHandle++;
+	PipelineInfo   info;
+	info.pipeline			 = pipeline;
+	info.layout				 = pipelineLayout;
+	info.descriptorSetLayout = descriptorSetLayout;
+	info.pushConstantSize	 = desc.pushConstantSize;
+	info.resources			 = std::move(sortedResources);
+	info.isGraphics			 = true;
+	info.vertexShader		 = desc.vertexShader;
+	info.fragmentShader		 = desc.fragmentShader;
+	info.topology			 = desc.topology;
+	info.colorFormat		 = desc.colorAttachmentFormat;
+	info.depthEnable		 = desc.depthTestEnable;
+	info.vertexLayout		 = desc.vertexLayout;
+
+	_pipelines[handle]		 = std::move(info);
+	return handle;
+}
+
+void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_caps.supportsGraphics) {
+		throw std::runtime_error("Graphics not supported on this device");
+	}
+	if (_insideRenderPass) {
+		throw std::runtime_error("BeginRendering called while already inside a render pass");
+	}
+	if (!_vkCmdBeginRenderingKHR) {
+		throw std::runtime_error("Dynamic rendering function not available");
+	}
+
+	EnsureCommandBuffer();
+
+	// Transition color attachment
+	auto colorIt = _textures.find(desc.colorAttachment);
+	if (colorIt == _textures.end()) {
+		throw std::runtime_error("Invalid color attachment texture handle");
+	}
+
+	VkRenderingAttachmentInfoKHR colorAttachment = {};
+	colorAttachment.sType						 = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+	colorAttachment.imageView					 = colorIt->second.view;
+	colorAttachment.imageLayout					 = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorAttachment.loadOp	= desc.clearColorFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.clearValue.color.float32[0] = desc.clearColor[0];
+	colorAttachment.clearValue.color.float32[1] = desc.clearColor[1];
+	colorAttachment.clearValue.color.float32[2] = desc.clearColor[2];
+	colorAttachment.clearValue.color.float32[3] = desc.clearColor[3];
+
+	// Transition to color attachment layout
+	TransitionTexture(colorIt->second, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+	VkRenderingAttachmentInfoKHR depthAttachment = {};
+	bool						 hasDepth		 = false;
+
+	if (desc.depthAttachment != INVALID_TEXTURE_HANDLE) {
+		auto depthIt = _textures.find(desc.depthAttachment);
+		if (depthIt != _textures.end()) {
+			depthAttachment.sType		= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+			depthAttachment.imageView	= depthIt->second.view;
+			depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			depthAttachment.loadOp	= desc.clearDepthFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+			depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			depthAttachment.clearValue.depthStencil.depth	= desc.clearDepth;
+			depthAttachment.clearValue.depthStencil.stencil = 0;
+
+			TransitionTexture(depthIt->second, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+							  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+			hasDepth = true;
+		}
+	}
+
+	VkRenderingInfoKHR renderingInfo	   = {};
+	renderingInfo.sType					   = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+	renderingInfo.renderArea.extent.width  = colorIt->second.width;
+	renderingInfo.renderArea.extent.height = colorIt->second.height;
+	renderingInfo.layerCount			   = 1;
+	renderingInfo.colorAttachmentCount	   = 1;
+	renderingInfo.pColorAttachments		   = &colorAttachment;
+	if (hasDepth) {
+		renderingInfo.pDepthAttachment = &depthAttachment;
+	}
+
+	_vkCmdBeginRenderingKHR(_commandBuffer, &renderingInfo);
+	_insideRenderPass = true;
+}
+
+void VulkanBackend::EndRendering() {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_insideRenderPass) {
+		throw std::runtime_error("EndRendering called without matching BeginRendering");
+	}
+
+	_vkCmdEndRenderingKHR(_commandBuffer);
+	_insideRenderPass = false;
+}
+
+void VulkanBackend::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	VkViewport					viewport = {};
+	viewport.x							 = static_cast<float>(x);
+	viewport.y							 = static_cast<float>(y);
+	viewport.width						 = static_cast<float>(width);
+	viewport.height						 = static_cast<float>(height);
+	viewport.minDepth					 = 0.0f;
+	viewport.maxDepth					 = 1.0f;
+
+	EnsureCommandBuffer();
+	vkCmdSetViewport(_commandBuffer, 0, 1, &viewport);
+}
+
+void VulkanBackend::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	VkRect2D					scissor = {};
+	scissor.offset						= {static_cast<int32_t>(x), static_cast<int32_t>(y)};
+	scissor.extent						= {width, height};
+
+	EnsureCommandBuffer();
+	vkCmdSetScissor(_commandBuffer, 0, 1, &scissor);
+}
+
+void VulkanBackend::BindVertexBuffer(BufferHandle buffer, uint32_t stride) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto						it = _buffers.find(buffer);
+	if (it == _buffers.end()) {
+		throw std::runtime_error("Invalid vertex buffer handle");
+	}
+
+	EnsureCommandBuffer();
+	VkDeviceSize offset = 0;
+	vkCmdBindVertexBuffers(_commandBuffer, 0, 1, &it->second.buffer, &offset);
+	_currentVertexBuffer = buffer;
+}
+
+void VulkanBackend::BindIndexBuffer(BufferHandle buffer) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto						it = _buffers.find(buffer);
+	if (it == _buffers.end()) {
+		throw std::runtime_error("Invalid index buffer handle");
+	}
+
+	EnsureCommandBuffer();
+	vkCmdBindIndexBuffer(_commandBuffer, it->second.buffer, 0, VK_INDEX_TYPE_UINT32);
+	_currentIndexBuffer = buffer;
+}
+
+void VulkanBackend::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_insideRenderPass) {
+		throw std::runtime_error("Draw called outside a render pass");
+	}
+
+	EnsureCommandBuffer();
+	vkCmdDraw(_commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+void VulkanBackend::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset,
+								uint32_t firstInstance) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_insideRenderPass) {
+		throw std::runtime_error("DrawIndexed called outside a render pass");
+	}
+
+	EnsureCommandBuffer();
+	vkCmdDrawIndexed(_commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
+
+// =============================================================================
+// Depth Buffer
+// =============================================================================
+
+TextureHandle VulkanBackend::CreateDepthBuffer(uint32_t width, uint32_t height) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_initialized) {
+		throw std::runtime_error("Vulkan backend not initialized");
+	}
+
+	VkFormat		  depthFormat = VK_FORMAT_D16_UNORM;
+
+	VkImageCreateInfo imageInfo	  = {};
+	imageInfo.sType				  = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType			  = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width		  = width;
+	imageInfo.extent.height		  = height;
+	imageInfo.extent.depth		  = 1;
+	imageInfo.mipLevels			  = 1;
+	imageInfo.arrayLayers		  = 1;
+	imageInfo.format			  = depthFormat;
+	imageInfo.tiling			  = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.initialLayout		  = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage				  = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	imageInfo.sharingMode		  = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.samples			  = VK_SAMPLE_COUNT_1_BIT;
+
+	VkImage	 image				  = nullptr;
+	VkResult result				  = vkCreateImage(_device, &imageInfo, nullptr, &image);
+	CheckVkResult(result, "vkCreateImage (depth)");
+
+	VkDeviceMemory memory = nullptr;
+	AllocateImageMemory(image, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	result = vkBindImageMemory(_device, image, memory, 0);
+	CheckVkResult(result, "vkBindImageMemory (depth)");
+
+	VkImageViewCreateInfo viewInfo			 = {};
+	viewInfo.sType							 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image							 = image;
+	viewInfo.viewType						 = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format							 = depthFormat;
+	viewInfo.subresourceRange.aspectMask	 = VK_IMAGE_ASPECT_DEPTH_BIT;
+	viewInfo.subresourceRange.baseMipLevel	 = 0;
+	viewInfo.subresourceRange.levelCount	 = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount	 = 1;
+
+	VkImageView view						 = nullptr;
+	result									 = vkCreateImageView(_device, &viewInfo, nullptr, &view);
+	CheckVkResult(result, "vkCreateImageView (depth)");
+
+	TextureHandle handle = _nextTextureHandle++;
+	TextureInfo	  info;
+	info.image		   = image;
+	info.memory		   = memory;
+	info.view		   = view;
+	info.width		   = width;
+	info.height		   = height;
+	info.depth		   = 1;
+	info.format		   = PixelFormat::R32F;
+	info.vkFormat	   = depthFormat;
+	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	_textures[handle]  = std::move(info);
+	return handle;
+}
+
+void VulkanBackend::DestroyDepthBuffer(TextureHandle texture) {
+	DestroyTexture(texture);
+}
+
+// =============================================================================
+// Uniform Buffer Support
+// =============================================================================
+
+BufferHandle VulkanBackend::CreateUniformBuffer(size_t size, const void *data) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	BufferDesc					desc;
+	desc.sizeInBytes = size;
+	desc.mode		 = BufferMode::Read;
+	desc.initialData = data;
+
+	// Create a buffer with UNIFORM_BUFFER usage
+	if (!_initialized) {
+		throw std::runtime_error("Vulkan backend not initialized");
+	}
+
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType			  = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size				  = size;
+	bufferInfo.usage			  = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	bufferInfo.sharingMode		  = VK_SHARING_MODE_EXCLUSIVE;
+
+	VkBuffer buffer				  = nullptr;
+	VkResult result				  = vkCreateBuffer(_device, &bufferInfo, nullptr, &buffer);
+	CheckVkResult(result, "vkCreateBuffer (UBO)");
+
+	VkDeviceMemory memory = nullptr;
+	AllocateBufferMemory(buffer, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, size);
+
+	result = vkBindBufferMemory(_device, buffer, memory, 0);
+	CheckVkResult(result, "vkBindBufferMemory (UBO)");
+
+	// Upload initial data if provided
+	if (data != nullptr) {
+		UploadBufferInternal(buffer, size, data);
+	}
+
+	BufferHandle handle = _nextBufferHandle++;
+	BufferInfo	 info;
+	info.buffer		 = buffer;
+	info.memory		 = memory;
+	info.size		 = size;
+	info.mode		 = BufferMode::Read;
+	info.memoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+	_buffers[handle] = std::move(info);
+	return handle;
+}
+
+void VulkanBackend::UploadUniformBuffer(BufferHandle handle, const void *data, size_t size) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto						it = _buffers.find(handle);
+	if (it == _buffers.end()) {
+		throw std::runtime_error("Invalid uniform buffer handle");
+	}
+
+	UploadBufferInternal(it->second.buffer, size, data);
 }
 
 } // namespace GPU::Backend

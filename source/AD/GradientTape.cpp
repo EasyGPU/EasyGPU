@@ -34,11 +34,10 @@ namespace GPU::AD {
 
 namespace {
 
-TapeEntry MakeEntry(int32_t id, TapeOpKind kind, const TapeVar &output,
-					const std::vector<TapeVar> &inputs) {
+TapeEntry MakeEntry(int32_t id, TapeOpKind kind, const TapeVar &output, const std::vector<TapeVar> &inputs) {
 	TapeEntry e;
-	e.id = id;
-	e.kind = kind;
+	e.id	 = id;
+	e.kind	 = kind;
 	e.output = output;
 	e.inputs = inputs;
 	return e;
@@ -88,7 +87,7 @@ void GradientTape::RecordRemapped(const TapeEntry &entry) {
 	// Add a pre-remapped entry with an auto-assigned ID.
 	// Used by AdjointGenerator to clone and remap sub-tape entries.
 	TapeEntry e = entry;
-	e.id = _nextId++;
+	e.id		= _nextId++;
 	_entries.push_back(std::move(e));
 }
 
@@ -125,13 +124,15 @@ const std::string *GradientTape::GetVarType(const std::string &name) const {
 // =============================================================================
 
 void GradientTape::RecordStore(const GPU::IR::Node::StoreNode &store) {
-	const auto *lhs = store.LHS();
-	const auto *rhs = store.RHS();
+	const auto *lhs		= store.LHS();
+	const auto *rhs		= store.RHS();
 
 	std::string outName = ExtractVarName(*lhs);
 	std::string outType;
-	if (auto *tp = GetVarType(outName)) outType = *tp;
-	else outType = "float";
+	if (auto *tp = GetVarType(outName))
+		outType = *tp;
+	else
+		outType = "float";
 
 	TapeVar output{outName, outType, IsParameter(outName)};
 
@@ -161,12 +162,13 @@ void GradientTape::RecordStore(const GPU::IR::Node::StoreNode &store) {
 		}
 		if (!inName.empty() && inName != outName) {
 			std::string inType;
-			if (auto *t = GetVarType(inName)) inType = *t;
-			else inType = "float";
+			if (auto *t = GetVarType(inName))
+				inType = *t;
+			else
+				inType = "float";
 
-			auto entry = MakeEntry(_nextId++, TapeOpKind::BinaryOp, output,
-								   {TapeVar{inName, inType, IsParameter(inName)},
-									TapeVar{"0", "float", false}});
+			auto entry	   = MakeEntry(_nextId++, TapeOpKind::BinaryOp, output,
+									   {TapeVar{inName, inType, IsParameter(inName)}, TapeVar{"0", "float", false}});
 			entry.binaryOp = GPU::IR::Node::OperationCode::Add;
 			_entries.push_back(std::move(entry));
 
@@ -191,11 +193,13 @@ void GradientTape::RecordStore(const GPU::IR::Node::StoreNode &store) {
 }
 
 void GradientTape::RecordCompoundAssignment(const GPU::IR::Node::CompoundAssignmentNode &node) {
-	std::string name = ExtractVarName(*node.LHS());
+	std::string name	= ExtractVarName(*node.LHS());
 	std::string rhsName = TryExtractVarName(*node.RHS());
 	std::string type;
-	if (auto *t = GetVarType(name)) type = *t;
-	else type = "float";
+	if (auto *t = GetVarType(name))
+		type = *t;
+	else
+		type = "float";
 
 	auto code = node.Code();
 	if (code != GPU::IR::Node::CompoundAssignmentCode::AddAssign &&
@@ -206,13 +210,15 @@ void GradientTape::RecordCompoundAssignment(const GPU::IR::Node::CompoundAssignm
 	}
 
 	std::string rhsType;
-	if (auto *t = GetVarType(rhsName)) rhsType = *t;
-	else rhsType = "float";
+	if (auto *t = GetVarType(rhsName))
+		rhsType = *t;
+	else
+		rhsType = "float";
 
 	TapeVar output{name, type, IsParameter(name)};
 	TapeVar rhsVar{rhsName, rhsType, IsParameter(rhsName)};
 
-	auto entry = MakeEntry(_nextId++, TapeOpKind::CompoundAssign, output, {output, rhsVar});
+	auto	entry	 = MakeEntry(_nextId++, TapeOpKind::CompoundAssign, output, {output, rhsVar});
 	entry.compoundOp = code;
 	_entries.push_back(std::move(entry));
 
@@ -235,21 +241,18 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 		return;
 	}
 
-	std::vector<TapeVar> inputs;
+	std::vector<TapeVar>	 inputs;
 	std::vector<std::string> inputGradExprs;
 
-	auto isLiteralName = [](const std::string &name) {
-		if (name.empty()) return true;
-		if (name == "true" || name == "false") return true;
-		static const char *glslTypes[] = {
-			"float", "int", "uint", "bool",
-			"vec2", "vec3", "vec4",
-			"ivec2", "ivec3", "ivec4",
-			"uvec2", "uvec3", "uvec4",
-			"bvec2", "bvec3", "bvec4",
-			"mat2", "mat3", "mat4",
-			"dvec2", "dvec3", "dvec4", "dmat2", "dmat3", "dmat4"
-		};
+	auto					 isLiteralName = [](const std::string &name) {
+		if (name.empty())
+			return true;
+		if (name == "true" || name == "false")
+			return true;
+		static const char *glslTypes[] = {"float", "int",	"uint",	 "bool",  "vec2",  "vec3",	"vec4",
+										  "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4", "bvec2",
+										  "bvec3", "bvec4", "mat2",	 "mat3",  "mat4",  "dvec2", "dvec3",
+										  "dvec4", "dmat2", "dmat3", "dmat4"};
 		for (const char *t : glslTypes) {
 			size_t len = std::char_traits<char>::length(t);
 			if (name.compare(0, len, t) == 0 && name.size() > len && name[len] == '(') {
@@ -259,18 +262,20 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 		return false;
 	};
 
-	auto nodeExpr = [](const GPU::IR::Node::Node &node) {
-		return GPU::IR::Builder::Builder::Get().BuildNode(node);
-	};
+	auto nodeExpr = [](const GPU::IR::Node::Node &node) { return GPU::IR::Builder::Builder::Get().BuildNode(node); };
 
-	auto addLeaf = [this, &inputs, &inputGradExprs, &isLiteralName](const GPU::IR::Node::Node &node,
-																	const std::string &coeff) {
+	auto addLeaf  = [this, &inputs, &inputGradExprs, &isLiteralName](const GPU::IR::Node::Node &node,
+																	 const std::string		   &coeff) {
 		std::string n = TryExtractVarName(node);
-		if (n.empty()) n = ExtractVarName(node);
-		if (isLiteralName(n)) return;
+		if (n.empty())
+			n = ExtractVarName(node);
+		if (isLiteralName(n))
+			return;
 		std::string t;
-		if (auto *tp = GetVarType(n)) t = *tp;
-		else t = "float";
+		if (auto *tp = GetVarType(n))
+			t = *tp;
+		else
+			t = "float";
 		inputs.push_back(TapeVar{n, t, IsParameter(n)});
 		inputGradExprs.push_back(coeff);
 	};
@@ -283,9 +288,10 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 		}
 
 		const auto &opNode = static_cast<const GPU::IR::Node::OperationNode &>(node);
-		const auto *lhs = opNode.LHS();
-		const auto *rhs = opNode.RHS();
-		if (!lhs) return;
+		const auto *lhs	   = opNode.LHS();
+		const auto *rhs	   = opNode.RHS();
+		if (!lhs)
+			return;
 
 		switch (opNode.Code()) {
 		case GPU::IR::Node::OperationCode::Add:
@@ -325,39 +331,47 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 	};
 
 	collect(op, "1.0");
-	if (inputs.empty()) return;
+	if (inputs.empty())
+		return;
 
-	auto entry = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, output, inputs);
-	entry.binaryOp = code;
+	auto entry			 = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, output, inputs);
+	entry.binaryOp		 = code;
 	entry.inputGradExprs = std::move(inputGradExprs);
 	_entries.push_back(std::move(entry));
 
 	PropagateActive(output, inputs);
 }
 
-void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node,
-									const TapeVar					&output) {
-	const auto	&params = node.Parameter();
-	size_t		 nParams = params.size();
-	std::string  intrinsicName(node.Name());
+void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node, const TapeVar &output) {
+	const auto &params	= node.Parameter();
+	size_t		nParams = params.size();
+	std::string intrinsicName(node.Name());
 
-	TapeOpKind kind;
+	TapeOpKind	kind;
 	switch (nParams) {
-	case 1:	 kind = TapeOpKind::Intrinsic1; break;
-	case 2:	 kind = TapeOpKind::Intrinsic2; break;
-	default: kind = TapeOpKind::Intrinsic3; break;
+	case 1:
+		kind = TapeOpKind::Intrinsic1;
+		break;
+	case 2:
+		kind = TapeOpKind::Intrinsic2;
+		break;
+	default:
+		kind = TapeOpKind::Intrinsic3;
+		break;
 	}
 
 	std::vector<TapeVar> inputs;
 	for (const auto &p : params) {
 		std::string n = ExtractVarName(*p);
 		std::string t;
-		if (auto *tp = GetVarType(n)) t = *tp;
-		else t = "float";
+		if (auto *tp = GetVarType(n))
+			t = *tp;
+		else
+			t = "float";
 		inputs.push_back(TapeVar{n, t, IsParameter(n)});
 	}
 
-	auto entry = MakeEntry(_nextId++, kind, output, inputs);
+	auto entry			= MakeEntry(_nextId++, kind, output, inputs);
 	entry.intrinsicName = intrinsicName;
 	_entries.push_back(std::move(entry));
 
@@ -368,8 +382,10 @@ void GradientTape::RecordTernary(const GPU::IR::Node::TernaryNode &node, const T
 	auto makeInput = [this](const GPU::IR::Node::Node &operand) -> TapeVar {
 		std::string n = ExtractVarName(operand);
 		std::string t;
-		if (auto *tp = GetVarType(n)) t = *tp;
-		else t = "float";
+		if (auto *tp = GetVarType(n))
+			t = *tp;
+		else
+			t = "float";
 		return TapeVar{n, t, IsParameter(n)};
 	};
 
@@ -390,8 +406,10 @@ void GradientTape::RecordTernary(const GPU::IR::Node::TernaryNode &node, const T
 
 void GradientTape::RecordLocalVariable(const GPU::IR::Node::LocalVariableNode &node) {
 	std::string name = node.VarName();
-	if (node.IsExternal()) return;
-	if (name.find("gl_GlobalInvocationID") != std::string::npos) return;
+	if (node.IsExternal())
+		return;
+	if (name.find("gl_GlobalInvocationID") != std::string::npos)
+		return;
 
 	_varTypes[name] = node.VarType();
 }
@@ -410,12 +428,15 @@ std::string GradientTape::ExtractVarName(const GPU::IR::Node::Node &loadNode) {
 std::string GradientTape::TryExtractVarName(const GPU::IR::Node::Node &node) {
 	if (node.Type() == GPU::IR::Node::NodeType::Load) {
 		auto	   &loadNode = static_cast<const GPU::IR::Node::LoadNode &>(node);
-		std::string s = loadNode.Unwrap();
-		if (s.empty()) return "";
+		std::string s		 = loadNode.Unwrap();
+		if (s.empty())
+			return "";
 		// Filter GLSL type constructors: float(...), vec2(...), etc.
-		if (s.find('(') != std::string::npos) return "";
+		if (s.find('(') != std::string::npos)
+			return "";
 		// Filter boolean literals
-		if (s == "true" || s == "false") return "";
+		if (s == "true" || s == "false")
+			return "";
 		return s;
 	}
 	return "";
@@ -431,7 +452,7 @@ TapeOpKind GradientTape::ClassifyOp(GPU::IR::Node::OperationCode code) {
 }
 
 void GradientTape::PropagateActive(const TapeVar &output, const std::vector<TapeVar> &inputs) {
-	bool outActive = IsActive(output.name) || IsParameter(output.name);
+	bool outActive		= IsActive(output.name) || IsParameter(output.name);
 	bool anyInputActive = false;
 	for (const auto &in : inputs) {
 		if (IsActive(in.name) || IsParameter(in.name)) {
@@ -454,52 +475,53 @@ void GradientTape::PropagateActive(const TapeVar &output, const std::vector<Tape
 
 void GradientTape::BeginIfBranch(const std::string &conditionExpr) {
 	TapeEntry entry;
-	entry.id = _nextId++;
-	entry.kind = TapeOpKind::ControlFlowBegin;
-	entry.controlFlowKind = ControlFlowKind::IfBranch;
+	entry.id			   = _nextId++;
+	entry.kind			   = TapeOpKind::ControlFlowBegin;
+	entry.controlFlowKind  = ControlFlowKind::IfBranch;
 	entry.conditionVarName = conditionExpr;
 	_entries.push_back(std::move(entry));
 }
 
 void GradientTape::BeginElifBranch(const std::string &conditionExpr) {
 	TapeEntry entry;
-	entry.id = _nextId++;
-	entry.kind = TapeOpKind::ControlFlowBegin;
-	entry.controlFlowKind = ControlFlowKind::ElifBranch;
+	entry.id			   = _nextId++;
+	entry.kind			   = TapeOpKind::ControlFlowBegin;
+	entry.controlFlowKind  = ControlFlowKind::ElifBranch;
 	entry.conditionVarName = conditionExpr;
 	_entries.push_back(std::move(entry));
 }
 
 void GradientTape::BeginElseBranch() {
 	TapeEntry entry;
-	entry.id = _nextId++;
-	entry.kind = TapeOpKind::ControlFlowBegin;
+	entry.id			  = _nextId++;
+	entry.kind			  = TapeOpKind::ControlFlowBegin;
 	entry.controlFlowKind = ControlFlowKind::ElseBranch;
 	_entries.push_back(std::move(entry));
 }
 
 void GradientTape::EndIfChain() {
 	TapeEntry entry;
-	entry.id = _nextId++;
+	entry.id   = _nextId++;
 	entry.kind = TapeOpKind::ControlFlowEnd;
 	_entries.push_back(std::move(entry));
 }
 
-void GradientTape::BeginForLoop(const std::string &varName, const std::string &start, const std::string &end, const std::string &step) {
+void GradientTape::BeginForLoop(const std::string &varName, const std::string &start, const std::string &end,
+								const std::string &step) {
 	TapeEntry entry;
-	entry.id = _nextId++;
-	entry.kind = TapeOpKind::ControlFlowBegin;
+	entry.id			  = _nextId++;
+	entry.kind			  = TapeOpKind::ControlFlowBegin;
 	entry.controlFlowKind = ControlFlowKind::ForLoop;
-	entry.forVarName = varName;
-	entry.forStart = start;
-	entry.forEnd = end;
-	entry.forStep = step;
+	entry.forVarName	  = varName;
+	entry.forStart		  = start;
+	entry.forEnd		  = end;
+	entry.forStep		  = step;
 	_entries.push_back(std::move(entry));
 }
 
 void GradientTape::EndForLoop() {
 	TapeEntry entry;
-	entry.id = _nextId++;
+	entry.id   = _nextId++;
 	entry.kind = TapeOpKind::ControlFlowEnd;
 	_entries.push_back(std::move(entry));
 }
@@ -513,19 +535,20 @@ bool GradientTape::IsActive() {
 // =============================================================================
 
 void GradientTape::PushSubTape() {
-	auto sub = std::make_unique<GradientTape>();
-	_currentSubTape = sub.get();
+	auto sub			 = std::make_unique<GradientTape>();
+	_currentSubTape		 = sub.get();
 	// Push to the current active tape (this or a sub-tape) so the hierarchy
 	// forms a proper tree. Otherwise nested Flow::For / Flow::If bodies would
 	// all be flattened into the main tape's _subTapes and recursion in
 	// ProcessCall (via CloneSubTapesFrom) would lose them.
-	GradientTape* parent = _subTapeStack.empty() ? this : _subTapeStack.top();
+	GradientTape *parent = _subTapeStack.empty() ? this : _subTapeStack.top();
 	_subTapeStack.push(_currentSubTape);
 	parent->_subTapes.push_back(std::move(sub));
 }
 
 int GradientTape::PopSubTape() {
-	if (_subTapeStack.empty()) return -1;
+	if (_subTapeStack.empty())
+		return -1;
 	int index = (int)_subTapes.size(); // will be size-1 after push_back, but we already pushed
 	// Find the index of the current sub-tape
 	for (int i = 0; i < (int)_subTapes.size(); i++) {
@@ -541,8 +564,8 @@ int GradientTape::PopSubTape() {
 
 void GradientTape::CloneSubTapesFrom(const GradientTape &src) {
 	for (size_t i = 0; i < src.SubTapeCount(); i++) {
-		const auto &ss = src.SubTape(i);
-		auto copy = std::make_unique<GradientTape>();
+		const auto &ss	 = src.SubTape(i);
+		auto		copy = std::make_unique<GradientTape>();
 		for (size_t j = 0; j < ss.Size(); j++) {
 			copy->RecordRemapped(ss[j]);
 		}
@@ -559,14 +582,17 @@ void GradientTape::RecordCall(const GPU::IR::Node::CallNode &callNode, const Tap
 	std::vector<TapeVar> inputs;
 	for (const auto &arg : callNode.Arguments()) {
 		std::string n = TryExtractVarName(*arg);
-		if (n.empty()) n = ExtractVarName(*arg);
+		if (n.empty())
+			n = ExtractVarName(*arg);
 		std::string t;
-		if (auto *tp = GetVarType(n)) t = *tp;
-		else t = "float";
+		if (auto *tp = GetVarType(n))
+			t = *tp;
+		else
+			t = "float";
 		inputs.push_back(TapeVar{n, t, IsParameter(n)});
 	}
 
-	auto entry = MakeEntry(_nextId++, TapeOpKind::Call, output, inputs);
+	auto entry			   = MakeEntry(_nextId++, TapeOpKind::Call, output, inputs);
 	entry.callableFuncName = callNode.FuncName();
 	_entries.push_back(std::move(entry));
 
@@ -583,20 +609,21 @@ void GradientTape::RecordReturn(const GPU::IR::Node::ReturnNode &retNode) {
 	// where to seed the adjoint.
 	if (retNode.Value()) {
 		std::string name = TryExtractVarName(*retNode.Value());
-		if (name.empty()) name = ExtractVarName(*retNode.Value());
+		if (name.empty())
+			name = ExtractVarName(*retNode.Value());
 		if (!name.empty()) {
 			std::string t;
-			if (auto *tp = GetVarType(name)) t = *tp;
-			else t = "float";
+			if (auto *tp = GetVarType(name))
+				t = *tp;
+			else
+				t = "float";
 
-			auto entry = MakeEntry(_nextId++, TapeOpKind::Return,
-								   TapeVar{name, t, IsParameter(name)}, {});
+			auto entry = MakeEntry(_nextId++, TapeOpKind::Return, TapeVar{name, t, IsParameter(name)}, {});
 			_entries.push_back(std::move(entry));
 		}
 	} else {
 		// void return
-		auto entry = MakeEntry(_nextId++, TapeOpKind::Return,
-							   TapeVar{"", "void", false}, {});
+		auto entry = MakeEntry(_nextId++, TapeOpKind::Return, TapeVar{"", "void", false}, {});
 		_entries.push_back(std::move(entry));
 	}
 }

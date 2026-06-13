@@ -84,12 +84,12 @@ Runtime::Buffer<float> bufIn(input);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufIn.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = in[id] + MakeFloat(1.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufIn.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = in[id] + MakeFloat(1.0f);
+	},
+	256);
 
 int groups = (N + 255) / 256;
 kernel.Dispatch(groups, true);
@@ -107,12 +107,12 @@ constexpr int		   H = 512;
 Runtime::Buffer<float> buf(W *H);
 
 Kernel2D			   kernel(
-				  [&, W, H](Var<int> &x, Var<int> &y) {
-		  auto	   out = buf.Bind();
-		  Var<int> idx = y * W + x;
-		  out[idx]	   = ToFloat(x) + ToFloat(y);
-				  },
-				  16, 16);
+	[&, W, H](Var<int> &x, Var<int> &y) {
+		auto	 out = buf.Bind();
+		Var<int> idx = y * W + x;
+		out[idx]	 = ToFloat(x) + ToFloat(y);
+	},
+	16, 16);
 
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
@@ -136,11 +136,11 @@ std::vector<float>	   data(N, 0.0f);
 Runtime::Buffer<float> buf(data);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto b = buf.Bind();
-		  b[id]	 = b[id] + MakeFloat(1.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto b = buf.Bind();
+		b[id]  = b[id] + MakeFloat(1.0f);
+	},
+	256);
 
 int groups = (N + 255) / 256;
 for (int iter = 0; iter < 50; ++iter) {
@@ -210,15 +210,15 @@ for (int b = 0; b < NUM_BUFFERS; ++b) {
 
 Runtime::Buffer<float> out(N);
 Kernel1D			   kernel(
-				  [&, N, NUM_BUFFERS](Var<int> &id) {
-		  Var<float> sum = MakeFloat(0.0f);
-		  for (int b = 0; b < NUM_BUFFERS; ++b) {
-			  sum = sum + buffers[b]->Bind()[id];
-		  }
-		  auto o = out.Bind();
-		  o[id]	 = sum;
-				  },
-				  256);
+	[&, N, NUM_BUFFERS](Var<int> &id) {
+		Var<float> sum = MakeFloat(0.0f);
+		for (int b = 0; b < NUM_BUFFERS; ++b) {
+			sum = sum + buffers[b]->Bind()[id];
+		}
+		auto o = out.Bind();
+		o[id]  = sum;
+	},
+	256);
 
 kernel.Dispatch((N + 255) / 256, true);
 

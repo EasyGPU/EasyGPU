@@ -98,13 +98,13 @@ Runtime::Buffer<Math::Vec4> bufOut(N);
 Uniform<Math::Mat4>			uMat(identity);
 
 Kernel1D					kernel(
-					   [&, N](Var<int> &id) {
-		   auto		 v	 = bufVec.Bind();
-		   auto		 out = bufOut.Bind();
-		   Var<Mat4> m	 = uMat.Load();
-		   out[id]		 = m * v[id];
-					   },
-					   256);
+	[&, N](Var<int> &id) {
+		auto	  v	  = bufVec.Bind();
+		auto	  out = bufOut.Bind();
+		Var<Mat4> m	  = uMat.Load();
+		out[id]		  = m * v[id];
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -131,13 +131,13 @@ Runtime::Buffer<Math::Vec4> bufOut(N);
 Uniform<Math::Mat4>			uMat(scaleMat);
 
 Kernel1D					kernel(
-					   [&, N](Var<int> &id) {
-		   auto		 v	 = bufVec.Bind();
-		   auto		 out = bufOut.Bind();
-		   Var<Mat4> m	 = uMat.Load();
-		   out[id]		 = m * v[id];
-					   },
-					   256);
+	[&, N](Var<int> &id) {
+		auto	  v	  = bufVec.Bind();
+		auto	  out = bufOut.Bind();
+		Var<Mat4> m	  = uMat.Load();
+		out[id]		  = m * v[id];
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -167,15 +167,15 @@ Runtime::Buffer<Math::Mat4> bufAdd(N);
 Runtime::Buffer<Math::Mat4> bufSub(N);
 
 Kernel1D					kernel(
-					   [&, N](Var<int> &id) {
-		   auto av	= bufA.Bind();
-		   auto bv	= bufB.Bind();
-		   auto add = bufAdd.Bind();
-		   auto sub = bufSub.Bind();
-		   add[id]	= av[0] + bv[0];
-		   sub[id]	= av[0] - bv[0];
-					   },
-					   256);
+	[&, N](Var<int> &id) {
+		auto av	 = bufA.Bind();
+		auto bv	 = bufB.Bind();
+		auto add = bufAdd.Bind();
+		auto sub = bufSub.Bind();
+		add[id]	 = av[0] + bv[0];
+		sub[id]	 = av[0] - bv[0];
+	},
+	256);
 
 kernel.Dispatch(1, true);
 

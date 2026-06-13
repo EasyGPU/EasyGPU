@@ -179,13 +179,13 @@ int main() {
 	int	 total	= 0;
 
 	auto run	= [&](auto func, const char *name) {
-		   total++;
-		   try {
-			   func();
-			   passed++;
-		   } catch (const std::exception &) {
-			   // Already printed by TEST/END_TEST macros
-		   }
+		total++;
+		try {
+			func();
+			passed++;
+		} catch (const std::exception &) {
+			// Already printed by TEST/END_TEST macros
+		}
 	};
 
 	run(test_float_prefix_increment, "Float prefix increment");

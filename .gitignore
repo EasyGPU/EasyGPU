@@ -89,6 +89,11 @@ generated/
 # Ensure formatting config is tracked
 !.clang-format
 
+# Debug artifacts (screenshots, temporary output)
+*.png
+*.jpg
+.cache/
+
 BUILD.md
 
 CMakeSettings.json

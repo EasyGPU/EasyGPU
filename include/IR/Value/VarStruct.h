@@ -65,7 +65,7 @@ template <typename T> void EASYGPU_RegisterIfStruct() {
 			EASYGPU_RegisterDep_##StructType();                                                                        \
 			auto name = Builder::Builder::Get().Context()->AssignVarName();                                            \
 			_node	  = std::make_unique<Node::LocalVariableNode>(                                                     \
-				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
+				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                                   \
 			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                           \
 			Builder::Builder::Get().Build(*_varNode, true);                                                            \
 		}                                                                                                              \
@@ -85,7 +85,7 @@ template <typename T> void EASYGPU_RegisterIfStruct() {
 				EASYGPU_RegisterDep_##StructType();                                                                    \
 				auto name = Builder::Builder::Get().Context()->AssignVarName();                                        \
 				_node	  = std::make_unique<Node::LocalVariableNode>(                                                 \
-					name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                           \
+					name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
 				_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                       \
 				Builder::Builder::Get().Build(*_varNode, true);                                                        \
 				auto rhs   = Other.Load();                                                                             \
@@ -125,7 +125,7 @@ template <typename T> void EASYGPU_RegisterIfStruct() {
 			EASYGPU_RegisterDep_##StructType();                                                                        \
 			auto name = Builder::Builder::Get().Context()->AssignVarName();                                            \
 			_node	  = std::make_unique<Node::LocalVariableNode>(                                                     \
-				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
+				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                                   \
 			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                           \
 			Builder::Builder::Get().Build(*_varNode, true);                                                            \
 		}                                                                                                              \
@@ -166,7 +166,7 @@ template <typename T> void EASYGPU_RegisterIfStruct() {
 			EASYGPU_RegisterDep_##StructType();                                                                        \
 			auto name = Builder::Builder::Get().Context()->AssignVarName();                                            \
 			_node	  = std::make_unique<Node::LocalVariableNode>(                                                     \
-				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
+				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                                   \
 			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                           \
 			Builder::Builder::Get().Build(*_varNode, true);                                                            \
 		}                                                                                                              \
@@ -207,7 +207,7 @@ template <typename T> void EASYGPU_RegisterIfStruct() {
 			EASYGPU_RegisterDep_##StructType();                                                                        \
 			auto name = Builder::Builder::Get().Context()->AssignVarName();                                            \
 			_node	  = std::make_unique<Node::LocalVariableNode>(                                                     \
-				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
+				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                                   \
 			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                           \
 			Builder::Builder::Get().Build(*_varNode, true);                                                            \
 		}                                                                                                              \

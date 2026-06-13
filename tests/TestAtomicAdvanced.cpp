@@ -71,13 +71,13 @@ Runtime::Buffer<int> bufMin(dataMin);
 Runtime::Buffer<int> bufMax(dataMax);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto mn = bufMin.Bind();
 		auto mx = bufMax.Bind();
 		ExprBase::NotUse(AtomicMin(mn[0], id));
 		ExprBase::NotUse(AtomicMax(mx[0], id));
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -107,15 +107,15 @@ Runtime::Buffer<int> bufOr(orData);
 Runtime::Buffer<int> bufXor(xorData);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto a = bufAnd.Bind();
 		auto o = bufOr.Bind();
 		auto x = bufXor.Bind();
 		ExprBase::NotUse(AtomicAnd(a[0], id));
 		ExprBase::NotUse(AtomicOr(o[0], id));
 		ExprBase::NotUse(AtomicXor(x[0], id));
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -150,12 +150,12 @@ std::vector<int>	 data(1, 0);
 Runtime::Buffer<int> buf(data);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto b = buf.Bind();
 		// Race to change 0 -> 1; only one thread should succeed in the CAS.
 		ExprBase::NotUse(AtomicCompSwap(b[0], MakeInt(0), MakeInt(1)));
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -175,12 +175,12 @@ std::vector<int>	 data(1, -1);
 Runtime::Buffer<int> buf(data);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto b = buf.Bind();
 		// Each thread tries to store its id; last one wins
 		ExprBase::NotUse(AtomicExchange(b[0], id));
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -233,11 +233,11 @@ std::vector<int>	 data(1, N);
 Runtime::Buffer<int> buf(data);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto b = buf.Bind();
 		ExprBase::NotUse(AtomicSub(b[0], MakeInt(1)));
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 

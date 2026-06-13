@@ -19,13 +19,13 @@ int main() {
 	Runtime::Buffer<float> inputBuffer(input);
 
 	Kernel::Kernel1D	   kernel(
-		  [&](IR::Value::Var<int> &Id) {
-			  auto boundBuffer		= buffer.Bind();
-			  auto boundInputBuffer = inputBuffer.Bind();
+		[&](IR::Value::Var<int> &Id) {
+			auto boundBuffer	  = buffer.Bind();
+			auto boundInputBuffer = inputBuffer.Bind();
 
-			  boundBuffer[Id]		= boundInputBuffer[Id] + 1.f;
-		  },
-		  input.size());
+			boundBuffer[Id]		  = boundInputBuffer[Id] + 1.f;
+		},
+		input.size());
 	kernel.Dispatch(1, true);
 
 	buffer.Download(output);

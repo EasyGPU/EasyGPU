@@ -50,12 +50,12 @@ Runtime::Buffer<float> bufIn(input);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufIn.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Sin(in[id]);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufIn.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Sin(in[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -76,12 +76,12 @@ Runtime::Buffer<float> bufIn(input);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufIn.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Cos(in[id]);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufIn.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Cos(in[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -101,13 +101,13 @@ Runtime::Buffer<float> bufY(yVals);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto x   = bufX.Bind();
-		  auto y   = bufY.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Atan2(y[id], x[id]);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto x	 = bufX.Bind();
+		auto y	 = bufY.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Atan2(y[id], x[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -132,12 +132,12 @@ Runtime::Buffer<float> bufIn(input);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufIn.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Sqrt(in[id]);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufIn.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Sqrt(in[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -158,13 +158,13 @@ Runtime::Buffer<float> bufIn(input);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufIn.Bind();
-		  auto out = bufOut.Bind();
-		  // log(exp(x)) should be x
-		  out[id]  = Log(Exp(in[id]));
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufIn.Bind();
+		auto out = bufOut.Bind();
+		// log(exp(x)) should be x
+		out[id]	 = Log(Exp(in[id]));
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -184,13 +184,13 @@ Runtime::Buffer<float> bufExp(exp);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto b   = bufBase.Bind();
-		  auto e   = bufExp.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Pow(b[id], e[id]);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto b	 = bufBase.Bind();
+		auto e	 = bufExp.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Pow(b[id], e[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -212,12 +212,12 @@ Runtime::Buffer<float> bufIn(input);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufIn.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Clamp(in[id], 0.0f, 1.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufIn.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Clamp(in[id], 0.0f, 1.0f);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -237,12 +237,12 @@ Runtime::Buffer<float> bufIn(input);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufIn.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Mod(in[id], 2.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufIn.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Mod(in[id], 2.0f);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -265,15 +265,15 @@ Runtime::Buffer<float> bufMin(N);
 Runtime::Buffer<float> bufMax(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto av = bufA.Bind();
-		  auto bv = bufB.Bind();
-		  auto mn = bufMin.Bind();
-		  auto mx = bufMax.Bind();
-		  mn[id]  = Min(av[id], bv[id]);
-		  mx[id]  = Max(av[id], bv[id]);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto av = bufA.Bind();
+		auto bv = bufB.Bind();
+		auto mn = bufMin.Bind();
+		auto mx = bufMax.Bind();
+		mn[id]	= Min(av[id], bv[id]);
+		mx[id]	= Max(av[id], bv[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -296,13 +296,13 @@ Runtime::Buffer<float> bufB(b);
 Runtime::Buffer<float> bufOut(N);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto av  = bufA.Bind();
-		  auto bv  = bufB.Bind();
-		  auto out = bufOut.Bind();
-		  out[id]  = Mix(av[id], bv[id], 0.5f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto av	 = bufA.Bind();
+		auto bv	 = bufB.Bind();
+		auto out = bufOut.Bind();
+		out[id]	 = Mix(av[id], bv[id], 0.5f);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -329,14 +329,14 @@ Runtime::Buffer<float>		bufLen(N);
 Runtime::Buffer<Math::Vec3> bufNorm(N);
 
 Kernel1D					kernel(
-					   [&, N](Var<int> &id) {
-		   auto in	 = bufIn.Bind();
-		   auto len	 = bufLen.Bind();
-		   auto norm = bufNorm.Bind();
-		   len[id]	 = Length(in[id]);
-		   norm[id]	 = Normalize(in[id]);
-					   },
-					   256);
+	[&, N](Var<int> &id) {
+		auto in	  = bufIn.Bind();
+		auto len  = bufLen.Bind();
+		auto norm = bufNorm.Bind();
+		len[id]	  = Length(in[id]);
+		norm[id]  = Normalize(in[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -371,15 +371,15 @@ Runtime::Buffer<float>		bufDot(N);
 Runtime::Buffer<Math::Vec3> bufCross(N);
 
 Kernel1D					kernel(
-					   [&, N](Var<int> &id) {
-		   auto av = bufA.Bind();
-		   auto bv = bufB.Bind();
-		   auto d  = bufDot.Bind();
-		   auto c  = bufCross.Bind();
-		   d[id]   = Dot(av[id], bv[id]);
-		   c[id]   = Cross(av[id], bv[id]);
-					   },
-					   256);
+	[&, N](Var<int> &id) {
+		auto av = bufA.Bind();
+		auto bv = bufB.Bind();
+		auto d	= bufDot.Bind();
+		auto c	= bufCross.Bind();
+		d[id]	= Dot(av[id], bv[id]);
+		c[id]	= Cross(av[id], bv[id]);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 

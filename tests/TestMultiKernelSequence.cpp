@@ -53,13 +53,13 @@ Runtime::Buffer<float> bufC(N);
 
 // Kernel 1: A -> B (square)
 Kernel1D			   kernel1(
-				  [&, N](Var<int> &id) {
-		  auto		 a = bufA.Bind();
-		  auto		 b = bufB.Bind();
-		  Var<float> v = a[id];
-		  b[id]		   = v * v;
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto	   a = bufA.Bind();
+		auto	   b = bufB.Bind();
+		Var<float> v = a[id];
+		b[id]		 = v * v;
+	},
+	256);
 
 // Kernel 2: B -> C (add 1)
 Kernel1D kernel2(
@@ -92,11 +92,11 @@ std::vector<float>	   data(N, 2.0f);
 Runtime::Buffer<float> buf(data);
 
 Kernel1D			   kernelMul(
-				  [&, N](Var<int> &id) {
-		  auto b = buf.Bind();
-		  b[id]	 = b[id] * MakeFloat(3.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto b = buf.Bind();
+		b[id]  = b[id] * MakeFloat(3.0f);
+	},
+	256);
 
 Kernel1D kernelAdd(
 	[&, N](Var<int> &id) {
@@ -140,12 +140,12 @@ Runtime::Buffer<float> bufOutB(N);
 
 // Kernel writes to bufOutA using bufA
 Kernel1D			   kernelA(
-				  [&, N](Var<int> &id) {
-		  auto in  = bufA.Bind();
-		  auto out = bufOutA.Bind();
-		  out[id]  = in[id] + MakeFloat(10.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto in	 = bufA.Bind();
+		auto out = bufOutA.Bind();
+		out[id]	 = in[id] + MakeFloat(10.0f);
+	},
+	256);
 
 // Kernel writes to bufOutB using bufB
 Kernel1D kernelB(
@@ -180,11 +180,11 @@ std::vector<float>	   data(N, 1.0f);
 Runtime::Buffer<float> buf(data);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto b = buf.Bind();
-		  b[id]	 = b[id] * MakeFloat(2.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto b = buf.Bind();
+		b[id]  = b[id] * MakeFloat(2.0f);
+	},
+	256);
 
 kernel.Dispatch(1, true); // 2
 kernel.Dispatch(1, true); // 4
@@ -208,12 +208,12 @@ Runtime::Buffer<float> buf(data);
 Uniform<float>		   factor(1.0f);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto		 b = buf.Bind();
-		  Var<float> f = factor.Load();
-		  b[id]		   = b[id] + f;
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto	   b = buf.Bind();
+		Var<float> f = factor.Load();
+		b[id]		 = b[id] + f;
+	},
+	256);
 
 kernel.Dispatch(1, true); // +1
 factor = 2.0f;
@@ -240,12 +240,12 @@ Runtime::Buffer<float> bufA(dataA);
 Runtime::Buffer<float> bufB(dataB);
 
 Kernel1D			   kernelAtoB(
-				  [&, N](Var<int> &id) {
-		  auto a = bufA.Bind();
-		  auto b = bufB.Bind();
-		  b[id]	 = a[id] + MakeFloat(1.0f);
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto a = bufA.Bind();
+		auto b = bufB.Bind();
+		b[id]  = a[id] + MakeFloat(1.0f);
+	},
+	256);
 
 Kernel1D kernelBtoA(
 	[&, N](Var<int> &id) {

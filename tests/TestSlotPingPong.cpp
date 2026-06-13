@@ -29,16 +29,16 @@ int main() {
 
 			// Jacobi iteration: new[i] = (old[i-1] + old[i] + old[i+1]) / 3
 			Kernel1D		   jacobi([&](Int i) {
-				  auto	src	  = readSlot.Bind();
-				  auto	dst	  = writeSlot.Bind();
+				auto  src	= readSlot.Bind();
+				auto  dst	= writeSlot.Bind();
 
-				  // Handle boundaries with Clamp
-				  Int	left  = Max(i - 1, 0);
-				  Int	right = Min(i + 1, 63);
+				// Handle boundaries with Clamp
+				Int	  left	= Max(i - 1, 0);
+				Int	  right = Min(i + 1, 63);
 
-				  Float sum	  = src[left] + src[i] + src[right];
-				  dst[i]	  = sum / 3.0f;
-			  });
+				Float sum	= src[left] + src[i] + src[right];
+				dst[i]		= sum / 3.0f;
+			});
 
 			// Initial data: step function
 			std::vector<float> ping(64);
@@ -93,29 +93,29 @@ int main() {
 			BufferSlot<Vec4>  writeSlot;
 
 			Kernel2D		  blur([&](Int x, Int y) {
-				 auto	src	   = readSlot.Bind();
-				 auto	dst	   = writeSlot.Bind();
+				auto   src	  = readSlot.Bind();
+				auto   dst	  = writeSlot.Bind();
 
-				 Int	width  = MakeInt(32);
-				 Int	height = MakeInt(32);
+				Int	   width  = MakeInt(32);
+				Int	   height = MakeInt(32);
 
-				 // 3x3 box blur
-				 Float4 sum	   = MakeFloat4(0.0f);
-				 Int	count  = MakeInt(0);
+				// 3x3 box blur
+				Float4 sum	  = MakeFloat4(0.0f);
+				Int	   count  = MakeInt(0);
 
-				 For(-1, 2, [&](Int &dy) {
-					 For(-1, 2, [&](Int &dx) {
-						 Int sx	 = Clamp(x + dx, 0, width - 1);
-						 Int sy	 = Clamp(y + dy, 0, height - 1);
-						 Int idx = sy * width + sx;
-						 sum	 = sum + src[idx];
-						 count	 = count + 1;
-					 });
-				 });
+				For(-1, 2, [&](Int &dy) {
+					For(-1, 2, [&](Int &dx) {
+						Int sx	= Clamp(x + dx, 0, width - 1);
+						Int sy	= Clamp(y + dy, 0, height - 1);
+						Int idx = sy * width + sx;
+						sum		= sum + src[idx];
+						count	= count + 1;
+					});
+				});
 
-				 Int idx  = y * width + x;
-				 dst[idx] = sum / ToFloat(count);
-			 });
+				Int idx	 = y * width + x;
+				dst[idx] = sum / ToFloat(count);
+			});
 
 			// Create test image with a bright spot in center
 			std::vector<Vec4> ping(32 * 32, Vec4(0, 0, 0, 1));
@@ -173,18 +173,18 @@ int main() {
 			TextureSlot<PixelFormat::R32F> writeSlot;
 
 			Kernel2D					   relax([&](Int x, Int y) {
-				  auto	src = readSlot.Bind();
-				  auto	dst = writeSlot.Bind();
+				auto  src = readSlot.Bind();
+				auto  dst = writeSlot.Bind();
 
-				  // Average of neighbors
-				  Float sum = MakeFloat(0.0f);
-				  sum		= sum + src.Read(Clamp(x - 1, 0, 15), y).x();
-				  sum		= sum + src.Read(Clamp(x + 1, 0, 15), y).x();
-				  sum		= sum + src.Read(x, Clamp(y - 1, 0, 15)).x();
-				  sum		= sum + src.Read(x, Clamp(y + 1, 0, 15)).x();
+				// Average of neighbors
+				Float sum = MakeFloat(0.0f);
+				sum		  = sum + src.Read(Clamp(x - 1, 0, 15), y).x();
+				sum		  = sum + src.Read(Clamp(x + 1, 0, 15), y).x();
+				sum		  = sum + src.Read(x, Clamp(y - 1, 0, 15)).x();
+				sum		  = sum + src.Read(x, Clamp(y + 1, 0, 15)).x();
 
-				  dst.Write(x, y, MakeFloat4(sum / 4.0f, 0.0f, 0.0f, 1.0f));
-			  });
+				dst.Write(x, y, MakeFloat4(sum / 4.0f, 0.0f, 0.0f, 1.0f));
+			});
 
 			// Create checkerboard pattern
 			std::vector<float>			   ping(16 * 16, 0.0f);

@@ -308,9 +308,7 @@ template <typename T> constexpr size_t GetStd430Size() {
 	} else if constexpr (std::is_same_v<T, Math::Mat4x3>) {
 		return 64; // 4 columns * 16
 	} else if constexpr (StructMeta<T>::isRegistered) {
-		// For nested structs, we need to compute at runtime or store in metadata
-		// Return 16 as minimum alignment, actual size computed by ExpandedDefinition
-		return 16; // Placeholder - actual structs should use their computed size
+		return StructMeta<T>::GetGPULayoutSize();
 	}
 	return 4;
 }
@@ -460,7 +458,7 @@ inline void CopyMemberFromGPU(const char *srcElem, char *dstElem, size_t &gpuOff
  * Variadic macro helpers (support up to 16 members)
  ************************************************/
 
-#define EASYGPU_ARG_COUNT(...)																			  EASYGPU_ARG_COUNT_(__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+#define EASYGPU_ARG_COUNT(...) EASYGPU_ARG_COUNT_(__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
 #define EASYGPU_ARG_COUNT_(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, N, ...) N
 
 #define EASYGPU_CAT(a, b) a##b
@@ -890,6 +888,7 @@ inline void UploadUniformDispatch(uint32_t program, const std::string &uniformNa
 	}
 }
 
+#ifdef EASYGPU_BACKEND_OPENGL
 // Specializations for primitive types - they call the corresponding glUniform* functions
 template <>
 inline void UploadUniformDispatch<float>(uint32_t program, const std::string &uniformName, const float &value,
@@ -938,6 +937,24 @@ inline void UploadUniformDispatch<Math::Vec4>(uint32_t program, const std::strin
 	if (loc != -1)
 		glProgramUniform4fv(program, loc, 1, &value.x);
 }
+#else
+// Vulkan no-op stubs (uniforms go through push constants)
+template <> inline void UploadUniformDispatch<float>(uint32_t, const std::string &, const float &, const char *) {
+}
+template <> inline void UploadUniformDispatch<int>(uint32_t, const std::string &, const int &, const char *) {
+}
+template <> inline void UploadUniformDispatch<bool>(uint32_t, const std::string &, const bool &, const char *) {
+}
+template <>
+inline void UploadUniformDispatch<Math::Vec2>(uint32_t, const std::string &, const Math::Vec2 &, const char *) {
+}
+template <>
+inline void UploadUniformDispatch<Math::Vec3>(uint32_t, const std::string &, const Math::Vec3 &, const char *) {
+}
+template <>
+inline void UploadUniformDispatch<Math::Vec4>(uint32_t, const std::string &, const Math::Vec4 &, const char *) {
+}
+#endif
 
 // Wrapper that extracts the field from the parent struct
 template <typename StructT, typename FieldT>
@@ -1117,7 +1134,7 @@ inline void DispatchUploadUniformField(uint32_t program, const std::string &unif
 			GPU::Meta::RegisterStructWithDependencies<StructType>();                                                   \
 			auto name = Builder::Builder::Get().Context()->AssignVarName();                                            \
 			_node	  = std::make_unique<Node::LocalVariableNode>(                                                     \
-				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
+				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                                   \
 			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                           \
 			Builder::Builder::Get().Build(*_varNode, true);                                                            \
 		}                                                                                                              \
@@ -1150,7 +1167,7 @@ inline void DispatchUploadUniformField(uint32_t program, const std::string &unif
 				GPU::Meta::RegisterStructWithDependencies<StructType>();                                               \
 				auto name = Builder::Builder::Get().Context()->AssignVarName();                                        \
 				_node	  = std::make_unique<Node::LocalVariableNode>(                                                 \
-					name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                           \
+					name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
 				_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                       \
 				Builder::Builder::Get().Build(*_varNode, true);                                                        \
 				auto rhs   = Other.Load();                                                                             \
@@ -1165,7 +1182,7 @@ inline void DispatchUploadUniformField(uint32_t program, const std::string &unif
 			GPU::Meta::RegisterStructWithDependencies<StructType>();                                                   \
 			auto name = Builder::Builder::Get().Context()->AssignVarName();                                            \
 			_node	  = std::make_unique<Node::LocalVariableNode>(                                                     \
-				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                               \
+				name, std::string(GPU::Meta::StructMeta<StructType>::glslTypeName));                                   \
 			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());                                           \
 			Builder::Builder::Get().Build(*_varNode, true);                                                            \
 			/* Initialize with CPU values */                                                                           \

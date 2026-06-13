@@ -24,12 +24,13 @@
 
 namespace GPU::NN {
 
-template <typename T = float, size_t EmbedDim = 0>
-class RMSNorm {
+template <typename T = float, size_t EmbedDim = 0> class RMSNorm {
 public:
-	explicit RMSNorm(float eps = 1e-5f) : eps_(eps) {}
+	explicit RMSNorm(float eps = 1e-5f) : eps_(eps) {
+	}
 
-	void Setup() {} // stateless
+	void Setup() {
+	} // stateless
 
 	/**
 	 * Apply RMS normalization in-place or to output buffer.
@@ -37,27 +38,25 @@ public:
 	 * @param out    Output buffer (may alias in for in-place)
 	 * @param offset Starting offset into both buffers
 	 */
-	void Forward(const IR::Value::BufferRef<T> &in,
-				 const IR::Value::BufferRef<T> &out,
+	void Forward(const IR::Value::BufferRef<T> &in, const IR::Value::BufferRef<T> &out,
 				 const IR::Value::Expr<int> &offset) {
-		constexpr int N = static_cast<int>(EmbedDim);
+		constexpr int		  N	 = static_cast<int>(EmbedDim);
 
 		// Compute mean square
 		IR::Value::Var<float> ms = MakeFloat(0.0f);
 		GPU::Flow::For(MakeInt(0), MakeInt(N), [&](IR::Value::Var<int> &d) {
-			IR::Value::Var<T> v = in[offset + d];
+			IR::Value::Var<T> v	 = in[offset + d];
 			IR::Value::Var<T> v2 = v * v;
-			ms = ms + v2;
+			ms					 = ms + v2;
 		});
-		ms = ms / MakeFloat(static_cast<float>(EmbedDim));
+		ms							= ms / MakeFloat(static_cast<float>(EmbedDim));
 
 		// RMS scale: (ms + eps)^(-0.5) = 1 / sqrt(ms + eps)
 		IR::Value::Var<float> scale = GPU::Math::Pow(ms + MakeFloat(eps_), MakeFloat(-0.5f));
 
 		// Apply normalization
-		GPU::Flow::For(MakeInt(0), MakeInt(N), [&](IR::Value::Var<int> &d) {
-			out[offset + d] = in[offset + d] * scale;
-		});
+		GPU::Flow::For(MakeInt(0), MakeInt(N),
+					   [&](IR::Value::Var<int> &d) { out[offset + d] = in[offset + d] * scale; });
 	}
 
 private:

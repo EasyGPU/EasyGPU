@@ -97,16 +97,16 @@ int main() {
 		Buffer<float>	   result(resultData, BufferMode::Write);
 
 		Kernel1D		   kernel(
-			  [&](Int i) {
-				  auto buf = result.Bind();
-				  auto c   = ubo.Load();
+			[&](Int i) {
+				auto buf = result.Bind();
+				auto c	 = ubo.Load();
 
-				  buf[0]   = c.color().x();
-				  buf[1]   = c.color().y();
-				  buf[2]   = c.color().z();
-				  buf[3]   = c.exposure();
-			  },
-			  1);
+				buf[0]	 = c.color().x();
+				buf[1]	 = c.color().y();
+				buf[2]	 = c.color().z();
+				buf[3]	 = c.exposure();
+			},
+			1);
 
 		kernel.Dispatch(1, true);
 		result.Download(resultData);
@@ -129,15 +129,15 @@ int main() {
 		Buffer<float>			   result(resultData, BufferMode::Write);
 
 		Kernel1D				   kernel(
-			  [&](Int i) {
-				  auto buf = result.Bind();
-				  auto c   = ubo.Load();
-				  buf[0]   = c.color().x();
-				  buf[1]   = c.color().y();
-				  buf[2]   = c.color().z();
-				  buf[3]   = c.exposure();
-			  },
-			  1);
+			[&](Int i) {
+				auto buf = result.Bind();
+				auto c	 = ubo.Load();
+				buf[0]	 = c.color().x();
+				buf[1]	 = c.color().y();
+				buf[2]	 = c.color().z();
+				buf[3]	 = c.exposure();
+			},
+			1);
 
 		// First dispatch
 		MyUBOConfig cfg1;

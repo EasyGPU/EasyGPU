@@ -81,7 +81,7 @@ END_TEST
 // =============================================================================
 TEST(texture_create_from_buffer)
 const int			 W = 64, H = 64;
-std::vector<uint8_t> pixels(W *H * 4);
+std::vector<uint8_t> pixels(W * H * 4);
 // Fill with red color
 for (int i = 0; i < W * H; ++i) {
 	pixels[i * 4 + 0] = 255; // R
@@ -102,8 +102,8 @@ END_TEST
 // =============================================================================
 TEST(texture_upload_download)
 const int			 W = 32, H = 32;
-std::vector<uint8_t> uploadPixels(W *H * 4);
-std::vector<uint8_t> downloadPixels(W *H * 4);
+std::vector<uint8_t> uploadPixels(W * H * 4);
+std::vector<uint8_t> downloadPixels(W * H * 4);
 
 // Fill with gradient pattern
 for (int y = 0; y < H; ++y) {
@@ -174,17 +174,17 @@ TEST(texture_bind_api_inspector)
 Texture2D<PixelFormat::RGBA8> tex(64, 64);
 
 GPU::Kernel::InspectorKernel  kernel([&](Var<int> &id) {
-	 auto	   img	 = tex.Bind();
+	auto	  img	= tex.Bind();
 
-	 // Calculate pixel coordinates
-	 Var<int>  x	 = id % 64;
-	 Var<int>  y	 = id / 64;
+	// Calculate pixel coordinates
+	Var<int>  x		= id % 64;
+	Var<int>  y		= id / 64;
 
-	 // Read pixel
-	 Var<Vec4> color = img.Read(x, y);
+	// Read pixel
+	Var<Vec4> color = img.Read(x, y);
 
-	 // Write inverted color
-	 img.Write(x, y, Vec4(1.0f) - color);
+	// Write inverted color
+	img.Write(x, y, Vec4(1.0f) - color);
 });
 
 std::cout << "\n=== Generated GLSL (Texture Bind API) ===\n";
@@ -246,15 +246,15 @@ Texture2D<PixelFormat::RGBA32I> tex(W, H, pixels.data());
 Buffer<IVec4>					output(4, BufferMode::Write);
 
 GPU::Kernel::Kernel1D			kernel(
-	  [&](Var<int> &id) {
-		  auto		 sampler = tex.BindSampler();
-		  auto		 out	 = output.Bind();
+	[&](Var<int> &id) {
+		auto	   sampler = tex.BindSampler();
+		auto	   out	   = output.Bind();
 
-		  Var<float> u		 = Expr<float>(id % 2) * 0.5f + 0.25f;
-		  Var<float> v		 = Expr<float>(id / 2) * 0.5f + 0.25f;
-		  out[id]			 = sampler.Sample(u, v);
-	  },
-	  4);
+		Var<float> u	   = Expr<float>(id % 2) * 0.5f + 0.25f;
+		Var<float> v	   = Expr<float>(id / 2) * 0.5f + 0.25f;
+		out[id]			   = sampler.Sample(u, v);
+	},
+	4);
 
 kernel.Dispatch(1, true);
 
@@ -275,7 +275,7 @@ TEST(gpu_texture_invert)
 const int			 W = 64, H = 64;
 
 // Create texture with red pixels
-std::vector<uint8_t> inputPixels(W *H * 4);
+std::vector<uint8_t> inputPixels(W * H * 4);
 for (int i = 0; i < W * H; ++i) {
 	inputPixels[i * 4 + 0] = 200; // R
 	inputPixels[i * 4 + 1] = 100; // G
@@ -312,7 +312,7 @@ int numPixels = W * H;
 kernel.Dispatch((numPixels + 255) / 256, true);
 
 // Download and verify
-std::vector<uint8_t> resultPixels(W *H * 4);
+std::vector<uint8_t> resultPixels(W * H * 4);
 tex.Download(resultPixels.data());
 
 bool correct = true;
@@ -342,7 +342,7 @@ TEST(gpu_texture_multiple)
 const int			 W = 32, H = 32;
 
 // Create input texture with gradient
-std::vector<uint8_t> inputPixels(W *H * 4);
+std::vector<uint8_t> inputPixels(W * H * 4);
 for (int y = 0; y < H; ++y) {
 	for (int x = 0; x < W; ++x) {
 		int idx				 = (y * W + x) * 4;
@@ -381,7 +381,7 @@ GPU::Kernel::Kernel1D		  kernel(
 kernel.Dispatch((W * H + 255) / 256, true);
 
 // Download output and verify
-std::vector<uint8_t> resultPixels(W *H * 4);
+std::vector<uint8_t> resultPixels(W * H * 4);
 outputTex.Download(resultPixels.data());
 
 bool correct = true;
@@ -415,7 +415,7 @@ TEST(texture_rgba32f_format)
 const int		   W = 16, H = 16;
 
 // Create float texture
-std::vector<float> floatPixels(W *H * 4);
+std::vector<float> floatPixels(W * H * 4);
 for (int i = 0; i < W * H; ++i) {
 	floatPixels[i * 4 + 0] = 0.5f;	// R
 	floatPixels[i * 4 + 1] = 1.0f;	// G
@@ -426,16 +426,16 @@ for (int i = 0; i < W * H; ++i) {
 Texture2D<PixelFormat::RGBA32F> floatTex(W, H, floatPixels.data());
 
 GPU::Kernel::InspectorKernel	kernel([&](Var<int> &id) {
-	   auto		 img   = floatTex.Bind();
+	auto	  img	= floatTex.Bind();
 
-	   Var<int>	 x	   = id % W;
-	   Var<int>	 y	   = id / W;
+	Var<int>  x		= id % W;
+	Var<int>  y		= id / W;
 
-	   // Read float values
-	   Var<Vec4> color = img.Read(x, y);
+	// Read float values
+	Var<Vec4> color = img.Read(x, y);
 
-	   // Multiply by 2
-	   img.Write(x, y, color * 2.0f);
+	// Multiply by 2
+	img.Write(x, y, color * 2.0f);
 });
 
 std::cout << "\n=== Generated GLSL (RGBA32F Texture) ===\n";
@@ -512,7 +512,7 @@ GPU::Kernel::Kernel2D		  kernel(
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
 // Download result
-std::vector<uint8_t> pixels(W *H * 4);
+std::vector<uint8_t> pixels(W * H * 4);
 tex.Download(pixels.data());
 
 // Save to PNG
@@ -564,7 +564,7 @@ GPU::Kernel::Kernel2D		  kernel(
 
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
-std::vector<uint8_t> pixels(W *H * 4);
+std::vector<uint8_t> pixels(W * H * 4);
 tex.Download(pixels.data());
 
 SaveTextureToPNG("plasma.png", W, H, pixels);
@@ -605,7 +605,7 @@ GPU::Kernel::Kernel2D		  kernel(
 
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
-std::vector<uint8_t> pixels(W *H * 4);
+std::vector<uint8_t> pixels(W * H * 4);
 tex.Download(pixels.data());
 
 SaveTextureToPNG("checkerboard.png", W, H, pixels);
@@ -618,7 +618,7 @@ TEST(image_filter_blur)
 const int			 W = 256, H = 256;
 
 // Create input texture with sharp edges
-std::vector<uint8_t> inputPixels(W *H * 4);
+std::vector<uint8_t> inputPixels(W * H * 4);
 for (int y = 0; y < H; ++y) {
 	for (int x = 0; x < W; ++x) {
 		int	  idx			 = (y * W + x) * 4;
@@ -671,7 +671,7 @@ GPU::Kernel::Kernel2D kernel(
 
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
-std::vector<uint8_t> outputPixels(W *H * 4);
+std::vector<uint8_t> outputPixels(W * H * 4);
 outputTex.Download(outputPixels.data());
 
 SaveTextureToPNG("blur_output.png", W, H, outputPixels);
@@ -684,7 +684,7 @@ TEST(image_filter_edge_detection)
 const int			 W = 256, H = 256;
 
 // Create input texture with shapes
-std::vector<uint8_t> inputPixels(W *H * 4);
+std::vector<uint8_t> inputPixels(W * H * 4);
 for (int y = 0; y < H; ++y) {
 	for (int x = 0; x < W; ++x) {
 		int		idx			 = (y * W + x) * 4;
@@ -725,16 +725,16 @@ GPU::Kernel::Kernel2D kernel(
 		// Gx = [-1 0 1; -2 0 2; -1 0 1]
 		// Gy = [-1 -2 -1; 0 0 0; 1 2 1]
 		Var<float> gx	   = -getGray(xm1, ym1) - 2.0f * getGray(xm1, idy) - getGray(xm1, yp1) + getGray(xp1, ym1) +
-						2.0f * getGray(xp1, idy) + getGray(xp1, yp1);
+							 2.0f * getGray(xp1, idy) + getGray(xp1, yp1);
 
-		Var<float> gy = -getGray(xm1, ym1) - 2.0f * getGray(idx, ym1) - getGray(xp1, ym1) + getGray(xm1, yp1) +
-						2.0f * getGray(idx, yp1) + getGray(xp1, yp1);
+		Var<float> gy	   = -getGray(xm1, ym1) - 2.0f * getGray(idx, ym1) - getGray(xp1, ym1) + getGray(xm1, yp1) +
+							 2.0f * getGray(idx, yp1) + getGray(xp1, yp1);
 
 		// Gradient magnitude using GLSL Sqrt
-		Var<float> mag = Sqrt(gx * gx + gy * gy);
+		Var<float> mag	   = Sqrt(gx * gx + gy * gy);
 
 		// Clamp using GLSL Min
-		mag			   = Min(mag, 1.0f);
+		mag				   = Min(mag, 1.0f);
 
 		output.Write(idx, idy, Expr<Vec4>(mag, mag, mag, 1.0f));
 	},
@@ -742,7 +742,7 @@ GPU::Kernel::Kernel2D kernel(
 
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
-std::vector<uint8_t> outputPixels(W *H * 4);
+std::vector<uint8_t> outputPixels(W * H * 4);
 outputTex.Download(outputPixels.data());
 
 SaveTextureToPNG("edge_output.png", W, H, outputPixels);

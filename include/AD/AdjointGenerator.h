@@ -30,11 +30,11 @@ struct AdjointBody {
 	/** (adjointName, glslType) pairs for variable declarations. */
 	std::vector<std::pair<std::string, std::string>> declarations;
 	/** Adjoint accumulation statements (body lines). */
-	std::vector<std::string> lines;
+	std::vector<std::string>						 lines;
 	/** (paramName, adjName) pairs for gradient write-back. */
 	std::vector<std::pair<std::string, std::string>> writebacks;
 	/** GLSL definitions of adjoint functions for Callable bodies. */
-	std::string callableAdjointFunctions;
+	std::string										 callableAdjointFunctions;
 };
 
 /**
@@ -60,125 +60,125 @@ public:
 	 * @param writeBackParams If true, emit code to write parameter adjoints to output buffers
 	 * @return Complete GLSL source for the backward pass
 	 */
-	std::string Generate(const GradientTape &tape, bool writeBackParams = true);
+	std::string			Generate(const GradientTape &tape, bool writeBackParams = true);
 
-		/**
-		 * Generate only the adjoint body parts (no main() wrapper).
-		 * Returns declarations, body lines, and writeback pairs for merging
-		 * into an existing forward shader's main().
-		 */
-		AdjointBody GenerateBody(const GradientTape &tape, bool writeBackParams = true);
+	/**
+	 * Generate only the adjoint body parts (no main() wrapper).
+	 * Returns declarations, body lines, and writeback pairs for merging
+	 * into an existing forward shader's main().
+	 */
+	AdjointBody			GenerateBody(const GradientTape &tape, bool writeBackParams = true);
 
 	/**
 	 * Get the adjoint table after generation (for querying adjoint variable names).
 	 */
-	const AdjointTable &GetAdjointTable() const { return _adjTable; }
+	const AdjointTable &GetAdjointTable() const {
+		return _adjTable;
+	}
 
 private:
 	// ---- Entry processing -------------------------------------------------
 
-	void ProcessEntry(const TapeEntry &entry);
-	void ProcessBinaryOp(const TapeEntry &entry);
-	void ProcessUnaryOp(const TapeEntry &entry);
-	void ProcessExpressionGradient(const TapeEntry &entry);
-	void ProcessIntrinsic1(const TapeEntry &entry);
-	void ProcessIntrinsic2(const TapeEntry &entry);
-	void ProcessIntrinsic3(const TapeEntry &entry);
-	void ProcessTernary(const TapeEntry &entry);
-	void ProcessCompoundAssign(const TapeEntry &entry);
-	void ProcessControlFlowBegin(const TapeEntry &entry);
-	void ProcessControlFlowEnd();
-	void ProcessCall(const TapeEntry &entry);
-	void ProcessReturn(const TapeEntry &entry);
+	void			   ProcessEntry(const TapeEntry &entry);
+	void			   ProcessBinaryOp(const TapeEntry &entry);
+	void			   ProcessUnaryOp(const TapeEntry &entry);
+	void			   ProcessExpressionGradient(const TapeEntry &entry);
+	void			   ProcessIntrinsic1(const TapeEntry &entry);
+	void			   ProcessIntrinsic2(const TapeEntry &entry);
+	void			   ProcessIntrinsic3(const TapeEntry &entry);
+	void			   ProcessTernary(const TapeEntry &entry);
+	void			   ProcessCompoundAssign(const TapeEntry &entry);
+	void			   ProcessControlFlowBegin(const TapeEntry &entry);
+	void			   ProcessControlFlowEnd();
+	void			   ProcessCall(const TapeEntry &entry);
+	void			   ProcessReturn(const TapeEntry &entry);
 
 	// ---- Control flow helpers ---------------------------------------------
 
 	/** Add a generated line to the current collector frame (or top-level body). */
-	void EmitLine(const std::string &line);
+	void			   EmitLine(const std::string &line);
 
 	/** Push a new control flow collector frame. */
-	void PushControlFrame();
+	void			   PushControlFrame();
 
 	/** Pop the top frame, wrap its contents, and emit to the parent frame. */
-	void PopControlFrameAndWrap(const TapeEntry &beginEntry);
+	void			   PopControlFrameAndWrap(const TapeEntry &beginEntry);
 
 	// ---- Gradient rule helpers --------------------------------------------
 
 	/** Emit: d_input += expression; */
-	void EmitAccumulate(const std::string &inputName, const std::string &gradExpr);
+	void			   EmitAccumulate(const std::string &inputName, const std::string &gradExpr);
 
 	/** Save current adjoint of result to temp, zero it, return temp name.
 	 *  Correctly handles variable reassignment: when a variable is redefined,
 	 *  its gradient accumulator must be reset before propagating upstream. */
-	std::string SaveAndZeroAdjoint(const std::string &adjName, const std::string &glslType);
+	std::string		   SaveAndZeroAdjoint(const std::string &adjName, const std::string &glslType);
 
 	/** Build the adjoint variable name for a forward variable. */
-	std::string Adj(const std::string &varName);
+	std::string		   Adj(const std::string &varName);
 
 	/** Build transitive alias map from simple copy tape entries.
 	 *  Resolves chains like v95->v93->v91->v85 so backward code uses
 	 *  canonical loop variables instead of stale final-value aliases. */
-	void BuildAliasMap();
+	void			   BuildAliasMap();
 
 	/** Replace alias variable names in an expression with their canonical names. */
-	std::string ResolveAliases(const std::string &expr) const;
+	std::string		   ResolveAliases(const std::string &expr) const;
 
 	/** Make a zero literal of the given GLSL type. */
 	static std::string ZeroOf(const std::string &glslType);
 
 	// ---- Intrinsic gradient rules -----------------------------------------
 
-	using GradientRule = std::function<void(AdjointGenerator			   *gen,
-											const TapeEntry			   &entry,
-											const std::string		   &dOut,
+	using GradientRule = std::function<void(AdjointGenerator *gen, const TapeEntry &entry, const std::string &dOut,
 											const std::vector<std::string> &inputs)>;
 
-	void RegisterIntrinsicRules();
-	void RegisterArithmeticRules();
+	void					 RegisterIntrinsicRules();
+	void					 RegisterArithmeticRules();
 
 	// ---- Output -----------------------------------------------------------
 
 	/** Final assembly: declarations + body + writeback */
-	std::string Assemble();
+	std::string				 Assemble();
 
 	// ---- State ------------------------------------------------------------
 
-	AdjointTable _adjTable;
+	AdjointTable			 _adjTable;
 
 	// Generated GLSL lines for the backward pass body
 	std::vector<std::string> _bodyLines;
 
 	// Control flow collector stack (for nesting if/for)
 	struct ControlFrame {
-		std::vector<std::string> lines;			// Current collected adjoint lines
-		std::vector<std::string> chainBlocks;	// For if-chains: accumulated wrapped branches
+		std::vector<std::string> lines;		  // Current collected adjoint lines
+		std::vector<std::string> chainBlocks; // For if-chains: accumulated wrapped branches
 		bool					 isIfChain = false;
 	};
-	std::vector<ControlFrame> _controlStack;
+	std::vector<ControlFrame>						 _controlStack;
 
 	/** Get the currently active line buffer (top of stack or bodyLines). */
-	std::vector<std::string> &ActiveLines();
+	std::vector<std::string>						&ActiveLines();
 
 	// Intrinsic function name -> gradient rule
-	std::unordered_map<std::string, GradientRule> _intrinsicRules;
+	std::unordered_map<std::string, GradientRule>	 _intrinsicRules;
 
 	// OperationCode -> gradient rule (for binary/unary ops)
-	std::unordered_map<int, GradientRule> _arithmeticRules;
+	std::unordered_map<int, GradientRule>			 _arithmeticRules;
 
 	// Parameter names that need gradient write-back
 	std::vector<std::pair<std::string, std::string>> _paramWritebacks;
 
 	// Reference to the main tape (for sub-tape access during Call processing)
-	const GradientTape *_tape = nullptr;
+	const GradientTape								*_tape = nullptr;
 
 	// Pre-built map: entry id → call index (for O(1) sub-tape lookup)
-	std::unordered_map<int32_t, int> _callIndexMap;
+	std::unordered_map<int32_t, int>				 _callIndexMap;
 
 	// Counter for unique temp names in SaveAndZeroAdjoint
-	int _tmpCounter = 0;
+	int												 _tmpCounter = 0;
 
 	// Alias map: alias variable → canonical variable (e.g. v95 → v85)
-	std::unordered_map<std::string, std::string> _aliasMap;
+	std::unordered_map<std::string, std::string>	 _aliasMap;
 };
 
 } // namespace GPU::AD

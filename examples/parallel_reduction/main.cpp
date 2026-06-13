@@ -24,28 +24,28 @@ int main() {
 	// Create reduction kernel
 	// Workgroup size is 256, so we dispatch 1 workgroup
 	Kernel1D		   reduceKernel(
-		  [&](Int i) {
-			  // Declare shared memory for workgroup
-			  SharedMemory<float, 256> shared;
+		[&](Int i) {
+			// Declare shared memory for workgroup
+			SharedMemory<float, 256> shared;
 
-			  // Get local thread ID within workgroup (0-255)
-			  Var<int>				   localId = LocalThreadId();
+			// Get local thread ID within workgroup (0-255)
+			Var<int>				 localId = LocalThreadId();
 
-			  // Each thread loads one element
-			  auto					   in	   = input.Bind();
-			  auto					   out	   = output.Bind();
+			// Each thread loads one element
+			auto					 in		 = input.Bind();
+			auto					 out	 = output.Bind();
 
-			  // Load input into shared memory
-			  shared[localId]				   = in[i];
+			// Load input into shared memory
+			shared[localId]					 = in[i];
 
-			  // Perform parallel reduction
-			  // This computes the sum of all values in the workgroup
-			  Expr<float> workgroupSum		   = WorkgroupReduce(shared, Expr<float>(shared[localId]));
+			// Perform parallel reduction
+			// This computes the sum of all values in the workgroup
+			Expr<float> workgroupSum		 = WorkgroupReduce(shared, Expr<float>(shared[localId]));
 
-			  // Only thread 0 writes the result
-			  If(localId == 0, [&]() { out[0] = workgroupSum; });
-		  },
-		  256); // Workgroup size: 256 threads
+			// Only thread 0 writes the result
+			If(localId == 0, [&]() { out[0] = workgroupSum; });
+		},
+		256); // Workgroup size: 256 threads
 
 	// Dispatch single workgroup
 	std::cout << "Computing sum of " << NUM_ELEMENTS << " elements..." << std::endl;

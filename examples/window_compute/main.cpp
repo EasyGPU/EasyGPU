@@ -48,43 +48,43 @@ int main() {
 	// Create the rendering kernel - generates a colorful plasma effect
 	// This kernel runs on the GPU
 	Kernel2D					  plasmaKernel([&](Int px, Int py) {
-		 auto	tex		   = renderTarget.Bind();
+		auto   tex		  = renderTarget.Bind();
 
-		 // Get uniform values
-		 Float	time	   = timeUniform.Load();
-		 Float2 mouse	   = mouseUniform.Load();
+		// Get uniform values
+		Float  time		  = timeUniform.Load();
+		Float2 mouse	  = mouseUniform.Load();
 
-		 // Normalized coordinates
-		 Float	u		   = ToFloat(px) / Float(WIDTH);
-		 Float	v		   = ToFloat(py) / Float(HEIGHT);
+		// Normalized coordinates
+		Float  u		  = ToFloat(px) / Float(WIDTH);
+		Float  v		  = ToFloat(py) / Float(HEIGHT);
 
-		 // Distance from mouse (for interaction)
-		 Float	dx		   = u - mouse.x();
-		 Float	dy		   = v - mouse.y();
-		 Float	dist	   = Sqrt(dx * dx + dy * dy);
+		// Distance from mouse (for interaction)
+		Float  dx		  = u - mouse.x();
+		Float  dy		  = v - mouse.y();
+		Float  dist		  = Sqrt(dx * dx + dy * dy);
 
-		 // Animated plasma effect
-		 Float	value1	   = Sin(u * 10.0f + time);
-		 Float	value2	   = Sin(v * 10.0f + time * 0.5f);
-		 Float	value3	   = Sin((u + v) * 5.0f + time * 0.3f);
-		 Float	value4	   = Sin(dist * 20.0f - time * 2.0f);
+		// Animated plasma effect
+		Float  value1	  = Sin(u * 10.0f + time);
+		Float  value2	  = Sin(v * 10.0f + time * 0.5f);
+		Float  value3	  = Sin((u + v) * 5.0f + time * 0.3f);
+		Float  value4	  = Sin(dist * 20.0f - time * 2.0f);
 
-		 // Combine waves
-		 Float	finalValue = (value1 + value2 + value3 + value4) * 0.25f;
+		// Combine waves
+		Float  finalValue = (value1 + value2 + value3 + value4) * 0.25f;
 
-		 // Color mapping
-		 Float	r		   = 0.5f + 0.5f * Sin(finalValue * 3.14159f + time);
-		 Float	g		   = 0.5f + 0.5f * Sin(finalValue * 3.14159f + 2.0f + time * 0.5f);
-		 Float	b		   = 0.5f + 0.5f * Sin(finalValue * 3.14159f + 4.0f + time * 0.3f);
+		// Color mapping
+		Float  r		  = 0.5f + 0.5f * Sin(finalValue * 3.14159f + time);
+		Float  g		  = 0.5f + 0.5f * Sin(finalValue * 3.14159f + 2.0f + time * 0.5f);
+		Float  b		  = 0.5f + 0.5f * Sin(finalValue * 3.14159f + 4.0f + time * 0.3f);
 
-		 // Add mouse glow
-		 Float	glow	   = Exp(-dist * 5.0f) * 0.5f;
-		 r				   = r + glow;
-		 g				   = g + glow * 0.5f;
+		// Add mouse glow
+		Float  glow		  = Exp(-dist * 5.0f) * 0.5f;
+		r				  = r + glow;
+		g				  = g + glow * 0.5f;
 
-		 // Output color (RGBA)
-		 tex.Write(px, py, MakeFloat4(r, g, b, 1.0f));
-	 });
+		// Output color (RGBA)
+		tex.Write(px, py, MakeFloat4(r, g, b, 1.0f));
+	});
 
 	// Create the presenter for displaying GPU texture
 	TexturePresenter			  presenter(window);

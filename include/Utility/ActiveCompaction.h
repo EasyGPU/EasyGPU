@@ -37,24 +37,35 @@ namespace GPU::Utility {
 class ActiveCompaction {
 public:
 	explicit ActiveCompaction(size_t maxElements)
-		: maxElements_(maxElements),
-		  count_(std::vector<int>{0}, Runtime::BufferMode::ReadWrite),
+		: maxElements_(maxElements), count_(std::vector<int>{0}, Runtime::BufferMode::ReadWrite),
 		  indices_(maxElements, Runtime::BufferMode::ReadWrite) {
 		if (maxElements == 0)
 			throw std::invalid_argument("ActiveCompaction requires maxElements > 0");
 	}
 
-	~ActiveCompaction() { Release(); }
+	~ActiveCompaction() {
+		Release();
+	}
 
-	ActiveCompaction(const ActiveCompaction &) = delete;
-	ActiveCompaction &operator=(const ActiveCompaction &) = delete;
+	ActiveCompaction(const ActiveCompaction &)				  = delete;
+	ActiveCompaction	 &operator=(const ActiveCompaction &) = delete;
 
-	Runtime::Buffer<int> &CountBuffer() { return count_; }
-	Runtime::Buffer<int> &IndicesBuffer() { return indices_; }
-	const Runtime::Buffer<int> &CountBuffer() const { return count_; }
-	const Runtime::Buffer<int> &IndicesBuffer() const { return indices_; }
+	Runtime::Buffer<int> &CountBuffer() {
+		return count_;
+	}
+	Runtime::Buffer<int> &IndicesBuffer() {
+		return indices_;
+	}
+	const Runtime::Buffer<int> &CountBuffer() const {
+		return count_;
+	}
+	const Runtime::Buffer<int> &IndicesBuffer() const {
+		return indices_;
+	}
 
-	size_t MaxElements() const { return maxElements_; }
+	size_t MaxElements() const {
+		return maxElements_;
+	}
 
 	/**
 	 * @brief Compact a 0/1 mask into the internal index list.
@@ -69,37 +80,39 @@ public:
 		EnsureCompactPipeline(elementCount);
 
 		auto *backend = Runtime::Context::GetBackend();
-		if (!backend) throw std::runtime_error("ActiveCompaction backend not available");
+		if (!backend)
+			throw std::runtime_error("ActiveCompaction backend not available");
 
 		backend->BindPipeline(clearPipeline_);
 		Backend::ResourceBinding clearBinding;
-		clearBinding.binding = 0;
-		clearBinding.type = Backend::BindingType::Buffer;
-		clearBinding.buffer = count_.GetHandle();
+		clearBinding.binding  = 0;
+		clearBinding.type	  = Backend::BindingType::Buffer;
+		clearBinding.buffer	  = count_.GetHandle();
 		clearBinding.readOnly = false;
 		backend->BindResources(&clearBinding, 1);
 		backend->Dispatch(1, 1, 1);
 		backend->MemoryBarrier(Backend::BarrierType::Buffer);
 
 		Backend::ResourceBinding bindings[3] = {};
-		bindings[0].binding = 0;
-		bindings[0].type = Backend::BindingType::Buffer;
-		bindings[0].buffer = activeMask.GetHandle();
-		bindings[0].readOnly = true;
-		bindings[1].binding = 1;
-		bindings[1].type = Backend::BindingType::Buffer;
-		bindings[1].buffer = indices_.GetHandle();
-		bindings[1].readOnly = false;
-		bindings[2].binding = 2;
-		bindings[2].type = Backend::BindingType::Buffer;
-		bindings[2].buffer = count_.GetHandle();
-		bindings[2].readOnly = false;
+		bindings[0].binding					 = 0;
+		bindings[0].type					 = Backend::BindingType::Buffer;
+		bindings[0].buffer					 = activeMask.GetHandle();
+		bindings[0].readOnly				 = true;
+		bindings[1].binding					 = 1;
+		bindings[1].type					 = Backend::BindingType::Buffer;
+		bindings[1].buffer					 = indices_.GetHandle();
+		bindings[1].readOnly				 = false;
+		bindings[2].binding					 = 2;
+		bindings[2].type					 = Backend::BindingType::Buffer;
+		bindings[2].buffer					 = count_.GetHandle();
+		bindings[2].readOnly				 = false;
 
 		backend->BindPipeline(compactPipeline_);
 		backend->BindResources(bindings, 3);
 		backend->Dispatch(static_cast<uint32_t>((elementCount + 255) / 256), 1, 1);
 		backend->MemoryBarrier(Backend::BarrierType::Buffer);
-		if (sync) backend->Finish();
+		if (sync)
+			backend->Finish();
 	}
 
 	int DownloadCount() {
@@ -111,29 +124,32 @@ public:
 	std::vector<int> DownloadIndices(size_t count) {
 		count = std::min(count, maxElements_);
 		std::vector<int> out(count, 0);
-		if (count > 0) indices_.Download(out.data(), count);
+		if (count > 0)
+			indices_.Download(out.data(), count);
 		return out;
 	}
 
 private:
 	void EnsureClearPipeline() {
-		if (clearPipeline_ != Backend::INVALID_PIPELINE_HANDLE) return;
+		if (clearPipeline_ != Backend::INVALID_PIPELINE_HANDLE)
+			return;
 
 		Runtime::Context::GetInstance().MakeCurrent();
 		auto *backend = Runtime::Context::GetBackend();
-		if (!backend) throw std::runtime_error("ActiveCompaction backend not available");
+		if (!backend)
+			throw std::runtime_error("ActiveCompaction backend not available");
 
 		Backend::ShaderDesc shaderDesc;
-		shaderDesc.type = Backend::ShaderType::Compute;
+		shaderDesc.type		  = Backend::ShaderType::Compute;
 		shaderDesc.sourceCode = R"GLSL(#version 430
 layout(local_size_x = 1) in;
 layout(std430, binding = 0) buffer CountBuf { int activeCount[]; };
 void main() { activeCount[0] = 0; }
 )GLSL";
-		clearShader_ = backend->CreateShader(shaderDesc);
+		clearShader_		  = backend->CreateShader(shaderDesc);
 
 		Backend::PipelineDesc pipelineDesc;
-		pipelineDesc.computeShader = clearShader_;
+		pipelineDesc.computeShader	= clearShader_;
 		pipelineDesc.workGroupSizeX = 1;
 		pipelineDesc.resources.push_back({0, Backend::BindingType::Buffer, Backend::PixelFormat::RGBA8, false});
 		clearPipeline_ = backend->CreatePipeline(pipelineDesc);
@@ -142,12 +158,13 @@ void main() { activeCount[0] = 0; }
 	}
 
 	void EnsureCompactPipeline(size_t elementCount) {
-		if (compactPipeline_ != Backend::INVALID_PIPELINE_HANDLE &&
-			compiledElements_ == elementCount) return;
+		if (compactPipeline_ != Backend::INVALID_PIPELINE_HANDLE && compiledElements_ == elementCount)
+			return;
 
 		Runtime::Context::GetInstance().MakeCurrent();
 		auto *backend = Runtime::Context::GetBackend();
-		if (!backend) throw std::runtime_error("ActiveCompaction backend not available");
+		if (!backend)
+			throw std::runtime_error("ActiveCompaction backend not available");
 
 		if (compactPipeline_ != Backend::INVALID_PIPELINE_HANDLE)
 			backend->DestroyPipeline(compactPipeline_);
@@ -155,8 +172,8 @@ void main() { activeCount[0] = 0; }
 			backend->DestroyShader(compactShader_);
 
 		Backend::ShaderDesc shaderDesc;
-		shaderDesc.type = Backend::ShaderType::Compute;
-		shaderDesc.sourceCode = std::string(R"GLSL(#version 430
+		shaderDesc.type			= Backend::ShaderType::Compute;
+		shaderDesc.sourceCode	= std::string(R"GLSL(#version 430
 layout(local_size_x = 256) in;
 layout(std430, binding = 0) readonly buffer MaskBuf { int mask[]; };
 layout(std430, binding = 1) buffer IndicesBuf { int activeIndices[]; };
@@ -171,12 +188,12 @@ void main() {
 }
 )GLSL");
 		const std::string token = "ELEMENT_COUNT";
-		const auto pos = shaderDesc.sourceCode.find(token);
+		const auto		  pos	= shaderDesc.sourceCode.find(token);
 		shaderDesc.sourceCode.replace(pos, token.size(), std::to_string(elementCount));
 		compactShader_ = backend->CreateShader(shaderDesc);
 
 		Backend::PipelineDesc pipelineDesc;
-		pipelineDesc.computeShader = compactShader_;
+		pipelineDesc.computeShader	= compactShader_;
 		pipelineDesc.workGroupSizeX = 256;
 		pipelineDesc.resources.push_back({0, Backend::BindingType::Buffer, Backend::PixelFormat::RGBA8, true});
 		pipelineDesc.resources.push_back({1, Backend::BindingType::Buffer, Backend::PixelFormat::RGBA8, false});
@@ -190,7 +207,8 @@ void main() {
 
 	void Release() {
 		auto *backend = Runtime::Context::GetBackend();
-		if (!backend) return;
+		if (!backend)
+			return;
 		if (clearPipeline_ != Backend::INVALID_PIPELINE_HANDLE) {
 			backend->DestroyPipeline(clearPipeline_);
 			clearPipeline_ = Backend::INVALID_PIPELINE_HANDLE;
@@ -209,13 +227,13 @@ void main() {
 		}
 	}
 
-	size_t maxElements_ = 0;
-	size_t compiledElements_ = 0;
-	Runtime::Buffer<int> count_;
-	Runtime::Buffer<int> indices_;
-	Backend::ShaderHandle clearShader_ = Backend::INVALID_SHADER_HANDLE;
-	Backend::PipelineHandle clearPipeline_ = Backend::INVALID_PIPELINE_HANDLE;
-	Backend::ShaderHandle compactShader_ = Backend::INVALID_SHADER_HANDLE;
+	size_t					maxElements_	  = 0;
+	size_t					compiledElements_ = 0;
+	Runtime::Buffer<int>	count_;
+	Runtime::Buffer<int>	indices_;
+	Backend::ShaderHandle	clearShader_	 = Backend::INVALID_SHADER_HANDLE;
+	Backend::PipelineHandle clearPipeline_	 = Backend::INVALID_PIPELINE_HANDLE;
+	Backend::ShaderHandle	compactShader_	 = Backend::INVALID_SHADER_HANDLE;
 	Backend::PipelineHandle compactPipeline_ = Backend::INVALID_PIPELINE_HANDLE;
 };
 

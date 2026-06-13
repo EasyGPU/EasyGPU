@@ -671,140 +671,180 @@ void main() {
 
 ## Graphics Pipeline
 
-EasyGPU provides a backend-agnostic graphics pipeline API for fullscreen and offscreen rendering. Both OpenGL (FBO-based) and Vulkan (VK_KHR_dynamic_rendering) backends are supported.
+EasyGPU provides a complete rasterization pipeline — vertex shader + fragment shader — as a C++ embedded DSL. You write both stages as C++ lambdas. The framework compiles them to GLSL/SPIR-V and executes via Vulkan (`VK_KHR_dynamic_rendering`).
 
-### BackendCaps
+For a tutorial-style guide, see [Graphics Pipeline](graphics-pipeline.md).
 
-Check for graphics support before using graphics features:
+### GraphicsPipeline (DSL)
 
-```cpp
-auto* backend = GPU::Runtime::Context::GetBackend();
-if (!backend->GetCaps().supportsGraphics) {
-    // Graphics not available — compute-only GPU or Vulkan without dynamic rendering
-}
-```
-
-### GraphicsPipelineDesc
-
-Descriptor for creating a graphics pipeline with vertex and fragment shaders:
+The main user-facing class. Construction follows the same pattern as `Kernel1D`/`Kernel2D`: lambda-based DSL, optional profiling name, lazy compilation.
 
 ```cpp
-struct GraphicsPipelineDesc {
-    ShaderHandle vertexShader   = INVALID_SHADER_HANDLE;
-    ShaderHandle fragmentShader = INVALID_SHADER_HANDLE;
-    PrimitiveTopology topology  = PrimitiveTopology::TriangleList;
-    std::vector<ResourceLayoutEntry> resources;
-    uint32_t pushConstantSize = 0;
-};
+// Fullscreen triangle (no explicit vertex input — use VertexIndex())
+GraphicsPipeline pipeline(
+    [&](Float4 &gl_Position) {
+        Int  vid = VertexIndex();
+        Float x  = ToFloat((vid & 1) << 2) - 1.0f;
+        Float y  = ToFloat((vid & 2) << 1) - 1.0f;
+        gl_Position = MakeFloat4(x, y, 0.0f, 1.0f);
+    },
+    [&](Float4 &fragColor) {
+        fragColor = MakeFloat4(1.0f, 0.0f, 0.0f, 1.0f);
+    });
+
+pipeline.Draw(renderTarget, 3, true);                    // no depth
+pipeline.Draw(renderTarget, depthBuffer, 3, true);       // with depth
 ```
 
-**PrimitiveTopology values:**
-
-| Value | Description |
-|:------|:------------|
-| `TriangleList` | Independent triangles (default) |
-| `TriangleStrip` | Connected triangle strip |
-| `LineList` | Independent line segments |
-| `PointList` | Individual points |
-
-### RenderPassBeginDesc
-
-Descriptor for beginning a render pass targeting a texture:
-
-```cpp
-struct RenderPassBeginDesc {
-    TextureHandle colorAttachment = INVALID_TEXTURE_HANDLE;
-    float clearColor[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-    bool clear = true;
-};
-```
-
-### Backend Graphics Methods
+**Methods**
 
 | Method | Description |
 |:-------|:------------|
-| `CreateGraphicsPipeline(const GraphicsPipelineDesc&)` | Create a graphics pipeline from VS+FS shaders |
-| `BeginRendering(const RenderPassBeginDesc&)` | Begin a render pass targeting a texture |
-| `EndRendering()` | End the current render pass |
-| `Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)` | Issue a draw call |
-| `SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)` | Set the viewport rectangle |
-| `SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)` | Set the scissor test rectangle |
+| `Draw(Texture2D&, uint32_t vertexCount, bool sync)` | Non-indexed draw without depth |
+| `Draw(Texture2D&, DepthBuffer&, uint32_t vertexCount, bool sync)` | Non-indexed draw with depth |
+| `SetVertexBuffer(BufferHandle, uint32_t stride)` | Bind a vertex buffer |
+| `SetIndexBuffer(BufferHandle)` | Bind an index buffer |
+| `SetIndexCount(uint32_t count)` | Set index count for indexed draws |
+| `SetName(name)` / `GetName()` | Profiling name |
+| `GetShaderSource()` | Return generated GLSL for debugging |
 
-### Rendering Example
+### FragmentShader (DSL)
+
+Simplified fullscreen pass — hardcoded fullscreen-triangle VS, user-provided FS lambda:
 
 ```cpp
-#include <GPU.h>
+FragmentShader shader([](Float2 &fragCoord, Float4 &fragColor) {
+    fragColor = MakeFloat4(1.0f, 0.0f, 0.0f, 1.0f);
+}, width, height);
 
-int main() {
-    GPU::Runtime::AutoInitContext();
-    auto* backend = GPU::Runtime::Context::GetBackend();
-    backend->MakeCurrent();
-
-    if (!backend->GetCaps().supportsGraphics) {
-        return 0;  // Graphics not available
-    }
-
-    // Create shaders
-    const char* vsSrc = "#version 450\nvoid main() {\n"
-        "vec2 pos; pos.x = float((gl_VertexID & 1) << 2) - 1.0;\n"
-        "pos.y = float((gl_VertexID & 2) << 1) - 1.0;\n"
-        "gl_Position = vec4(pos, 0.0, 1.0);\n}\n";
-    const char* fsSrc = "#version 450\nlayout(location = 0) out vec4 outColor;\n"
-        "void main() { outColor = vec4(0.5, 0.3, 0.1, 1.0); }\n";
-
-    GPU::Backend::ShaderDesc vsDesc{GPU::Backend::ShaderType::Vertex, vsSrc, "main"};
-    auto vs = backend->CreateShader(vsDesc);
-    GPU::Backend::ShaderDesc fsDesc{GPU::Backend::ShaderType::Fragment, fsSrc, "main"};
-    auto fs = backend->CreateShader(fsDesc);
-
-    // Create graphics pipeline
-    GPU::Backend::GraphicsPipelineDesc pipeDesc;
-    pipeDesc.vertexShader   = vs;
-    pipeDesc.fragmentShader = fs;
-    pipeDesc.topology       = GPU::Backend::PrimitiveTopology::TriangleList;
-    auto pipeline = backend->CreateGraphicsPipeline(pipeDesc);
-
-    // Create render target texture
-    const uint32_t W = 256, H = 256;
-    GPU::Backend::TextureDesc texDesc;
-    texDesc.width  = W;
-    texDesc.height = H;
-    texDesc.format = GPU::Backend::PixelFormat::RGBA8;
-    auto rt = backend->CreateTexture(texDesc);
-
-    // Render
-    GPU::Backend::RenderPassBeginDesc rpDesc;
-    rpDesc.colorAttachment = rt;
-    rpDesc.clearColor[0]   = 0.0f;
-    rpDesc.clearColor[1]   = 0.0f;
-    rpDesc.clearColor[2]   = 0.0f;
-    rpDesc.clearColor[3]   = 1.0f;
-    rpDesc.clear           = true;
-
-    backend->BeginRendering(rpDesc);
-    backend->SetViewport(0, 0, W, H);
-    backend->SetScissor(0, 0, W, H);
-    backend->BindPipeline(pipeline);
-    backend->Draw(3, 1, 0, 0);
-    backend->EndRendering();
-    backend->Finish();
-
-    // Read back pixels
-    std::vector<uint8_t> pixels(W * H * 4);
-    backend->DownloadTexture(rt, 0, 0, W, H, pixels.data());
-}
+shader.Render(renderTarget, sync);
 ```
 
-**Error Handling:**
+### Varying\<T\>
 
-The following runtime errors are enforced:
-- Calling `Draw()` outside `BeginRendering()`/`EndRendering()` throws `std::runtime_error`
-- Calling `BeginRendering()` while already in a render pass throws `std::runtime_error`
+Declared outside both VS and FS lambdas, captured by reference. VS writes, FS reads the rasterizer-interpolated value.
 
-**Vulkan Implementation Notes:**
-- Uses `VK_KHR_dynamic_rendering` (Vulkan 1.1 extension) to eliminate render pass/framebuffer objects
-- Function pointers loaded via `vkGetDeviceProcAddr` — if unavailable, `supportsGraphics` is set to `false`
-- Compute operations remain unaffected when graphics is unavailable
+```cpp
+Varying<Vec3> vColor;
+
+GraphicsPipeline pipeline(
+    [&](Float4 &gl_Position) {
+        // VS writes
+        vColor = Float3(MakeFloat3(r, g, b));
+    },
+    [&](Float4 &fragColor) {
+        // FS reads (interpolated)
+        Float3 c = vColor;
+        fragColor = MakeFloat4(c.x(), c.y(), c.z(), 1.0f);
+    });
+```
+
+Supported types: `float`, `int`, `Vec2`, `Vec3`, `Vec4`, `IVec2`, `IVec3`, `IVec4`, `Mat3`, `Mat4`, registered structs.
+
+### DepthBuffer
+
+RAII depth buffer:
+
+```cpp
+DepthBuffer db(width, height);
+// ...
+pipeline.Draw(rt, db, vertCount, true);
+```
+
+### Built-in Shader Variables
+
+Free functions in `GPU::Kernel`:
+
+| Function | GLSL Built-in | Stage |
+|:---------|:-------------|:------|
+| `VertexIndex()` | `gl_VertexIndex` | Vertex |
+| `FragmentCoord()` | `gl_FragCoord` | Fragment |
+
+### Type Aliases
+
+For cleaner DSL code, use the aliases from `GPU.h` / `<Utility/Helpers.h>`:
+
+| Alias | Full Type |
+|:------|:----------|
+| `Float` | `IR::Value::Var<float>` |
+| `Float2` | `IR::Value::Var<Math::Vec2>` |
+| `Float3` | `IR::Value::Var<Math::Vec3>` |
+| `Float4` | `IR::Value::Var<Math::Vec4>` |
+| `Int` | `IR::Value::Var<int>` |
+
+### Backend API (Low-Level)
+
+For raw GLSL usage or custom pipeline construction. The DSL classes above are built on this API.
+
+**Capability Check**
+
+```cpp
+auto* backend = GPU::Runtime::Context::GetBackend();
+if (!backend->GetCaps().supportsGraphics) { /* not available */ }
+```
+
+**GraphicsPipelineDesc**
+
+```cpp
+struct GraphicsPipelineDesc {
+    ShaderHandle      vertexShader           = INVALID_SHADER_HANDLE;
+    ShaderHandle      fragmentShader         = INVALID_SHADER_HANDLE;
+    PrimitiveTopology topology               = PrimitiveTopology::TriangleList;
+    PixelFormat       colorAttachmentFormat  = PixelFormat::RGBA8;
+    bool              depthTestEnable        = false;
+    bool              depthWriteEnable       = true;
+    std::vector<VertexLayoutEntry> vertexLayout;
+    std::vector<ResourceLayoutEntry> resources;
+    uint32_t          pushConstantSize       = 0;
+};
+```
+
+**RenderPassBeginDesc**
+
+```cpp
+struct RenderPassBeginDesc {
+    TextureHandle colorAttachment  = INVALID_TEXTURE_HANDLE;
+    TextureHandle depthAttachment  = INVALID_TEXTURE_HANDLE;
+    float         clearColor[4]    = {0.0f, 0.0f, 0.0f, 1.0f};
+    float         clearDepth       = 1.0f;
+    bool          clearColorFlag   = true;
+    bool          clearDepthFlag   = true;
+};
+```
+
+**PrimitiveTopology**
+
+| Value | Description |
+|:------|:------------|
+| `PointList` | Individual points |
+| `LineList` / `LineStrip` | Line segments |
+| `TriangleList` | Independent triangles (default) |
+| `TriangleStrip` / `TriangleFan` | Connected triangles |
+
+**Backend Methods**
+
+| Method | Description |
+|:-------|:------------|
+| `CreateGraphicsPipeline(desc)` | Create a graphics pipeline |
+| `BeginRendering(desc)` / `EndRendering()` | Dynamic render pass |
+| `SetViewport(x, y, w, h)` / `SetScissor(x, y, w, h)` | Viewport and scissor |
+| `BindVertexBuffer(h, stride)` / `BindIndexBuffer(h)` | Bind vertex/index data |
+| `Draw(vc, ic, fv, fi)` | Non-indexed draw |
+| `DrawIndexed(ic, ic, fi, vo, fi)` | Indexed draw |
+| `CreateDepthBuffer(w, h)` / `DestroyDepthBuffer(h)` | Depth buffer management |
+
+**Error Handling**
+
+- `Draw()` outside `BeginRendering()`/`EndRendering()` throws `std::runtime_error`
+- `BeginRendering()` while already in a pass throws `std::runtime_error`
+- Push constant size exceeding device limit throws at pipeline creation
+
+**Vulkan Implementation Notes**
+
+- Uses `VK_KHR_dynamic_rendering` (loaded via `vkGetDeviceProcAddr`)
+- Queue family selected with `VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT`
+- Depth format: `VK_FORMAT_D16_UNORM` (universal support)
+- Compute operations unaffected when graphics is unavailable
 
 ---
 

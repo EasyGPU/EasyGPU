@@ -56,12 +56,12 @@ int main() {
 			TextureSlot<PixelFormat::RGBA8> outputSlot;
 
 			Kernel2D						kernel([&](Int x, Int y) {
-				   auto		 in	   = inputSlot.Bind();
-				   auto		 out   = outputSlot.Bind();
-				   Var<Vec4> color = in.Read(x, y);
-				   // Invert colors
-				   out.Write(x, y, MakeFloat4(1.0f - color.x(), 1.0f - color.y(), 1.0f - color.z(), color.w()));
-			   });
+				auto	  in	= inputSlot.Bind();
+				auto	  out	= outputSlot.Bind();
+				Var<Vec4> color = in.Read(x, y);
+				// Invert colors
+				out.Write(x, y, MakeFloat4(1.0f - color.x(), 1.0f - color.y(), 1.0f - color.z(), color.w()));
+			});
 
 			// Create test pattern
 			std::vector<uint8_t>			inputData(64 * 64 * 4);
@@ -122,12 +122,12 @@ int main() {
 			TextureSlot<PixelFormat::RGBA8> outputSlot;
 
 			Kernel2D						kernel([&](Int x, Int y) {
-				   auto		 in	   = inputSlot.Bind();
-				   auto		 out   = outputSlot.Bind();
-				   Var<Vec4> color = in.Read(x, y);
-				   // Multiply by 0.5
-				   out.Write(x, y, color * 0.5f);
-			   });
+				auto	  in	= inputSlot.Bind();
+				auto	  out	= outputSlot.Bind();
+				Var<Vec4> color = in.Read(x, y);
+				// Multiply by 0.5
+				out.Write(x, y, color * 0.5f);
+			});
 
 			// Texture A: solid red
 			std::vector<uint8_t>			dataA(16 * 16 * 4, 0);
@@ -183,13 +183,13 @@ int main() {
 			TextureSlot<PixelFormat::R32F> slotC;
 
 			Kernel2D					   kernel([&](Int x, Int y) {
-				  auto	a  = slotA.Bind();
-				  auto	b  = slotB.Bind();
-				  auto	c  = slotC.Bind();
-				  Float va = a.Read(x, y).x();
-				  Float vb = b.Read(x, y).x();
-				  c.Write(x, y, MakeFloat4(va + vb, 0.0f, 0.0f, 1.0f));
-			  });
+				auto  a	 = slotA.Bind();
+				auto  b	 = slotB.Bind();
+				auto  c	 = slotC.Bind();
+				Float va = a.Read(x, y).x();
+				Float vb = b.Read(x, y).x();
+				c.Write(x, y, MakeFloat4(va + vb, 0.0f, 0.0f, 1.0f));
+			});
 
 			std::vector<float>			   dataA(16 * 16, 10.0f);
 			std::vector<float>			   dataB(16 * 16, 20.0f);
@@ -227,10 +227,10 @@ int main() {
 			TextureSlot<PixelFormat::RGBA32F> slot;
 
 			Kernel2D						  kernel([&](Int x, Int y) {
-				 auto	   tex	 = slot.Bind();
-				 Var<Vec4> color = tex.Read(x, y);
-				 tex.Write(x, y, color * 2.0f);
-			 });
+				auto	  tex	= slot.Bind();
+				Var<Vec4> color = tex.Read(x, y);
+				tex.Write(x, y, color * 2.0f);
+			});
 
 			std::vector<float>				  data(16 * 16 * 4);
 			for (int i = 0; i < 16 * 16; ++i) {
@@ -268,11 +268,11 @@ int main() {
 			TextureSlot<PixelFormat::R32F> outputSlot;
 
 			Kernel2D					   kernel([&](Int x, Int y) {
-				  auto	in	= inputSlot.Bind();
-				  auto	out = outputSlot.Bind();
-				  Float v	= in.Read(x, y).x();
-				  out.Write(x, y, MakeFloat4(v + 1.0f, 0.0f, 0.0f, 1.0f));
-			  });
+				auto  in  = inputSlot.Bind();
+				auto  out = outputSlot.Bind();
+				Float v	  = in.Read(x, y).x();
+				out.Write(x, y, MakeFloat4(v + 1.0f, 0.0f, 0.0f, 1.0f));
+			});
 
 			const int					   size = 1024;
 			std::vector<float>			   data(size * size);

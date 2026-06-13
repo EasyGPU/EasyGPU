@@ -52,12 +52,12 @@ Runtime::Buffer<float> buf(data);
 Uniform<float>		   u(1.0f);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto		 b = buf.Bind();
-		  Var<float> v = u.Load();
-		  b[id]		   = b[id] + v;
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto	   b = buf.Bind();
+		Var<float> v = u.Load();
+		b[id]		 = b[id] + v;
+	},
+	256);
 
 kernel.Dispatch(1, true);
 u = 2.0f;
@@ -79,12 +79,12 @@ Runtime::Buffer<Math::Vec4> buf(data);
 Uniform<Math::Vec4>			u(Math::Vec4{1.0f, 2.0f, 3.0f, 4.0f});
 
 Kernel1D					kernel(
-					   [&, N](Var<int> &id) {
-		   auto		 b = buf.Bind();
-		   Var<Vec4> v = u.Load();
-		   b[id]	   = b[id] + v;
-					   },
-					   256);
+	[&, N](Var<int> &id) {
+		auto	  b = buf.Bind();
+		Var<Vec4> v = u.Load();
+		b[id]		= b[id] + v;
+	},
+	256);
 
 kernel.Dispatch(1, true);
 u = Math::Vec4{10.0f, 20.0f, 30.0f, 40.0f};
@@ -107,12 +107,12 @@ Runtime::Buffer<int> buf(data);
 Uniform<int>		 u(5);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto	 b = buf.Bind();
 		Var<int> v = u.Load();
 		b[id]	   = b[id] + v;
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 u = 10;
@@ -137,13 +137,13 @@ Uniform<float>		   scale(2.0f);
 Uniform<float>		   offset(3.0f);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto		 b = buf.Bind();
-		  Var<float> s = scale.Load();
-		  Var<float> o = offset.Load();
-		  b[id]		   = b[id] * s + o;
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto	   b = buf.Bind();
+		Var<float> s = scale.Load();
+		Var<float> o = offset.Load();
+		b[id]		 = b[id] * s + o;
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -165,12 +165,12 @@ Runtime::Buffer<float> buf(data);
 Uniform<float>		   factor(2.0f);
 
 Kernel1D			   kernelA(
-				  [&, N](Var<int> &id) {
-		  auto		 b = buf.Bind();
-		  Var<float> f = factor.Load();
-		  b[id]		   = b[id] + f;
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto	   b = buf.Bind();
+		Var<float> f = factor.Load();
+		b[id]		 = b[id] + f;
+	},
+	256);
 
 Kernel1D kernelB(
 	[&, N](Var<int> &id) {
@@ -204,12 +204,12 @@ Runtime::Buffer<float> buf(data);
 Uniform<bool>		   flag(true);
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto		b = buf.Bind();
-		  Var<bool> f = flag.Load();
-		  If(f, [&]() { b[id] = b[id] * MakeFloat(2.0f); }).Else([&]() { b[id] = b[id] * MakeFloat(3.0f); });
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto	  b = buf.Bind();
+		Var<bool> f = flag.Load();
+		If(f, [&]() { b[id] = b[id] * MakeFloat(2.0f); }).Else([&]() { b[id] = b[id] * MakeFloat(3.0f); });
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -234,13 +234,13 @@ Uniform<Math::Vec2>			u2(Math::Vec2{1.0f, 2.0f});
 Uniform<Math::Vec3>			u3(Math::Vec3{3.0f, 4.0f, 5.0f});
 
 Kernel1D					kernel(
-					   [&, N](Var<int> &id) {
-		   auto b2 = buf2.Bind();
-		   auto b3 = buf3.Bind();
-		   b2[id]  = b2[id] + u2.Load();
-		   b3[id]  = b3[id] + u3.Load();
-					   },
-					   256);
+	[&, N](Var<int> &id) {
+		auto b2 = buf2.Bind();
+		auto b3 = buf3.Bind();
+		b2[id]	= b2[id] + u2.Load();
+		b3[id]	= b3[id] + u3.Load();
+	},
+	256);
 
 kernel.Dispatch(1, true);
 

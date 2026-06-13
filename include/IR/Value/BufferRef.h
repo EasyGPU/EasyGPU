@@ -37,7 +37,8 @@ template <typename T> class BufferElement;
  */
 template <typename T> class BufferRef {
 public:
-	BufferRef() : _binding(0) {}
+	BufferRef() : _binding(0) {
+	}
 	BufferRef(std::string bufferName, uint32_t binding) : _bufferName(std::move(bufferName)), _binding(binding) {
 	}
 

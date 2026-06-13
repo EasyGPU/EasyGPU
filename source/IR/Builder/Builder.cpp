@@ -479,6 +479,4 @@ std::string Builder::BuildAtomicOp(const Node::AtomicOpNode &Node) {
 	return std::format("{}({}, {})", opName, BuildNode(*Node.Target()), BuildNode(*Node.Value()));
 }
 
-
-
 } // namespace GPU::IR::Builder

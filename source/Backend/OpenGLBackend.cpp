@@ -786,26 +786,26 @@ uint32_t OpenGLBackend::GetGLImageFormat(PixelFormat format) {
 static const wchar_t *s_windowClassName = L"EasyGPUHiddenWindow";
 
 void				  OpenGLBackend::InitializePlatform() {
-	 _hInstance = GetModuleHandleW(nullptr);
-	 if (!_hInstance) {
-		 throw std::runtime_error("Failed to get module handle");
-	 }
+	_hInstance = GetModuleHandleW(nullptr);
+	if (!_hInstance) {
+		throw std::runtime_error("Failed to get module handle");
+	}
 
-	 WNDCLASSEXW wcex	= {};
-	 wcex.cbSize		= sizeof(WNDCLASSEXW);
-	 wcex.lpfnWndProc	= DefWindowProcW;
-	 wcex.hInstance		= _hInstance;
-	 wcex.lpszClassName = s_windowClassName;
+	WNDCLASSEXW wcex   = {};
+	wcex.cbSize		   = sizeof(WNDCLASSEXW);
+	wcex.lpfnWndProc   = DefWindowProcW;
+	wcex.hInstance	   = _hInstance;
+	wcex.lpszClassName = s_windowClassName;
 
-	 if (!GetClassInfoExW(_hInstance, s_windowClassName, &wcex)) {
-		 if (!RegisterClassExW(&wcex)) {
-			 throw std::runtime_error("Failed to register window class");
-		 }
-	 }
+	if (!GetClassInfoExW(_hInstance, s_windowClassName, &wcex)) {
+		if (!RegisterClassExW(&wcex)) {
+			throw std::runtime_error("Failed to register window class");
+		}
+	}
 
-	 CreateHiddenWindow();
-	 SetupGLContext();
-	 LoadGLAD();
+	CreateHiddenWindow();
+	SetupGLContext();
+	LoadGLAD();
 }
 
 void OpenGLBackend::CreateHiddenWindow() {
@@ -1172,6 +1172,93 @@ uint32_t OpenGLBackend::GetPipelineCacheFormat() const {
 	// Use the first available format as the identifier
 	// In practice, most drivers only support one format
 	return static_cast<uint32_t>(formats[0]);
+}
+
+// ========================================================================
+// Graphics Pipeline (stub - not implemented for OpenGL)
+// ========================================================================
+
+PipelineHandle OpenGLBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc &desc) {
+	(void)desc;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::BeginRendering(const RenderPassBeginDesc &desc) {
+	(void)desc;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::EndRendering() {
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	(void)x;
+	(void)y;
+	(void)width;
+	(void)height;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	(void)x;
+	(void)y;
+	(void)width;
+	(void)height;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::BindVertexBuffer(BufferHandle buffer, uint32_t stride) {
+	(void)buffer;
+	(void)stride;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::BindIndexBuffer(BufferHandle buffer) {
+	(void)buffer;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+	(void)vertexCount;
+	(void)instanceCount;
+	(void)firstVertex;
+	(void)firstInstance;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset,
+								uint32_t firstInstance) {
+	(void)indexCount;
+	(void)instanceCount;
+	(void)firstIndex;
+	(void)vertexOffset;
+	(void)firstInstance;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+TextureHandle OpenGLBackend::CreateDepthBuffer(uint32_t width, uint32_t height) {
+	(void)width;
+	(void)height;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+void OpenGLBackend::DestroyDepthBuffer(TextureHandle texture) {
+	(void)texture;
+	throw std::runtime_error("OpenGL backend does not support graphics pipeline");
+}
+
+BufferHandle OpenGLBackend::CreateUniformBuffer(size_t size, const void *data) {
+	(void)size;
+	(void)data;
+	throw std::runtime_error("OpenGL backend does not support uniform buffer yet");
+}
+
+void OpenGLBackend::UploadUniformBuffer(BufferHandle handle, const void *data, size_t size) {
+	(void)handle;
+	(void)data;
+	(void)size;
+	throw std::runtime_error("OpenGL backend does not support uniform buffer yet");
 }
 
 } // namespace GPU::Backend

@@ -226,24 +226,29 @@ public:
 	 */
 	IR::Builder::CallableGenState  &GetCallableState(const void *callablePtr) override;
 
-	void RegisterFloatAtomicBuffer(const std::string &bufferName) override {
-		if (_parentContext) _parentContext->RegisterFloatAtomicBuffer(bufferName);
+	void							RegisterFloatAtomicBuffer(const std::string &bufferName) override {
+		if (_parentContext)
+			_parentContext->RegisterFloatAtomicBuffer(bufferName);
 	}
 
 	void RegisterBufferSlot(Runtime::BufferSlotBase *slot) override {
-		if (_parentContext) _parentContext->RegisterBufferSlot(slot);
+		if (_parentContext)
+			_parentContext->RegisterBufferSlot(slot);
 	}
 
 	void RegisterTextureSlot(Runtime::TextureSlotBase *slot) override {
-		if (_parentContext) _parentContext->RegisterTextureSlot(slot);
+		if (_parentContext)
+			_parentContext->RegisterTextureSlot(slot);
 	}
 
 	void PushSharedMemoryDeclaration(const std::string &declaration) override {
-		if (_parentContext) _parentContext->PushSharedMemoryDeclaration(declaration);
+		if (_parentContext)
+			_parentContext->PushSharedMemoryDeclaration(declaration);
 	}
 
 	std::vector<std::string> GetSharedMemoryDeclarations() const override {
-		if (_parentContext) return _parentContext->GetSharedMemoryDeclarations();
+		if (_parentContext)
+			return _parentContext->GetSharedMemoryDeclarations();
 		return {};
 	}
 

@@ -129,7 +129,7 @@ public:
 	 * @brief Set pixel (unchecked, for performance)
 	 */
 	void				   SetPixelUnchecked(uint32_t x, uint32_t y, uint32_t rgba) {
-		  _data[y * _width + x] = rgba;
+		_data[y * _width + x] = rgba;
 	}
 
 	/**

@@ -254,22 +254,22 @@ void test_reduction_execution() {
 	Buffer<float> output(1);
 
 	Kernel1D	  reduceKernel(
-		 [&](Int i) {
-			 SharedMemory<float, 256> shared;
+		[&](Int i) {
+			SharedMemory<float, 256> shared;
 
-			 // Load input
-			 auto					  in	  = input.Bind();
-			 Expr<float>			  val	  = in[i];
+			// Load input
+			auto					 in		 = input.Bind();
+			Expr<float>				 val	 = in[i];
 
-			 // Perform reduction
-			 Expr<float>			  result  = WorkgroupReduce(shared, val);
+			// Perform reduction
+			Expr<float>				 result	 = WorkgroupReduce(shared, val);
 
-			 // Store result (only thread 0)
-			 auto					  out	  = output.Bind();
-			 Int					  localId = LocalThreadId();
-			 If(localId == 0, [&]() { out[0] = result; });
-		 },
-		 256); // Workgroup size of 256
+			// Store result (only thread 0)
+			auto					 out	 = output.Bind();
+			Int						 localId = LocalThreadId();
+			If(localId == 0, [&]() { out[0] = result; });
+		},
+		256); // Workgroup size of 256
 
 	// Dispatch single workgroup
 	reduceKernel.Dispatch(1, true);

@@ -215,8 +215,53 @@ struct BackendCaps {
 	uint32_t	maxBufferBindings	   = 0;
 	uint32_t	maxTextureBindings	   = 0;
 	bool		supportsComputeShaders = false;
+	bool		supportsGraphics	   = false;
 	bool		supportsAsyncTransfer  = false;
 	bool		supportsMultiQueue	   = false;
+};
+
+// ============================================================================
+// Graphics Pipeline Types
+// ============================================================================
+
+/** @brief Primitive topology for graphics pipeline assembly. */
+enum class PrimitiveTopology {
+	PointList,
+	LineList,
+	LineStrip,
+	TriangleList,
+	TriangleStrip,
+	TriangleFan
+};
+
+/** @brief Vertex attribute layout entry for vertex buffer binding. */
+struct VertexLayoutEntry {
+	uint32_t	location = 0;
+	PixelFormat format	 = PixelFormat::RGBA32F; // R32G32B32_FLOAT etc.
+	uint32_t	offset	 = 0;					 // Byte offset in vertex struct
+};
+
+/** @brief Descriptor for creating a graphics pipeline. */
+struct GraphicsPipelineDesc {
+	ShaderHandle					 vertexShader		   = INVALID_SHADER_HANDLE;
+	ShaderHandle					 fragmentShader		   = INVALID_SHADER_HANDLE;
+	PrimitiveTopology				 topology			   = PrimitiveTopology::TriangleList;
+	PixelFormat						 colorAttachmentFormat = PixelFormat::RGBA8;
+	bool							 depthTestEnable	   = false;
+	bool							 depthWriteEnable	   = true;
+	std::vector<VertexLayoutEntry>	 vertexLayout;
+	std::vector<ResourceLayoutEntry> resources;
+	uint32_t						 pushConstantSize = 0;
+};
+
+/** @brief Descriptor for beginning a render pass. */
+struct RenderPassBeginDesc {
+	TextureHandle colorAttachment = INVALID_TEXTURE_HANDLE;
+	TextureHandle depthAttachment = INVALID_TEXTURE_HANDLE;
+	float		  clearColor[4]	  = {0.0f, 0.0f, 0.0f, 1.0f};
+	float		  clearDepth	  = 1.0f;
+	bool		  clearColorFlag  = true;
+	bool		  clearDepthFlag  = true;
 };
 
 // ============================================================================
@@ -427,9 +472,9 @@ public:
 	 * @param size Size in bytes.
 	 */
 	virtual void		   SetUniformData(PipelineHandle pipeline, const void *data, size_t size) {
-		  (void)pipeline;
-		  (void)data;
-		  (void)size;
+		(void)pipeline;
+		(void)data;
+		(void)size;
 	}
 	/**
 	 * @brief Dispatch a compute shader with the given work group count.
@@ -437,26 +482,139 @@ public:
 	 * @param groupY Work groups in Y dimension.
 	 * @param groupZ Work groups in Z dimension.
 	 */
-	virtual void		   Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) = 0;
+	virtual void		   Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ)							  = 0;
 	/**
 	 * @brief Insert a memory barrier for pipeline synchronization.
 	 * @param barrierType Types of barriers to insert.
 	 */
-	virtual void		   MemoryBarrier(BarrierType barrierType)					   = 0;
+	virtual void		   MemoryBarrier(BarrierType barrierType)												  = 0;
 	/** @brief Flush and wait for all pending GPU work to complete. */
-	virtual void		   Finish()													   = 0;
+	virtual void		   Finish()																				  = 0;
 
 	/**
 	 * @brief Begin a GPU timestamp query.
 	 * @return Query index for passing to EndQuery.
 	 */
-	virtual uint32_t	   BeginQuery()												   = 0;
+	virtual uint32_t	   BeginQuery()																			  = 0;
 	/**
 	 * @brief End a GPU timestamp query and retrieve the result.
 	 * @param query Query index from BeginQuery.
 	 * @return Timestamp value in nanoseconds.
 	 */
-	virtual uint64_t	   EndQuery(uint32_t query)									   = 0;
+	virtual uint64_t	   EndQuery(uint32_t query)																  = 0;
+
+	// ========================================================================
+	// Graphics Pipeline Support
+	// ========================================================================
+
+	/**
+	 * @brief Create a graphics pipeline (vertex + fragment shader).
+	 * @param desc Graphics pipeline creation descriptor.
+	 * @return Handle to the created pipeline.
+	 */
+	virtual PipelineHandle CreateGraphicsPipeline(const GraphicsPipelineDesc &desc)								  = 0;
+
+	/**
+	 * @brief Begin a dynamic render pass to a texture attachment.
+	 * @param desc Render pass begin descriptor with color/depth attachments.
+	 */
+	virtual void		   BeginRendering(const RenderPassBeginDesc &desc)										  = 0;
+
+	/** @brief End the current dynamic render pass. */
+	virtual void		   EndRendering()																		  = 0;
+
+	/**
+	 * @brief Set the viewport for rasterization.
+	 * @param x Left coordinate.
+	 * @param y Top coordinate.
+	 * @param width Viewport width.
+	 * @param height Viewport height.
+	 */
+	virtual void		   SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)					  = 0;
+
+	/**
+	 * @brief Set the scissor rectangle.
+	 * @param x Left coordinate.
+	 * @param y Top coordinate.
+	 * @param width Scissor width.
+	 * @param height Scissor height.
+	 */
+	virtual void		   SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)					  = 0;
+
+	/**
+	 * @brief Bind a vertex buffer for indexed or non-indexed drawing.
+	 * @param buffer Buffer handle containing vertex data.
+	 * @param stride Vertex stride in bytes.
+	 */
+	virtual void		   BindVertexBuffer(BufferHandle buffer, uint32_t stride)								  = 0;
+
+	/**
+	 * @brief Bind an index buffer for indexed drawing.
+	 * @param buffer Buffer handle containing index data (uint32_t).
+	 */
+	virtual void		   BindIndexBuffer(BufferHandle buffer)													  = 0;
+
+	/**
+	 * @brief Draw non-indexed primitives.
+	 * @param vertexCount Number of vertices to draw.
+	 * @param instanceCount Number of instances.
+	 * @param firstVertex First vertex index.
+	 * @param firstInstance First instance index.
+	 */
+	virtual void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) = 0;
+
+	/**
+	 * @brief Draw indexed primitives.
+	 * @param indexCount Number of indices to draw.
+	 * @param instanceCount Number of instances.
+	 * @param firstIndex First index offset.
+	 * @param vertexOffset Vertex base offset.
+	 * @param firstInstance First instance index.
+	 */
+	virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset,
+							 uint32_t firstInstance)															  = 0;
+
+	/**
+	 * @brief Create a depth buffer texture for depth testing.
+	 * @param width Depth buffer width.
+	 * @param height Depth buffer height.
+	 * @return Handle to the depth buffer texture.
+	 */
+	virtual TextureHandle CreateDepthBuffer(uint32_t width, uint32_t height)									  = 0;
+
+	/**
+	 * @brief Destroy a depth buffer.
+	 * @param texture Depth buffer handle from CreateDepthBuffer.
+	 */
+	virtual void		  DestroyDepthBuffer(TextureHandle texture)												  = 0;
+
+	// ========================================================================
+	// Uniform Buffer Support
+	// ========================================================================
+
+	/**
+	 * @brief Create a uniform buffer (UBO) with initial data.
+	 * @param size Buffer size in bytes.
+	 * @param data Initial data pointer (may be nullptr).
+	 * @return Buffer handle.
+	 */
+	virtual BufferHandle  CreateUniformBuffer(size_t size, const void *data) {
+		(void)size;
+		(void)data;
+		return INVALID_BUFFER_HANDLE;
+	}
+
+	/**
+	 * @brief Upload data to a uniform buffer.
+	 * @param handle Buffer handle.
+	 * @param data Data pointer.
+	 * @param size Data size in bytes.
+	 */
+	virtual void UploadUniformBuffer(BufferHandle handle, const void *data, size_t size) {
+		(void)handle;
+		(void)data;
+		(void)size;
+	}
 
 	// ========================================================================
 	// Binary Cache Support (for shader compilation acceleration)

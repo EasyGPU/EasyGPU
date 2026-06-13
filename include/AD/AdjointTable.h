@@ -43,7 +43,7 @@ public:
 	/**
 	 * Check if an adjoint exists for a forward variable.
 	 */
-	bool Has(const std::string &varName) const;
+	bool		Has(const std::string &varName) const;
 
 	/**
 	 * Get all (adjointName, glslType) pairs for GLSL variable declarations.
@@ -54,24 +54,24 @@ public:
 	/**
 	 * Clear all mappings (for reuse).
 	 */
-	void Clear();
+	void											 Clear();
 
 	/**
 	 * Generate a uniquely-named adjoint variable from a forward variable name.
 	 */
-	static std::string MakeAdjointName(const std::string &varName);
+	static std::string								 MakeAdjointName(const std::string &varName);
 
 	/**
 	 * Set the array size for a buffer-type adjoint.
 	 * Buffer adjoints are declared as arrays (float grad_buf[N]) so that
 	 * per-element gradient indexing works with both constant and variable indices.
 	 */
-	void SetArraySize(const std::string &adjName, size_t arraySize);
+	void											 SetArraySize(const std::string &adjName, size_t arraySize);
 
 	/**
 	 * Get the array size for an adjoint name, or 0 if it's a scalar.
 	 */
-	size_t GetArraySize(const std::string &adjName) const;
+	size_t											 GetArraySize(const std::string &adjName) const;
 
 private:
 	// Forward var name -> adjoint var name
@@ -81,9 +81,9 @@ private:
 	// Adjoint var name -> GLSL type (element type for arrays)
 	std::unordered_map<std::string, std::string> _types;
 	// Adjoint var name -> array size (0 = scalar)
-	std::unordered_map<std::string, size_t> _arraySizes;
+	std::unordered_map<std::string, size_t>		 _arraySizes;
 	// Insertion order tracking for deterministic declarations
-	std::vector<std::string> _insertionOrder;
+	std::vector<std::string>					 _insertionOrder;
 };
 
 } // namespace GPU::AD

@@ -349,6 +349,9 @@ add_library(EasyGPU STATIC
     source/Kernel/FragmentBuildContext.cpp
     include/Kernel/WindowAttachment.h
     source/Kernel/WindowAttachment.cpp
+	    source/Kernel/GraphicsBuildContext.cpp
+	    source/Kernel/GraphicsPipeline.cpp
+	    source/Kernel/FragmentShader.cpp
     
     # Flow Control
     include/Flow/IfFlow.h
@@ -518,6 +521,7 @@ if(EASYGPU_BUILD_TESTS)
         tests/TestADCore.cpp
         tests/TestADStress.cpp
         tests/TestNN.cpp
+        tests/TestGraphicsPipeline.cpp
     )
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})
@@ -536,7 +540,8 @@ endif()
 # =============================================================================
 if(EASYGPU_BUILD_EXAMPLES)
     set(EASYGPU_EXAMPLE_SOURCES
-        examples/hello_world/main.cpp
+        examples/obj_renderer/main.cpp
+	    examples/hello_world/main.cpp
         examples/mandelbrot/main.cpp
         examples/julia_set/main.cpp
         examples/ray_tracing/main.cpp
@@ -554,6 +559,7 @@ if(EASYGPU_BUILD_EXAMPLES)
     )
 
     set(EASYGPU_EXAMPLE_NAMES
+        obj_renderer
         hello_world
         mandelbrot
         julia_set
@@ -581,6 +587,9 @@ if(EASYGPU_BUILD_EXAMPLES)
         target_link_libraries(${example_name} PRIVATE EasyGPU)
         if(MSVC)
             target_compile_options(${example_name} PRIVATE /Zc:preprocessor /bigobj)
+        endif()
+        if(${example_name} STREQUAL "obj_renderer")
+            target_link_libraries(${example_name} PRIVATE EasyGPUWindow)
         endif()
     endforeach()
     

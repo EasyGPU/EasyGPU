@@ -31,44 +31,39 @@ AdjointGenerator::AdjointGenerator() : _tmpCounter(0) {
 }
 
 void AdjointGenerator::RegisterArithmeticRules() {
-	using Op = GPU::IR::Node::OperationCode;
+	using Op									= GPU::IR::Node::OperationCode;
 
 	// --- Add: z = a + b  →  d_a += d_z;  d_b += d_z ---
-	_arithmeticRules[static_cast<int>(Op::Add)] = [](AdjointGenerator *gen, const TapeEntry &e,
-													  const std::string			&dOut,
-													  const std::vector<std::string> &in) {
+	_arithmeticRules[static_cast<int>(Op::Add)] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
+													 const std::vector<std::string> &in) {
 		gen->EmitAccumulate(in[0], dOut);
 		gen->EmitAccumulate(in[1], dOut);
 	};
 
 	// --- Sub: z = a - b  →  d_a += d_z;  d_b += -d_z ---
-	_arithmeticRules[static_cast<int>(Op::Sub)] = [](AdjointGenerator *gen, const TapeEntry &e,
-													  const std::string			&dOut,
-													  const std::vector<std::string> &in) {
+	_arithmeticRules[static_cast<int>(Op::Sub)] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
+													 const std::vector<std::string> &in) {
 		gen->EmitAccumulate(in[0], dOut);
 		gen->EmitAccumulate(in[1], std::format("-({})", dOut));
 	};
 
 	// --- Mul: z = a * b  →  d_a += d_z * b;  d_b += d_z * a ---
-	_arithmeticRules[static_cast<int>(Op::Mul)] = [](AdjointGenerator *gen, const TapeEntry &e,
-													  const std::string			&dOut,
-													  const std::vector<std::string> &in) {
+	_arithmeticRules[static_cast<int>(Op::Mul)] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
+													 const std::vector<std::string> &in) {
 		gen->EmitAccumulate(in[0], std::format("({})*({})", dOut, in[1]));
 		gen->EmitAccumulate(in[1], std::format("({})*({})", dOut, in[0]));
 	};
 
 	// --- Div: z = a / b  →  d_a += d_z / b;  d_b += -d_z * a / (b*b) ---
-	_arithmeticRules[static_cast<int>(Op::Div)] = [](AdjointGenerator *gen, const TapeEntry &e,
-													  const std::string			&dOut,
-													  const std::vector<std::string> &in) {
+	_arithmeticRules[static_cast<int>(Op::Div)] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
+													 const std::vector<std::string> &in) {
 		gen->EmitAccumulate(in[0], std::format("({})/({})", dOut, in[1]));
 		gen->EmitAccumulate(in[1], std::format("-(({})*({}))/(({})*({}))", dOut, in[0], in[1], in[1]));
 	};
 
 	// --- Neg: z = -a  →  d_a += -d_z ---
-	_arithmeticRules[static_cast<int>(Op::Neg)] = [](AdjointGenerator *gen, const TapeEntry &e,
-													  const std::string			&dOut,
-													  const std::vector<std::string> &in) {
+	_arithmeticRules[static_cast<int>(Op::Neg)] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
+													 const std::vector<std::string> &in) {
 		gen->EmitAccumulate(in[0], std::format("-({})", dOut));
 	};
 }
@@ -183,10 +178,8 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	};
 
 	// fract(x)  →  d_x += d_out  (gradient of fractional part is 1)
-	_intrinsicRules["fract"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
-								  const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], dOut);
-	};
+	_intrinsicRules["fract"]   = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
+									const std::vector<std::string> &in) { gen->EmitAccumulate(in[0], dOut); };
 
 	// radians(x)  →  d_x += d_out * (PI / 180.0)
 	_intrinsicRules["radians"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
@@ -219,26 +212,24 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	};
 
 	// Non-differentiable single-param functions (floor, ceil, trunc, round, sign)
-	auto zeroGrad1 = [](AdjointGenerator *, const TapeEntry &, const std::string &,
-						const std::vector<std::string> &) { /* gradient is 0 */ };
-	_intrinsicRules["floor"] = zeroGrad1;
-	_intrinsicRules["ceil"] = zeroGrad1;
-	_intrinsicRules["trunc"] = zeroGrad1;
-	_intrinsicRules["round"] = zeroGrad1;
+	auto zeroGrad1				 = [](AdjointGenerator *, const TapeEntry &, const std::string &,
+									  const std::vector<std::string> &) { /* gradient is 0 */ };
+	_intrinsicRules["floor"]	 = zeroGrad1;
+	_intrinsicRules["ceil"]		 = zeroGrad1;
+	_intrinsicRules["trunc"]	 = zeroGrad1;
+	_intrinsicRules["round"]	 = zeroGrad1;
 	_intrinsicRules["roundEven"] = zeroGrad1;
-	_intrinsicRules["sign"] = zeroGrad1;
+	_intrinsicRules["sign"]		 = zeroGrad1;
 
 	// =========================================================================
 	// Two-parameter intrinsics
 	// =========================================================================
 
 	// pow(a, b)  →  d_a += d_out * b * pow(a, b-1);  d_b += d_out * pow(a, b) * log(a)
-	_intrinsicRules["pow"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
-								const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0],
-							std::format("({})*({})*pow({},({})-1.0)", dOut, in[1], in[0], in[1]));
-		gen->EmitAccumulate(in[1],
-							std::format("({})*pow({},{})*log({})", dOut, in[0], in[1], in[0]));
+	_intrinsicRules["pow"]		 = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
+									  const std::vector<std::string> &in) {
+		gen->EmitAccumulate(in[0], std::format("({})*({})*pow({},({})-1.0)", dOut, in[1], in[0], in[1]));
+		gen->EmitAccumulate(in[1], std::format("({})*pow({},{})*log({})", dOut, in[0], in[1], in[0]));
 	};
 
 	// min(a, b)  →  subgradient: pass to whichever is smaller
@@ -263,7 +254,7 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	};
 
 	// step(edge, x)  →  d_x += 0 (discontinuous), d_edge += 0
-	_intrinsicRules["step"] = zeroGrad1;
+	_intrinsicRules["step"]	 = zeroGrad1;
 
 	// =========================================================================
 	// Three-parameter intrinsics
@@ -272,8 +263,7 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// clamp(x, lo, hi)  →  piecewise gradient
 	_intrinsicRules["clamp"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								  const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], std::format("({})*step({},{})*(1.0-step({},{}))", dOut, in[1], in[0],
-											   in[2], in[0]));
+		gen->EmitAccumulate(in[0], std::format("({})*step({},{})*(1.0-step({},{}))", dOut, in[1], in[0], in[2], in[0]));
 		gen->EmitAccumulate(in[1], std::format("({})*(1.0-step({},{}))", dOut, in[1], in[0]));
 		gen->EmitAccumulate(in[2], std::format("({})*step({},{})", dOut, in[2], in[0]));
 	};
@@ -291,14 +281,13 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// dx  = d_out * deriv / (e1-e0)
 	// de0 = -d_out * deriv * (e1-x) / (e1-e0)^2
 	// de1 = -d_out * deriv * (x-e0) / (e1-e0)^2
-	_intrinsicRules["smoothstep"] = [](AdjointGenerator *gen, const TapeEntry &e,
-									   const std::string			  &dOut,
+	_intrinsicRules["smoothstep"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 									   const std::vector<std::string> &in) {
 		const auto &e0 = in[0], &e1 = in[1], &x = in[2];
-		std::string t  = std::format("clamp((({})-({}))/(({})-({})),0.0,1.0)", x, e0, e1, e0);
-		std::string df = std::format("6.0*{}*(1.0-{})", t, t);
+		std::string t	= std::format("clamp((({})-({}))/(({})-({})),0.0,1.0)", x, e0, e1, e0);
+		std::string df	= std::format("6.0*{}*(1.0-{})", t, t);
 		std::string den = std::format("({})-({})", e1, e0);
-		gen->EmitAccumulate(x,  std::format("({})*{}/({})", dOut, df, den));
+		gen->EmitAccumulate(x, std::format("({})*{}/({})", dOut, df, den));
 		gen->EmitAccumulate(e0, std::format("-({})*{}*(({})-({}))/(({})*({}))", dOut, df, e1, x, den, den));
 		gen->EmitAccumulate(e1, std::format("-({})*{}*(({})-({}))/(({})*({}))", dOut, df, x, e0, den, den));
 	};
@@ -331,8 +320,8 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// where x_n = x / length(x)
 	_intrinsicRules["normalize"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 									  const std::vector<std::string> &in) {
-		std::string xn = std::format("({})/length({})", in[0], in[0]);
-		std::string proj = std::format("({})*dot({},{})", xn, xn, dOut);
+		std::string xn		= std::format("({})/length({})", in[0], in[0]);
+		std::string proj	= std::format("({})*dot({},{})", xn, xn, dOut);
 		std::string tangent = std::format("({})-({})", dOut, proj);
 		gen->EmitAccumulate(in[0], std::format("({})/length({})", tangent, in[0]));
 	};
@@ -350,8 +339,7 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	_intrinsicRules["reflect"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 									const std::vector<std::string> &in) {
 		std::string dotNI = std::format("dot({},{})", in[1], in[0]);
-		gen->EmitAccumulate(in[0],
-			std::format("({})-2.0*({})*({})", dOut, in[1], dotNI));
+		gen->EmitAccumulate(in[0], std::format("({})-2.0*({})*({})", dOut, in[1], dotNI));
 	};
 
 	// refract(I, N, eta)  →  approximate gradient for I
@@ -363,13 +351,13 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	};
 
 	// faceforward(N, I, Nref) — discrete sign-based, zero gradient
-	_intrinsicRules["faceforward"] = [](AdjointGenerator *, const TapeEntry &, const std::string &,
-										const std::vector<std::string> &) { /* zero gradient */ };
+	_intrinsicRules["faceforward"]	   = [](AdjointGenerator *, const TapeEntry &, const std::string &,
+											const std::vector<std::string> &) { /* zero gradient */ };
 
 	// Non-differentiable on integer params
-	_intrinsicRules["floatBitsToInt"] = zeroGrad1;
+	_intrinsicRules["floatBitsToInt"]  = zeroGrad1;
 	_intrinsicRules["floatBitsToUint"] = zeroGrad1;
-	_intrinsicRules["intBitsToFloat"] = zeroGrad1;
+	_intrinsicRules["intBitsToFloat"]  = zeroGrad1;
 	_intrinsicRules["uintBitsToFloat"] = zeroGrad1;
 }
 
@@ -383,7 +371,8 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	_bodyLines.clear();
 	_paramWritebacks.clear();
 
-	if (tape.Size() == 0) return "";
+	if (tape.Size() == 0)
+		return "";
 
 	// Step 0: Build the active set by backward propagation from loss/parameters.
 	// MarkLoss() is called after the forward computation, so the tape's
@@ -400,22 +389,19 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 
 	// Filter: skip literal/constant names (GLSL constructors, booleans).
 	auto isLiteral = [](const std::string &name) {
-		if (name.empty()) return true;
+		if (name.empty())
+			return true;
 		// Boolean literals
-		if (name == "true" || name == "false") return true;
+		if (name == "true" || name == "false")
+			return true;
 		// GLSL type constructors: float(...), vec2(...), etc.
 		// Buffer accesses look like buf[...] and are NOT literals.
 		// Only treat as literal if it starts with a GLSL type name followed by '('.
-		static const char* glslTypes[] = {
-			"float","int","uint","bool",
-			"vec2","vec3","vec4",
-			"ivec2","ivec3","ivec4",
-			"uvec2","uvec3","uvec4",
-			"bvec2","bvec3","bvec4",
-			"mat2","mat3","mat4",
-			"dvec2","dvec3","dvec4","dmat2","dmat3","dmat4"
-		};
-		for (const char* t : glslTypes) {
+		static const char *glslTypes[] = {"float", "int",	"uint",	 "bool",  "vec2",  "vec3",	"vec4",
+										  "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4", "bvec2",
+										  "bvec3", "bvec4", "mat2",	 "mat3",  "mat4",  "dvec2", "dvec3",
+										  "dvec4", "dmat2", "dmat3", "dmat4"};
+		for (const char *t : glslTypes) {
 			size_t tlen = std::char_traits<char>::length(t);
 			if (name.compare(0, tlen, t) == 0 && name.size() > tlen && name[tlen] == '(') {
 				return true;
@@ -428,21 +414,23 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	// For "buf1[expr]" -> "buf1". For "v123" -> returns "" (not a buffer).
 	auto bufBaseName = [](const std::string &name) -> std::string {
 		auto bpos = name.find('[');
-		if (bpos == std::string::npos) return "";
+		if (bpos == std::string::npos)
+			return "";
 		return name.substr(0, bpos);
 	};
 
 	// Helper: check if a name is active, matching both full name and
 	// buffer base name (so buf1[expr1] matches buf1[expr2]).
 	auto isActive = [&](const std::string &name) -> bool {
-		if (activeSet.count(name)) return true;
+		if (activeSet.count(name))
+			return true;
 		std::string base = bufBaseName(name);
 		return !base.empty() && activeSet.count(base);
 	};
 
 	// Iterate reverse until the active set stabilizes.
 	bool changed = true;
-	int passNum = 0;
+	int	 passNum = 0;
 	while (changed) {
 		changed = false;
 		passNum++;
@@ -451,18 +439,19 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 			const auto &entry = tape[i];
 			if (isActive(entry.output.name)) {
 				for (const auto &in : entry.inputs) {
-					if (isLiteral(in.name)) continue;
+					if (isLiteral(in.name))
+						continue;
 					if (activeSet.insert(in.name).second) {
 						// Also add base buffer name for producer matching
 						std::string base = bufBaseName(in.name);
-						if (!base.empty()) activeSet.insert(base);
+						if (!base.empty())
+							activeSet.insert(base);
 						changed = true;
 						addedThisPass++;
 					}
 				}
 			}
 		}
-
 	}
 
 	// Build transitive alias map for resolving stale aliases in loops
@@ -470,7 +459,8 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 
 	// Step 1: Pre-allocate adjoint variables for all active variables.
 	for (const auto &entry : tape.Entries()) {
-		if (!isActive(entry.output.name)) continue;
+		if (!isActive(entry.output.name))
+			continue;
 
 		_adjTable.GetOrCreate(entry.output.name, entry.output.glslType);
 		for (const auto &in : entry.inputs) {
@@ -538,8 +528,7 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 		for (const auto &[paramName, paramType] : tape.Parameters()) {
 			std::string adjName = _adjTable.Get(paramName);
 			if (!adjName.empty()) {
-				_paramWritebacks.emplace_back(ResolveAliases(paramName),
-					ResolveAliases(adjName));
+				_paramWritebacks.emplace_back(ResolveAliases(paramName), ResolveAliases(adjName));
 			}
 		}
 	}
@@ -552,8 +541,8 @@ AdjointBody AdjointGenerator::GenerateBody(const GradientTape &tape, bool writeB
 	Generate(tape, writeBackParams);
 	AdjointBody body;
 	body.declarations = _adjTable.AllDeclarations();
-	body.lines = std::move(_bodyLines);
-	body.writebacks = std::move(_paramWritebacks);
+	body.lines		  = std::move(_bodyLines);
+	body.writebacks	  = std::move(_paramWritebacks);
 	return body;
 }
 
@@ -606,10 +595,12 @@ void AdjointGenerator::ProcessEntry(const TapeEntry &entry) {
 
 void AdjointGenerator::ProcessBinaryOp(const TapeEntry &entry) {
 	std::string dOut = _adjTable.Get(entry.output.name);
-	if (dOut.empty()) return;
+	if (dOut.empty())
+		return;
 
 	auto ruleIt = _arithmeticRules.find(static_cast<int>(entry.binaryOp));
-	if (ruleIt == _arithmeticRules.end()) return;
+	if (ruleIt == _arithmeticRules.end())
+		return;
 
 	std::vector<std::string> inputNames;
 	for (const auto &in : entry.inputs) {
@@ -626,25 +617,28 @@ void AdjointGenerator::ProcessUnaryOp(const TapeEntry &entry) {
 
 void AdjointGenerator::ProcessExpressionGradient(const TapeEntry &entry) {
 	std::string dOut = _adjTable.Get(entry.output.name);
-	if (dOut.empty()) return;
+	if (dOut.empty())
+		return;
 
-	std::string adjSrc = SaveAndZeroAdjoint(dOut, entry.output.glslType);
-	const size_t count = std::min(entry.inputs.size(), entry.inputGradExprs.size());
+	std::string	 adjSrc = SaveAndZeroAdjoint(dOut, entry.output.glslType);
+	const size_t count	= std::min(entry.inputs.size(), entry.inputGradExprs.size());
 	for (size_t i = 0; i < count; i++) {
-		EmitAccumulate(entry.inputs[i].name,
-					   std::format("({})*({})", adjSrc, entry.inputGradExprs[i]));
+		EmitAccumulate(entry.inputs[i].name, std::format("({})*({})", adjSrc, entry.inputGradExprs[i]));
 	}
 }
 
 void AdjointGenerator::ProcessIntrinsic1(const TapeEntry &entry) {
 	std::string dOut = _adjTable.Get(entry.output.name);
-	if (dOut.empty()) return;
+	if (dOut.empty())
+		return;
 
 	auto ruleIt = _intrinsicRules.find(entry.intrinsicName);
-	if (ruleIt == _intrinsicRules.end()) return;
+	if (ruleIt == _intrinsicRules.end())
+		return;
 
 	std::vector<std::string> inputNames;
-	for (const auto &in : entry.inputs) inputNames.push_back(in.name);
+	for (const auto &in : entry.inputs)
+		inputNames.push_back(in.name);
 
 	std::string adjSrc = SaveAndZeroAdjoint(dOut, entry.output.glslType);
 	ruleIt->second(this, entry, adjSrc, inputNames);
@@ -660,36 +654,39 @@ void AdjointGenerator::ProcessIntrinsic3(const TapeEntry &entry) {
 
 void AdjointGenerator::ProcessTernary(const TapeEntry &entry) {
 	std::string dOut = _adjTable.Get(entry.output.name);
-	if (dOut.empty()) return;
-	if (entry.inputs.size() < 3) return;
+	if (dOut.empty())
+		return;
+	if (entry.inputs.size() < 3)
+		return;
 
-	const auto &cond = entry.inputs[0];
-	const auto &trueVal = entry.inputs[1];
+	const auto &cond	 = entry.inputs[0];
+	const auto &trueVal	 = entry.inputs[1];
 	const auto &falseVal = entry.inputs[2];
 
-	std::string adjTrue = _adjTable.Get(trueVal.name);
+	std::string adjTrue	 = _adjTable.Get(trueVal.name);
 	std::string adjFalse = _adjTable.Get(falseVal.name);
 
-	std::string adjSrc = SaveAndZeroAdjoint(dOut, entry.output.glslType);
+	std::string adjSrc	 = SaveAndZeroAdjoint(dOut, entry.output.glslType);
 
 	if (!adjTrue.empty()) {
-		EmitLine(
-			std::format("{} += ({})?({}):{}(0);", adjTrue, cond.name, adjSrc, ZeroOf(trueVal.glslType)));
+		EmitLine(std::format("{} += ({})?({}):{}(0);", adjTrue, cond.name, adjSrc, ZeroOf(trueVal.glslType)));
 	}
 	if (!adjFalse.empty()) {
-		EmitLine(
-			std::format("{} += ({})?{}(0):({});", adjFalse, cond.name, ZeroOf(falseVal.glslType), adjSrc));
+		EmitLine(std::format("{} += ({})?{}(0):({});", adjFalse, cond.name, ZeroOf(falseVal.glslType), adjSrc));
 	}
 }
 
 void AdjointGenerator::ProcessCompoundAssign(const TapeEntry &entry) {
 	std::string dLhs = _adjTable.Get(entry.output.name);
-	if (dLhs.empty()) return;
-	if (entry.inputs.size() < 2) return;
+	if (dLhs.empty())
+		return;
+	if (entry.inputs.size() < 2)
+		return;
 
-	const auto &rhs = entry.inputs[1]; // inputs[0] is the LHS itself
+	const auto &rhs	   = entry.inputs[1]; // inputs[0] is the LHS itself
 	std::string adjRhs = _adjTable.Get(rhs.name);
-	if (adjRhs.empty()) return;
+	if (adjRhs.empty())
+		return;
 
 	switch (entry.compoundOp) {
 	case GPU::IR::Node::CompoundAssignmentCode::AddAssign:
@@ -702,8 +699,7 @@ void AdjointGenerator::ProcessCompoundAssign(const TapeEntry &entry) {
 		// Backprop through a *= b:
 		//   d_b += d_a_new * a_old = d_a * a / b
 		//   adj_a *= b  (transform d_a_new -> d_a_old)
-		EmitLine(std::format("{} += {} * {} / {};", adjRhs, dLhs,
-						 entry.output.name, rhs.name));
+		EmitLine(std::format("{} += {} * {} / {};", adjRhs, dLhs, entry.output.name, rhs.name));
 		EmitLine(std::format("{} *= {};", dLhs, rhs.name));
 		break;
 	}
@@ -711,8 +707,7 @@ void AdjointGenerator::ProcessCompoundAssign(const TapeEntry &entry) {
 		// Backprop through a /= b:
 		//   d_b += d_a_new * (-a_old / b^2) = -d_a * a / b
 		//   adj_a /= b  (transform d_a_new -> d_a_old)
-		EmitLine(std::format("{} += -({} * {} / {});", adjRhs, dLhs,
-						 entry.output.name, rhs.name));
+		EmitLine(std::format("{} += -({} * {} / {});", adjRhs, dLhs, entry.output.name, rhs.name));
 		EmitLine(std::format("{} /= {};", dLhs, rhs.name));
 		break;
 	}
@@ -727,7 +722,8 @@ void AdjointGenerator::ProcessCompoundAssign(const TapeEntry &entry) {
 
 void AdjointGenerator::EmitAccumulate(const std::string &inputName, const std::string &gradExpr) {
 	std::string adjName = _adjTable.Get(inputName);
-	if (adjName.empty()) return;
+	if (adjName.empty())
+		return;
 	EmitLine(std::format("{} += {};", ResolveAliases(adjName), ResolveAliases(gradExpr)));
 }
 
@@ -751,7 +747,8 @@ void AdjointGenerator::PushControlFrame() {
 }
 
 void AdjointGenerator::PopControlFrameAndWrap(const TapeEntry &beginEntry) {
-	if (_controlStack.empty()) return;
+	if (_controlStack.empty())
+		return;
 
 	auto frame = std::move(_controlStack.back());
 	_controlStack.pop_back();
@@ -791,7 +788,8 @@ void AdjointGenerator::PopControlFrameAndWrap(const TapeEntry &beginEntry) {
 			block += "    " + line + "\n";
 		}
 		block += "}";
-		frame.chainBlocks.insert(frame.chainBlocks.begin(), block); frame.lines.clear();
+		frame.chainBlocks.insert(frame.chainBlocks.begin(), block);
+		frame.lines.clear();
 		_controlStack.push_back(std::move(frame));
 		break;
 	}
@@ -799,10 +797,9 @@ void AdjointGenerator::PopControlFrameAndWrap(const TapeEntry &beginEntry) {
 		// Reversed for loop: for (int var = end-1; var >= start; var -= step)
 		std::string forHeader;
 		if (!beginEntry.forVarName.empty()) {
-			forHeader = std::format("for (int {} = ({}) - 1; {} >= ({}); {} -= ({})) {{\n",
-				beginEntry.forVarName, beginEntry.forEnd,
-				beginEntry.forVarName, beginEntry.forStart,
-				beginEntry.forVarName, beginEntry.forStep);
+			forHeader = std::format("for (int {} = ({}) - 1; {} >= ({}); {} -= ({})) {{\n", beginEntry.forVarName,
+									beginEntry.forEnd, beginEntry.forVarName, beginEntry.forStart,
+									beginEntry.forVarName, beginEntry.forStep);
 		} else {
 			forHeader = "for (int _i = 0; _i < 1; _i++) {\n";
 		}
@@ -829,27 +826,44 @@ std::string AdjointGenerator::Adj(const std::string &varName) {
 }
 
 std::string AdjointGenerator::ZeroOf(const std::string &glslType) {
-	if (glslType == "float") return "0.0";
-	if (glslType == "int") return "0";
-	if (glslType == "bool") return "false";
-	if (glslType == "vec2") return "vec2(0.0)";
-	if (glslType == "vec3") return "vec3(0.0)";
-	if (glslType == "vec4") return "vec4(0.0)";
-	if (glslType == "ivec2") return "ivec2(0)";
-	if (glslType == "ivec3") return "ivec3(0)";
-	if (glslType == "ivec4") return "ivec4(0)";
-	if (glslType == "mat2") return "mat2(0.0)";
-	if (glslType == "mat3") return "mat3(0.0)";
-	if (glslType == "mat4") return "mat4(0.0)";
-	if (glslType == "mat2x3") return "mat2x3(0.0)";
-	if (glslType == "mat2x4") return "mat2x4(0.0)";
-	if (glslType == "mat3x2") return "mat3x2(0.0)";
-	if (glslType == "mat3x4") return "mat3x4(0.0)";
-	if (glslType == "mat4x2") return "mat4x2(0.0)";
-	if (glslType == "mat4x3") return "mat4x3(0.0)";
+	if (glslType == "float")
+		return "0.0";
+	if (glslType == "int")
+		return "0";
+	if (glslType == "bool")
+		return "false";
+	if (glslType == "vec2")
+		return "vec2(0.0)";
+	if (glslType == "vec3")
+		return "vec3(0.0)";
+	if (glslType == "vec4")
+		return "vec4(0.0)";
+	if (glslType == "ivec2")
+		return "ivec2(0)";
+	if (glslType == "ivec3")
+		return "ivec3(0)";
+	if (glslType == "ivec4")
+		return "ivec4(0)";
+	if (glslType == "mat2")
+		return "mat2(0.0)";
+	if (glslType == "mat3")
+		return "mat3(0.0)";
+	if (glslType == "mat4")
+		return "mat4(0.0)";
+	if (glslType == "mat2x3")
+		return "mat2x3(0.0)";
+	if (glslType == "mat2x4")
+		return "mat2x4(0.0)";
+	if (glslType == "mat3x2")
+		return "mat3x2(0.0)";
+	if (glslType == "mat3x4")
+		return "mat3x4(0.0)";
+	if (glslType == "mat4x2")
+		return "mat4x2(0.0)";
+	if (glslType == "mat4x3")
+		return "mat4x3(0.0)";
 	return "0.0";
 }
-
 
 // =============================================================================
 // Save-and-zero helper
@@ -867,15 +881,18 @@ std::string AdjointGenerator::SaveAndZeroAdjoint(const std::string &adjName, con
 // =============================================================================
 
 void AdjointGenerator::BuildAliasMap() {
-	if (!_tape) return;
+	if (!_tape)
+		return;
 
 	_aliasMap.clear();
 
 	// Helper: check if a name is a pure scalar variable (e.g. "v95")
 	auto isScalarVar = [](const std::string &name) -> bool {
-		if (name.empty() || name[0] != 'v') return false;
+		if (name.empty() || name[0] != 'v')
+			return false;
 		for (size_t i = 1; i < name.size(); i++) {
-			if (name[i] < '0' || name[i] > '9') return false;
+			if (name[i] < '0' || name[i] > '9')
+				return false;
 		}
 		return true;
 	};
@@ -883,21 +900,19 @@ void AdjointGenerator::BuildAliasMap() {
 	// Build direct alias map from simple copy operations (v95 = v93 recorded as Add-with-zero)
 	std::unordered_map<std::string, std::string> directAliases;
 	for (const auto &entry : _tape->Entries()) {
-		if (entry.kind == TapeOpKind::BinaryOp &&
-			entry.binaryOp == GPU::IR::Node::OperationCode::Add &&
-			entry.inputs.size() == 2 &&
-			entry.inputs[1].name == "0" &&
-			isScalarVar(entry.output.name) &&
+		if (entry.kind == TapeOpKind::BinaryOp && entry.binaryOp == GPU::IR::Node::OperationCode::Add &&
+			entry.inputs.size() == 2 && entry.inputs[1].name == "0" && isScalarVar(entry.output.name) &&
 			isScalarVar(entry.inputs[0].name)) {
 			directAliases[entry.output.name] = entry.inputs[0].name;
 		}
 	}
 
-	if (directAliases.empty()) return;
+	if (directAliases.empty())
+		return;
 
 	// Compute transitive closure: v95 -> v93 -> v91 -> v85  =>  v95 -> v85
 	for (const auto &[alias, target] : directAliases) {
-		std::string canonical = target;
+		std::string						canonical = target;
 		std::unordered_set<std::string> visited{alias};
 		while (directAliases.count(canonical) && visited.insert(canonical).second) {
 			canonical = directAliases[canonical];
@@ -909,27 +924,25 @@ void AdjointGenerator::BuildAliasMap() {
 }
 
 std::string AdjointGenerator::ResolveAliases(const std::string &expr) const {
-	if (_aliasMap.empty()) return expr;
+	if (_aliasMap.empty())
+		return expr;
 
 	// Sort aliases by name length (longest first) to avoid partial replacements
-	std::vector<std::pair<std::string, std::string>> sortedAliases(
-		_aliasMap.begin(), _aliasMap.end());
+	std::vector<std::pair<std::string, std::string>> sortedAliases(_aliasMap.begin(), _aliasMap.end());
 	std::sort(sortedAliases.begin(), sortedAliases.end(),
-		[](const auto &a, const auto &b) {
-			return a.first.size() > b.first.size();
-		});
+			  [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
 
 	std::string result = expr;
 	for (const auto &[alias, canonical] : sortedAliases) {
 		size_t pos = 0;
 		while ((pos = result.find(alias, pos)) != std::string::npos) {
 			// Word-boundary check: character before must not be [a-zA-Z0-9_]
-			bool leftOk = (pos == 0) ||
-				!(std::isalnum(static_cast<unsigned char>(result[pos - 1])) || result[pos - 1] == '_');
+			bool leftOk =
+				(pos == 0) || !(std::isalnum(static_cast<unsigned char>(result[pos - 1])) || result[pos - 1] == '_');
 			// Character after must not be [a-zA-Z0-9_]
-			size_t endPos = pos + alias.size();
-			bool rightOk = (endPos >= result.size()) ||
-				!(std::isalnum(static_cast<unsigned char>(result[endPos])) || result[endPos] == '_');
+			size_t endPos  = pos + alias.size();
+			bool   rightOk = (endPos >= result.size()) ||
+							 !(std::isalnum(static_cast<unsigned char>(result[endPos])) || result[endPos] == '_');
 
 			if (leftOk && rightOk) {
 				result.replace(pos, alias.size(), canonical);
@@ -949,22 +962,27 @@ std::string AdjointGenerator::ResolveAliases(const std::string &expr) const {
 void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	// Get the adjoint of the call output from the main adjoint table
 	std::string dOut = _adjTable.Get(entry.output.name);
-	if (dOut.empty()) return;
-	if (!_tape) return;
+	if (dOut.empty())
+		return;
+	if (!_tape)
+		return;
 
 	// O(1) sub-tape lookup via pre-built index map
 	auto mapIt = _callIndexMap.find(entry.id);
-	if (mapIt == _callIndexMap.end()) return;
+	if (mapIt == _callIndexMap.end())
+		return;
 	int callIndex = mapIt->second;
-	if (callIndex >= static_cast<int>(_tape->SubTapeCount())) return;
+	if (callIndex >= static_cast<int>(_tape->SubTapeCount()))
+		return;
 
 	const auto &subTape = _tape->SubTape(callIndex);
-	if (subTape.Size() == 0) return;
+	if (subTape.Size() == 0)
+		return;
 
 	// Build a name-remapped copy of the sub-tape for the adjoint generator.
 	// Parameter names (p0, p1, ...) are mapped to the caller's input names.
 	// Internal variable names are prefixed for uniqueness.
-	std::string prefix = "_ca" + std::to_string(callIndex) + "_";
+	std::string									 prefix = "_ca" + std::to_string(callIndex) + "_";
 	std::unordered_map<std::string, std::string> nameMap;
 	// Map parameters: p0 -> inputs[0].name, p1 -> inputs[1].name, ...
 	for (size_t pi = 0; pi < entry.inputs.size(); pi++) {
@@ -983,7 +1001,7 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	// Create a remapped tape with renamed variables
 	GradientTape remappedTape;
 	for (size_t i = 0; i < subTape.Size(); i++) {
-		TapeEntry se = subTape[i];
+		TapeEntry	se			= subTape[i];
 
 		// Remap output name
 		std::string origOutName = se.output.name;
@@ -1010,15 +1028,18 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		}
 
 		// Skip Return entries — we handle them specially
-		if (se.kind == TapeOpKind::Return) continue;
+		if (se.kind == TapeOpKind::Return)
+			continue;
 
 		// For binary ops with literal operands, keep them as-is
 		// Check 'forVarName' etc. in control flow entries
 		if (se.kind == TapeOpKind::ControlFlowBegin) {
 			if (!se.conditionVarName.empty()) {
 				auto nit = nameMap.find(se.conditionVarName);
-				if (nit != nameMap.end()) se.conditionVarName = nit->second;
-				else se.conditionVarName = prefix + se.conditionVarName;
+				if (nit != nameMap.end())
+					se.conditionVarName = nit->second;
+				else
+					se.conditionVarName = prefix + se.conditionVarName;
 			}
 		}
 
@@ -1032,8 +1053,9 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	if (!retVarName.empty()) {
 		std::string mappedRetName = prefix + retVarName;
 		// Also check if retVarName is a parameter
-		auto nit = nameMap.find(retVarName);
-		if (nit != nameMap.end()) mappedRetName = nit->second;
+		auto		nit			  = nameMap.find(retVarName);
+		if (nit != nameMap.end())
+			mappedRetName = nit->second;
 		remappedTape.MarkLoss(mappedRetName, "float");
 		// Seed: the adjoint of the return variable = dOut
 		// We'll handle this manually after generation
@@ -1048,7 +1070,7 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 
 	// Generate adjoint body for the remapped sub-tape
 	AdjointGenerator subGen;
-	AdjointBody subBody = subGen.GenerateBody(remappedTape, false);
+	AdjointBody		 subBody = subGen.GenerateBody(remappedTape, false);
 
 	// Emit declarations for local adjoint variables (prefixed ones)
 	for (const auto &[adjName, glslType] : subBody.declarations) {
@@ -1066,12 +1088,13 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	for (const auto &line : subBody.lines) {
 		// Find the seed line (adj_of_loss = float(1.0)) and replace with dOut
 		std::string seedName = prefix + retVarName;
-		auto nit = nameMap.find(retVarName);
-		if (nit != nameMap.end()) seedName = nit->second;
-		
-		std::string adjRetName = subGen.GetAdjointTable().Get(
-			nit != nameMap.end() ? nit->second : (prefix + retVarName));
-		
+		auto		nit		 = nameMap.find(retVarName);
+		if (nit != nameMap.end())
+			seedName = nit->second;
+
+		std::string adjRetName =
+			subGen.GetAdjointTable().Get(nit != nameMap.end() ? nit->second : (prefix + retVarName));
+
 		std::string expectedSeed = adjRetName + " = float(1.0);";
 		if (line == expectedSeed) {
 			EmitLine(adjRetName + " += " + dOut + ";");

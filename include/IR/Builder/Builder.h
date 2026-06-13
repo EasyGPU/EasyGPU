@@ -94,12 +94,16 @@ public:
 	 * When set, every Build() call also records the operation to the tape.
 	 * @param tape Pointer to the gradient tape, or nullptr to disable recording
 	 */
-	void SetGradientTape(GPU::AD::GradientTape *tape) { _gradientTape = tape; }
+	void SetGradientTape(GPU::AD::GradientTape *tape) {
+		_gradientTape = tape;
+	}
 
 	/**
 	 * Get the currently active gradient tape, or nullptr if none.
 	 */
-	GPU::AD::GradientTape *GetGradientTape() const { return _gradientTape; }
+	GPU::AD::GradientTape *GetGradientTape() const {
+		return _gradientTape;
+	}
 
 	/**
 	 * Set whether the builder is currently generating a callable function body.
@@ -110,7 +114,9 @@ public:
 	}
 
 	/** Check if currently generating a callable function body. */
-	bool IsInCallableBody() const { return _inCallableBody; }
+	bool IsInCallableBody() const {
+		return _inCallableBody;
+	}
 
 public:
 	/**
@@ -275,8 +281,8 @@ private:
 private:
 	BuilderContext				*_context = nullptr;
 	std::stack<BuilderContext *> _contextStack; // Stack for nested kernel definitions
-	GPU::AD::GradientTape	   *_gradientTape = nullptr;
-		bool						_inCallableBody = false;
+	GPU::AD::GradientTape		*_gradientTape	 = nullptr;
+	bool						 _inCallableBody = false;
 };
 } // namespace GPU::IR::Builder
 

@@ -46,11 +46,11 @@ class GPURMSprop;
 // =============================================================================
 
 struct ParamSlot {
-    std::vector<float> m;
-    std::vector<float> v;
-    float *data = nullptr;
-    size_t size   = 0;
-    Runtime::Buffer<float> *buffer = nullptr;
+	std::vector<float>		m;
+	std::vector<float>		v;
+	float				   *data   = nullptr;
+	size_t					size   = 0;
+	Runtime::Buffer<float> *buffer = nullptr;
 };
 
 // =============================================================================
@@ -59,40 +59,48 @@ struct ParamSlot {
 
 class Adam {
 public:
-    Adam(float lr = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f)
-        : lr_(lr), beta1_(beta1), beta2_(beta2), eps_(eps) {}
-    ~Adam();
+	Adam(float lr = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f)
+		: lr_(lr), beta1_(beta1), beta2_(beta2), eps_(eps) {
+	}
+	~Adam();
 
-    void SetWeightDecay(float wd) { weightDecay_ = wd; }
-    void SetGradClip(float clip) { gradClip_ = clip; }
+	void SetWeightDecay(float wd) {
+		weightDecay_ = wd;
+	}
+	void SetGradClip(float clip) {
+		gradClip_ = clip;
+	}
 
-    void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
-        ParamSlot ps;
-        ps.m.resize(size, 0.0f);
-        ps.v.resize(size, 0.0f);
-        ps.data   = data;
-        ps.size   = size;
-        ps.buffer = buf;
-        params_.push_back(std::move(ps));
-    }
+	void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
+		ParamSlot ps;
+		ps.m.resize(size, 0.0f);
+		ps.v.resize(size, 0.0f);
+		ps.data	  = data;
+		ps.size	  = size;
+		ps.buffer = buf;
+		params_.push_back(std::move(ps));
+	}
 
-    template <size_t... Dims>
-    void AddTensor(Tensor<float, Dims...> &tensor) {
-        AddParameter(tensor.Data(), tensor.Size(), &tensor.GetBuffer());
-    }
+	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
+		AddParameter(tensor.Data(), tensor.Size(), &tensor.GetBuffer());
+	}
 
-    void Step(AD::ADKernel1D &kernel);
+	void Step(AD::ADKernel1D &kernel);
 
-    int GetStep() const { return step_; }
-    size_t ParameterCount() const { return params_.size(); }
+	int	 GetStep() const {
+		return step_;
+	}
+	size_t ParameterCount() const {
+		return params_.size();
+	}
 
 private:
-    float lr_, beta1_, beta2_, eps_;
-    float weightDecay_ = 0.0f;
-    float gradClip_    = 0.0f;
-    int   step_        = 0;
-    std::vector<ParamSlot> params_;
-    std::unique_ptr<GPUAdam> gpu_;
+	float					 lr_, beta1_, beta2_, eps_;
+	float					 weightDecay_ = 0.0f;
+	float					 gradClip_	  = 0.0f;
+	int						 step_		  = 0;
+	std::vector<ParamSlot>	 params_;
+	std::unique_ptr<GPUAdam> gpu_;
 };
 
 // =============================================================================
@@ -101,90 +109,95 @@ private:
 
 class GPUAdam {
 public:
-    GPUAdam(float lr = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f)
-        : lr_(lr), beta1_(beta1), beta2_(beta2), eps_(eps) {}
+	GPUAdam(float lr = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f)
+		: lr_(lr), beta1_(beta1), beta2_(beta2), eps_(eps) {
+	}
 
-    ~GPUAdam() { ReleasePipelines(); }
+	~GPUAdam() {
+		ReleasePipelines();
+	}
 
-    GPUAdam(const GPUAdam &) = delete;
-    GPUAdam &operator=(const GPUAdam &) = delete;
+	GPUAdam(const GPUAdam &)			= delete;
+	GPUAdam &operator=(const GPUAdam &) = delete;
 
-    void SetWeightDecay(float wd) { weightDecay_ = wd; }
-    void SetGradClip(float clip) { gradClip_ = clip; }
+	void	 SetWeightDecay(float wd) {
+		weightDecay_ = wd;
+	}
+	void SetGradClip(float clip) {
+		gradClip_ = clip;
+	}
 
-    template <size_t... Dims>
-    void AddTensor(Tensor<float, Dims...> &tensor) {
-        AddParameter(tensor.Size(), tensor.GetBuffer().GetHandle());
-    }
+	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
+		AddParameter(tensor.Size(), tensor.GetBuffer().GetHandle());
+	}
 
-    void AddParameter(size_t size, Backend::BufferHandle weightHandle);
+	void AddParameter(size_t size, Backend::BufferHandle weightHandle);
 
-    void Step(AD::ADKernel1D &kernel, bool sync = false);
+	void Step(AD::ADKernel1D &kernel, bool sync = false);
 
-    int GetStep() const { return step_; }
-    size_t ParameterCount() const { return params_.size(); }
+	int	 GetStep() const {
+		return step_;
+	}
+	size_t ParameterCount() const {
+		return params_.size();
+	}
 
 private:
-    struct ParamSlotGPU {
-        size_t size = 0;
-        Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
-        std::unique_ptr<Runtime::Buffer<float>> m;
-        std::unique_ptr<Runtime::Buffer<float>> v;
-        std::unique_ptr<Runtime::Buffer<float>> hyper;
-        Backend::ShaderHandle shader = Backend::INVALID_SHADER_HANDLE;
-        Backend::PipelineHandle pipeline = Backend::INVALID_PIPELINE_HANDLE;
-        size_t compiledSamples = 0;
-        int compiledGradOffset = 0;
-        int compiledGradStride = 1;
-    };
+	struct ParamSlotGPU {
+		size_t									size		 = 0;
+		Backend::BufferHandle					weightHandle = Backend::INVALID_BUFFER_HANDLE;
+		std::unique_ptr<Runtime::Buffer<float>> m;
+		std::unique_ptr<Runtime::Buffer<float>> v;
+		std::unique_ptr<Runtime::Buffer<float>> hyper;
+		Backend::ShaderHandle					shader			   = Backend::INVALID_SHADER_HANDLE;
+		Backend::PipelineHandle					pipeline		   = Backend::INVALID_PIPELINE_HANDLE;
+		size_t									compiledSamples	   = 0;
+		int										compiledGradOffset = 0;
+		int										compiledGradStride = 1;
+	};
 
-    struct CombinedSlot {
-        size_t size = 0;
-        size_t base = 0;
-        size_t sampleCount = 0;
-        int gradOffset = 0;
-        int gradStride = 1;
-        Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
-        Backend::BufferHandle gradHandle = Backend::INVALID_BUFFER_HANDLE;
-    };
+	struct CombinedSlot {
+		size_t				  size		   = 0;
+		size_t				  base		   = 0;
+		size_t				  sampleCount  = 0;
+		int					  gradOffset   = 0;
+		int					  gradStride   = 1;
+		Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
+		Backend::BufferHandle gradHandle   = Backend::INVALID_BUFFER_HANDLE;
+	};
 
-    std::vector<CombinedSlot>
-    BuildCombinedSlots(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                       size_t &totalSize) const;
+	std::vector<CombinedSlot> BuildCombinedSlots(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
+												 size_t												  &totalSize) const;
 
-    std::string CombinedSignature(const std::vector<CombinedSlot> &slots,
-                                  size_t totalSize) const;
+	std::string				  CombinedSignature(const std::vector<CombinedSlot> &slots, size_t totalSize) const;
 
-    static std::string BuildCombinedAdamShader(const std::vector<CombinedSlot> &slots,
-                                               size_t totalSize);
+	static std::string		  BuildCombinedAdamShader(const std::vector<CombinedSlot> &slots, size_t totalSize);
 
-    void StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                      bool sync);
+	void					  StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams, bool sync);
 
-    void EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
-    void UploadCombinedHyperParams(size_t totalSize, size_t sampleCount);
-    void DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync);
+	void					  EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
+	void					  UploadCombinedHyperParams(size_t totalSize, size_t sampleCount);
+	void					  DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync);
 
-    static std::string BuildAdamShader(size_t paramSize, size_t sampleCount,
-                                       int gradOffset, int gradStride);
+	static std::string		  BuildAdamShader(size_t paramSize, size_t sampleCount, int gradOffset, int gradStride);
 
-    void EnsurePipeline(ParamSlotGPU &ps, const AD::ADKernel1D::GradientParamInfo &first);
-    void UploadHyperParams(ParamSlotGPU &ps, size_t sampleCount);
-    void DispatchSlot(ParamSlotGPU &ps, Backend::BufferHandle gradHandle, bool sync);
-    void ReleasePipelines();
+	void					  EnsurePipeline(ParamSlotGPU &ps, const AD::ADKernel1D::GradientParamInfo &first);
+	void					  UploadHyperParams(ParamSlotGPU &ps, size_t sampleCount);
+	void					  DispatchSlot(ParamSlotGPU &ps, Backend::BufferHandle gradHandle, bool sync);
+	void					  ReleasePipelines();
 
-    float lr_, beta1_, beta2_, eps_;
-    float weightDecay_ = 0.0f;
-    float gradClip_    = 0.0f;
-    int   step_        = 0;
-    std::vector<ParamSlotGPU> params_;
-    std::unique_ptr<Runtime::Buffer<float>> _flatM;
-    std::unique_ptr<Runtime::Buffer<float>> _flatV;
-    std::unique_ptr<Runtime::Buffer<float>> _combinedHyper;
-    size_t _flatMSize = 0;
-    Backend::ShaderHandle _combinedShader = Backend::INVALID_SHADER_HANDLE;
-    Backend::PipelineHandle _combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
-    std::string _combinedSignature;
+	float					  lr_, beta1_, beta2_, eps_;
+	float					  weightDecay_ = 0.0f;
+	float					  gradClip_	   = 0.0f;
+	int						  step_		   = 0;
+	std::vector<ParamSlotGPU> params_;
+	std::unique_ptr<Runtime::Buffer<float>> _flatM;
+	std::unique_ptr<Runtime::Buffer<float>> _flatV;
+	std::unique_ptr<Runtime::Buffer<float>> _combinedHyper;
+	size_t									_flatMSize		  = 0;
+	Backend::ShaderHandle					_combinedShader	  = Backend::INVALID_SHADER_HANDLE;
+	Backend::PipelineHandle					_combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+	std::string								_combinedSignature;
 };
 
 // =============================================================================
@@ -193,93 +206,96 @@ private:
 
 class GPUSGD {
 public:
-    GPUSGD(float lr = 0.01f, float momentum = 0.0f)
-        : lr_(lr), momentum_(momentum) {}
+	GPUSGD(float lr = 0.01f, float momentum = 0.0f) : lr_(lr), momentum_(momentum) {
+	}
 
-    ~GPUSGD() { ReleasePipelines(); }
+	~GPUSGD() {
+		ReleasePipelines();
+	}
 
-    GPUSGD(const GPUSGD &) = delete;
-    GPUSGD &operator=(const GPUSGD &) = delete;
+	GPUSGD(const GPUSGD &)			  = delete;
+	GPUSGD &operator=(const GPUSGD &) = delete;
 
-    void SetWeightDecay(float wd) { weightDecay_ = wd; }
-    void SetGradClip(float clip) { gradClip_ = clip; }
+	void	SetWeightDecay(float wd) {
+		weightDecay_ = wd;
+	}
+	void SetGradClip(float clip) {
+		gradClip_ = clip;
+	}
 
-    template <size_t... Dims>
-    void AddTensor(Tensor<float, Dims...> &tensor) {
-        AddParameter(tensor.Size(), tensor.GetBuffer().GetHandle());
-    }
+	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
+		AddParameter(tensor.Size(), tensor.GetBuffer().GetHandle());
+	}
 
-    void AddParameter(size_t size, Backend::BufferHandle weightHandle);
+	void AddParameter(size_t size, Backend::BufferHandle weightHandle);
 
-    void Step(AD::ADKernel1D &kernel, bool sync = false);
+	void Step(AD::ADKernel1D &kernel, bool sync = false);
 
-    int GetStep() const { return step_; }
-    size_t ParameterCount() const { return params_.size(); }
+	int	 GetStep() const {
+		return step_;
+	}
+	size_t ParameterCount() const {
+		return params_.size();
+	}
 
 private:
-    struct ParamSlotGPU {
-        size_t size = 0;
-        Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
-        std::unique_ptr<Runtime::Buffer<float>> velocity;
-        std::unique_ptr<Runtime::Buffer<float>> hyper;
-        Backend::ShaderHandle shader = Backend::INVALID_SHADER_HANDLE;
-        Backend::PipelineHandle pipeline = Backend::INVALID_PIPELINE_HANDLE;
-        size_t compiledSamples = 0;
-        int compiledGradOffset = 0;
-        int compiledGradStride = 1;
-    };
+	struct ParamSlotGPU {
+		size_t									size		 = 0;
+		Backend::BufferHandle					weightHandle = Backend::INVALID_BUFFER_HANDLE;
+		std::unique_ptr<Runtime::Buffer<float>> velocity;
+		std::unique_ptr<Runtime::Buffer<float>> hyper;
+		Backend::ShaderHandle					shader			   = Backend::INVALID_SHADER_HANDLE;
+		Backend::PipelineHandle					pipeline		   = Backend::INVALID_PIPELINE_HANDLE;
+		size_t									compiledSamples	   = 0;
+		int										compiledGradOffset = 0;
+		int										compiledGradStride = 1;
+	};
 
-    struct CombinedSlot {
-        size_t size = 0;
-        size_t base = 0;
-        size_t sampleCount = 0;
-        int gradOffset = 0;
-        int gradStride = 1;
-        Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
-        Backend::BufferHandle gradHandle = Backend::INVALID_BUFFER_HANDLE;
-    };
+	struct CombinedSlot {
+		size_t				  size		   = 0;
+		size_t				  base		   = 0;
+		size_t				  sampleCount  = 0;
+		int					  gradOffset   = 0;
+		int					  gradStride   = 1;
+		Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
+		Backend::BufferHandle gradHandle   = Backend::INVALID_BUFFER_HANDLE;
+	};
 
-    static void ValidateGradientGroup(const char *name,
-                                      const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                                      size_t paramBase, size_t size,
-                                      const AD::ADKernel1D::GradientParamInfo &first);
+	static void ValidateGradientGroup(const char										   *name,
+									  const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
+									  size_t paramBase, size_t size, const AD::ADKernel1D::GradientParamInfo &first);
 
-    std::vector<CombinedSlot>
-    BuildCombinedSlots(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                       size_t &totalSize) const;
+	std::vector<CombinedSlot> BuildCombinedSlots(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
+												 size_t												  &totalSize) const;
 
-    std::string CombinedSignature(const std::vector<CombinedSlot> &slots,
-                                  size_t totalSize) const;
+	std::string				  CombinedSignature(const std::vector<CombinedSlot> &slots, size_t totalSize) const;
 
-    static std::string BuildCombinedShader(const std::vector<CombinedSlot> &slots,
-                                           size_t totalSize);
+	static std::string		  BuildCombinedShader(const std::vector<CombinedSlot> &slots, size_t totalSize);
 
-    void StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                      bool sync);
+	void					  StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams, bool sync);
 
-    void EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
-    void UploadCombinedHyperParams(size_t sampleCount);
-    void DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync);
+	void					  EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
+	void					  UploadCombinedHyperParams(size_t sampleCount);
+	void					  DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync);
 
-    static std::string BuildShader(size_t paramSize, size_t sampleCount,
-                                   int gradOffset, int gradStride);
+	static std::string		  BuildShader(size_t paramSize, size_t sampleCount, int gradOffset, int gradStride);
 
-    void EnsurePipeline(ParamSlotGPU &ps, const AD::ADKernel1D::GradientParamInfo &first);
-    void UploadHyperParams(ParamSlotGPU &ps, size_t sampleCount);
-    void DispatchSlot(ParamSlotGPU &ps, Backend::BufferHandle gradHandle, bool sync);
-    void ReleasePipelines();
+	void					  EnsurePipeline(ParamSlotGPU &ps, const AD::ADKernel1D::GradientParamInfo &first);
+	void					  UploadHyperParams(ParamSlotGPU &ps, size_t sampleCount);
+	void					  DispatchSlot(ParamSlotGPU &ps, Backend::BufferHandle gradHandle, bool sync);
+	void					  ReleasePipelines();
 
-    float lr_, momentum_;
-    float weightDecay_ = 0.0f;
-    float gradClip_    = 0.0f;
-    int   step_        = 0;
-    std::vector<ParamSlotGPU> params_;
-    std::unique_ptr<Runtime::Buffer<float>> _flatVelocity;
-    std::unique_ptr<Runtime::Buffer<float>> _combinedHyper;
-    size_t _flatVelocitySize = 0;
-    Backend::ShaderHandle _combinedShader = Backend::INVALID_SHADER_HANDLE;
-    Backend::PipelineHandle _combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
-    std::string _combinedSignature;
+	float					  lr_, momentum_;
+	float					  weightDecay_ = 0.0f;
+	float					  gradClip_	   = 0.0f;
+	int						  step_		   = 0;
+	std::vector<ParamSlotGPU> params_;
+	std::unique_ptr<Runtime::Buffer<float>> _flatVelocity;
+	std::unique_ptr<Runtime::Buffer<float>> _combinedHyper;
+	size_t									_flatVelocitySize = 0;
+	Backend::ShaderHandle					_combinedShader	  = Backend::INVALID_SHADER_HANDLE;
+	Backend::PipelineHandle					_combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+	std::string								_combinedSignature;
 };
 
 // =============================================================================
@@ -288,93 +304,96 @@ private:
 
 class GPURMSprop {
 public:
-    GPURMSprop(float lr = 0.001f, float beta = 0.9f, float eps = 1e-8f)
-        : lr_(lr), beta_(beta), eps_(eps) {}
+	GPURMSprop(float lr = 0.001f, float beta = 0.9f, float eps = 1e-8f) : lr_(lr), beta_(beta), eps_(eps) {
+	}
 
-    ~GPURMSprop() { ReleasePipelines(); }
+	~GPURMSprop() {
+		ReleasePipelines();
+	}
 
-    GPURMSprop(const GPURMSprop &) = delete;
-    GPURMSprop &operator=(const GPURMSprop &) = delete;
+	GPURMSprop(const GPURMSprop &)			  = delete;
+	GPURMSprop &operator=(const GPURMSprop &) = delete;
 
-    void SetWeightDecay(float wd) { weightDecay_ = wd; }
-    void SetGradClip(float clip) { gradClip_ = clip; }
+	void		SetWeightDecay(float wd) {
+		weightDecay_ = wd;
+	}
+	void SetGradClip(float clip) {
+		gradClip_ = clip;
+	}
 
-    template <size_t... Dims>
-    void AddTensor(Tensor<float, Dims...> &tensor) {
-        AddParameter(tensor.Size(), tensor.GetBuffer().GetHandle());
-    }
+	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
+		AddParameter(tensor.Size(), tensor.GetBuffer().GetHandle());
+	}
 
-    void AddParameter(size_t size, Backend::BufferHandle weightHandle);
+	void AddParameter(size_t size, Backend::BufferHandle weightHandle);
 
-    void Step(AD::ADKernel1D &kernel, bool sync = false);
+	void Step(AD::ADKernel1D &kernel, bool sync = false);
 
-    int GetStep() const { return step_; }
-    size_t ParameterCount() const { return params_.size(); }
+	int	 GetStep() const {
+		return step_;
+	}
+	size_t ParameterCount() const {
+		return params_.size();
+	}
 
 private:
-    struct ParamSlotGPU {
-        size_t size = 0;
-        Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
-        std::unique_ptr<Runtime::Buffer<float>> squareAvg;
-        std::unique_ptr<Runtime::Buffer<float>> hyper;
-        Backend::ShaderHandle shader = Backend::INVALID_SHADER_HANDLE;
-        Backend::PipelineHandle pipeline = Backend::INVALID_PIPELINE_HANDLE;
-        size_t compiledSamples = 0;
-        int compiledGradOffset = 0;
-        int compiledGradStride = 1;
-    };
+	struct ParamSlotGPU {
+		size_t									size		 = 0;
+		Backend::BufferHandle					weightHandle = Backend::INVALID_BUFFER_HANDLE;
+		std::unique_ptr<Runtime::Buffer<float>> squareAvg;
+		std::unique_ptr<Runtime::Buffer<float>> hyper;
+		Backend::ShaderHandle					shader			   = Backend::INVALID_SHADER_HANDLE;
+		Backend::PipelineHandle					pipeline		   = Backend::INVALID_PIPELINE_HANDLE;
+		size_t									compiledSamples	   = 0;
+		int										compiledGradOffset = 0;
+		int										compiledGradStride = 1;
+	};
 
-    struct CombinedSlot {
-        size_t size = 0;
-        size_t base = 0;
-        size_t sampleCount = 0;
-        int gradOffset = 0;
-        int gradStride = 1;
-        Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
-        Backend::BufferHandle gradHandle = Backend::INVALID_BUFFER_HANDLE;
-    };
+	struct CombinedSlot {
+		size_t				  size		   = 0;
+		size_t				  base		   = 0;
+		size_t				  sampleCount  = 0;
+		int					  gradOffset   = 0;
+		int					  gradStride   = 1;
+		Backend::BufferHandle weightHandle = Backend::INVALID_BUFFER_HANDLE;
+		Backend::BufferHandle gradHandle   = Backend::INVALID_BUFFER_HANDLE;
+	};
 
-    static void ValidateGradientGroup(const char *name,
-                                      const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                                      size_t paramBase, size_t size,
-                                      const AD::ADKernel1D::GradientParamInfo &first);
+	static void ValidateGradientGroup(const char										   *name,
+									  const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
+									  size_t paramBase, size_t size, const AD::ADKernel1D::GradientParamInfo &first);
 
-    std::vector<CombinedSlot>
-    BuildCombinedSlots(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                       size_t &totalSize) const;
+	std::vector<CombinedSlot> BuildCombinedSlots(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
+												 size_t												  &totalSize) const;
 
-    std::string CombinedSignature(const std::vector<CombinedSlot> &slots,
-                                  size_t totalSize) const;
+	std::string				  CombinedSignature(const std::vector<CombinedSlot> &slots, size_t totalSize) const;
 
-    static std::string BuildCombinedShader(const std::vector<CombinedSlot> &slots,
-                                           size_t totalSize);
+	static std::string		  BuildCombinedShader(const std::vector<CombinedSlot> &slots, size_t totalSize);
 
-    void StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams,
-                      bool sync);
+	void					  StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams, bool sync);
 
-    void EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
-    void UploadCombinedHyperParams(size_t sampleCount);
-    void DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync);
+	void					  EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
+	void					  UploadCombinedHyperParams(size_t sampleCount);
+	void					  DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync);
 
-    static std::string BuildShader(size_t paramSize, size_t sampleCount,
-                                   int gradOffset, int gradStride);
+	static std::string		  BuildShader(size_t paramSize, size_t sampleCount, int gradOffset, int gradStride);
 
-    void EnsurePipeline(ParamSlotGPU &ps, const AD::ADKernel1D::GradientParamInfo &first);
-    void UploadHyperParams(ParamSlotGPU &ps, size_t sampleCount);
-    void DispatchSlot(ParamSlotGPU &ps, Backend::BufferHandle gradHandle, bool sync);
-    void ReleasePipelines();
+	void					  EnsurePipeline(ParamSlotGPU &ps, const AD::ADKernel1D::GradientParamInfo &first);
+	void					  UploadHyperParams(ParamSlotGPU &ps, size_t sampleCount);
+	void					  DispatchSlot(ParamSlotGPU &ps, Backend::BufferHandle gradHandle, bool sync);
+	void					  ReleasePipelines();
 
-    float lr_, beta_, eps_;
-    float weightDecay_ = 0.0f;
-    float gradClip_    = 0.0f;
-    int   step_        = 0;
-    std::vector<ParamSlotGPU> params_;
-    std::unique_ptr<Runtime::Buffer<float>> _flatSquareAvg;
-    std::unique_ptr<Runtime::Buffer<float>> _combinedHyper;
-    size_t _flatSquareAvgSize = 0;
-    Backend::ShaderHandle _combinedShader = Backend::INVALID_SHADER_HANDLE;
-    Backend::PipelineHandle _combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
-    std::string _combinedSignature;
+	float					  lr_, beta_, eps_;
+	float					  weightDecay_ = 0.0f;
+	float					  gradClip_	   = 0.0f;
+	int						  step_		   = 0;
+	std::vector<ParamSlotGPU> params_;
+	std::unique_ptr<Runtime::Buffer<float>> _flatSquareAvg;
+	std::unique_ptr<Runtime::Buffer<float>> _combinedHyper;
+	size_t									_flatSquareAvgSize = 0;
+	Backend::ShaderHandle					_combinedShader	   = Backend::INVALID_SHADER_HANDLE;
+	Backend::PipelineHandle					_combinedPipeline  = Backend::INVALID_PIPELINE_HANDLE;
+	std::string								_combinedSignature;
 };
 
 // =============================================================================
@@ -383,39 +402,46 @@ private:
 
 class SGD {
 public:
-    SGD(float lr = 0.01f, float momentum = 0.0f)
-        : lr_(lr), momentum_(momentum) {}
-    ~SGD() = default;
+	SGD(float lr = 0.01f, float momentum = 0.0f) : lr_(lr), momentum_(momentum) {
+	}
+	~SGD() = default;
 
-    void SetWeightDecay(float wd) { weightDecay_ = wd; }
-    void SetGradClip(float clip) { gradClip_ = clip; }
+	void SetWeightDecay(float wd) {
+		weightDecay_ = wd;
+	}
+	void SetGradClip(float clip) {
+		gradClip_ = clip;
+	}
 
-    void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
-        ParamSlot ps;
-        ps.m.resize(size, 0.0f);
-        ps.data   = data;
-        ps.size   = size;
-        ps.buffer = buf;
-        params_.push_back(std::move(ps));
-    }
+	void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
+		ParamSlot ps;
+		ps.m.resize(size, 0.0f);
+		ps.data	  = data;
+		ps.size	  = size;
+		ps.buffer = buf;
+		params_.push_back(std::move(ps));
+	}
 
-    template <size_t... Dims>
-    void AddTensor(Tensor<float, Dims...> &tensor) {
-        AddParameter(tensor.Data(), tensor.Size(), &tensor.GetBuffer());
-    }
+	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
+		AddParameter(tensor.Data(), tensor.Size(), &tensor.GetBuffer());
+	}
 
-    void Step(AD::ADKernel1D &kernel);
+	void Step(AD::ADKernel1D &kernel);
 
-    int GetStep() const { return step_; }
-    size_t ParameterCount() const { return params_.size(); }
+	int	 GetStep() const {
+		return step_;
+	}
+	size_t ParameterCount() const {
+		return params_.size();
+	}
 
 private:
-    float lr_, momentum_;
-    float weightDecay_ = 0.0f;
-    float gradClip_    = 0.0f;
-    int   step_        = 0;
-    std::vector<ParamSlot> params_;
-    std::unique_ptr<GPUSGD> gpu_;
+	float					lr_, momentum_;
+	float					weightDecay_ = 0.0f;
+	float					gradClip_	 = 0.0f;
+	int						step_		 = 0;
+	std::vector<ParamSlot>	params_;
+	std::unique_ptr<GPUSGD> gpu_;
 };
 
 // =============================================================================
@@ -424,39 +450,46 @@ private:
 
 class RMSprop {
 public:
-    RMSprop(float lr = 0.001f, float beta = 0.9f, float eps = 1e-8f)
-        : lr_(lr), beta_(beta), eps_(eps) {}
-    ~RMSprop() = default;
+	RMSprop(float lr = 0.001f, float beta = 0.9f, float eps = 1e-8f) : lr_(lr), beta_(beta), eps_(eps) {
+	}
+	~RMSprop() = default;
 
-    void SetWeightDecay(float wd) { weightDecay_ = wd; }
-    void SetGradClip(float clip) { gradClip_ = clip; }
+	void SetWeightDecay(float wd) {
+		weightDecay_ = wd;
+	}
+	void SetGradClip(float clip) {
+		gradClip_ = clip;
+	}
 
-    void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
-        ParamSlot ps;
-        ps.m.resize(size, 0.0f);
-        ps.data   = data;
-        ps.size   = size;
-        ps.buffer = buf;
-        params_.push_back(std::move(ps));
-    }
+	void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
+		ParamSlot ps;
+		ps.m.resize(size, 0.0f);
+		ps.data	  = data;
+		ps.size	  = size;
+		ps.buffer = buf;
+		params_.push_back(std::move(ps));
+	}
 
-    template <size_t... Dims>
-    void AddTensor(Tensor<float, Dims...> &tensor) {
-        AddParameter(tensor.Data(), tensor.Size(), &tensor.GetBuffer());
-    }
+	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
+		AddParameter(tensor.Data(), tensor.Size(), &tensor.GetBuffer());
+	}
 
-    void Step(AD::ADKernel1D &kernel);
+	void Step(AD::ADKernel1D &kernel);
 
-    int GetStep() const { return step_; }
-    size_t ParameterCount() const { return params_.size(); }
+	int	 GetStep() const {
+		return step_;
+	}
+	size_t ParameterCount() const {
+		return params_.size();
+	}
 
 private:
-    float lr_, beta_, eps_;
-    float weightDecay_ = 0.0f;
-    float gradClip_    = 0.0f;
-    int   step_        = 0;
-    std::vector<ParamSlot> params_;
-    std::unique_ptr<GPURMSprop> gpu_;
+	float						lr_, beta_, eps_;
+	float						weightDecay_ = 0.0f;
+	float						gradClip_	 = 0.0f;
+	int							step_		 = 0;
+	std::vector<ParamSlot>		params_;
+	std::unique_ptr<GPURMSprop> gpu_;
 };
 
 } // namespace GPU::NN

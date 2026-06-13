@@ -44,100 +44,100 @@ class ExprBase;
  * @return GLSL-formatted string representation of the value
  */
 template <typename Type> std::string	  ValueToString(const Type &Value) {
-	 std::ostringstream oss;
+	std::ostringstream oss;
 
-	 if constexpr (std::same_as<Type, float>) {
-		 oss << "float(" << Value << ")";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, int>) {
-		 oss << "int(" << Value << ")";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, bool>) {
-		 return Value ? "true" : "false";
-	 } else if constexpr (std::same_as<Type, Math::Vec2>) {
-		 oss << "vec2(float(" << Value.x << "), float(" << Value.y << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Vec3>) {
-		 oss << "vec3(float(" << Value.x << "), float(" << Value.y << "), float(" << Value.z << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Vec4>) {
-		 oss << "vec4(float(" << Value.x << "), float(" << Value.y << "), float(" << Value.z << "), float(" << Value.w
-			 << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::IVec2>) {
-		 oss << "ivec2(int(" << Value.x << "), int(" << Value.y << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::IVec3>) {
-		 oss << "ivec3(int(" << Value.x << "), int(" << Value.y << "), int(" << Value.z << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::IVec4>) {
-		 oss << "ivec4(int(" << Value.x << "), int(" << Value.y << "), int(" << Value.z << "), int(" << Value.w << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat2>) {
-		 oss << "mat2(float(" << Value.m00 << "), float(" << Value.m10 << "), "
-			 << "float(" << Value.m01 << "), float(" << Value.m11 << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat3>) {
-		 oss << "mat3("
-			 << "float(" << Value.m00 << "), float(" << Value.m10 << "), float(" << Value.m20 << "), "
-			 << "float(" << Value.m01 << "), float(" << Value.m11 << "), float(" << Value.m21 << "), "
-			 << "float(" << Value.m02 << "), float(" << Value.m12 << "), float(" << Value.m22 << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat4>) {
-		 oss << "mat4("
-			 << "float(" << Value.m00 << "), float(" << Value.m10 << "), float(" << Value.m20 << "), float(" << Value.m30
-			 << "), "
-			 << "float(" << Value.m01 << "), float(" << Value.m11 << "), float(" << Value.m21 << "), float(" << Value.m31
-			 << "), "
-			 << "float(" << Value.m02 << "), float(" << Value.m12 << "), float(" << Value.m22 << "), float(" << Value.m32
-			 << "), "
-			 << "float(" << Value.m03 << "), float(" << Value.m13 << "), float(" << Value.m23 << "), float(" << Value.m33
-			 << "))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat2x3>) {
-		 oss << "mat2x3("
-			 << "vec3(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << ")), "
-			 << "vec3(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << ")))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat3x2>) {
-		 oss << "mat3x2("
-			 << "vec2(float(" << Value.c0.x << "), float(" << Value.c0.y << ")), "
-			 << "vec2(float(" << Value.c1.x << "), float(" << Value.c1.y << ")), "
-			 << "vec2(float(" << Value.c2.x << "), float(" << Value.c2.y << ")))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat2x4>) {
-		 oss << "mat2x4("
-			 << "vec4(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << "), float("
-			 << Value.c0.w << ")), "
-			 << "vec4(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << "), float("
-			 << Value.c1.w << ")))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat4x2>) {
-		 oss << "mat4x2("
-			 << "vec2(float(" << Value.c0.x << "), float(" << Value.c0.y << ")), "
-			 << "vec2(float(" << Value.c1.x << "), float(" << Value.c1.y << ")), "
-			 << "vec2(float(" << Value.c2.x << "), float(" << Value.c2.y << ")), "
-			 << "vec2(float(" << Value.c3.x << "), float(" << Value.c3.y << ")))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat3x4>) {
-		 oss << "mat3x4("
-			 << "vec4(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << "), float("
-			 << Value.c0.w << ")), "
-			 << "vec4(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << "), float("
-			 << Value.c1.w << ")), "
-			 << "vec4(float(" << Value.c2.x << "), float(" << Value.c2.y << "), float(" << Value.c2.z << "), float("
-			 << Value.c2.w << ")))";
-		 return oss.str();
-	 } else if constexpr (std::same_as<Type, Math::Mat4x3>) {
-		 oss << "mat4x3("
-			 << "vec3(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << ")), "
-			 << "vec3(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << ")), "
-			 << "vec3(float(" << Value.c2.x << "), float(" << Value.c2.y << "), float(" << Value.c2.z << ")), "
-			 << "vec3(float(" << Value.c3.x << "), float(" << Value.c3.y << "), float(" << Value.c3.z << ")))";
-		 return oss.str();
-	 } else {
-		 return "unknown";
-	 }
+	if constexpr (std::same_as<Type, float>) {
+		oss << "float(" << Value << ")";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, int>) {
+		oss << "int(" << Value << ")";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, bool>) {
+		return Value ? "true" : "false";
+	} else if constexpr (std::same_as<Type, Math::Vec2>) {
+		oss << "vec2(float(" << Value.x << "), float(" << Value.y << "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Vec3>) {
+		oss << "vec3(float(" << Value.x << "), float(" << Value.y << "), float(" << Value.z << "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Vec4>) {
+		oss << "vec4(float(" << Value.x << "), float(" << Value.y << "), float(" << Value.z << "), float(" << Value.w
+			<< "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::IVec2>) {
+		oss << "ivec2(int(" << Value.x << "), int(" << Value.y << "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::IVec3>) {
+		oss << "ivec3(int(" << Value.x << "), int(" << Value.y << "), int(" << Value.z << "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::IVec4>) {
+		oss << "ivec4(int(" << Value.x << "), int(" << Value.y << "), int(" << Value.z << "), int(" << Value.w << "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat2>) {
+		oss << "mat2(float(" << Value.m00 << "), float(" << Value.m10 << "), "
+			<< "float(" << Value.m01 << "), float(" << Value.m11 << "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat3>) {
+		oss << "mat3("
+			<< "float(" << Value.m00 << "), float(" << Value.m10 << "), float(" << Value.m20 << "), "
+			<< "float(" << Value.m01 << "), float(" << Value.m11 << "), float(" << Value.m21 << "), "
+			<< "float(" << Value.m02 << "), float(" << Value.m12 << "), float(" << Value.m22 << "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat4>) {
+		oss << "mat4("
+			<< "float(" << Value.m00 << "), float(" << Value.m10 << "), float(" << Value.m20 << "), float(" << Value.m30
+			<< "), "
+			<< "float(" << Value.m01 << "), float(" << Value.m11 << "), float(" << Value.m21 << "), float(" << Value.m31
+			<< "), "
+			<< "float(" << Value.m02 << "), float(" << Value.m12 << "), float(" << Value.m22 << "), float(" << Value.m32
+			<< "), "
+			<< "float(" << Value.m03 << "), float(" << Value.m13 << "), float(" << Value.m23 << "), float(" << Value.m33
+			<< "))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat2x3>) {
+		oss << "mat2x3("
+			<< "vec3(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << ")), "
+			<< "vec3(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << ")))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat3x2>) {
+		oss << "mat3x2("
+			<< "vec2(float(" << Value.c0.x << "), float(" << Value.c0.y << ")), "
+			<< "vec2(float(" << Value.c1.x << "), float(" << Value.c1.y << ")), "
+			<< "vec2(float(" << Value.c2.x << "), float(" << Value.c2.y << ")))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat2x4>) {
+		oss << "mat2x4("
+			<< "vec4(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << "), float("
+			<< Value.c0.w << ")), "
+			<< "vec4(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << "), float("
+			<< Value.c1.w << ")))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat4x2>) {
+		oss << "mat4x2("
+			<< "vec2(float(" << Value.c0.x << "), float(" << Value.c0.y << ")), "
+			<< "vec2(float(" << Value.c1.x << "), float(" << Value.c1.y << ")), "
+			<< "vec2(float(" << Value.c2.x << "), float(" << Value.c2.y << ")), "
+			<< "vec2(float(" << Value.c3.x << "), float(" << Value.c3.y << ")))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat3x4>) {
+		oss << "mat3x4("
+			<< "vec4(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << "), float("
+			<< Value.c0.w << ")), "
+			<< "vec4(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << "), float("
+			<< Value.c1.w << ")), "
+			<< "vec4(float(" << Value.c2.x << "), float(" << Value.c2.y << "), float(" << Value.c2.z << "), float("
+			<< Value.c2.w << ")))";
+		return oss.str();
+	} else if constexpr (std::same_as<Type, Math::Mat4x3>) {
+		oss << "mat4x3("
+			<< "vec3(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << ")), "
+			<< "vec3(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << ")), "
+			<< "vec3(float(" << Value.c2.x << "), float(" << Value.c2.y << "), float(" << Value.c2.z << ")), "
+			<< "vec3(float(" << Value.c3.x << "), float(" << Value.c3.y << "), float(" << Value.c3.z << ")))";
+		return oss.str();
+	} else {
+		return "unknown";
+	}
 }
 
 /**
@@ -322,8 +322,7 @@ public:
 	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
 	}
 
-	explicit Expr(const ExprBase &base)
-		: ExprBase(base.Node()->Clone()) {
+	explicit Expr(const ExprBase &base) : ExprBase(base.Node()->Clone()) {
 	}
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
@@ -390,7 +389,7 @@ public:
 	template <BitableType IndexType> Expr<ElementType_t> operator[](IndexType index) & = delete;
 
 	Expr<ElementType_t>									 operator[](ExprBase index)									 &&{
-		 return Expr<ElementType_t>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<ElementType_t>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<ElementType_t>								 operator[](ExprBase index) & = delete;

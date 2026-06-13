@@ -28,8 +28,8 @@ int main() {
 		int			passed = 0, total = 0;
 
 		const char *vsSrc =
-			"#version 450\nvoid main() {\n\tvec2 pos;\n\tpos.x = float((gl_VertexID & 1) << 2) - 1.0;\n\tpos.y = "
-			"float((gl_VertexID & 2) << 1) - 1.0;\n\tgl_Position = vec4(pos, 0.0, 1.0);\n}\n";
+			"#version 450\nvoid main() {\n\tvec2 pos;\n\tpos.x = float((gl_VertexIndex & 1) << 2) - 1.0;\n\tpos.y = "
+			"float((gl_VertexIndex & 2) << 1) - 1.0;\n\tgl_Position = vec4(pos, 0.0, 1.0);\n}\n";
 		const char *fsSrc = "#version 450\nlayout(location = 0) out vec4 outColor;\nvoid main() {\n\toutColor = "
 							"vec4(0.5, 0.3, 0.1, 1.0);\n}\n";
 
@@ -67,10 +67,11 @@ int main() {
 			auto							   fs = backend->CreateShader(fsDesc);
 
 			GPU::Backend::GraphicsPipelineDesc pipeDesc;
-			pipeDesc.vertexShader	= vs;
-			pipeDesc.fragmentShader = fs;
-			pipeDesc.topology		= GPU::Backend::PrimitiveTopology::TriangleList;
-			auto pipeline			= backend->CreateGraphicsPipeline(pipeDesc);
+			pipeDesc.vertexShader		   = vs;
+			pipeDesc.fragmentShader		   = fs;
+			pipeDesc.topology			   = GPU::Backend::PrimitiveTopology::TriangleList;
+			pipeDesc.colorAttachmentFormat = GPU::Backend::PixelFormat::RGBA8;
+			auto pipeline				   = backend->CreateGraphicsPipeline(pipeDesc);
 			if (pipeline == GPU::Backend::INVALID_PIPELINE_HANDLE) {
 				backend->DestroyShader(vs);
 				backend->DestroyShader(fs);
@@ -100,6 +101,7 @@ int main() {
 			pipeDesc.vertexShader			   = vs;
 			pipeDesc.fragmentShader			   = fs;
 			pipeDesc.topology				   = GPU::Backend::PrimitiveTopology::TriangleList;
+			pipeDesc.colorAttachmentFormat	   = GPU::Backend::PixelFormat::RGBA8;
 			auto					  pipeline = backend->CreateGraphicsPipeline(pipeDesc);
 
 			GPU::Backend::TextureDesc texDesc;
@@ -114,7 +116,7 @@ int main() {
 			rpDesc.clearColor[1]   = 0.0f;
 			rpDesc.clearColor[2]   = 0.0f;
 			rpDesc.clearColor[3]   = 1.0f;
-			rpDesc.clear		   = true;
+			rpDesc.clearColorFlag  = true;
 
 			backend->BeginRendering(rpDesc);
 			backend->SetViewport(0, 0, W, H);
@@ -169,10 +171,11 @@ int main() {
 			auto							   fs = backend->CreateShader(fsDesc);
 
 			GPU::Backend::GraphicsPipelineDesc pipeDesc;
-			pipeDesc.vertexShader	= vs;
-			pipeDesc.fragmentShader = fs;
-			pipeDesc.topology		= GPU::Backend::PrimitiveTopology::TriangleList;
-			auto pipeline			= backend->CreateGraphicsPipeline(pipeDesc);
+			pipeDesc.vertexShader		   = vs;
+			pipeDesc.fragmentShader		   = fs;
+			pipeDesc.topology			   = GPU::Backend::PrimitiveTopology::TriangleList;
+			pipeDesc.colorAttachmentFormat = GPU::Backend::PixelFormat::RGBA8;
+			auto pipeline				   = backend->CreateGraphicsPipeline(pipeDesc);
 
 			backend->BindPipeline(pipeline);
 			bool caught = false;
@@ -206,7 +209,7 @@ int main() {
 
 			GPU::Backend::RenderPassBeginDesc rpDesc;
 			rpDesc.colorAttachment = tex;
-			rpDesc.clear		   = false;
+			rpDesc.clearColorFlag  = false;
 
 			backend->BeginRendering(rpDesc);
 			bool caught = false;

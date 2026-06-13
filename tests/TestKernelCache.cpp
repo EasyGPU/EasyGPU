@@ -250,19 +250,19 @@ bool Test_MultipleKernelsCaching() {
 
 	// Create and run multiple different kernels
 	Kernel1D	  kernel1([&](Int i) {
-		 auto b = buf1.Bind();
-		 b[i]	= ToFloat(i) * 1.0f;
-	 });
+		auto b = buf1.Bind();
+		b[i]   = ToFloat(i) * 1.0f;
+	});
 
 	Kernel1D	  kernel2([&](Int i) {
-		 auto b = buf2.Bind();
-		 b[i]	= ToFloat(i) * 2.0f;
-	 });
+		auto b = buf2.Bind();
+		b[i]   = ToFloat(i) * 2.0f;
+	});
 
 	Kernel1D	  kernel3([&](Int i) {
-		 auto b = buf3.Bind();
-		 b[i]	= ToFloat(i) * 3.0f;
-	 });
+		auto b = buf3.Bind();
+		b[i]   = ToFloat(i) * 3.0f;
+	});
 
 	kernel1.Dispatch(2, true);
 	kernel2.Dispatch(2, true);

@@ -52,7 +52,7 @@ public:
 	 * @return The binding slot index, or -1 if not bound
 	 */
 	int							  GetBinding() const {
-		  return _binding;
+		return _binding;
 	}
 
 	/**

@@ -1097,15 +1097,15 @@ public:
 	Var() {
 		GPU::Meta::RegisterStructWithDependencies<GameObject>();
 		auto name = Builder::Builder::Get().Context()->AssignVarName();
-		_node	  = std::make_unique<Node::LocalVariableNode>(name,
-															  std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
-		_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+		_node = std::make_unique<Node::LocalVariableNode>(name,
+														  std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
+		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
 		Builder::Builder::Get().Build(*_varNode, true);
 	}
 	explicit Var(const std::string &varName) {
 		GPU::Meta::RegisterStructWithDependencies<GameObject>();
-		_node	 = std::make_unique<Node::LocalVariableNode>(varName,
-															 std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
+		_node = std::make_unique<Node::LocalVariableNode>(varName,
+														  std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
 		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
 	}
 	Var(const std::string &varName, bool IsExternal) {
@@ -1135,9 +1135,9 @@ public:
 	Var(const GameObject &value) {
 		GPU::Meta::RegisterStructWithDependencies<GameObject>();
 		auto name = Builder::Builder::Get().Context()->AssignVarName();
-		_node	  = std::make_unique<Node::LocalVariableNode>(name,
-															  std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
-		_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+		_node = std::make_unique<Node::LocalVariableNode>(name,
+														  std::string(GPU::Meta::StructMeta<GameObject>::glslTypeName));
+		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
 		Builder::Builder::Get().Build(*_varNode, true);
 		std::ostringstream initCodeOss_;
 		initCodeOss_ << name << "=" << GPU::Meta::StructMeta<GameObject>::ToGLSLInit(value) << ";";
@@ -1219,23 +1219,23 @@ Buffer<ObjectTransform> buffer(transformsCPU, BufferMode::ReadWrite);
 
 // Kernel: update position based on id
 GPU::Kernel::Kernel1D	kernel(
-	  [&](Var<int> &id) {
-		  auto				   data = buffer.Bind();
+	[&](Var<int> &id) {
+		auto				 data = buffer.Bind();
 
-		  Var<ObjectTransform> t	= data[id];
+		Var<ObjectTransform> t	  = data[id];
 
-		  // Modify position
-		  t.position()				= t.position() + Vec3(1.0f, 2.0f, 3.0f);
+		// Modify position
+		t.position()			  = t.position() + Vec3(1.0f, 2.0f, 3.0f);
 
-		  // Modify rotation (simple rotation around Z)
-		  t.rotation()				= Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		// Modify rotation (simple rotation around Z)
+		t.rotation()			  = Vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-		  // Modify scale
-		  t.scale()					= t.scale() * 2.0f;
+		// Modify scale
+		t.scale()				  = t.scale() * 2.0f;
 
-		  data[id]					= t;
-	  },
-	  64);
+		data[id]				  = t;
+	},
+	64);
 
 kernel.Dispatch(1, true);
 
@@ -1364,19 +1364,19 @@ Buffer<MisalignedData> buffer(dataCPU, BufferMode::ReadWrite);
 
 // Kernel: modify all fields
 GPU::Kernel::Kernel1D  kernel(
-	 [&](Var<int> &id) {
-		 auto				 data = buffer.Bind();
+	[&](Var<int> &id) {
+		auto				data = buffer.Bind();
 
-		 Var<MisalignedData> d	  = data[id];
+		Var<MisalignedData> d	 = data[id];
 
-		 d.a()					  = d.a() * 2.0f;
-		 d.b()					  = d.b() + Vec4(1.0f, 1.0f, 1.0f, 0.0f);
-		 d.c()					  = d.c() + 1.0f;
-		 d.d()					  = d.d() + 1.0f;
+		d.a()					 = d.a() * 2.0f;
+		d.b()					 = d.b() + Vec4(1.0f, 1.0f, 1.0f, 0.0f);
+		d.c()					 = d.c() + 1.0f;
+		d.d()					 = d.d() + 1.0f;
 
-		 data[id]				  = d;
-	 },
-	 32);
+		data[id]				 = d;
+	},
+	32);
 
 kernel.Dispatch(1, true);
 

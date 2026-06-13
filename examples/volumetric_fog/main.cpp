@@ -64,10 +64,10 @@ constexpr int			NOISE_OCTAVES	= 4;
 // Hash function for pseudo-random numbers
 // =============================================================================
 Callable<Float(Float3)> Hash			= [](Float3 &p) {
-	   Float3 q = p * MakeFloat3(0.1031f, 0.1030f, 0.0973f);
-	   Float  h = Fract(q.x() + q.y() + q.z());
-	   h		= h * 0.47f;
-	   Return(Fract(h * 93.31f));
+	Float3 q = p * MakeFloat3(0.1031f, 0.1030f, 0.0973f);
+	Float  h = Fract(q.x() + q.y() + q.z());
+	h		 = h * 0.47f;
+	Return(Fract(h * 93.31f));
 };
 
 // =============================================================================

@@ -13,9 +13,9 @@
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>
+#include <Utility/ActiveCompaction.h>
 #include <Utility/Helpers.h>
 #include <Utility/Math.h>
-#include <Utility/ActiveCompaction.h>
 
 #include <algorithm>
 #include <cassert>
@@ -39,57 +39,57 @@ using namespace GPU::NN;
 static int test_count = 0;
 static int pass_count = 0;
 
-#define TEST(name)                                                                                             \
-	void test_##name() {                                                                                       \
-		std::cout << "\n[TEST] " #name " ... ";                                                                \
-		test_count++;                                                                                           \
+#define TEST(name)                                                                                                     \
+	void test_##name() {                                                                                               \
+		std::cout << "\n[TEST] " #name " ... ";                                                                        \
+		test_count++;                                                                                                  \
 		try {
 
-#define END_TEST                                                                                               \
-		pass_count++;                                                                                              \
-		std::cout << "PASSED\n";                                                                                   \
-		}                                                                                                          \
-		catch (const std::exception &e) {                                                                          \
-			std::cout << "FAILED: " << e.what() << "\n";                                                           \
-		}                                                                                                          \
-		}
-
-#define ASSERT(cond)                                                                                           \
-	if (!(cond)) {                                                                                             \
-		throw std::runtime_error("Assertion failed: " #cond);                                                  \
+#define END_TEST                                                                                                       \
+	pass_count++;                                                                                                      \
+	std::cout << "PASSED\n";                                                                                           \
+	}                                                                                                                  \
+	catch (const std::exception &e) {                                                                                  \
+		std::cout << "FAILED: " << e.what() << "\n";                                                                   \
+	}                                                                                                                  \
 	}
 
-#define CHECK_CONTAINS(str, sub)                                                                               \
-	if ((str).find(sub) == std::string::npos) {                                                                \
-		throw std::runtime_error("Expected '" + std::string(sub) + "' in:\n" + str);                            \
+#define ASSERT(cond)                                                                                                   \
+	if (!(cond)) {                                                                                                     \
+		throw std::runtime_error("Assertion failed: " #cond);                                                          \
 	}
 
-#define CHECK_NOT_CONTAINS(str, sub)                                                                           \
-	if ((str).find(sub) != std::string::npos) {                                                                \
-		throw std::runtime_error("Unexpected '" + std::string(sub) + "' in:\n" + str);                          \
+#define CHECK_CONTAINS(str, sub)                                                                                       \
+	if ((str).find(sub) == std::string::npos) {                                                                        \
+		throw std::runtime_error("Expected '" + std::string(sub) + "' in:\n" + str);                                   \
+	}
+
+#define CHECK_NOT_CONTAINS(str, sub)                                                                                   \
+	if ((str).find(sub) != std::string::npos) {                                                                        \
+		throw std::runtime_error("Unexpected '" + std::string(sub) + "' in:\n" + str);                                 \
 	}
 
 // =============================================================================
 // SECTION 1: Tensor — construction and CPU indexing
 // =============================================================================
 
-TEST(nn_tensor_1d_construct)
-{
+TEST(nn_tensor_1d_construct) {
 	Tensor<float, 10> t;
 	ASSERT(t.Size() == 10);
 	ASSERT(t.Data()[0] == 0.0f);
 	ASSERT(t.Data()[9] == 0.0f);
 
 	// Fill and verify
-	for (size_t i = 0; i < 10; i++) t.Data()[i] = (float)i * 1.5f;
+	for (size_t i = 0; i < 10; i++)
+		t.Data()[i] = (float)i * 1.5f;
 	t.Upload();
 	t.Download();
-	for (size_t i = 0; i < 10; i++) ASSERT(t.Data()[i] == (float)i * 1.5f);
+	for (size_t i = 0; i < 10; i++)
+		ASSERT(t.Data()[i] == (float)i * 1.5f);
 }
 END_TEST
 
-TEST(nn_tensor_2d_indexing)
-{
+TEST(nn_tensor_2d_indexing) {
 	std::vector<float> data(128 * 64);
 	for (size_t i = 0; i < 128; i++)
 		for (size_t j = 0; j < 64; j++)
@@ -107,8 +107,7 @@ TEST(nn_tensor_2d_indexing)
 }
 END_TEST
 
-TEST(nn_tensor_3d_indexing)
-{
+TEST(nn_tensor_3d_indexing) {
 	std::vector<float> data(2 * 3 * 4);
 	for (size_t i = 0; i < 2; i++)
 		for (size_t j = 0; j < 3; j++)
@@ -125,8 +124,7 @@ TEST(nn_tensor_3d_indexing)
 }
 END_TEST
 
-TEST(nn_tensor_const_indexing)
-{
+TEST(nn_tensor_const_indexing) {
 	std::vector<float> data(5 * 3);
 	for (size_t i = 0; i < 5; i++)
 		for (size_t j = 0; j < 3; j++)
@@ -139,8 +137,7 @@ TEST(nn_tensor_const_indexing)
 }
 END_TEST
 
-TEST(nn_tensor_move_semantics)
-{
+TEST(nn_tensor_move_semantics) {
 	Tensor<float, 10> t1;
 	t1.Data()[0] = 42.0f;
 	t1.Upload();
@@ -158,12 +155,12 @@ END_TEST
 // SECTION 2: Tensor — AdjointInspector DSL verification
 // =============================================================================
 
-TEST(nn_tensor_ref_1d_for_each_param)
-{
+TEST(nn_tensor_ref_1d_for_each_param) {
 	// Verify ForEachParam registers all elements in flat order
-	Tensor<float, 5> t;
+	Tensor<float, 5>   t;
 	std::vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-	for (int i = 0; i < 5; i++) t.Data()[i] = data[i];
+	for (int i = 0; i < 5; i++)
+		t.Data()[i] = data[i];
 	t.Upload();
 
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
@@ -177,7 +174,7 @@ TEST(nn_tensor_ref_1d_for_each_param)
 		ctx.MarkLoss(loss);
 	});
 
-	auto &tape = inspector.Tape();
+	auto			  &tape = inspector.Tape();
 	ASSERT(tape.Size() > 0);
 	// Should have 5 parameters + some operations + 1 loss
 	ASSERT(!inspector.GetForwardCode().empty());
@@ -189,18 +186,19 @@ TEST(nn_tensor_ref_1d_for_each_param)
 }
 END_TEST
 
-TEST(nn_tensor_ref_for_each_param_dsl)
-{
+TEST(nn_tensor_ref_for_each_param_dsl) {
 	// Verify ForEachParam can be used with a lambda
 	Tensor<float, 8> t;
-	for (int i = 0; i < 8; i++) t.Data()[i] = (float)i;
+	for (int i = 0; i < 8; i++)
+		t.Data()[i] = (float)i;
 	t.Upload();
 
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		auto tref = t.Bind();
 		tref.ForEachParam([&](auto &w) { ctx.RegisterParameter(w); });
 		Var<float> loss = MakeFloat(0.0f);
-		for (int i = 0; i < 8; i++) loss = loss + tref[i];
+		for (int i = 0; i < 8; i++)
+			loss = loss + tref[i];
 		ctx.MarkLoss(loss);
 	});
 
@@ -211,8 +209,7 @@ TEST(nn_tensor_ref_for_each_param_dsl)
 }
 END_TEST
 
-TEST(nn_tensor_ref_2d_inspector)
-{
+TEST(nn_tensor_ref_2d_inspector) {
 	std::vector<float> data(3 * 4);
 	for (size_t i = 0; i < 3; i++)
 		for (size_t j = 0; j < 4; j++)
@@ -220,7 +217,7 @@ TEST(nn_tensor_ref_2d_inspector)
 
 	Tensor<float, 3, 4> t(data);
 
-	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
+	AdjointInspector1D	inspector([&](Var<int> &id, AdjointContext &ctx) {
 		auto tref = t.Bind();
 		ctx.RegisterParameter(tref(0, 0));
 		ctx.RegisterParameter(tref(1, 2));
@@ -228,7 +225,7 @@ TEST(nn_tensor_ref_2d_inspector)
 		ctx.MarkLoss(loss);
 	});
 
-	auto fwd = inspector.GetForwardCode();
+	auto				fwd = inspector.GetForwardCode();
 	CHECK_CONTAINS(fwd, "buf");
 	CHECK_CONTAINS(inspector.GetBackwardCode(), "d_");
 }
@@ -238,8 +235,7 @@ END_TEST
 // SECTION 3: Optimizer — parameter registration
 // =============================================================================
 
-TEST(nn_adam_parameter_count)
-{
+TEST(nn_adam_parameter_count) {
 	Adam adam(0.001f);
 	ASSERT(adam.GetStep() == 0);
 	ASSERT(adam.ParameterCount() == 0);
@@ -254,17 +250,15 @@ TEST(nn_adam_parameter_count)
 }
 END_TEST
 
-TEST(nn_adam_add_tensor)
-{
+TEST(nn_adam_add_tensor) {
 	Tensor<float, 20> t;
-	Adam adam(0.001f);
+	Adam			  adam(0.001f);
 	adam.AddTensor(t);
 	ASSERT(adam.ParameterCount() == 1);
 }
 END_TEST
 
-TEST(nn_adam_weight_decay_setting)
-{
+TEST(nn_adam_weight_decay_setting) {
 	Adam adam(0.001f);
 	adam.SetWeightDecay(0.0001f);
 	adam.SetGradClip(0.5f);
@@ -275,8 +269,7 @@ TEST(nn_adam_weight_decay_setting)
 }
 END_TEST
 
-TEST(nn_sgd_parameter_count)
-{
+TEST(nn_sgd_parameter_count) {
 	SGD sgd(0.01f, 0.9f);
 	ASSERT(sgd.GetStep() == 0);
 	ASSERT(sgd.ParameterCount() == 0);
@@ -287,8 +280,7 @@ TEST(nn_sgd_parameter_count)
 }
 END_TEST
 
-TEST(nn_rmsprop_parameter_count)
-{
+TEST(nn_rmsprop_parameter_count) {
 	RMSprop rms(0.001f, 0.9f);
 	ASSERT(rms.GetStep() == 0);
 	ASSERT(rms.ParameterCount() == 0);
@@ -299,12 +291,11 @@ TEST(nn_rmsprop_parameter_count)
 }
 END_TEST
 
-TEST(nn_optimizer_multiple_tensors)
-{
+TEST(nn_optimizer_multiple_tensors) {
 	Tensor<float, 10> W;
-	Tensor<float, 5> b;
+	Tensor<float, 5>  b;
 
-	Adam adam(0.001f);
+	Adam			  adam(0.001f);
 	adam.AddTensor(W);
 	adam.AddTensor(b);
 	ASSERT(adam.ParameterCount() == 2);
@@ -315,8 +306,7 @@ END_TEST
 // SECTION 4: Optimizer — update rule math verification
 // =============================================================================
 
-TEST(nn_adam_update_math)
-{
+TEST(nn_adam_update_math) {
 	// Verify Adam update rule manually:
 	// m = beta1*m + (1-beta1)*g
 	// v = beta2*v + (1-beta2)*g^2
@@ -327,16 +317,16 @@ TEST(nn_adam_update_math)
 
 	// Manual computation for comparison
 	float weight = 1.0f;
-	float grad = 0.5f;
+	float grad	 = 0.5f;
 	float m = 0.0f, v = 0.0f;
-	int t = 1;
+	int	  t			= 1;
 
-	m = beta1 * m + (1.0f - beta1) * grad;
-	v = beta2 * v + (1.0f - beta2) * grad * grad;
-	float bias1 = 1.0f - std::pow(beta1, t);
-	float bias2 = 1.0f - std::pow(beta2, t);
-	float mHat = m / bias1;
-	float vHat = v / bias2;
+	m				= beta1 * m + (1.0f - beta1) * grad;
+	v				= beta2 * v + (1.0f - beta2) * grad * grad;
+	float bias1		= 1.0f - std::pow(beta1, t);
+	float bias2		= 1.0f - std::pow(beta2, t);
+	float mHat		= m / bias1;
+	float vHat		= v / bias2;
 	float expectedW = weight - lr * mHat / (std::sqrt(vHat) + eps);
 
 	// Verify Adam formula correctness
@@ -346,26 +336,25 @@ TEST(nn_adam_update_math)
 }
 END_TEST
 
-TEST(nn_adam_elementwise_update_matches_gradients)
-{
+TEST(nn_adam_elementwise_update_matches_gradients) {
 	std::vector<float> weight = {1.0f, 2.0f};
-	std::vector<float> grad   = {0.5f, -0.25f};
+	std::vector<float> grad	  = {0.5f, -0.25f};
 	std::vector<float> m(2, 0.0f);
 	std::vector<float> v(2, 0.0f);
 
 	// Inline Adam update (CPU helper removed, logic replicated for test)
-		float lr = 0.1f, beta1 = 0.9f, beta2 = 0.999f, eps = 1e-8f;
-		int step = 1;
-		const double biasCorr1 = 1.0 - std::pow(beta1, step);
-		const double biasCorr2 = 1.0 - std::pow(beta2, step);
-		for (size_t i = 0; i < weight.size(); ++i) {
-			double g = static_cast<double>(grad[i]);
-			m[i] = static_cast<float>(beta1 * m[i] + (1.0 - beta1) * g);
-			v[i] = static_cast<float>(beta2 * v[i] + (1.0 - beta2) * g * g);
-			const double mHat = m[i] / biasCorr1;
-			const double vHat = v[i] / biasCorr2;
-			weight[i] -= static_cast<float>(lr * mHat / (std::sqrt(vHat) + eps));
-		}
+	float			   lr = 0.1f, beta1 = 0.9f, beta2 = 0.999f, eps = 1e-8f;
+	int				   step		 = 1;
+	const double	   biasCorr1 = 1.0 - std::pow(beta1, step);
+	const double	   biasCorr2 = 1.0 - std::pow(beta2, step);
+	for (size_t i = 0; i < weight.size(); ++i) {
+		double g		   = static_cast<double>(grad[i]);
+		m[i]			   = static_cast<float>(beta1 * m[i] + (1.0 - beta1) * g);
+		v[i]			   = static_cast<float>(beta2 * v[i] + (1.0 - beta2) * g * g);
+		const double mHat  = m[i] / biasCorr1;
+		const double vHat  = v[i] / biasCorr2;
+		weight[i]		  -= static_cast<float>(lr * mHat / (std::sqrt(vHat) + eps));
+	}
 
 	// The update must use each element's own gradient, not a single averaged scalar.
 	ASSERT(std::abs(m[0] - 0.05f) < 1e-6f);
@@ -375,21 +364,22 @@ TEST(nn_adam_elementwise_update_matches_gradients)
 }
 END_TEST
 
-TEST(nn_gpu_adam_updates_on_device)
-{
+TEST(nn_gpu_adam_updates_on_device) {
 	Tensor<float, 2> weight({1.0f, -1.0f});
-	Buffer<float> xBuf({2.0f, 3.0f}, BufferMode::Read);
+	Buffer<float>	 xBuf({2.0f, 3.0f}, BufferMode::Read);
 
-	ADKernel1D kernel([&](Var<int> &id) {
-		(void)id;
-		auto x = xBuf.Bind();
-		auto w = weight.Bind();
-		AD::Param(w[0]);
-		AD::Param(w[1]);
-		Var<float> y = w[0] * x[0] + w[1] * x[1];
-		Var<float> loss = y * y;
-		AD::Loss(loss);
-	}, 1, 256);
+	ADKernel1D		 kernel(
+		[&](Var<int> &id) {
+			(void)id;
+			auto x = xBuf.Bind();
+			auto w = weight.Bind();
+			AD::Param(w[0]);
+			AD::Param(w[1]);
+			Var<float> y	= w[0] * x[0] + w[1] * x[1];
+			Var<float> loss = y * y;
+			AD::Loss(loss);
+		},
+		1, 256);
 
 	GPUAdam optimizer(0.1f, 0.0f, 0.0f, 1e-8f);
 	optimizer.AddTensor(weight);
@@ -403,21 +393,22 @@ TEST(nn_gpu_adam_updates_on_device)
 }
 END_TEST
 
-TEST(nn_adam_step_is_gpu_backed)
-{
+TEST(nn_adam_step_is_gpu_backed) {
 	Tensor<float, 2> weight({1.0f, -1.0f});
-	Buffer<float> xBuf({2.0f, 3.0f}, BufferMode::Read);
+	Buffer<float>	 xBuf({2.0f, 3.0f}, BufferMode::Read);
 
-	ADKernel1D kernel([&](Var<int> &id) {
-		(void)id;
-		auto x = xBuf.Bind();
-		auto w = weight.Bind();
-		AD::Param(w[0]);
-		AD::Param(w[1]);
-		Var<float> y = w[0] * x[0] + w[1] * x[1];
-		Var<float> loss = y * y;
-		AD::Loss(loss);
-	}, 1, 256);
+	ADKernel1D		 kernel(
+		[&](Var<int> &id) {
+			(void)id;
+			auto x = xBuf.Bind();
+			auto w = weight.Bind();
+			AD::Param(w[0]);
+			AD::Param(w[1]);
+			Var<float> y	= w[0] * x[0] + w[1] * x[1];
+			Var<float> loss = y * y;
+			AD::Loss(loss);
+		},
+		1, 256);
 
 	Adam optimizer(0.1f, 0.0f, 0.0f, 1e-8f);
 	optimizer.AddTensor(weight);
@@ -431,12 +422,11 @@ TEST(nn_adam_step_is_gpu_backed)
 }
 END_TEST
 
-TEST(nn_adam_bias_correction)
-{
+TEST(nn_adam_bias_correction) {
 	// At t=1, bias correction = 1 - beta1 = 0.1 (for beta1=0.9)
 	// m_hat = m / 0.1 = 10 * m
 	float beta1 = 0.9f;
-	float m = 0.05f;
+	float m		= 0.05f;
 	float bias1 = 1.0f - std::pow(beta1, 1);
 	ASSERT(std::abs(bias1 - 0.1f) < 1e-6f);
 
@@ -449,46 +439,46 @@ TEST(nn_adam_bias_correction)
 }
 END_TEST
 
-TEST(nn_sgd_momentum_math)
-{
+TEST(nn_sgd_momentum_math) {
 	// SGD with momentum:
 	// v = momentum*v + g
 	// w -= lr * v
 
 	float lr = 0.1f, momentum = 0.9f;
-	float w = 1.0f;
-	float grad = 0.5f;
-	float v = 0.0f;
+	float w		= 1.0f;
+	float grad	= 0.5f;
+	float v		= 0.0f;
 
-	v = momentum * v + grad;
-	w -= lr * v;
+	v			= momentum * v + grad;
+	w		   -= lr * v;
 
 	ASSERT(std::abs(v - 0.5f) < 1e-6f);
 	ASSERT(std::abs(w - 0.95f) < 1e-6f); // 1.0 - 0.1*0.5 = 0.95
 
 	// Second step
-	float grad2 = 0.3f;
-	v = momentum * v + grad2; // 0.9*0.5 + 0.3 = 0.75
-	w -= lr * v;              // 0.95 - 0.1*0.75 = 0.875
+	float grad2	 = 0.3f;
+	v			 = momentum * v + grad2; // 0.9*0.5 + 0.3 = 0.75
+	w			-= lr * v;				 // 0.95 - 0.1*0.75 = 0.875
 	ASSERT(std::abs(v - 0.75f) < 1e-6f);
 	ASSERT(std::abs(w - 0.875f) < 1e-6f);
 }
 END_TEST
 
-TEST(nn_sgd_step_is_gpu_backed)
-{
+TEST(nn_sgd_step_is_gpu_backed) {
 	Tensor<float, 1> weight(std::vector<float>{1.0f});
-	Buffer<float> xBuf(std::vector<float>{2.0f}, BufferMode::Read);
+	Buffer<float>	 xBuf(std::vector<float>{2.0f}, BufferMode::Read);
 
-	ADKernel1D kernel([&](Var<int> &id) {
-		(void)id;
-		auto x = xBuf.Bind();
-		auto w = weight.Bind();
-		AD::Param(w[0]);
-		Var<float> y = w[0] * x[0];
-		Var<float> loss = y * y;
-		AD::Loss(loss);
-	}, 1, 256);
+	ADKernel1D		 kernel(
+		[&](Var<int> &id) {
+			(void)id;
+			auto x = xBuf.Bind();
+			auto w = weight.Bind();
+			AD::Param(w[0]);
+			Var<float> y	= w[0] * x[0];
+			Var<float> loss = y * y;
+			AD::Loss(loss);
+		},
+		1, 256);
 
 	SGD optimizer(0.1f, 0.0f);
 	optimizer.AddTensor(weight);
@@ -501,41 +491,41 @@ TEST(nn_sgd_step_is_gpu_backed)
 }
 END_TEST
 
-TEST(nn_rmsprop_update_math)
-{
+TEST(nn_rmsprop_update_math) {
 	// RMSprop:
 	// v = beta*v + (1-beta)*g^2
 	// w -= lr * g / sqrt(v + eps)
 
 	float lr = 0.1f, beta = 0.9f, eps = 1e-8f;
-	float w = 1.0f;
-	float grad = 0.5f;
-	float v = 0.0f;
+	float w			 = 1.0f;
+	float grad		 = 0.5f;
+	float v			 = 0.0f;
 
-	v = beta * v + (1.0f - beta) * grad * grad;
-	w -= lr * grad / std::sqrt(v + eps);
+	v				 = beta * v + (1.0f - beta) * grad * grad;
+	w				-= lr * grad / std::sqrt(v + eps);
 
-	float expectedV = 0.9f * 0.0f + 0.1f * 0.25f; // = 0.025
-	float expectedW = 1.0f - 0.1f * 0.5f / std::sqrt(0.025f + 1e-8f);
+	float expectedV	 = 0.9f * 0.0f + 0.1f * 0.25f; // = 0.025
+	float expectedW	 = 1.0f - 0.1f * 0.5f / std::sqrt(0.025f + 1e-8f);
 	ASSERT(std::abs(v - expectedV) < 1e-6f);
 	ASSERT(std::abs(w - expectedW) < 1e-6f);
 }
 END_TEST
 
-TEST(nn_rmsprop_step_is_gpu_backed)
-{
+TEST(nn_rmsprop_step_is_gpu_backed) {
 	Tensor<float, 1> weight(std::vector<float>{1.0f});
-	Buffer<float> xBuf(std::vector<float>{2.0f}, BufferMode::Read);
+	Buffer<float>	 xBuf(std::vector<float>{2.0f}, BufferMode::Read);
 
-	ADKernel1D kernel([&](Var<int> &id) {
-		(void)id;
-		auto x = xBuf.Bind();
-		auto w = weight.Bind();
-		AD::Param(w[0]);
-		Var<float> y = w[0] * x[0];
-		Var<float> loss = y * y;
-		AD::Loss(loss);
-	}, 1, 256);
+	ADKernel1D		 kernel(
+		[&](Var<int> &id) {
+			(void)id;
+			auto x = xBuf.Bind();
+			auto w = weight.Bind();
+			AD::Param(w[0]);
+			Var<float> y	= w[0] * x[0];
+			Var<float> loss = y * y;
+			AD::Loss(loss);
+		},
+		1, 256);
 
 	RMSprop optimizer(0.1f, 0.0f, 1e-8f);
 	optimizer.AddTensor(weight);
@@ -548,8 +538,7 @@ TEST(nn_rmsprop_step_is_gpu_backed)
 }
 END_TEST
 
-TEST(nn_weight_decay_math)
-{
+TEST(nn_weight_decay_math) {
 	// Weight decay adds 2*wd*w to gradient:
 	// effective_grad = grad + 2 * wd * w
 
@@ -559,17 +548,16 @@ TEST(nn_weight_decay_math)
 }
 END_TEST
 
-TEST(nn_grad_clip_math)
-{
+TEST(nn_grad_clip_math) {
 	float grad = 1.5f, clip = 0.5f;
 	float clipped = std::clamp(grad, -clip, clip);
 	ASSERT(std::abs(clipped - 0.5f) < 1e-6f);
 
-	float grad2 = -0.8f;
+	float grad2	   = -0.8f;
 	float clipped2 = std::clamp(grad2, -clip, clip);
 	ASSERT(std::abs(clipped2 - -0.5f) < 1e-6f);
 
-	float grad3 = 0.2f;
+	float grad3	   = 0.2f;
 	float clipped3 = std::clamp(grad3, -clip, clip);
 	ASSERT(std::abs(clipped3 - 0.2f) < 1e-6f);
 }
@@ -579,18 +567,20 @@ END_TEST
 // SECTION 5: Layers — Linear
 // =============================================================================
 
-TEST(nn_linear_construct)
-{
+TEST(nn_linear_construct) {
 	Linear<float, 4, 8> fc;
 	ASSERT(fc.InputDim() == 4);
 	ASSERT(fc.OutputDim() == 8);
 	ASSERT(fc.ParamCount() == 4 * 8 + 8); // weights + biases
 
 	// Verify Xavier init produces non-zero weights
-	auto &W = fc.Weight();
-	bool hasNonZero = false;
+	auto &W			 = fc.Weight();
+	bool  hasNonZero = false;
 	for (size_t i = 0; i < W.Size(); i++) {
-		if (std::abs(W.Data()[i]) > 1e-6f) { hasNonZero = true; break; }
+		if (std::abs(W.Data()[i]) > 1e-6f) {
+			hasNonZero = true;
+			break;
+		}
 	}
 	ASSERT(hasNonZero);
 
@@ -602,22 +592,20 @@ TEST(nn_linear_construct)
 }
 END_TEST
 
-TEST(nn_linear_xavier_range)
-{
+TEST(nn_linear_xavier_range) {
 	// Xavier uniform range for 4→8: ±√(6/(4+8)) = ±√(0.5) ≈ ±0.707
 	Linear<float, 4, 8> fc;
-	float limit = std::sqrt(6.0f / 12.0f);
-	auto &W = fc.Weight();
+	float				limit = std::sqrt(6.0f / 12.0f);
+	auto			   &W	  = fc.Weight();
 	for (size_t i = 0; i < W.Size(); i++) {
 		ASSERT(std::abs(W.Data()[i]) <= limit + 1e-6f);
 	}
 }
 END_TEST
 
-TEST(nn_linear_reset)
-{
+TEST(nn_linear_reset) {
 	Linear<float, 4, 8> fc(123);
-	auto origW0 = fc.Weight().Data()[0];
+	auto				origW0 = fc.Weight().Data()[0];
 
 	fc.Reset(456);
 	auto newW0 = fc.Weight().Data()[0];
@@ -626,16 +614,15 @@ TEST(nn_linear_reset)
 }
 END_TEST
 
-TEST(nn_linear_setup_forward_inspector)
-{
+TEST(nn_linear_setup_forward_inspector) {
 	Linear<float, 3, 2> fc;
 
-	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
+	AdjointInspector1D	inspector([&](Var<int> &id, AdjointContext &ctx) {
 		// Bind input/output buffers
 		Buffer<float> inBuf(3 * 10, BufferMode::Read);
 		Buffer<float> outBuf(2 * 10, BufferMode::ReadWrite);
-		auto input = inBuf.Bind();
-		auto output = outBuf.Bind();
+		auto		  input	 = inBuf.Bind();
+		auto		  output = outBuf.Bind();
 
 		fc.Setup();
 		fc.Forward(input, id, output);
@@ -645,8 +632,8 @@ TEST(nn_linear_setup_forward_inspector)
 		ctx.MarkLoss(loss);
 	});
 
-	auto fwd = inspector.GetForwardCode();
-	CHECK_CONTAINS(fwd, "for");  // DSL For loop generated
+	auto				fwd = inspector.GetForwardCode();
+	CHECK_CONTAINS(fwd, "for"); // DSL For loop generated
 	CHECK_CONTAINS(inspector.GetBackwardCode(), "d_");
 
 	auto &tape = inspector.Tape();
@@ -654,15 +641,14 @@ TEST(nn_linear_setup_forward_inspector)
 }
 END_TEST
 
-TEST(nn_linear_params_are_registered)
-{
+TEST(nn_linear_params_are_registered) {
 	Linear<float, 3, 2> fc; // 3*2=6 weights + 2 biases = 8 params
 
-	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
+	AdjointInspector1D	inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Buffer<float> inBuf(3 * 5, BufferMode::Read);
 		Buffer<float> outBuf(2 * 5, BufferMode::ReadWrite);
-		auto input = inBuf.Bind();
-		auto output = outBuf.Bind();
+		auto		  input	 = inBuf.Bind();
+		auto		  output = outBuf.Bind();
 
 		fc.Setup();
 		// Use params in forward
@@ -679,20 +665,26 @@ TEST(nn_linear_params_are_registered)
 }
 END_TEST
 
-TEST(nn_fused_mlp2_forward_matches_cpu)
-{
-	constexpr size_t N = 2;
+TEST(nn_fused_mlp2_forward_matches_cpu) {
+	constexpr size_t		  N = 2;
 	FusedMLP2<float, 2, 3, 1> mlp(42, FusedActivation::ReLU);
 
-	float *w1 = mlp.W1().Data();
-	w1[0] = 1.0f; w1[1] = 0.0f;
-	w1[2] = 0.0f; w1[3] = 1.0f;
-	w1[4] = 1.0f; w1[5] = 1.0f;
-	float *b1 = mlp.B1().Data();
-	b1[0] = 0.5f; b1[1] = -0.5f; b1[2] = 0.0f;
-	float *w2 = mlp.W2().Data();
-	w2[0] = 1.0f; w2[1] = 2.0f; w2[2] = -1.0f;
-	mlp.B2().Data()[0] = 0.25f;
+	float					 *w1 = mlp.W1().Data();
+	w1[0]						 = 1.0f;
+	w1[1]						 = 0.0f;
+	w1[2]						 = 0.0f;
+	w1[3]						 = 1.0f;
+	w1[4]						 = 1.0f;
+	w1[5]						 = 1.0f;
+	float *b1					 = mlp.B1().Data();
+	b1[0]						 = 0.5f;
+	b1[1]						 = -0.5f;
+	b1[2]						 = 0.0f;
+	float *w2					 = mlp.W2().Data();
+	w2[0]						 = 1.0f;
+	w2[1]						 = 2.0f;
+	w2[2]						 = -1.0f;
+	mlp.B2().Data()[0]			 = 0.25f;
 	mlp.W1().Upload();
 	mlp.B1().Upload();
 	mlp.W2().Upload();
@@ -701,12 +693,14 @@ TEST(nn_fused_mlp2_forward_matches_cpu)
 	Buffer<float> inBuf({2.0f, 3.0f, -1.0f, 4.0f}, BufferMode::Read);
 	Buffer<float> outBuf(N, BufferMode::ReadWrite);
 
-	Kernel1D kernel([&](Var<int> &id) {
-		auto in = inBuf.Bind();
-		auto out = outBuf.Bind();
-		mlp.Setup(false);
-		mlp.Forward(in, id, out);
-	}, 1);
+	Kernel1D	  kernel(
+		[&](Var<int> &id) {
+			auto in	 = inBuf.Bind();
+			auto out = outBuf.Bind();
+			mlp.Setup(false);
+			mlp.Forward(in, id, out);
+		},
+		1);
 	kernel.Dispatch(static_cast<int>(N), true);
 
 	std::vector<float> out;
@@ -716,8 +710,7 @@ TEST(nn_fused_mlp2_forward_matches_cpu)
 }
 END_TEST
 
-TEST(nn_fused_mlp2_trainer_codegen_is_specialized)
-{
+TEST(nn_fused_mlp2_trainer_codegen_is_specialized) {
 	using Trainer = FusedMLP2Trainer<float, 16, 16, 16>;
 	auto trainSrc = Trainer::TrainingShaderSource(8);
 	CHECK_CONTAINS(trainSrc, "shared float shW1[256]");
@@ -734,10 +727,9 @@ TEST(nn_fused_mlp2_trainer_codegen_is_specialized)
 }
 END_TEST
 
-TEST(nn_fused_mlp2_trainer_forward_identity_16)
-{
+TEST(nn_fused_mlp2_trainer_forward_identity_16) {
 	using Trainer = FusedMLP2Trainer<float, 16, 16, 16>;
-	Trainer trainer(1);
+	Trainer			   trainer(1);
 
 	std::vector<float> w1(16 * 16, 0.0f), b1(16, 0.0f), w2(16 * 16, 0.0f), b2(16, 0.0f);
 	for (int i = 0; i < 16; i++) {
@@ -748,7 +740,7 @@ TEST(nn_fused_mlp2_trainer_forward_identity_16)
 
 	std::vector<float> input(2 * 16, 0.0f);
 	for (int i = 0; i < 16; i++) {
-		input[i] = static_cast<float>(i - 8);
+		input[i]	  = static_cast<float>(i - 8);
 		input[16 + i] = static_cast<float>(8 - i);
 	}
 	Buffer<float> inBuf(input, BufferMode::Read);
@@ -765,10 +757,9 @@ TEST(nn_fused_mlp2_trainer_forward_identity_16)
 }
 END_TEST
 
-TEST(nn_fused_mlp2_trainer_mse_loss_16)
-{
+TEST(nn_fused_mlp2_trainer_mse_loss_16) {
 	using Trainer = FusedMLP2Trainer<float, 16, 16, 16>;
-	Trainer trainer(1);
+	Trainer			   trainer(1);
 
 	std::vector<float> w1(16 * 16, 0.0f), b1(16, 0.0f), w2(16 * 16, 0.0f), b2(16, 0.0f);
 	for (int i = 0; i < 16; i++) {
@@ -779,18 +770,17 @@ TEST(nn_fused_mlp2_trainer_mse_loss_16)
 
 	std::vector<float> input(2 * 16, 1.0f);
 	std::vector<float> target(2 * 16, 0.0f);
-	Buffer<float> inBuf(input, BufferMode::Read);
-	Buffer<float> targetBuf(target, BufferMode::Read);
+	Buffer<float>	   inBuf(input, BufferMode::Read);
+	Buffer<float>	   targetBuf(target, BufferMode::Read);
 
 	trainer.TrainMSE(inBuf, targetBuf, 2, 0.0f, 0.9f, 0.999f, 1e-8f, true);
 	ASSERT(std::abs(trainer.DownloadLoss() - 0.5f) < 1e-4f);
 }
 END_TEST
 
-TEST(nn_active_compaction_builds_dense_index_list)
-{
-	std::vector<int> mask = {0, 1, 0, 1, 1, 0, 0, 1};
-	Buffer<int> maskBuf(mask, BufferMode::Read);
+TEST(nn_active_compaction_builds_dense_index_list) {
+	std::vector<int>			   mask = {0, 1, 0, 1, 1, 0, 0, 1};
+	Buffer<int>					   maskBuf(mask, BufferMode::Read);
 	GPU::Utility::ActiveCompaction compactor(mask.size());
 
 	compactor.Compact(maskBuf, mask.size(), true);
@@ -808,21 +798,19 @@ END_TEST
 // SECTION 6: Layers — Activations
 // =============================================================================
 
-TEST(nn_relu_construct)
-{
+TEST(nn_relu_construct) {
 	ReLU<float> relu(128);
 	// Stateless — Setup should not crash
 	relu.Setup();
 }
 END_TEST
 
-TEST(nn_relu_forward_inspector)
-{
-	ReLU<float> relu(4);
+TEST(nn_relu_forward_inspector) {
+	ReLU<float>		   relu(4);
 
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Buffer<float> buf(4 * 5, BufferMode::ReadWrite);
-		auto b = buf.Bind();
+		auto		  b = buf.Bind();
 
 		relu.Forward(b, id, b); // in-place
 
@@ -830,18 +818,17 @@ TEST(nn_relu_forward_inspector)
 		ctx.MarkLoss(loss);
 	});
 
-	auto fwd = inspector.GetForwardCode();
-	CHECK_CONTAINS(fwd, "max");  // ReLU uses max(x, 0)
+	auto			   fwd = inspector.GetForwardCode();
+	CHECK_CONTAINS(fwd, "max"); // ReLU uses max(x, 0)
 }
 END_TEST
 
-TEST(nn_sigmoid_forward_inspector)
-{
-	Sigmoid<float> sig(4);
+TEST(nn_sigmoid_forward_inspector) {
+	Sigmoid<float>	   sig(4);
 
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Buffer<float> buf(4 * 5, BufferMode::ReadWrite);
-		auto b = buf.Bind();
+		auto		  b = buf.Bind();
 
 		sig.Forward(b, id, b);
 
@@ -849,18 +836,17 @@ TEST(nn_sigmoid_forward_inspector)
 		ctx.MarkLoss(loss);
 	});
 
-	auto fwd = inspector.GetForwardCode();
+	auto			   fwd = inspector.GetForwardCode();
 	CHECK_CONTAINS(fwd, "exp");
 }
 END_TEST
 
-TEST(nn_tanh_activation_forward_inspector)
-{
+TEST(nn_tanh_activation_forward_inspector) {
 	TanhActivation<float> tanh(4);
 
-	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
+	AdjointInspector1D	  inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Buffer<float> buf(4 * 5, BufferMode::ReadWrite);
-		auto b = buf.Bind();
+		auto		  b = buf.Bind();
 
 		tanh.Forward(b, id, b);
 
@@ -868,7 +854,7 @@ TEST(nn_tanh_activation_forward_inspector)
 		ctx.MarkLoss(loss);
 	});
 
-	auto fwd = inspector.GetForwardCode();
+	auto				  fwd = inspector.GetForwardCode();
 	CHECK_CONTAINS(fwd, "exp"); // tanh uses exp internally
 }
 END_TEST
@@ -877,21 +863,18 @@ END_TEST
 // SECTION 7: Layers — Sequential
 // =============================================================================
 
-TEST(nn_sequential_construct)
-{
+TEST(nn_sequential_construct) {
 	Sequential<float, Linear<float, 4, 8>, ReLU<float>, Linear<float, 8, 2>> model(64, 8);
 
 	ASSERT(model.NumLayers == 3);
 }
 END_TEST
 
-TEST(nn_sequential_setup_forward_inspector)
-{
-	Linear<float, 3, 4> fc1;
-	ReLU<float> relu(4);
-	Linear<float, 4, 2> fc2;
-	Sequential<float, Linear<float, 3, 4>, ReLU<float>, Linear<float, 4, 2>>
-		model(64, std::max({4u, 2u}));
+TEST(nn_sequential_setup_forward_inspector) {
+	Linear<float, 3, 4>														 fc1;
+	ReLU<float>																 relu(4);
+	Linear<float, 4, 2>														 fc2;
+	Sequential<float, Linear<float, 3, 4>, ReLU<float>, Linear<float, 4, 2>> model(64, std::max({4u, 2u}));
 
 	// Move layers into sequential (Sequential owns its layers — this test
 	// verifies the types compile and Setup/Forward don't crash)
@@ -899,8 +882,8 @@ TEST(nn_sequential_setup_forward_inspector)
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Buffer<float> inBuf(3 * 64, BufferMode::Read);
 		Buffer<float> outBuf(2 * 64, BufferMode::ReadWrite);
-		auto input = inBuf.Bind();
-		auto output = outBuf.Bind();
+		auto		  input	 = inBuf.Bind();
+		auto		  output = outBuf.Bind();
 
 		model.Setup();
 		model.Forward(input, id, output);
@@ -920,13 +903,12 @@ END_TEST
 // SECTION 8: Loss functions
 // =============================================================================
 
-TEST(nn_mse_scalar)
-{
+TEST(nn_mse_scalar) {
 	// Scalar MSE: (pred - target)^2
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Var<float> pred, target;
-		pred = MakeFloat(2.5f);
-		target = MakeFloat(1.0f);
+		pred			= MakeFloat(2.5f);
+		target			= MakeFloat(1.0f);
 		Var<float> loss = MSELoss(pred, target);
 		ctx.MarkLoss(loss);
 	});
@@ -937,16 +919,15 @@ TEST(nn_mse_scalar)
 }
 END_TEST
 
-TEST(nn_mse_buffer_loss)
-{
+TEST(nn_mse_buffer_loss) {
 	// Multi-output MSE from buffers
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Buffer<float> predBuf(2 * 10, BufferMode::Read);
 		Buffer<float> targetBuf(2 * 10, BufferMode::Read);
-		auto pred = predBuf.Bind();
-		auto target = targetBuf.Bind();
+		auto		  pred	 = predBuf.Bind();
+		auto		  target = targetBuf.Bind();
 
-		Var<float> loss = MSELoss(pred, target, id, 2);
+		Var<float>	  loss	 = MSELoss(pred, target, id, 2);
 		ctx.MarkLoss(loss);
 	});
 
@@ -956,12 +937,11 @@ TEST(nn_mse_buffer_loss)
 }
 END_TEST
 
-TEST(nn_l1_loss)
-{
+TEST(nn_l1_loss) {
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		Var<float> pred, target;
-		pred = MakeFloat(3.0f);
-		target = MakeFloat(1.0f);
+		pred			= MakeFloat(3.0f);
+		target			= MakeFloat(1.0f);
 		Var<float> loss = L1Loss(pred, target);
 		ctx.MarkLoss(loss);
 	});
@@ -976,21 +956,24 @@ END_TEST
 // SECTION 9: Checkpoint
 // =============================================================================
 
-TEST(nn_checkpoint_save_load_roundtrip)
-{
+TEST(nn_checkpoint_save_load_roundtrip) {
 	Tensor<float, 10> W;
-	for (size_t i = 0; i < 10; i++) W.Data()[i] = (float)i * 1.5f;
+	for (size_t i = 0; i < 10; i++)
+		W.Data()[i] = (float)i * 1.5f;
 
 	Tensor<float, 5> b;
-	for (size_t i = 0; i < 5; i++) b.Data()[i] = (float)i * 0.5f;
+	for (size_t i = 0; i < 5; i++)
+		b.Data()[i] = (float)i * 0.5f;
 
 	// Save
 	const char *path = "test_checkpoint.bin";
 	SaveWeights(path, W, b);
 
 	// Modify
-	for (size_t i = 0; i < 10; i++) W.Data()[i] = 0.0f;
-	for (size_t i = 0; i < 5; i++) b.Data()[i] = 0.0f;
+	for (size_t i = 0; i < 10; i++)
+		W.Data()[i] = 0.0f;
+	for (size_t i = 0; i < 5; i++)
+		b.Data()[i] = 0.0f;
 
 	// Load
 	LoadWeights(path, W, b);
@@ -1006,10 +989,11 @@ TEST(nn_checkpoint_save_load_roundtrip)
 }
 END_TEST
 
-TEST(nn_checkpoint_single_tensor)
-{
+TEST(nn_checkpoint_single_tensor) {
 	Tensor<float, 3> t;
-	t.Data()[0] = 1.0f; t.Data()[1] = 2.0f; t.Data()[2] = 3.0f;
+	t.Data()[0]		 = 1.0f;
+	t.Data()[1]		 = 2.0f;
+	t.Data()[2]		 = 3.0f;
 
 	const char *path = "test_single.bin";
 	SaveWeights(path, t);
@@ -1025,12 +1009,11 @@ TEST(nn_checkpoint_single_tensor)
 }
 END_TEST
 
-TEST(nn_checkpoint_size_mismatch_throws)
-{
+TEST(nn_checkpoint_size_mismatch_throws) {
 	Tensor<float, 10> t1;
-	Tensor<float, 5> t2;
+	Tensor<float, 5>  t2;
 
-	const char *path = "test_mismatch.bin";
+	const char		 *path = "test_mismatch.bin";
 	SaveWeights(path, t1);
 
 	ASSERT(t2.Size() == 5); // different from saved 10
@@ -1050,20 +1033,21 @@ END_TEST
 // These require an actual GPU backend (OpenGL/Vulkan).
 // =============================================================================
 
-TEST(nn_e2e_simple_gradient_nonzero)
-{
+TEST(nn_e2e_simple_gradient_nonzero) {
 	Tensor<float, 2> weight({1.0f, -1.0f});
-	Buffer<float> xBuf({2.0f, 3.0f}, BufferMode::Read);
+	Buffer<float>	 xBuf({2.0f, 3.0f}, BufferMode::Read);
 
-	ADKernel1D kernel([&](Var<int> &id) {
-		auto x = xBuf.Bind();
-		auto w = weight.Bind();
-		AD::Param(w[0]);
-		AD::Param(w[1]);
-		Var<float> y = w[0] * x[0] + w[1] * x[1];
-		Var<float> loss = y * y;
-		AD::Loss(loss);
-	}, 1, 256);
+	ADKernel1D		 kernel(
+		[&](Var<int> &id) {
+			auto x = xBuf.Bind();
+			auto w = weight.Bind();
+			AD::Param(w[0]);
+			AD::Param(w[1]);
+			Var<float> y	= w[0] * x[0] + w[1] * x[1];
+			Var<float> loss = y * y;
+			AD::Loss(loss);
+		},
+		1, 256);
 
 	try {
 		kernel.Backward(1, true);
@@ -1079,12 +1063,11 @@ TEST(nn_e2e_simple_gradient_nonzero)
 }
 END_TEST
 
-TEST(nn_e2e_linear_regression_gpu)
-{
+TEST(nn_e2e_linear_regression_gpu) {
 	// Simple linear regression with ADKernel1D + Linear + Adam
-	constexpr size_t N = 64;
-	constexpr size_t InDim = 1;
-	constexpr size_t OutDim = 1;
+	constexpr size_t   N	  = 64;
+	constexpr size_t   InDim  = 1;
+	constexpr size_t   OutDim = 1;
 
 	// Generate synthetic data: y = 2*x + 1
 	std::vector<float> xData(N * InDim), yData(N * OutDim);
@@ -1096,7 +1079,7 @@ TEST(nn_e2e_linear_regression_gpu)
 	// Build model
 	Linear<float, InDim, OutDim> fc;
 	fc.Weight().Data()[0] = 0.0f;
-	fc.Bias().Data()[0] = 0.0f;
+	fc.Bias().Data()[0]	  = 0.0f;
 	fc.Weight().Upload();
 	fc.Bias().Upload();
 
@@ -1110,15 +1093,17 @@ TEST(nn_e2e_linear_regression_gpu)
 	Buffer<float> bufPred(N * OutDim, BufferMode::ReadWrite);
 
 	// Build AD kernel
-	ADKernel1D kernel([&](Var<int> &id) {
-		auto x = bufX.Bind();
-		auto y = bufY.Bind();
-		auto pred = bufPred.Bind();
-		fc.Setup();
-		fc.Forward(x, id, pred);
-		Var<float> loss = MSELoss(pred, y, id, static_cast<int>(OutDim));
-		AD::Loss(loss);
-	}, N);
+	ADKernel1D	  kernel(
+		[&](Var<int> &id) {
+			auto x	  = bufX.Bind();
+			auto y	  = bufY.Bind();
+			auto pred = bufPred.Bind();
+			fc.Setup();
+			fc.Forward(x, id, pred);
+			Var<float> loss = MSELoss(pred, y, id, static_cast<int>(OutDim));
+			AD::Loss(loss);
+		},
+		N);
 
 	int groups = static_cast<int>((N + 255) / 256);
 	kernel.Backward(groups, true);
@@ -1130,20 +1115,20 @@ TEST(nn_e2e_linear_regression_gpu)
 
 	double expectedW = 0.0;
 	double expectedB = 0.0;
-	double actualW = 0.0;
-	double actualB = 0.0;
+	double actualW	 = 0.0;
+	double actualB	 = 0.0;
 	for (size_t i = 0; i < N; i++) {
-		float pred = 0.0f;
-		float diff = pred - yData[i];
-		expectedW += 2.0 * diff * xData[i];
-		expectedB += 2.0 * diff;
-		actualW += grads[0][i];
-		actualB += grads[1][i];
+		float pred	= 0.0f;
+		float diff	= pred - yData[i];
+		expectedW  += 2.0 * diff * xData[i];
+		expectedB  += 2.0 * diff;
+		actualW	   += grads[0][i];
+		actualB	   += grads[1][i];
 	}
 	expectedW /= static_cast<double>(N);
 	expectedB /= static_cast<double>(N);
-	actualW /= static_cast<double>(N);
-	actualB /= static_cast<double>(N);
+	actualW	  /= static_cast<double>(N);
+	actualB	  /= static_cast<double>(N);
 
 	ASSERT(std::abs(actualW - expectedW) < 1e-4);
 	ASSERT(std::abs(actualB - expectedB) < 1e-4);

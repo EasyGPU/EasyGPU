@@ -43,24 +43,19 @@ namespace GPU::NN {
 // =============================================================================
 namespace detail {
 
-template <size_t I, size_t... Dims>
-struct StrideAt;
+template <size_t I, size_t... Dims> struct StrideAt;
 
-template <size_t I, size_t D0, size_t... Rest>
-struct StrideAt<I, D0, Rest...> : StrideAt<I - 1, Rest...> {};
+template <size_t I, size_t D0, size_t... Rest> struct StrideAt<I, D0, Rest...> : StrideAt<I - 1, Rest...> {};
 
-template <size_t D0, size_t... Rest>
-struct StrideAt<0, D0, Rest...> {
+template <size_t D0, size_t... Rest> struct StrideAt<0, D0, Rest...> {
 	static constexpr size_t value = (1 * ... * Rest);
 };
 
-template <size_t D0>
-struct StrideAt<0, D0> {
+template <size_t D0> struct StrideAt<0, D0> {
 	static constexpr size_t value = 1;
 };
 
-template <size_t I>
-struct StrideAt<I> {
+template <size_t I> struct StrideAt<I> {
 	static constexpr size_t value = 1;
 };
 
@@ -83,14 +78,14 @@ inline const IR::Value::Expr<int> &ToExprIdx(const IR::Value::Expr<int> &e) {
 // TensorRef — DSL-side multi-dimensional buffer reference
 // =============================================================================
 
-template <typename T, size_t... Dims>
-class TensorRef {
-	static constexpr size_t NumDims = sizeof...(Dims);
+template <typename T, size_t... Dims> class TensorRef {
+	static constexpr size_t NumDims	  = sizeof...(Dims);
 	static constexpr size_t TotalSize = (Dims * ...);
 
 public:
 	TensorRef() = default;
-	explicit TensorRef(IR::Value::BufferRef<T> ref) : ref_(std::move(ref)) {}
+	explicit TensorRef(IR::Value::BufferRef<T> ref) : ref_(std::move(ref)) {
+	}
 
 	/** Direct flat index access (same as BufferRef). */
 	[[nodiscard]] IR::Value::Var<T> operator[](int index) const {
@@ -110,8 +105,7 @@ public:
 	 *
 	 * Supports int, Var<int>, and Expr<int> indices.
 	 */
-	template <typename... Indices>
-	[[nodiscard]] IR::Value::Var<T> operator()(Indices... indices) const {
+	template <typename... Indices> [[nodiscard]] IR::Value::Var<T> operator()(Indices... indices) const {
 		static_assert(sizeof...(Indices) == NumDims,
 					  "TensorRef::operator() argument count must match tensor dimension");
 		return ref_[ComputeFlat<0>(indices...)];
@@ -122,20 +116,23 @@ public:
 	 * Calls f(Var<T>) for each flat-indexed element in order.
 	 * Compile-time unrolled for fixed-shape tensors.
 	 */
-	template <typename F>
-	void ForEachParam(F &&f) {
+	template <typename F> void ForEachParam(F &&f) {
 		ForEachImpl(std::forward<F>(f), std::make_index_sequence<TotalSize>());
 	}
 
-	[[nodiscard]] const IR::Value::BufferRef<T> &GetBufferRef() const { return ref_; }
-	static constexpr size_t Size() { return TotalSize; }
+	[[nodiscard]] const IR::Value::BufferRef<T> &GetBufferRef() const {
+		return ref_;
+	}
+	static constexpr size_t Size() {
+		return TotalSize;
+	}
 
 private:
 	/** Recursive flat-index computation: idx0*stride0 + idx1*stride1 + ... */
 	template <size_t Dim, typename Head, typename... Tail>
 	[[nodiscard]] static IR::Value::Expr<int> ComputeFlat(Head head, Tail... tail) {
-		constexpr int stride = static_cast<int>(detail::StrideAt<Dim, Dims...>::value);
-		IR::Value::Expr<int> term = detail::ToExprIdx(head) * stride;
+		constexpr int		 stride = static_cast<int>(detail::StrideAt<Dim, Dims...>::value);
+		IR::Value::Expr<int> term	= detail::ToExprIdx(head) * stride;
 		if constexpr (sizeof...(Tail) == 0)
 			return term;
 		else
@@ -143,13 +140,11 @@ private:
 	}
 
 	/** Base case for ComputeFlat (unreachable since sizeof...(Indices) == NumDims). */
-	template <size_t Dim>
-	[[nodiscard]] static IR::Value::Expr<int> ComputeFlat() {
+	template <size_t Dim> [[nodiscard]] static IR::Value::Expr<int> ComputeFlat() {
 		return MakeInt(0);
 	}
 
-	template <typename F, size_t... Is>
-	void ForEachImpl(F &&f, std::index_sequence<Is...>) {
+	template <typename F, size_t... Is> void ForEachImpl(F &&f, std::index_sequence<Is...>) {
 		for (size_t i = 0; i < TotalSize; i++) {
 			auto elem = ref_[static_cast<int>(i)];
 			f(elem);
@@ -163,14 +158,12 @@ private:
 // Tensor — CPU+GPU multi-dimensional array
 // =============================================================================
 
-template <typename T, size_t... Dims>
-class Tensor {
+template <typename T, size_t... Dims> class Tensor {
 	static constexpr size_t TotalSize = (Dims * ...);
 
 public:
 	/** Construct a zero-initialized tensor. */
-	Tensor()
-		: buffer_(TotalSize, Runtime::BufferMode::ReadWrite), data_(TotalSize, T{}) {
+	Tensor() : buffer_(TotalSize, Runtime::BufferMode::ReadWrite), data_(TotalSize, T{}) {
 		buffer_.Upload(data_.data(), TotalSize);
 	}
 
@@ -178,8 +171,7 @@ public:
 	 * Construct a tensor from existing CPU data.
 	 * The data is uploaded to the GPU buffer immediately.
 	 */
-	explicit Tensor(const std::vector<T> &data,
-					Runtime::BufferMode mode = Runtime::BufferMode::ReadWrite)
+	explicit Tensor(const std::vector<T> &data, Runtime::BufferMode mode = Runtime::BufferMode::ReadWrite)
 		: buffer_(TotalSize, mode), data_(data) {
 		if (data.size() != TotalSize)
 			throw std::invalid_argument("Tensor: data size does not match tensor shape");
@@ -187,47 +179,55 @@ public:
 	}
 
 	/** Move constructor. */
-	Tensor(Tensor &&other) noexcept
-		: buffer_(std::move(other.buffer_)), data_(std::move(other.data_)) {}
+	Tensor(Tensor &&other) noexcept : buffer_(std::move(other.buffer_)), data_(std::move(other.data_)) {
+	}
 
 	/** Move assignment. */
 	Tensor &operator=(Tensor &&other) noexcept {
 		if (this != &other) {
 			buffer_ = std::move(other.buffer_);
-			data_ = std::move(other.data_);
+			data_	= std::move(other.data_);
 		}
 		return *this;
 	}
 
-	Tensor(const Tensor &) = delete;
+	Tensor(const Tensor &)			  = delete;
 	Tensor &operator=(const Tensor &) = delete;
 
 	// ---- CPU data access ----
 
-	T *Data() { return data_.data(); }
-	const T *Data() const { return data_.data(); }
+	T	   *Data() {
+		return data_.data();
+	}
+	const T *Data() const {
+		return data_.data();
+	}
 
 	/** Multi-dimensional CPU indexing. */
-	template <typename... Indices>
-	T &operator()(Indices... indices) {
+	template <typename... Indices> T &operator()(Indices... indices) {
 		static_assert(sizeof...(Indices) == sizeof...(Dims),
 					  "Tensor::operator() argument count must match tensor dimension");
 		return data_[FlatIndex(indices...)];
 	}
 
-	template <typename... Indices>
-	const T &operator()(Indices... indices) const {
+	template <typename... Indices> const T &operator()(Indices... indices) const {
 		static_assert(sizeof...(Indices) == sizeof...(Dims),
 					  "Tensor::operator() argument count must match tensor dimension");
 		return data_[FlatIndex(indices...)];
 	}
 
-	static constexpr size_t Size() { return TotalSize; }
+	static constexpr size_t Size() {
+		return TotalSize;
+	}
 
 	// ---- GPU synchronization ----
 
-	void Upload() { buffer_.Upload(data_.data(), TotalSize); }
-	void Download() { buffer_.Download(data_); }
+	void Upload() {
+		buffer_.Upload(data_.data(), TotalSize);
+	}
+	void Download() {
+		buffer_.Download(data_);
+	}
 
 	// ---- DSL binding ----
 
@@ -238,18 +238,20 @@ public:
 
 	// ---- Underlying buffer access ----
 
-	Runtime::Buffer<T> &GetBuffer() { return buffer_; }
-	const Runtime::Buffer<T> &GetBuffer() const { return buffer_; }
+	Runtime::Buffer<T> &GetBuffer() {
+		return buffer_;
+	}
+	const Runtime::Buffer<T> &GetBuffer() const {
+		return buffer_;
+	}
 
 private:
 	/** Flat-index computation for CPU-side indexing (all indices are int). */
-	template <typename... Indices>
-	static size_t FlatIndex(Indices... indices) {
+	template <typename... Indices> static size_t FlatIndex(Indices... indices) {
 		return FlatIndexImpl<0>(static_cast<size_t>(indices)...);
 	}
 
-	template <size_t Dim, typename Head, typename... Tail>
-	static size_t FlatIndexImpl(Head head, Tail... tail) {
+	template <size_t Dim, typename Head, typename... Tail> static size_t FlatIndexImpl(Head head, Tail... tail) {
 		size_t stride = detail::StrideAt<Dim, Dims...>::value;
 		if constexpr (sizeof...(Tail) == 0)
 			return head * stride;
@@ -257,13 +259,12 @@ private:
 			return head * stride + FlatIndexImpl<Dim + 1>(tail...);
 	}
 
-	template <size_t Dim>
-	static size_t FlatIndexImpl() {
+	template <size_t Dim> static size_t FlatIndexImpl() {
 		return 0;
 	}
 
 	Runtime::Buffer<T> buffer_;
-	std::vector<T> data_;
+	std::vector<T>	   data_;
 };
 
 } // namespace GPU::NN

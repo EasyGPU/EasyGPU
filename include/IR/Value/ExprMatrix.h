@@ -34,7 +34,11 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
-	~Expr() = default;
+	// Explicit move operations (match general Expr<T> template)
+	Expr(Expr &&)			 = default;
+	Expr &operator=(Expr &&) = default;
+
+	~Expr()					 = default;
 
 	// Column access via subscript
 	template <CountableType IndexType> Expr<Math::Vec2> operator[](IndexType index) && {
@@ -45,7 +49,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec2> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec2>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec2>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec2>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec2>							  operator[](ExprBase index) & = delete;
@@ -103,7 +107,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec3> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec3>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec3>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec3>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec3>							  operator[](ExprBase index) & = delete;
@@ -175,7 +179,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec4> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec4>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec4>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec4>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec4>							  operator[](ExprBase index) & = delete;
@@ -247,7 +251,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec3> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec3>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec3>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec3>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec3>							  operator[](ExprBase index) & = delete;
@@ -260,8 +264,8 @@ public:
 
 	// Matrix-Vector multiplication (broadcast) - Mat2x3 * Vec2 -> Vec3
 	friend Expr<Math::Vec3>						  operator*(Expr<Math::Mat2x3> lhs, Expr<Math::Vec2> rhs) {
-		  return Expr<Math::Vec3>(
-			  std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+		return Expr<Math::Vec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
 	}
 };
 
@@ -293,7 +297,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec2> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec2>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec2>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec2>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec2>							  operator[](ExprBase index) & = delete;
@@ -306,8 +310,8 @@ public:
 
 	// Matrix-Vector multiplication (broadcast) - Mat3x2 * Vec3 -> Vec2
 	friend Expr<Math::Vec2>						  operator*(Expr<Math::Mat3x2> lhs, Expr<Math::Vec3> rhs) {
-		  return Expr<Math::Vec2>(
-			  std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+		return Expr<Math::Vec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
 	}
 };
 
@@ -339,7 +343,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec4> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec4>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec4>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec4>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec4>							  operator[](ExprBase index) & = delete;
@@ -352,8 +356,8 @@ public:
 
 	// Matrix-Vector multiplication (broadcast) - Mat2x4 * Vec2 -> Vec4
 	friend Expr<Math::Vec4>						  operator*(Expr<Math::Mat2x4> lhs, Expr<Math::Vec2> rhs) {
-		  return Expr<Math::Vec4>(
-			  std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+		return Expr<Math::Vec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
 	}
 };
 
@@ -385,7 +389,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec2> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec2>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec2>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec2>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec2>							  operator[](ExprBase index) & = delete;
@@ -398,8 +402,8 @@ public:
 
 	// Matrix-Vector multiplication (broadcast) - Mat4x2 * Vec4 -> Vec2
 	friend Expr<Math::Vec2>						  operator*(Expr<Math::Mat4x2> lhs, Expr<Math::Vec4> rhs) {
-		  return Expr<Math::Vec2>(
-			  std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+		return Expr<Math::Vec2>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
 	}
 };
 
@@ -431,7 +435,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec4> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec4>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec4>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec4>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec4>							  operator[](ExprBase index) & = delete;
@@ -444,8 +448,8 @@ public:
 
 	// Matrix-Vector multiplication (broadcast) - Mat3x4 * Vec3 -> Vec4
 	friend Expr<Math::Vec4>						  operator*(Expr<Math::Mat3x4> lhs, Expr<Math::Vec3> rhs) {
-		  return Expr<Math::Vec4>(
-			  std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+		return Expr<Math::Vec4>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
 	}
 };
 
@@ -477,7 +481,7 @@ public:
 	template <CountableType IndexType> Expr<Math::Vec3> operator[](IndexType index) & = delete;
 
 	Expr<Math::Vec3>									operator[](ExprBase index)									  &&{
-		   return Expr<Math::Vec3>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<Math::Vec3>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<Math::Vec3>							  operator[](ExprBase index) & = delete;
@@ -490,8 +494,8 @@ public:
 
 	// Matrix-Vector multiplication (broadcast) - Mat4x3 * Vec4 -> Vec3
 	friend Expr<Math::Vec3>						  operator*(Expr<Math::Mat4x3> lhs, Expr<Math::Vec4> rhs) {
-		  return Expr<Math::Vec3>(
-			  std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
+		return Expr<Math::Vec3>(
+			std::make_unique<Node::OperationNode>(Node::OperationCode::Mul, lhs.Release(), rhs.Release()));
 	}
 };
 

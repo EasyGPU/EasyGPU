@@ -156,7 +156,7 @@ Runtime::Buffer<int> bufIn(input);
 Runtime::Buffer<int> bufOut(N);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto	 in		= bufIn.Bind();
 		auto	 out	= bufOut.Bind();
 		Var<int> v		= in[id];
@@ -165,8 +165,8 @@ Kernel1D			 kernel(
 			If(v > 50, [&]() { result = MakeInt(3); }).Else([&]() { result = MakeInt(2); });
 		}).Else([&]() { result = MakeInt(1); });
 		out[id] = result;
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -183,13 +183,13 @@ constexpr int		 N = 64;
 Runtime::Buffer<int> bufOut(N);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto	 out = bufOut.Bind();
 		Var<int> sum = MakeInt(0);
 		For(0, id + 1, [&](Int &j) { sum = sum + j; });
 		out[id] = sum;
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -206,14 +206,14 @@ constexpr int		 N = 64;
 Runtime::Buffer<int> bufOut(N);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto	 out = bufOut.Bind();
 		Var<int> sum = MakeInt(0);
 		// Sum even numbers up to id*2
 		For(0, id * 2 + 1, 2, [&](Int &j) { sum = sum + j; });
 		out[id] = sum;
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -231,7 +231,7 @@ constexpr int		 N = 64;
 Runtime::Buffer<int> bufOut(N);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto	 out   = bufOut.Bind();
 		Var<int> count = MakeInt(0);
 		For(0, 100, [&](Int &j) {
@@ -239,8 +239,8 @@ Kernel1D			 kernel(
 			count = count + MakeInt(1);
 		});
 		out[id] = count;
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -257,7 +257,7 @@ constexpr int		 N = 64;
 Runtime::Buffer<int> bufOut(N);
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto	 out = bufOut.Bind();
 		Var<int> sum = MakeInt(0);
 		For(0, id + 1, [&](Int &j) {
@@ -265,8 +265,8 @@ Kernel1D			 kernel(
 			sum = sum + j;
 		});
 		out[id] = sum;
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 

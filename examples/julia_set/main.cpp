@@ -56,31 +56,31 @@ constexpr float		  JULIA_CY		 = 0.156f;
 // Color mapping function - Smooth gradient palette
 // =============================================================================
 Callable<Float3(Int)> GetColor		 = [](Int &iter) {
-	  Float3 color;
-	  If(iter == MAX_ITERATIONS, [&]() {
-		  // Inside set - deep navy/black
-		  color = MakeFloat3(0.02f, 0.02f, 0.05f);
-	  }).Else([&]() {
-		  // Outside set - smooth gradient from cyan to blue to purple
-		  Float t	 = ToFloat(iter) / MakeFloat(MAX_ITERATIONS);
+	Float3 color;
+	If(iter == MAX_ITERATIONS, [&]() {
+		// Inside set - deep navy/black
+		color = MakeFloat3(0.02f, 0.02f, 0.05f);
+	}).Else([&]() {
+		// Outside set - smooth gradient from cyan to blue to purple
+		Float t	   = ToFloat(iter) / MakeFloat(MAX_ITERATIONS);
 
-		  // Smooth color gradient using cosine palette
-		  Float freq = MakeFloat(4.71239f); // 1.5 * PI for broader color range
+		// Smooth color gradient using cosine palette
+		Float freq = MakeFloat(4.71239f); // 1.5 * PI for broader color range
 
-		  // Cyan to Blue to Purple gradient (cool tones)
-		  Float r	 = 0.2f + 0.6f * Sin(freq * t + 4.0f);
-		  Float g	 = 0.3f + 0.5f * Sin(freq * t + 2.0f);
-		  Float b	 = 0.6f + 0.4f * Sin(freq * t + 0.0f);
+		// Cyan to Blue to Purple gradient (cool tones)
+		Float r	   = 0.2f + 0.6f * Sin(freq * t + 4.0f);
+		Float g	   = 0.3f + 0.5f * Sin(freq * t + 2.0f);
+		Float b	   = 0.6f + 0.4f * Sin(freq * t + 0.0f);
 
-		  // Boost blue channel for ocean-like aesthetic
-		  r			 = Clamp(r, 0.0f, 1.0f);
-		  g			 = Clamp(g, 0.0f, 1.0f);
-		  b			 = Clamp(b * 1.1f, 0.0f, 1.0f);
+		// Boost blue channel for ocean-like aesthetic
+		r		   = Clamp(r, 0.0f, 1.0f);
+		g		   = Clamp(g, 0.0f, 1.0f);
+		b		   = Clamp(b * 1.1f, 0.0f, 1.0f);
 
-		  color		 = MakeFloat3(r, g, b);
-	  });
+		color	   = MakeFloat3(r, g, b);
+	});
 
-	  Return(color);
+	Return(color);
 };
 
 // =============================================================================

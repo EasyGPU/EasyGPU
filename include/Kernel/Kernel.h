@@ -32,26 +32,40 @@ public:
 	virtual ~KernelBase() = default;
 
 public:
-	/**
-	 * @brief Insert a workgroup memory barrier (GLSL barrier()).
-	 *
-	 * This is for shader-internal workgroup synchronization.
-	 */
-	static void WorkgroupBarrier();
+	// ===================================================================
+	// Synchronization
+	// ===================================================================
+
+	/** @brief Insert a workgroup memory barrier (GLSL barrier()). */
+	static void				   WorkgroupBarrier();
+	/** @brief Insert a GPU memory barrier. */
+	static void				   MemoryBarrier();
+	/** @brief Combined memory barrier and execution barrier. */
+	static void				   FullBarrier();
+
+	// ===================================================================
+	// Built-in Shader Variables
+	// ===================================================================
 
 	/**
-	 * @brief Insert a GPU memory barrier.
+	 * @brief The vertex index in a graphics pipeline draw call.
 	 *
-	 * Ensures all memory writes are visible to subsequent operations.
+	 * Equivalent to GLSL `gl_VertexIndex`. Available in vertex shaders.
+	 * Usage: Int vid = VertexIndex();
 	 */
-	static void MemoryBarrier();
+	static IR::Value::Var<int> VertexIndex() {
+		return IR::Value::Var<int>("gl_VertexIndex", true);
+	}
 
 	/**
-	 * @brief Combined memory barrier and execution barrier.
+	 * @brief The fragment coordinate in a fragment shader.
 	 *
-	 * Ensures all threads in the workgroup reach this point and memory is synchronized.
+	 * Equivalent to GLSL `gl_FragCoord`. Available in fragment shaders.
+	 * Usage: Float4 fc = FragmentCoord();
 	 */
-	static void FullBarrier();
+	static IR::Value::Var<GPU::Math::Vec4> FragmentCoord() {
+		return IR::Value::Var<GPU::Math::Vec4>("gl_FragCoord", true);
+	}
 
 public:
 	/**
@@ -61,6 +75,14 @@ public:
 	 */
 	static void RuntimeBarrier();
 };
+/// @brief Shorthand for KernelBase::VertexIndex() — the current vertex index in a graphics pipeline.
+inline IR::Value::Var<int> VertexIndex() {
+	return KernelBase::VertexIndex();
+}
+/// @brief Shorthand for KernelBase::FragmentCoord() — the current fragment coordinate.
+inline IR::Value::Var<GPU::Math::Vec4> FragmentCoord() {
+	return KernelBase::FragmentCoord();
+}
 
 // ===================================================================================
 // Inspector Kernels - For debugging and viewing generated GLSL code
@@ -233,13 +255,13 @@ public:
 	 * @brief Set the kernel name for profiling.
 	 * @param name The kernel name.
 	 */
-	void		SetName(const std::string &name);
+	void					  SetName(const std::string &name);
 
 	/**
 	 * @brief Get the kernel name.
 	 * @return The kernel name.
 	 */
-	std::string GetName() const;
+	std::string				  GetName() const;
 
 	/**
 	 * @brief Dispatch the compute shader.
@@ -248,15 +270,17 @@ public:
 	 * @param GroupX The x group size.
 	 * @param sync If true, wait for GPU execution to complete (blocking).
 	 */
-	void		Dispatch(int GroupX, bool sync = false);
+	void					  Dispatch(int GroupX, bool sync = false);
 
 	/**
 	 * @brief Get the generated GLSL code without executing.
 	 * @return The full GLSL compute shader source.
 	 */
-	std::string GetCode();
+	std::string				  GetCode();
 
-	const KernelBuildContext &GetContext() const { return _context; }
+	const KernelBuildContext &GetContext() const {
+		return _context;
+	}
 
 private:
 	KernelBuildContext _context;
@@ -293,13 +317,13 @@ public:
 	 * @brief Set the kernel name for profiling.
 	 * @param name The kernel name.
 	 */
-	void		SetName(const std::string &name);
+	void					  SetName(const std::string &name);
 
 	/**
 	 * @brief Get the kernel name.
 	 * @return The kernel name.
 	 */
-	std::string GetName() const;
+	std::string				  GetName() const;
 
 	/**
 	 * @brief Dispatch the 2D compute shader.
@@ -307,15 +331,17 @@ public:
 	 * @param GroupY The y group count.
 	 * @param sync If true, wait for GPU execution to complete (blocking).
 	 */
-	void		Dispatch(int GroupX, int GroupY, bool sync = false);
+	void					  Dispatch(int GroupX, int GroupY, bool sync = false);
 
 	/**
 	 * @brief Get the generated GLSL code without executing.
 	 * @return The full GLSL compute shader source.
 	 */
-	std::string GetCode();
+	std::string				  GetCode();
 
-	const KernelBuildContext &GetContext() const { return _context; }
+	const KernelBuildContext &GetContext() const {
+		return _context;
+	}
 
 private:
 	KernelBuildContext _context;
@@ -356,13 +382,13 @@ public:
 	 * @brief Set the kernel name for profiling.
 	 * @param name The kernel name.
 	 */
-	void		SetName(const std::string &name);
+	void					  SetName(const std::string &name);
 
 	/**
 	 * @brief Get the kernel name.
 	 * @return The kernel name.
 	 */
-	std::string GetName() const;
+	std::string				  GetName() const;
 
 	/**
 	 * @brief Dispatch the 3D compute shader.
@@ -371,15 +397,17 @@ public:
 	 * @param GroupZ The z group count.
 	 * @param sync If true, wait for GPU execution to complete (blocking).
 	 */
-	void		Dispatch(int GroupX, int GroupY, int GroupZ, bool sync = false);
+	void					  Dispatch(int GroupX, int GroupY, int GroupZ, bool sync = false);
 
 	/**
 	 * @brief Get the generated GLSL code without executing.
 	 * @return The full GLSL compute shader source.
 	 */
-	std::string GetCode();
+	std::string				  GetCode();
 
-	const KernelBuildContext &GetContext() const { return _context; }
+	const KernelBuildContext &GetContext() const {
+		return _context;
+	}
 
 private:
 	KernelBuildContext _context;

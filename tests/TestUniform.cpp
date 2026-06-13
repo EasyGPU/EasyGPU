@@ -44,11 +44,11 @@ void TestUniformInt() {
 	Buffer<int> gpuOutput(64);
 
 	Kernel1D	kernel([&](Int i) {
-		   auto in	= gpuInput.Bind();
-		   auto out = gpuOutput.Bind();
-		   auto off = offset.Load(); // Load uniform
-		   out[i]	= in[i] + off;
-	   });
+		auto in	 = gpuInput.Bind();
+		auto out = gpuOutput.Bind();
+		auto off = offset.Load(); // Load uniform
+		out[i]	 = in[i] + off;
+	});
 
 	kernel.Dispatch(1, true);
 
@@ -86,11 +86,11 @@ void TestUniformFloat() {
 	Buffer<float> gpuOutput(64);
 
 	Kernel1D	  kernel([&](Int i) {
-		 auto in  = gpuInput.Bind();
-		 auto out = gpuOutput.Bind();
-		 auto s	  = scale.Load(); // Load uniform
-		 out[i]	  = in[i] * s;
-	 });
+		auto in	 = gpuInput.Bind();
+		auto out = gpuOutput.Bind();
+		auto s	 = scale.Load(); // Load uniform
+		out[i]	 = in[i] * s;
+	});
 
 	kernel.Dispatch(1, true);
 
@@ -134,15 +134,15 @@ void TestMultipleUniforms() {
 	Buffer<int> gpuOutput(64);
 
 	Kernel1D	kernel([&](Int i) {
-		   auto in	   = gpuInput.Bind();
-		   auto out	   = gpuOutput.Bind();
-		   auto off	   = offset.Load();
-		   auto s	   = scale.Load();
-		   auto thresh = threshold.Load();
+		auto in		= gpuInput.Bind();
+		auto out	= gpuOutput.Bind();
+		auto off	= offset.Load();
+		auto s		= scale.Load();
+		auto thresh = threshold.Load();
 
-		   Int	val	   = in[i] + off;
-		   If(val > thresh, [&]() { out[i] = ToInt(ToFloat(val) * s); }).Else([&]() { out[i] = Expr<int>(val); });
-	   });
+		Int	 val	= in[i] + off;
+		If(val > thresh, [&]() { out[i] = ToInt(ToFloat(val) * s); }).Else([&]() { out[i] = Expr<int>(val); });
+	});
 
 	kernel.Dispatch(1, true);
 
@@ -187,11 +187,11 @@ void TestUniformValueChange() {
 	Buffer<int> gpuOutput(64);
 
 	Kernel1D	kernel([&](Int i) {
-		   auto in	= gpuInput.Bind();
-		   auto out = gpuOutput.Bind();
-		   auto m	= multiplier.Load();
-		   out[i]	= in[i] * m;
-	   });
+		auto in	 = gpuInput.Bind();
+		auto out = gpuOutput.Bind();
+		auto m	 = multiplier.Load();
+		out[i]	 = in[i] * m;
+	});
 
 	// First dispatch with multiplier = 2
 	kernel.Dispatch(1, true);
@@ -244,11 +244,11 @@ void TestUniformConstructorInit() {
 	Buffer<float> gpuOutput(64);
 
 	Kernel1D	  kernel([&](Int i) {
-		 auto in  = gpuInput.Bind();
-		 auto out = gpuOutput.Bind();
-		 auto f	  = factor.Load();
-		 out[i]	  = in[i] * f;
-	 });
+		auto in	 = gpuInput.Bind();
+		auto out = gpuOutput.Bind();
+		auto f	 = factor.Load();
+		out[i]	 = in[i] * f;
+	});
 
 	kernel.Dispatch(1, true);
 
@@ -287,11 +287,11 @@ void TestUniformBool() {
 	Buffer<int> gpuOutput(64);
 
 	Kernel1D	kernel([&](Int i) {
-		   auto in	 = gpuInput.Bind();
-		   auto out	 = gpuOutput.Bind();
-		   auto cond = condition.Load();
-		   If(cond, [&]() { out[i] = in[i] * 2; }).Else([&]() { out[i] = Expr<int>(in[i]); });
-	   });
+		auto in	  = gpuInput.Bind();
+		auto out  = gpuOutput.Bind();
+		auto cond = condition.Load();
+		If(cond, [&]() { out[i] = in[i] * 2; }).Else([&]() { out[i] = Expr<int>(in[i]); });
+	});
 
 	// First dispatch with condition = true
 	kernel.Dispatch(1, true);

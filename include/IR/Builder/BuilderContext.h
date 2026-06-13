@@ -192,7 +192,7 @@ public:
 	 * Get the uniform declarations for GLSL
 	 * @return The uniform declaration string
 	 */
-	virtual std::string GetUniformDeclarations() const		= 0;
+	virtual std::string GetUniformDeclarations() const										= 0;
 
 public:
 	// ===================================================================
@@ -292,6 +292,30 @@ public:
 	 * @param slot Pointer to the TextureSlotBase
 	 */
 	virtual void RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
+	}
+
+	/**
+	 * @brief Register a varying variable for graphics pipeline (VS out -> FS in).
+	 * @param name GLSL variable name.
+	 * @param glslType GLSL type string.
+	 */
+	virtual void RegisterVarying(const std::string &name, const std::string &glslType) {
+		(void)name;
+		(void)glslType;
+	}
+
+	/**
+	 * @brief Register a uniform buffer (UBO) with this context.
+	 * @param typeName GLSL struct type name.
+	 * @param ubo Pointer to UniformBufferBase.
+	 * @param gpuSize Size of the UBO in GPU memory.
+	 * @return The GLSL variable name for accessing the UBO.
+	 */
+	virtual std::string RegisterUniformBuffer(const std::string &typeName, void *ubo, size_t gpuSize) {
+		(void)typeName;
+		(void)ubo;
+		(void)gpuSize;
+		return "";
 	}
 
 protected:

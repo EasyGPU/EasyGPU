@@ -23,13 +23,13 @@ int main() {
 	// ========================================================================
 	// Packed RGBA pixels: 0xAARRGGBB
 	std::vector<int> host_input	 = {
-		 static_cast<int>(0xFFFF0000), static_cast<int>(0xFF00FF00), static_cast<int>(0xFF0000FF),
-		 static_cast<int>(0xFFFFFFFF), static_cast<int>(0xFF7F7F7F), static_cast<int>(0xFF123456),
-		 static_cast<int>(0xFFABCDEF), static_cast<int>(0xFF000000), static_cast<int>(0xFFFF00FF),
-		 static_cast<int>(0xFFFFFF00), static_cast<int>(0xFF00FFFF), static_cast<int>(0xFF112233),
-		 static_cast<int>(0xFF445566), static_cast<int>(0xFF778899), static_cast<int>(0xFFAABBCC),
-		 static_cast<int>(0xFFDDEEFF),
-	 };
+		static_cast<int>(0xFFFF0000), static_cast<int>(0xFF00FF00), static_cast<int>(0xFF0000FF),
+		static_cast<int>(0xFFFFFFFF), static_cast<int>(0xFF7F7F7F), static_cast<int>(0xFF123456),
+		static_cast<int>(0xFFABCDEF), static_cast<int>(0xFF000000), static_cast<int>(0xFFFF00FF),
+		static_cast<int>(0xFFFFFF00), static_cast<int>(0xFF00FFFF), static_cast<int>(0xFF112233),
+		static_cast<int>(0xFF445566), static_cast<int>(0xFF778899), static_cast<int>(0xFFAABBCC),
+		static_cast<int>(0xFFDDEEFF),
+	};
 
 	std::vector<int> host_output(PIXEL_COUNT);
 

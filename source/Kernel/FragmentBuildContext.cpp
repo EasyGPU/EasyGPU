@@ -75,13 +75,12 @@ void FragmentBuildContext::GenerateCommonHeaders(std::ostringstream &oss) {
 std::string FragmentBuildContext::GetCompleteCode() {
 	// Execute all body generators first
 	{
-		std::string				savedCallableBody	= std::move(_currentCallableBody);
-		bool					savedInCallableBody = _inCallableBody;
-		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
+		std::string				savedCallableBody	 = std::move(_currentCallableBody);
+		bool					savedInCallableBody	 = _inCallableBody;
+		std::stack<std::string> savedBodyStack		 = std::move(_callableBodyStack);
 
-
-		auto &builder	  = IR::Builder::Builder::Get();
-		bool savedBuilderCallable = builder.IsInCallableBody();
+		auto				   &builder				 = IR::Builder::Builder::Get();
+		bool					savedBuilderCallable = builder.IsInCallableBody();
 		_currentCallableBody.clear();
 		_inCallableBody = false;
 		builder.SetInCallableBody(false);
@@ -148,18 +147,17 @@ std::string FragmentBuildContext::GetVertexShaderSource() {
 std::string FragmentBuildContext::GetFragmentShaderSource() {
 	// Execute all body generators first
 	{
-		std::string				savedCallableBody	= std::move(_currentCallableBody);
-		bool					savedInCallableBody = _inCallableBody;
-		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
+		std::string				savedCallableBody	 = std::move(_currentCallableBody);
+		bool					savedInCallableBody	 = _inCallableBody;
+		std::stack<std::string> savedBodyStack		 = std::move(_callableBodyStack);
 
-
-		auto &builder	  = IR::Builder::Builder::Get();
-		bool savedBuilderCallable = builder.IsInCallableBody();
-			_callableBodyStack.pop();
+		auto				   &builder				 = IR::Builder::Builder::Get();
+		bool					savedBuilderCallable = builder.IsInCallableBody();
+		_callableBodyStack.pop();
 		while (!_callableBodyStack.empty()) {
-		_currentCallableBody.clear();
-		_inCallableBody = false;
-		builder.SetInCallableBody(false);
+			_currentCallableBody.clear();
+			_inCallableBody = false;
+			builder.SetInCallableBody(false);
 		}
 
 		auto *prevContext = builder.Context();

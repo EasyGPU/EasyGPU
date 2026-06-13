@@ -34,19 +34,19 @@ struct TapeVar {
  * Categories of differentiable operations that can be recorded on the tape.
  */
 enum class TapeOpKind : uint8_t {
-	BinaryOp,		   // v = a + b, a * b, a / b, a - b
-	UnaryOp,		   // v = -a
+	BinaryOp,			// v = a + b, a * b, a / b, a - b
+	UnaryOp,			// v = -a
 	ExpressionGradient, // v = complex expression, with precomputed leaf gradient coefficients
-	Intrinsic1,		   // v = sin(x), sqrt(x), exp(x) ...  (1 parameter)
-	Intrinsic2,		   // v = pow(a,b), atan2(y,x) ...       (2 parameters)
-	Intrinsic3,		   // v = clamp(x,lo,hi), mix(a,b,t) ... (3 parameters)
-	Ternary,		   // v = cond ? a : b
-	CompoundAssign,	   // v += a, v *= a ...
-	Call,			   // v = callable_func(args...) — user-defined function call
-	Return,			   // return v — marks the return variable in a callable body
-	ControlFlowBegin,  // Entering if / for block
-	ControlFlowEnd,	   // Leaving if / for block
-	Loss,			   // Marks the scalar loss variable (seed for backward pass)
+	Intrinsic1,			// v = sin(x), sqrt(x), exp(x) ...  (1 parameter)
+	Intrinsic2,			// v = pow(a,b), atan2(y,x) ...       (2 parameters)
+	Intrinsic3,			// v = clamp(x,lo,hi), mix(a,b,t) ... (3 parameters)
+	Ternary,			// v = cond ? a : b
+	CompoundAssign,		// v += a, v *= a ...
+	Call,				// v = callable_func(args...) — user-defined function call
+	Return,				// return v — marks the return variable in a callable body
+	ControlFlowBegin,	// Entering if / for block
+	ControlFlowEnd,		// Leaving if / for block
+	Loss,				// Marks the scalar loss variable (seed for backward pass)
 };
 
 /**
@@ -63,26 +63,26 @@ enum class ControlFlowKind : uint8_t {
  * A single entry on the gradient tape, representing one differentiable operation.
  */
 struct TapeEntry {
-	int32_t					id = 0;
-	TapeOpKind				kind = TapeOpKind::BinaryOp;
-	TapeVar					output;
-	std::vector<TapeVar>	inputs;
+	int32_t								  id   = 0;
+	TapeOpKind							  kind = TapeOpKind::BinaryOp;
+	TapeVar								  output;
+	std::vector<TapeVar>				  inputs;
 
 	// Operation-specific data
-	GPU::IR::Node::OperationCode			binaryOp = GPU::IR::Node::OperationCode::Add;
-	GPU::IR::Node::CompoundAssignmentCode	compoundOp = GPU::IR::Node::CompoundAssignmentCode::AddAssign;
-	std::string intrinsicName;
-	std::string callableFuncName;  // for Call: the mangled GLSL function name
-	int callableIndex = -1;       // for Call: index into the sub-tape list (assigned during body recording)
+	GPU::IR::Node::OperationCode		  binaryOp	 = GPU::IR::Node::OperationCode::Add;
+	GPU::IR::Node::CompoundAssignmentCode compoundOp = GPU::IR::Node::CompoundAssignmentCode::AddAssign;
+	std::string							  intrinsicName;
+	std::string							  callableFuncName; // for Call: the mangled GLSL function name
+	int callableIndex = -1;					 // for Call: index into the sub-tape list (assigned during body recording)
 	std::vector<std::string> inputGradExprs; // for ExpressionGradient: coefficient per input
 
 	// Control flow metadata (only valid for ControlFlowBegin)
-	ControlFlowKind controlFlowKind = ControlFlowKind::IfBranch;
-	std::string		conditionVarName;
-	std::string		forStart;
-	std::string		forEnd;
-	std::string		forStep  = "1";
-	std::string		forVarName;
+	ControlFlowKind			 controlFlowKind = ControlFlowKind::IfBranch;
+	std::string				 conditionVarName;
+	std::string				 forStart;
+	std::string				 forEnd;
+	std::string				 forStep = "1";
+	std::string				 forVarName;
 };
 
 } // namespace GPU::AD

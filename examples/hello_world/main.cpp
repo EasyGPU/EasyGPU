@@ -39,16 +39,16 @@ int main() {
 	// Define a 1D kernel that processes one element per thread
 	// The kernel captures device buffers by reference
 	Kernel1D	kernel(
-		   "IncrementKernel",
-		   [&](Int tid) {
-			   // Bind buffers to access them in the kernel scope
-			   auto input  = device_input.Bind();
-			   auto output = device_output.Bind();
+		"IncrementKernel",
+		[&](Int tid) {
+			// Bind buffers to access them in the kernel scope
+			auto input	= device_input.Bind();
+			auto output = device_output.Bind();
 
-			   // Guard against out-of-bounds access (though dispatch size matches here)
-			   If(tid < static_cast<Int>(kElementCount), [&]() { output[tid] = input[tid] + 1; });
-		   },
-		   kThreadGroupSize);
+			// Guard against out-of-bounds access (though dispatch size matches here)
+			If(tid < static_cast<Int>(kElementCount), [&]() { output[tid] = input[tid] + 1; });
+		},
+		kThreadGroupSize);
 
 	// =========================================================================
 	// Kernel Dispatch

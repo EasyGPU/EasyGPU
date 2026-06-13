@@ -63,6 +63,10 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
+	// Explicit move operations (match general Expr<T> template)
+	Expr(Expr &&)			 = default;
+	Expr &operator=(Expr &&) = default;
+
 	/**
 	 * @brief Construct an IVec2 expression from a Var<IVec2>, cloning its expression tree
 	 * @param var The source Var<IVec2> to convert
@@ -85,7 +89,7 @@ public:
 	template <CountableType IndexType> Expr<int> operator[](IndexType index) & = delete;
 
 	Expr<int>									 operator[](ExprBase index)									   &&{
-		   return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<int>							   operator[](ExprBase index) & = delete;
@@ -106,8 +110,7 @@ public:
 
 	public :
 	// Arithmetic operations
-	friend Expr<Math::IVec2>
-	operator+(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
+	friend Expr<Math::IVec2> operator+(Expr<Math::IVec2> lhs, Expr<Math::IVec2> rhs) {
 		return Expr<Math::IVec2>(
 			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
 	}
@@ -278,7 +281,7 @@ public:
 	template <CountableType IndexType> Expr<int> operator[](IndexType index) & = delete;
 
 	Expr<int>									 operator[](ExprBase index)									   &&{
-		   return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<int>							   operator[](ExprBase index) & = delete;
@@ -314,8 +317,7 @@ public:
 
 	public :
 	// Arithmetic operations
-	friend Expr<Math::IVec3>
-	operator+(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
+	friend Expr<Math::IVec3> operator+(Expr<Math::IVec3> lhs, Expr<Math::IVec3> rhs) {
 		return Expr<Math::IVec3>(
 			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
 	}
@@ -486,7 +488,7 @@ public:
 	template <CountableType IndexType> Expr<int> operator[](IndexType index) & = delete;
 
 	Expr<int>									 operator[](ExprBase index)									   &&{
-		   return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<int>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<int>							   operator[](ExprBase index) & = delete;
@@ -572,8 +574,7 @@ public:
 
 	public :
 	// Arithmetic operations
-	friend Expr<Math::IVec4>
-	operator+(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
+	friend Expr<Math::IVec4> operator+(Expr<Math::IVec4> lhs, Expr<Math::IVec4> rhs) {
 		return Expr<Math::IVec4>(
 			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
 	}

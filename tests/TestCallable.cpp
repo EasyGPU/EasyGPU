@@ -574,7 +574,7 @@ TEST(callable_texture_dispatch)
 const int			 W = 32, H = 32;
 
 // Create input texture with red pixels
-std::vector<uint8_t> inputPixels(W *H * 4);
+std::vector<uint8_t> inputPixels(W * H * 4);
 for (int i = 0; i < W * H; ++i) {
 	inputPixels[i * 4 + 0] = 255; // R
 	inputPixels[i * 4 + 1] = 0;	  // G
@@ -617,7 +617,7 @@ GPU::Kernel::Kernel2D kernel(
 kernel.Dispatch((W + 15) / 16, (H + 15) / 16, true);
 
 // Download and verify result
-std::vector<uint8_t> outputPixels(W *H * 4);
+std::vector<uint8_t> outputPixels(W * H * 4);
 outputTex.Download(outputPixels.data());
 
 // Check first pixel - should be inverted red (0, 255, 255, 0)

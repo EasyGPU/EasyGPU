@@ -22,9 +22,9 @@ int main() {
 		BufferSlot<float> slot;
 
 		Kernel1D		  kernel([&](Int i) {
-			 auto buf = slot.Bind();
-			 buf[i]	  = buf[i] * 2.0f;
-		 });
+			auto buf = slot.Bind();
+			buf[i]	 = buf[i] * 2.0f;
+		});
 
 		bool			  caught = false;
 		try {
@@ -53,9 +53,9 @@ int main() {
 		TextureSlot<PixelFormat::R32F> slot;
 
 		Kernel2D					   kernel([&](Int x, Int y) {
-			  auto tex = slot.Bind();
-			  tex.Write(x, y, MakeFloat4(1.0f, 0.0f, 0.0f, 1.0f));
-		  });
+			auto tex = slot.Bind();
+			tex.Write(x, y, MakeFloat4(1.0f, 0.0f, 0.0f, 1.0f));
+		});
 
 		bool						   caught = false;
 		try {
@@ -84,10 +84,10 @@ int main() {
 		BufferSlot<float>  slotB;
 
 		Kernel1D		   kernel([&](Int i) {
-			  auto a = slotA.Bind();
-			  auto b = slotB.Bind();
-			  b[i]	 = Expr<float>(a[i]);
-		  });
+			auto a = slotA.Bind();
+			auto b = slotB.Bind();
+			b[i]   = Expr<float>(a[i]);
+		});
 
 		// Only attach slotA
 		std::vector<float> data(8, 1.0f);
@@ -121,9 +121,9 @@ int main() {
 		BufferSlot<float>  slot;
 
 		Kernel1D		   kernel([&](Int i) {
-			  auto buf = slot.Bind();
-			  buf[i]   = 1.0f;
-		  });
+			auto buf = slot.Bind();
+			buf[i]	 = 1.0f;
+		});
 
 		std::vector<float> data(8, 0.0f);
 		Buffer<float>	   buf(data);
@@ -157,9 +157,9 @@ int main() {
 		BufferSlot<float>  slot;
 
 		Kernel1D		   kernel([&](Int i) {
-			  auto buf = slot.Bind();
-			  buf[i]   = buf[i] + 5.0f;
-		  });
+			auto buf = slot.Bind();
+			buf[i]	 = buf[i] + 5.0f;
+		});
 
 		std::vector<float> data(8, 10.0f);
 		Buffer<float>	   buf(data);

@@ -103,8 +103,8 @@ TEST(buffer_mode_readonly_no_write_in_kernel)
 // This is a code-generation test: readonly buffer should generate "readonly" qualifier.
 Runtime::Buffer<float> buf(std::vector<float>{1.0f, 2.0f, 3.0f}, Runtime::BufferMode::Read);
 InspectorKernel1D	   inspector([&](Int i) {
-	 auto		b = buf.Bind();
-	 Var<float> v = b[i];
+	auto	   b = buf.Bind();
+	Var<float> v = b[i];
 });
 std::string			   code = inspector.GetCode();
 // The generated code should contain "readonly" for the buffer.

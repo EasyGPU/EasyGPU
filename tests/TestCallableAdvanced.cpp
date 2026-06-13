@@ -49,7 +49,7 @@ TEST(callable_multi_parameter)
 Callable<float(float, float, float)> addThree([](Float a, Float b, Float c) { Return(a + b + c); });
 
 InspectorKernel1D					 inspector([&](Int i) {
-	   Var<float> result = addThree(MakeFloat(1.0f), MakeFloat(2.0f), MakeFloat(3.0f));
+	Var<float> result = addThree(MakeFloat(1.0f), MakeFloat(2.0f), MakeFloat(3.0f));
 });
 std::string							 code = inspector.GetCode();
 ASSERT(code.find("float") != std::string::npos);
@@ -59,8 +59,8 @@ END_TEST
 TEST(callable_void_side_effects)
 Runtime::Buffer<float> buf(4);
 Callable<void(float)>  storeValue([&](Float val) {
-	 auto b = buf.Bind();
-	 b[0]	= val;
+	auto b = buf.Bind();
+	b[0]   = val;
 });
 
 InspectorKernel1D	   inspector([&](Int i) { storeValue(MakeFloat(42.0f)); });
@@ -81,9 +81,9 @@ TEST(callable_called_multiple_times)
 Callable<float(float)> negate([](Float x) { Return(-x); });
 
 InspectorKernel1D	   inspector([&](Int i) {
-	 Var<float> a = negate(MakeFloat(1.0f));
-	 Var<float> b = negate(MakeFloat(2.0f));
-	 Var<float> c = negate(MakeFloat(3.0f));
+	Var<float> a = negate(MakeFloat(1.0f));
+	Var<float> b = negate(MakeFloat(2.0f));
+	Var<float> c = negate(MakeFloat(3.0f));
 });
 std::string			   code = inspector.GetCode();
 // Verify code was generated successfully
@@ -94,9 +94,9 @@ TEST(callable_with_vector_return)
 Callable<Math::Vec3(Math::Vec3, Math::Vec3)> vecAdd([](Float3 a, Float3 b) { Return(a + b); });
 
 InspectorKernel1D							 inspector([&](Int i) {
-	   Var<Vec3> v1		= MakeFloat3(1.0f, 2.0f, 3.0f);
-	   Var<Vec3> v2		= MakeFloat3(4.0f, 5.0f, 6.0f);
-	   Var<Vec3> result = vecAdd(v1, v2);
+	Var<Vec3> v1	 = MakeFloat3(1.0f, 2.0f, 3.0f);
+	Var<Vec3> v2	 = MakeFloat3(4.0f, 5.0f, 6.0f);
+	Var<Vec3> result = vecAdd(v1, v2);
 });
 std::string									 code = inspector.GetCode();
 ASSERT(code.find("vec3") != std::string::npos);
@@ -126,14 +126,14 @@ bufC.Upload(cData.data(), N);
 Callable<float(float, float, float)> add3([](Float a, Float b, Float c) { Return(a + b + c); });
 
 Kernel1D							 kernel(
-								[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto a	 = bufA.Bind();
 		auto b	 = bufB.Bind();
 		auto c	 = bufC.Bind();
 		auto out = bufOut.Bind();
 		out[id]	 = add3(a[id], b[id], c[id]);
-								},
-								256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -152,13 +152,13 @@ Runtime::Buffer<int> bufOut(N);
 Callable<int(int)>	 square([](Int x) { Return(x * x); });
 
 Kernel1D			 kernel(
-				[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto	 out = bufOut.Bind();
 		Var<int> sum = MakeInt(0);
 		For(0, id + 1, [&](Int &j) { sum = sum + square(j); });
 		out[id] = sum;
-				},
-				256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -182,11 +182,11 @@ Callable<float(float)> addOne([](Float x) { Return(x + MakeFloat(1.0f)); });
 Callable<float(float)> addTwo([&](Float x) { Return(addOne(addOne(x))); });
 
 Kernel1D			   kernel(
-				  [&, N](Var<int> &id) {
-		  auto out = bufOut.Bind();
-		  out[id]  = addTwo(ToFloat(id));
-				  },
-				  256);
+	[&, N](Var<int> &id) {
+		auto out = bufOut.Bind();
+		out[id]	 = addTwo(ToFloat(id));
+	},
+	256);
 
 kernel.Dispatch(1, true);
 
@@ -213,12 +213,12 @@ bufIn.Upload(data.data(), N);
 Callable<Math::Vec4(Math::Vec4)> vecAdd([](Float4 v) { Return(v + MakeFloat4(1.0f, 2.0f, 3.0f, 4.0f)); });
 
 Kernel1D						 kernel(
-							[&, N](Var<int> &id) {
+	[&, N](Var<int> &id) {
 		auto in	 = bufIn.Bind();
 		auto out = bufOut.Bind();
 		out[id]	 = vecAdd(in[id]);
-							},
-							256);
+	},
+	256);
 
 kernel.Dispatch(1, true);
 

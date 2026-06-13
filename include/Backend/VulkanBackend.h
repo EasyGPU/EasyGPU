@@ -122,10 +122,37 @@ public:
 	bool				 SupportsPipelineCache() const override;
 	/** @copydoc Backend::GetPipelineCacheFormat */
 	uint32_t			 GetPipelineCacheFormat() const override;
+	/** @copydoc Backend::CreateGraphicsPipeline */
+	PipelineHandle		 CreateGraphicsPipeline(const GraphicsPipelineDesc &desc) override;
+	/** @copydoc Backend::BeginRendering */
+	void				 BeginRendering(const RenderPassBeginDesc &desc) override;
+	/** @copydoc Backend::EndRendering */
+	void				 EndRendering() override;
+	/** @copydoc Backend::SetViewport */
+	void				 SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
+	/** @copydoc Backend::SetScissor */
+	void				 SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
+	/** @copydoc Backend::BindVertexBuffer */
+	void				 BindVertexBuffer(BufferHandle buffer, uint32_t stride) override;
+	/** @copydoc Backend::BindIndexBuffer */
+	void				 BindIndexBuffer(BufferHandle buffer) override;
+	/** @copydoc Backend::Draw */
+	void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) override;
+	/** @copydoc Backend::DrawIndexed */
+	void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset,
+					 uint32_t firstInstance) override;
+	/** @copydoc Backend::CreateDepthBuffer */
+	TextureHandle CreateDepthBuffer(uint32_t width, uint32_t height) override;
+	/** @copydoc Backend::DestroyDepthBuffer */
+	void		  DestroyDepthBuffer(TextureHandle texture) override;
+	/** @copydoc Backend::CreateUniformBuffer */
+	BufferHandle  CreateUniformBuffer(size_t size, const void *data) override;
+	/** @copydoc Backend::UploadUniformBuffer */
+	void		  UploadUniformBuffer(BufferHandle handle, const void *data, size_t size) override;
 
 	/** @copydoc Backend::GetType */
-	BackendType			 GetType() const override {
-		 return BackendType::Vulkan;
+	BackendType	  GetType() const override {
+		return BackendType::Vulkan;
 	}
 
 private:
@@ -177,6 +204,14 @@ private:
 		uint32_t						 workGroupSizeZ		 = 1;
 		uint32_t						 pushConstantSize	 = 0;
 		std::vector<ResourceLayoutEntry> resources;
+		// Graphics pipeline extensions
+		bool							 isGraphics		= false;
+		ShaderHandle					 vertexShader	= INVALID_SHADER_HANDLE;
+		ShaderHandle					 fragmentShader = INVALID_SHADER_HANDLE;
+		PrimitiveTopology				 topology		= PrimitiveTopology::TriangleList;
+		PixelFormat						 colorFormat	= PixelFormat::RGBA8;
+		bool							 depthEnable	= false;
+		std::vector<VertexLayoutEntry>	 vertexLayout;
 	};
 
 	/** @brief Internal Vulkan query resource information. */
@@ -409,6 +444,15 @@ private:
 	VkFence											 _commandFence			  = nullptr;
 	bool											 _commandBufferRecording  = false;
 	bool											 _submissionPending		  = false;
+
+	// Graphics pipeline state
+	bool											 _insideRenderPass		  = false;
+	BufferHandle									 _currentVertexBuffer	  = INVALID_BUFFER_HANDLE;
+	BufferHandle									 _currentIndexBuffer	  = INVALID_BUFFER_HANDLE;
+
+	// Dynamic rendering function pointers (loaded at runtime for Vulkan 1.1 compatibility)
+	PFN_vkCmdBeginRenderingKHR						 _vkCmdBeginRenderingKHR  = nullptr;
+	PFN_vkCmdEndRenderingKHR						 _vkCmdEndRenderingKHR	  = nullptr;
 
 	// Descriptor resources
 	VkDescriptorPool								 _descriptorPool		  = nullptr;

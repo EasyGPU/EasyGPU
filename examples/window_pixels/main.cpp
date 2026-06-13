@@ -23,7 +23,7 @@ int main() {
 
 	// Create window and pixel buffer
 	AppWindow	   window(
-		 {.width = WIDTH, .height = HEIGHT, .title = "EasyGPU Window - Pixel Buffer", .resizable = true, .vsync = true});
+		{.width = WIDTH, .height = HEIGHT, .title = "EasyGPU Window - Pixel Buffer", .resizable = true, .vsync = true});
 
 	PixelBuffer pixels(WIDTH, HEIGHT);
 

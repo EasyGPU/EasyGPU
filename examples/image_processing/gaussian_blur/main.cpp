@@ -88,8 +88,8 @@ int main() {
 					return (na << 24) | (nr << 16) | (ng << 8) | nb;
 				};
 
-				Int sum = apply_weight(pl, MakeFloat(WEIGHT_SIDE)) + apply_weight(pc, MakeFloat(WEIGHT_CENTER)) +
-						  apply_weight(pr, MakeFloat(WEIGHT_SIDE));
+				Int sum	 = apply_weight(pl, MakeFloat(WEIGHT_SIDE)) + apply_weight(pc, MakeFloat(WEIGHT_CENTER)) +
+						   apply_weight(pr, MakeFloat(WEIGHT_SIDE));
 
 				out[idx] = sum;
 			});
@@ -133,8 +133,8 @@ int main() {
 					return (na << 24) | (nr << 16) | (ng << 8) | nb;
 				};
 
-				Int sum = apply_weight(pt, MakeFloat(WEIGHT_SIDE)) + apply_weight(pc, MakeFloat(WEIGHT_CENTER)) +
-						  apply_weight(pb, MakeFloat(WEIGHT_SIDE));
+				Int sum	 = apply_weight(pt, MakeFloat(WEIGHT_SIDE)) + apply_weight(pc, MakeFloat(WEIGHT_CENTER)) +
+						   apply_weight(pb, MakeFloat(WEIGHT_SIDE));
 
 				out[idx] = sum;
 			});

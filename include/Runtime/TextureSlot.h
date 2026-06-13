@@ -60,7 +60,7 @@ public:
 	 */
 	virtual void				   GetDimensions(uint32_t &width, uint32_t &height) const = 0;
 	virtual uint32_t			   GetDepth() const {
-		  return 1;
+		return 1;
 	}
 
 	/**
@@ -147,7 +147,7 @@ public:
 	 * Detach the current texture
 	 */
 	void Detach() {
-		_texture = nullptr;
+		_texture	   = nullptr;
 		_textureHandle = Backend::INVALID_TEXTURE_HANDLE;
 		_width = _height = 0;
 	}
@@ -246,7 +246,7 @@ public:
 	}
 
 private:
-	Texture2D<Format>   *_texture		  = nullptr;
+	Texture2D<Format>	  *_texture		  = nullptr;
 	Backend::TextureHandle _textureHandle = Backend::INVALID_TEXTURE_HANDLE; // Currently attached texture handle
 	uint32_t			   _width		  = 0;
 	uint32_t			   _height		  = 0;

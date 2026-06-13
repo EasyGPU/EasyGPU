@@ -228,7 +228,7 @@ public:
 	 * @param textureHandle The backend texture handle.
 	 */
 	void			   BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) override {
-		  _runtimeTextures[binding] = textureHandle;
+		_runtimeTextures[binding] = textureHandle;
 	}
 
 	/**
@@ -398,7 +398,6 @@ public:
 	 */
 	std::string				 GenerateCallableBodies() override;
 
-
 public:
 	int WorkSizeX; /**< @brief Local work group size in the X dimension. */
 	int WorkSizeY; /**< @brief Local work group size in the Y dimension. */
@@ -462,8 +461,12 @@ public:
 	// Float Atomic Support
 	// ===================================================================
 
-	void RegisterFloatAtomicBuffer(const std::string &bufferName) override;
-	bool HasFloatAtomics() const { return !_floatAtomicBuffers.empty(); }
+	void		RegisterFloatAtomicBuffer(const std::string &bufferName) override;
+	void		RegisterVarying(const std::string &name, const std::string &glslType) override;
+	std::string RegisterUniformBuffer(const std::string &typeName, void *ubo, size_t gpuSize) override;
+	bool		HasFloatAtomics() const {
+		return !_floatAtomicBuffers.empty();
+	}
 
 public:
 	// ===================================================================

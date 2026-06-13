@@ -18,6 +18,9 @@
 // Core Kernel
 // =============================================================================
 #include <Kernel/FragmentKernel.h>
+#include <Kernel/FragmentShader.h>
+#include <Kernel/GraphicsBuildContext.h>
+#include <Kernel/GraphicsPipeline.h>
 #include <Kernel/Kernel.h>
 #include <Kernel/KernelBuildContext.h>
 #include <Kernel/KernelProfiler.h>
@@ -61,6 +64,7 @@
 #include <IR/Value/Var.h>
 #include <IR/Value/VarArray.h>
 #include <IR/Value/VarStruct.h>
+#include <IR/Value/Varying.h>
 
 // =============================================================================
 // IR Nodes (advanced usage)
@@ -88,6 +92,7 @@
 #include <Runtime/Buffer.h>
 #include <Runtime/BufferSlot.h>
 #include <Runtime/Context.h>
+#include <Runtime/DepthBuffer.h>
 #include <Runtime/Exception.h>
 #include <Runtime/PixelFormat.h>
 #include <Runtime/ShaderException.h>
@@ -186,7 +191,7 @@ using InspectorKernel2D = Kernel::InspectorKernel2D;
 using InspectorKernel3D = Kernel::InspectorKernel3D;
 
 /// Alias for ADKernel1D (GPU training with autograd)
-using ADKernel1D = AD::ADKernel1D;
+using ADKernel1D		= AD::ADKernel1D;
 
 #ifdef _WIN32
 using FragmentKernel2D = Kernel::FragmentKernel2D;

@@ -64,7 +64,7 @@ END_TEST
 // =============================================================================
 TEST(texture3d_create_from_buffer)
 const int			 W = 8, H = 8, D = 8;
-std::vector<uint8_t> voxels(W *H *D * 4);
+std::vector<uint8_t> voxels(W * H * D * 4);
 for (int i = 0; i < W * H * D; ++i) {
 	voxels[i * 4 + 0] = 255;
 	voxels[i * 4 + 1] = 128;
@@ -84,8 +84,8 @@ END_TEST
 // =============================================================================
 TEST(texture3d_upload_download)
 const int			 W = 8, H = 8, D = 8;
-std::vector<uint8_t> uploadVoxels(W *H *D * 4);
-std::vector<uint8_t> downloadVoxels(W *H *D * 4);
+std::vector<uint8_t> uploadVoxels(W * H * D * 4);
+std::vector<uint8_t> downloadVoxels(W * H * D * 4);
 
 for (int z = 0; z < D; ++z) {
 	for (int y = 0; y < H; ++y) {
@@ -121,7 +121,7 @@ END_TEST
 // =============================================================================
 TEST(texture3d_subregion_upload)
 const int			 W = 8, H = 8, D = 8;
-std::vector<uint8_t> uploadVoxels(W *H *D * 4, 0);
+std::vector<uint8_t> uploadVoxels(W * H * D * 4, 0);
 std::vector<uint8_t> subVoxels(4 * 4 * 4 * 4, 255);
 for (int i = 0; i < 4 * 4 * 4; ++i) {
 	subVoxels[i * 4 + 0] = 10;
@@ -133,7 +133,7 @@ for (int i = 0; i < 4 * 4 * 4; ++i) {
 Texture3D<PixelFormat::RGBA8> tex(W, H, D);
 tex.UploadSubRegion(2, 2, 2, 4, 4, 4, subVoxels.data());
 
-std::vector<uint8_t> downloadVoxels(W *H *D * 4);
+std::vector<uint8_t> downloadVoxels(W * H * D * 4);
 tex.Download(downloadVoxels.data());
 
 bool correct = true;
@@ -183,14 +183,14 @@ TEST(texture3d_bind_api_inspector)
 Texture3D<PixelFormat::RGBA8> tex(8, 8, 8);
 
 GPU::Kernel::InspectorKernel  kernel([&](Var<int> &id) {
-	 auto	   vol	 = tex.Bind();
+	auto	  vol	= tex.Bind();
 
-	 Var<int>  x	 = id % 8;
-	 Var<int>  y	 = (id / 8) % 8;
-	 Var<int>  z	 = id / 64;
+	Var<int>  x		= id % 8;
+	Var<int>  y		= (id / 8) % 8;
+	Var<int>  z		= id / 64;
 
-	 Var<Vec4> color = vol.Read(x, y, z);
-	 vol.Write(x, y, z, Vec4(1.0f) - color);
+	Var<Vec4> color = vol.Read(x, y, z);
+	vol.Write(x, y, z, Vec4(1.0f) - color);
 });
 
 std::cout << "\n=== Generated GLSL (Texture3D Bind API) ===\n";
@@ -225,7 +225,7 @@ GPU::Kernel::Kernel1D		  kernel(
 
 kernel.Dispatch((W * H * D + 63) / 64, true);
 
-std::vector<uint8_t> resultVoxels(W *H *D * 4);
+std::vector<uint8_t> resultVoxels(W * H * D * 4);
 tex.Download(resultVoxels.data());
 
 bool correct = true;
@@ -262,7 +262,7 @@ END_TEST
 TEST(texture3d_rgba32f_format)
 const int		   W = 4, H = 4, D = 4;
 
-std::vector<float> floatVoxels(W *H *D * 4);
+std::vector<float> floatVoxels(W * H * D * 4);
 for (int i = 0; i < W * H * D; ++i) {
 	floatVoxels[i * 4 + 0] = 0.25f;
 	floatVoxels[i * 4 + 1] = 0.5f;
@@ -273,21 +273,21 @@ for (int i = 0; i < W * H * D; ++i) {
 Texture3D<PixelFormat::RGBA32F> floatTex(W, H, D, floatVoxels.data());
 
 GPU::Kernel::Kernel1D			kernel(
-	  [&](Var<int> &id) {
-		  auto		vol	  = floatTex.Bind();
+	[&](Var<int> &id) {
+		auto	  vol	= floatTex.Bind();
 
-		  Var<int>	x	  = id % W;
-		  Var<int>	y	  = (id / W) % H;
-		  Var<int>	z	  = id / (W * H);
+		Var<int>  x		= id % W;
+		Var<int>  y		= (id / W) % H;
+		Var<int>  z		= id / (W * H);
 
-		  Var<Vec4> color = vol.Read(x, y, z);
-		  vol.Write(x, y, z, color * 2.0f);
-	  },
-	  32);
+		Var<Vec4> color = vol.Read(x, y, z);
+		vol.Write(x, y, z, color * 2.0f);
+	},
+	32);
 
 kernel.Dispatch((W * H * D + 31) / 32, true);
 
-std::vector<float> resultVoxels(W *H *D * 4);
+std::vector<float> resultVoxels(W * H * D * 4);
 floatTex.Download(resultVoxels.data());
 
 bool correct = true;
@@ -308,7 +308,7 @@ END_TEST
 TEST(texture3d_r32f_format)
 const int		   W = 4, H = 4, D = 4;
 
-std::vector<float> floatVoxels(W *H *D);
+std::vector<float> floatVoxels(W * H * D);
 for (int i = 0; i < W * H * D; ++i) {
 	floatVoxels[i] = static_cast<float>(i);
 }
@@ -316,21 +316,21 @@ for (int i = 0; i < W * H * D; ++i) {
 Texture3D<PixelFormat::R32F> floatTex(W, H, D, floatVoxels.data());
 
 GPU::Kernel::Kernel1D		 kernel(
-	   [&](Var<int> &id) {
-		   auto		 vol   = floatTex.Bind();
+	[&](Var<int> &id) {
+		auto	  vol	= floatTex.Bind();
 
-		   Var<int>	 x	   = id % W;
-		   Var<int>	 y	   = (id / W) % H;
-		   Var<int>	 z	   = id / (W * H);
+		Var<int>  x		= id % W;
+		Var<int>  y		= (id / W) % H;
+		Var<int>  z		= id / (W * H);
 
-		   Var<Vec4> color = vol.Read(x, y, z);
-		   vol.Write(x, y, z, MakeFloat4(color.x() + 1.0f, 0.0f, 0.0f, 0.0f));
-	   },
-	   32);
+		Var<Vec4> color = vol.Read(x, y, z);
+		vol.Write(x, y, z, MakeFloat4(color.x() + 1.0f, 0.0f, 0.0f, 0.0f));
+	},
+	32);
 
 kernel.Dispatch((W * H * D + 31) / 32, true);
 
-std::vector<float> resultVoxels(W *H *D);
+std::vector<float> resultVoxels(W * H * D);
 floatTex.Download(resultVoxels.data());
 
 bool correct = true;

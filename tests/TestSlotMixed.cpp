@@ -28,17 +28,17 @@ int main() {
 			TextureSlot<PixelFormat::R32F> textureSlot;
 
 			Kernel2D					   kernel([&](Int x, Int y) {
-				  auto	buf	   = bufferSlot.Bind();
-				  auto	tex	   = textureSlot.Bind();
+				auto  buf	 = bufferSlot.Bind();
+				auto  tex	 = textureSlot.Bind();
 
-				  // Read from buffer and texture
-				  Int	idx	   = y * 16 + x;
-				  Float bufVal = buf[idx];
-				  Float texVal = tex.Read(x, y).x();
+				// Read from buffer and texture
+				Int	  idx	 = y * 16 + x;
+				Float bufVal = buf[idx];
+				Float texVal = tex.Read(x, y).x();
 
-				  // Write sum back to texture
-				  tex.Write(x, y, MakeFloat4(bufVal + texVal, 0.0f, 0.0f, 1.0f));
-			  });
+				// Write sum back to texture
+				tex.Write(x, y, MakeFloat4(bufVal + texVal, 0.0f, 0.0f, 1.0f));
+			});
 
 			// Setup buffer
 			std::vector<float>			   bufData(16 * 16);
@@ -82,11 +82,11 @@ int main() {
 			Uniform<float>	   offset;
 
 			Kernel1D		   kernel([&](Int i) {
-				  auto	buf = slot.Bind();
-				  Float s	= scale.Load();
-				  Float o	= offset.Load();
-				  buf[i]	= buf[i] * s + o;
-			  });
+				auto  buf = slot.Bind();
+				Float s	  = scale.Load();
+				Float o	  = offset.Load();
+				buf[i]	  = buf[i] * s + o;
+			});
 
 			std::vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
 			Buffer<float>	   buffer(data);
@@ -133,13 +133,13 @@ int main() {
 			BufferSlot<float>  slot;
 
 			Kernel1D		   kernel([&](Int i) {
-				  // Access static buffer
-				  auto c = constBuffer.Bind();
-				  // Access slot buffer
-				  auto s = slot.Bind();
+				// Access static buffer
+				auto c = constBuffer.Bind();
+				// Access slot buffer
+				auto s = slot.Bind();
 
-				  s[i]	 = s[i] + c[i];
-			  });
+				s[i]   = s[i] + c[i];
+			});
 
 			std::vector<float> data = {1.0f, 2.0f, 3.0f};
 			Buffer<float>	   buffer(data);
@@ -172,10 +172,10 @@ int main() {
 			Uniform<int>	   iteration;
 
 			Kernel1D		   kernel([&](Int i) {
-				  auto buf	= slot.Bind();
-				  Int  iter = iteration.Load();
-				  buf[i]	= buf[i] + ToFloat(iter);
-			  });
+				auto buf  = slot.Bind();
+				Int	 iter = iteration.Load();
+				buf[i]	  = buf[i] + ToFloat(iter);
+			});
 
 			std::vector<float> data(10, 0.0f);
 			Buffer<float>	   buffer(data);
@@ -212,11 +212,11 @@ int main() {
 			TextureSlot<PixelFormat::R32F> tex2DSlot;
 
 			Kernel1D					   kernel([&](Int i) {
-				  auto buf = bufSlot.Bind();
-				  // Note: Can't use 2D texture Bind in 1D kernel easily,
-				  // so we just verify the buffer slot works
-				  buf[i]   = buf[i] * 2.0f;
-			  });
+				auto buf = bufSlot.Bind();
+				// Note: Can't use 2D texture Bind in 1D kernel easily,
+				// so we just verify the buffer slot works
+				buf[i]	 = buf[i] * 2.0f;
+			});
 
 			std::vector<float>			   data(8, 5.0f);
 			Buffer<float>				   buffer(data);
@@ -255,9 +255,9 @@ int main() {
 			Callable<Float(Float)> Process = [](Float &x) { Return(x * x + 1.0f); };
 
 			Kernel1D			   kernel([&](Int i) {
-				  auto buf = slot.Bind();
-				  buf[i]   = Process(buf[i]);
-			  });
+				auto buf = slot.Bind();
+				buf[i]	 = Process(buf[i]);
+			});
 
 			std::vector<float>	   data = {1.0f, 2.0f, 3.0f, 4.0f};
 			Buffer<float>		   buffer(data);

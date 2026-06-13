@@ -4,7 +4,7 @@
 
 # EasyGPU
 
-C++20 Embedded DSL for GPU Compute, Autograd & Neural Networks
+C++20 Embedded DSL for GPU Compute, Rasterization, Autograd & Neural Networks
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-orange.svg)](https://en.cppreference.com/w/cpp/20)
@@ -13,7 +13,7 @@ C++20 Embedded DSL for GPU Compute, Autograd & Neural Networks
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![Autograd](https://img.shields.io/badge/Autograd-Reverse--Mode-blue.svg)](docs/autodiff.md)
 
-[Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Examples](#examples) · [API Reference](docs/api-reference.md)
+[Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Graphics Pipeline](docs/graphics-pipeline.md) · [API Reference](docs/api-reference.md)
 
 </div>
 
@@ -153,11 +153,11 @@ square.Dispatch(16, true);
 
 Runs natively on Windows, Linux, and macOS with zero code changes. The same kernel code works identically across platforms.
 
-| Platform | Compute Kernels | Fragment Kernels | Backend |
-|:---------|:---------------|:-----------------|:--------|
-| **Windows** | ✅ Full support | ✅ Full support | WGL |
-| **Linux** | ✅ Full support | — | GLX |
-| **macOS** | ✅ Full support | — | Vulkan |
+| Platform | Compute Kernels | Graphics Pipeline | Backend |
+|:---------|:---------------|:------------------|:--------|
+| **Windows** | ✅ Full support | ✅ Vulkan | WGL / Vulkan |
+| **Linux** | ✅ Full support | ✅ Vulkan | GLX / Vulkan |
+| **macOS** | ✅ Full support | ✅ Vulkan | Vulkan (MoltenVK) |
 
 ```cpp
 // This code runs identically on Windows, Linux, and macOS
@@ -180,6 +180,45 @@ cmake -S . -B build_gl -DEASYGPU_BACKEND=OpenGL
 ```
 
 For new projects, Vulkan is the recommended default. OpenGL remains available for users who need a lighter dependency footprint or are targeting existing GL applications.
+
+### Graphics Pipeline — Rasterization in C++ DSL
+
+Write vertex and fragment shaders as C++ lambdas. The framework compiles them to GLSL/SPIR-V and renders via Vulkan dynamic rendering (`VK_KHR_dynamic_rendering`). Full support for depth testing, push-constant uniforms, SSBO vertex data, and `Varying<T>` interpolation.
+
+```cpp
+Varying<Vec3> vColor;
+
+GraphicsPipeline pipeline(
+    // ── Vertex Shader ──
+    [&](Float4 &gl_Position) {
+        Int  vid  = VertexIndex();
+        auto vert = vertexBuffer.Bind()[vid];
+        auto u    = ubo.Load();
+        gl_Position = u.mvp() * MakeFloat4(vert.pos(), 1.0f);
+
+        Float3 N(Normalize(vert.normal()));
+        Float  diff = Max(Dot(N, MakeFloat3(0.4f, 0.6f, 0.7f)), 0.15f);
+        vColor = Float3(MakeFloat3(diff, diff * 0.5f, diff * 0.3f));
+    },
+    // ── Fragment Shader ──
+    [&](Float4 &fragColor) {
+        Float3 c = vColor;  // interpolated varying
+        fragColor = MakeFloat4(c.x(), c.y(), c.z(), 1.0f);
+    });
+
+// Render with depth testing
+DepthBuffer db(W, H);
+pipeline.Draw(renderTarget, db, vertCount, true);
+```
+
+**Key features:**
+- `GraphicsPipeline` — complete VS+FS DSL class, matching `Kernel1D` API conventions
+- `FragmentShader` — simplified fullscreen pass (hardcoded VS + user FS)
+- `Varying<T>` — vertex→fragment interpolated variables
+- `DepthBuffer` — RAII depth buffer for occlusion testing
+- `VertexIndex()` / `FragmentCoord()` — built-in shader variable helpers
+
+See the full guide: [docs/graphics-pipeline.md](docs/graphics-pipeline.md)
 
 ### Automatic Differentiation — GPU Gradients, Zero Hand-Written Math
 
@@ -925,6 +964,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [API Reference](docs/api-reference.md#neural-network) — Neural Network API: Tensor, Optimizer (Adam/SGD/RMSprop), Layers, Loss, Checkpoint
 - [Texture3D Guide](docs/texture3d.md) — Volumetric textures and 3D compute
 - [Window Component](docs/window.md) — Cross-platform window for interactive visualization
+- [Graphics Pipeline](docs/graphics-pipeline.md) — Vertex + Fragment shader DSL, Varying\<T\>, depth testing, OBJ rendering
 - [Shader Cache](docs/shader-cache.md) — Automatic kernel compilation caching
 - [Common Patterns](docs/patterns.md)
 - [Unref - Independent Variable Copies](docs/unref.md)

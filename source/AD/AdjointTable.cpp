@@ -11,14 +11,15 @@ namespace GPU::AD {
 
 std::string AdjointTable::GetOrCreate(const std::string &varName, const std::string &glslType) {
 	auto it = _map.find(varName);
-	if (it != _map.end()) return it->second;
+	if (it != _map.end())
+		return it->second;
 
 	std::string adjName = MakeAdjointName(varName);
 
-	_map[varName] = adjName;
+	_map[varName]		= adjName;
 
 	// Also index by base buffer name for variable-indexed lookups
-	auto bpos = varName.find('[');
+	auto bpos			= varName.find('[');
 	if (bpos != std::string::npos) {
 		std::string base = varName.substr(0, bpos);
 		if (!_baseMap.count(base)) {
@@ -43,11 +44,12 @@ std::string AdjointTable::Get(const std::string &varName) const {
 		// variable indices (e.g. buf5[v115*16+v116] -> lookup "buf5")
 		auto bpos = varName.find('[');
 		if (bpos != std::string::npos) {
-			std::string base = varName.substr(0, bpos);
-			auto baseIt = _baseMap.find(base);
-			if (baseIt == _baseMap.end()) return "";
+			std::string base   = varName.substr(0, bpos);
+			auto		baseIt = _baseMap.find(base);
+			if (baseIt == _baseMap.end())
+				return "";
 			std::string adjBase = baseIt->second;
-			auto epos = varName.rfind(']');
+			auto		epos	= varName.rfind(']');
 			std::string idxExpr = varName.substr(bpos + 1, epos - bpos - 1);
 			return adjBase + "[" + idxExpr + "]";
 		}
@@ -58,7 +60,7 @@ std::string AdjointTable::Get(const std::string &varName) const {
 	// or grad_buf[tokenId*E+d] without needing to parse the index themselves.
 	auto bpos = varName.find('[');
 	if (bpos != std::string::npos) {
-		auto epos = varName.rfind(']');
+		auto		epos	= varName.rfind(']');
 		std::string idxExpr = varName.substr(bpos + 1, epos - bpos - 1);
 		return it->second + "[" + idxExpr + "]";
 	}
@@ -77,8 +79,7 @@ std::vector<std::pair<std::string, std::string>> AdjointTable::AllDeclarations()
 			auto sizeIt = _arraySizes.find(adjName);
 			if (sizeIt != _arraySizes.end() && sizeIt->second > 0) {
 				// Array adjoint for buffer parameters
-				decls.emplace_back(adjName,
-					std::format("{}[{}]", typeIt->second, sizeIt->second));
+				decls.emplace_back(adjName, std::format("{}[{}]", typeIt->second, sizeIt->second));
 			} else {
 				decls.emplace_back(adjName, typeIt->second);
 			}
@@ -114,8 +115,10 @@ std::string AdjointTable::MakeAdjointName(const std::string &varName) {
 	// Swizzle access "v3.xyz" -> "d_v3_xyz"
 	std::string sanitized;
 	for (char c : varName) {
-		if (c == '.') sanitized += '_';
-		else sanitized += c;
+		if (c == '.')
+			sanitized += '_';
+		else
+			sanitized += c;
 	}
 	return std::format("d_{}", sanitized);
 }

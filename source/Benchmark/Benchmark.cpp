@@ -16,15 +16,15 @@ namespace GPU::Benchmark {
 // =============================================================================
 
 namespace {
-const char *COLOR_RESET   = "\033[0m";
-const char *COLOR_BOLD    = "\033[1m";
-const char *COLOR_CYAN    = "\033[36m";
-const char *COLOR_GREEN   = "\033[32m";
+const char *COLOR_RESET	  = "\033[0m";
+const char *COLOR_BOLD	  = "\033[1m";
+const char *COLOR_CYAN	  = "\033[36m";
+const char *COLOR_GREEN	  = "\033[32m";
 const char *COLOR_YELLOW  = "\033[33m";
 const char *COLOR_MAGENTA = "\033[35m";
-const char *COLOR_GRAY    = "\033[90m";
+const char *COLOR_GRAY	  = "\033[90m";
 
-bool UseColor() {
+bool		UseColor() {
 #ifdef _WIN32
 	return false;
 #else
@@ -122,15 +122,15 @@ void PrintResultRow(std::ostream &os, const BenchmarkResult &r, size_t index, bo
 		os << Col(COLOR_CYAN) << "║ " << Col(COLOR_RESET) << rowColor << std::left << std::setw(24)
 		   << r.name.substr(0, 23) << Col(COLOR_RESET) << " │ " << std::right << std::setw(6) << r.measuredCount
 		   << " │ " << std::fixed << std::setprecision(3) << std::setw(9) << r.minMs << " │ " << Col(COLOR_GREEN)
-		   << std::setw(9) << r.avgMs << Col(COLOR_RESET) << " │ " << std::setw(9) << r.medianMs << " │ " << std::setw(9)
-		   << r.maxMs << " │ " << Col(COLOR_YELLOW) << std::setw(9) << r.stddevMs << Col(COLOR_RESET) << Col(COLOR_CYAN)
-		   << "  ║\n"
+		   << std::setw(9) << r.avgMs << Col(COLOR_RESET) << " │ " << std::setw(9) << r.medianMs << " │ "
+		   << std::setw(9) << r.maxMs << " │ " << Col(COLOR_YELLOW) << std::setw(9) << r.stddevMs << Col(COLOR_RESET)
+		   << Col(COLOR_CYAN) << "  ║\n"
 		   << Col(COLOR_RESET);
 	} else {
 		os << "| " << std::left << std::setw(24) << r.name.substr(0, 23) << " | " << std::right << std::setw(6)
 		   << r.measuredCount << " | " << std::fixed << std::setprecision(3) << std::setw(9) << r.minMs << " | "
-		   << std::setw(9) << r.avgMs << " | " << std::setw(9) << r.medianMs << " | " << std::setw(9) << r.maxMs << " | "
-		   << std::setw(9) << r.stddevMs << "  |\n";
+		   << std::setw(9) << r.avgMs << " | " << std::setw(9) << r.medianMs << " | " << std::setw(9) << r.maxMs
+		   << " | " << std::setw(9) << r.stddevMs << "  |\n";
 	}
 }
 

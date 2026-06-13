@@ -34,8 +34,8 @@ public:
 	 * @param message  Human-readable description of the error.
 	 */
 	Exception(std::string component, std::string message)
-		: std::runtime_error(std::format("[GPU::{}] {}", component, message)),
-		  _component(std::move(component)), _message(std::move(message)) {
+		: std::runtime_error(std::format("[GPU::{}] {}", component, message)), _component(std::move(component)),
+		  _message(std::move(message)) {
 	}
 
 	/** @brief Return the subsystem component that raised this error. */
@@ -62,8 +62,7 @@ private:
  */
 class BuilderContextException : public Exception {
 public:
-	explicit BuilderContextException(std::string reason)
-		: Exception("Builder", std::move(reason)) {
+	explicit BuilderContextException(std::string reason) : Exception("Builder", std::move(reason)) {
 	}
 };
 
@@ -76,8 +75,7 @@ public:
  */
 class InternalIRException : public Exception {
 public:
-	explicit InternalIRException(std::string detail)
-		: Exception("IR", std::move(detail)) {
+	explicit InternalIRException(std::string detail) : Exception("IR", std::move(detail)) {
 	}
 };
 

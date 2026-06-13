@@ -97,16 +97,16 @@ std::string KernelBuildContext::GetCompleteCode() {
 	// ===================================================================
 	{
 		// Save current state
-		std::string				savedCallableBody	= std::move(_currentCallableBody);
-		bool					savedInCallableBody = _inCallableBody;
-		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
-			auto				  &builder				= IR::Builder::Builder::Get();
-			bool					savedBuilderCallable = builder.IsInCallableBody();
+		std::string				savedCallableBody	 = std::move(_currentCallableBody);
+		bool					savedInCallableBody	 = _inCallableBody;
+		std::stack<std::string> savedBodyStack		 = std::move(_callableBodyStack);
+		auto				   &builder				 = IR::Builder::Builder::Get();
+		bool					savedBuilderCallable = builder.IsInCallableBody();
 
 		// Clear state for pre-execution
 		_currentCallableBody.clear();
 		_inCallableBody = false;
-			builder.SetInCallableBody(false);
+		builder.SetInCallableBody(false);
 		while (!_callableBodyStack.empty()) {
 			_callableBodyStack.pop();
 		}
@@ -453,7 +453,7 @@ std::string KernelBuildContext::RegisterUniform(
 
 	std::string uniformName = std::format("u{}", _nextUniformIndex++);
 	size_t		alignedOffset =
-		 gpuAlignment == 0 ? _nextUniformOffset : ((_nextUniformOffset + gpuAlignment - 1) & ~(gpuAlignment - 1));
+		gpuAlignment == 0 ? _nextUniformOffset : ((_nextUniformOffset + gpuAlignment - 1) & ~(gpuAlignment - 1));
 	_uniforms.push_back(
 		{uniformName, typeName, uniformPtr, gpuSize, gpuAlignment, alignedOffset, uploadFunc, packFunc});
 	_nextUniformOffset = alignedOffset + gpuSize;
@@ -516,8 +516,7 @@ uint32_t KernelBuildContext::GetPushConstantSize() const {
 void KernelBuildContext::RegisterBufferSlot(Runtime::BufferSlotBase *slot) {
 	auto existing = _bufferSlotBindings.find(slot);
 	if (existing != _bufferSlotBindings.end()) {
-		slot->SetBindingInfo(static_cast<int>(existing->second),
-							 std::format("buf_slot_{}", existing->second));
+		slot->SetBindingInfo(static_cast<int>(existing->second), std::format("buf_slot_{}", existing->second));
 		return;
 	}
 
@@ -536,8 +535,7 @@ void KernelBuildContext::RegisterBufferSlot(Runtime::BufferSlotBase *slot) {
 void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
 	auto existing = _textureSlotBindings.find(slot);
 	if (existing != _textureSlotBindings.end()) {
-		slot->SetBindingInfo(static_cast<int>(existing->second),
-							 std::format("tex_slot_{}", existing->second));
+		slot->SetBindingInfo(static_cast<int>(existing->second), std::format("tex_slot_{}", existing->second));
 		return;
 	}
 
@@ -597,6 +595,19 @@ std::vector<std::string> KernelBuildContext::GetSharedMemoryDeclarations() const
 void KernelBuildContext::ComputeShaderHash() {
 	std::string source = GetCompleteCode();
 	_shaderHash		   = ShaderCache::ComputeShaderHash(source);
+}
+
+void KernelBuildContext::RegisterVarying(const std::string &name, const std::string &glslType) {
+	(void)name;
+	(void)glslType;
+	// Base implementation: no-op. GraphicsBuildContext overrides this.
+}
+
+std::string KernelBuildContext::RegisterUniformBuffer(const std::string &typeName, void *ubo, size_t gpuSize) {
+	(void)ubo;
+	// For now, return a placeholder name. Full UBO support is a separate feature.
+	std::string name = std::string("ubo_") + typeName;
+	return name;
 }
 
 } // namespace GPU::Kernel

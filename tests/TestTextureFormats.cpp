@@ -81,7 +81,7 @@ END_TEST
 TEST(texture_rg8_upload_download)
 constexpr int		 W = 16;
 constexpr int		 H = 16;
-std::vector<uint8_t> data(W *H * 2);
+std::vector<uint8_t> data(W * H * 2);
 for (int i = 0; i < W * H; ++i) {
 	data[i * 2 + 0] = static_cast<uint8_t>(i % 256);
 	data[i * 2 + 1] = static_cast<uint8_t>((i * 3) % 256);
@@ -90,7 +90,7 @@ for (int i = 0; i < W * H; ++i) {
 Runtime::Texture2D<PixelFormat::RG8> tex(W, H);
 tex.Upload(data.data());
 
-std::vector<uint8_t> output(W *H * 2);
+std::vector<uint8_t> output(W * H * 2);
 tex.Download(output.data());
 
 for (int i = 0; i < W * H * 2; ++i) {
@@ -104,7 +104,7 @@ END_TEST
 TEST(texture_rgba8_upload_download)
 constexpr int		 W = 16;
 constexpr int		 H = 16;
-std::vector<uint8_t> data(W *H * 4);
+std::vector<uint8_t> data(W * H * 4);
 for (int i = 0; i < W * H; ++i) {
 	data[i * 4 + 0] = static_cast<uint8_t>(i % 256);
 	data[i * 4 + 1] = static_cast<uint8_t>((i * 2) % 256);
@@ -115,7 +115,7 @@ for (int i = 0; i < W * H; ++i) {
 Runtime::Texture2D<PixelFormat::RGBA8> tex(W, H);
 tex.Upload(data.data());
 
-std::vector<uint8_t> output(W *H * 4);
+std::vector<uint8_t> output(W * H * 4);
 tex.Download(output.data());
 
 for (int i = 0; i < W * H * 4; ++i) {
@@ -129,7 +129,7 @@ END_TEST
 TEST(texture_rgba16f_upload_download)
 constexpr int		  W = 8;
 constexpr int		  H = 8;
-std::vector<uint16_t> data(W *H * 4);
+std::vector<uint16_t> data(W * H * 4);
 for (int i = 0; i < W * H; ++i) {
 	// Simple half-float values (1.0, 2.0, 0.5, 1.0)
 	data[i * 4 + 0] = 0x3C00; // 1.0 in half-float
@@ -141,7 +141,7 @@ for (int i = 0; i < W * H; ++i) {
 Runtime::Texture2D<PixelFormat::RGBA16F> tex(W, H);
 tex.Upload(data.data());
 
-std::vector<uint16_t> output(W *H * 4);
+std::vector<uint16_t> output(W * H * 4);
 tex.Download(output.data());
 
 for (int i = 0; i < W * H * 4; ++i) {
@@ -177,7 +177,7 @@ END_TEST
 TEST(texture_rgba32ui_upload_download)
 constexpr int		  W = 4;
 constexpr int		  H = 4;
-std::vector<uint32_t> data(W *H * 4);
+std::vector<uint32_t> data(W * H * 4);
 for (int i = 0; i < W * H; ++i) {
 	data[i * 4 + 0] = static_cast<uint32_t>(i);
 	data[i * 4 + 1] = static_cast<uint32_t>(i * 2);
@@ -188,7 +188,7 @@ for (int i = 0; i < W * H; ++i) {
 Runtime::Texture2D<PixelFormat::RGBA32UI> tex(W, H);
 tex.Upload(data.data());
 
-std::vector<uint32_t> output(W *H * 4);
+std::vector<uint32_t> output(W * H * 4);
 tex.Download(output.data());
 
 for (int i = 0; i < W * H * 4; ++i) {
@@ -203,7 +203,7 @@ TEST(texture3d_rgba8_upload_download)
 constexpr int		 W = 8;
 constexpr int		 H = 8;
 constexpr int		 D = 8;
-std::vector<uint8_t> data(W *H *D * 4);
+std::vector<uint8_t> data(W * H * D * 4);
 for (int i = 0; i < W * H * D; ++i) {
 	data[i * 4 + 0] = static_cast<uint8_t>(i % 256);
 	data[i * 4 + 1] = static_cast<uint8_t>((i * 7) % 256);
@@ -214,7 +214,7 @@ for (int i = 0; i < W * H * D; ++i) {
 Runtime::Texture3D<PixelFormat::RGBA8> tex(W, H, D);
 tex.Upload(data.data());
 
-std::vector<uint8_t> output(W *H *D * 4);
+std::vector<uint8_t> output(W * H * D * 4);
 tex.Download(output.data());
 
 for (int i = 0; i < W * H * D * 4; ++i) {
@@ -231,7 +231,7 @@ constexpr int						   H = 16;
 Runtime::Texture2D<PixelFormat::RGBA8> tex(W, H);
 
 // Initialize with zeros
-std::vector<uint8_t>				   zeros(W *H * 4, 0);
+std::vector<uint8_t>				   zeros(W * H * 4, 0);
 tex.Upload(zeros.data());
 
 // Upload a 4x4 red block at (2, 3)
@@ -244,7 +244,7 @@ for (int i = 0; i < 4 * 4; ++i) {
 }
 tex.UploadSubRegion(2, 3, 4, 4, block.data());
 
-std::vector<uint8_t> output(W *H * 4);
+std::vector<uint8_t> output(W * H * 4);
 tex.Download(output.data());
 
 // Check the block area
@@ -275,19 +275,19 @@ constexpr int						   H = 8;
 Runtime::Texture2D<PixelFormat::RGBA8> tex(W, H);
 
 Kernel2D							   kernel(
-								  [&, W, H](Var<int> &x, Var<int> &y) {
-		  auto		 img = tex.Bind();
-		  Var<int>	 idx = y * W + x;
-		  Var<float> r	 = ToFloat(idx % 256) / 255.0f;
-		  Var<float> g	 = ToFloat((idx * 2) % 256) / 255.0f;
-		  Var<float> b	 = ToFloat((idx * 3) % 256) / 255.0f;
-		  img.Write(x, y, MakeFloat4(r, g, b, 1.0f));
-								  },
-								  8, 8);
+	[&, W, H](Var<int> &x, Var<int> &y) {
+		auto	   img = tex.Bind();
+		Var<int>   idx = y * W + x;
+		Var<float> r   = ToFloat(idx % 256) / 255.0f;
+		Var<float> g   = ToFloat((idx * 2) % 256) / 255.0f;
+		Var<float> b   = ToFloat((idx * 3) % 256) / 255.0f;
+		img.Write(x, y, MakeFloat4(r, g, b, 1.0f));
+	},
+	8, 8);
 
 kernel.Dispatch(1, 1, true);
 
-std::vector<uint8_t> output(W *H * 4);
+std::vector<uint8_t> output(W * H * 4);
 tex.Download(output.data());
 
 for (int y = 0; y < H; ++y) {

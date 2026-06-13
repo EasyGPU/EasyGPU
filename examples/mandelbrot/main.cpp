@@ -47,42 +47,42 @@ constexpr float		  ZOOM			 = 1.5f;
 // Color mapping function - Ultra Fractal style palette
 // =============================================================================
 Callable<Float3(Int)> GetColor		 = [](Int &iter) {
-	  Float3 color;
-	  If(iter == MAX_ITERATIONS, [&]() {
-		  // Inside set - deep black with subtle blue tint
-		  color = MakeFloat3(0.02f, 0.02f, 0.05f);
-	  }).Else([&]() {
-		  // Outside set - rich psychedelic gradient
-		  Float t		  = Expr<float>(iter) / float(MAX_ITERATIONS);
+	Float3 color;
+	If(iter == MAX_ITERATIONS, [&]() {
+		// Inside set - deep black with subtle blue tint
+		color = MakeFloat3(0.02f, 0.02f, 0.05f);
+	}).Else([&]() {
+		// Outside set - rich psychedelic gradient
+		Float t			= Expr<float>(iter) / float(MAX_ITERATIONS);
 
-		  // Use multiple sine waves for richer colors (Ultra Fractal style)
-		  // This creates bands of color that cycle through the spectrum
-		  Float freq	  = MakeFloat(6.28318f); // 2 * PI
+		// Use multiple sine waves for richer colors (Ultra Fractal style)
+		// This creates bands of color that cycle through the spectrum
+		Float freq		= MakeFloat(6.28318f); // 2 * PI
 
-		  // Red channel: mix of two frequencies
-		  Float r		  = 0.5f + 0.5f * Sin(freq * t + 0.0f) * Cos(freq * t * 0.5f);
+		// Red channel: mix of two frequencies
+		Float r			= 0.5f + 0.5f * Sin(freq * t + 0.0f) * Cos(freq * t * 0.5f);
 
-		  // Green channel: phase shifted
-		  Float g		  = 0.5f + 0.5f * Sin(freq * t + 2.094f) * Cos(freq * t * 0.3f + 1.0f);
+		// Green channel: phase shifted
+		Float g			= 0.5f + 0.5f * Sin(freq * t + 2.094f) * Cos(freq * t * 0.3f + 1.0f);
 
-		  // Blue channel: different phase
-		  Float b		  = 0.5f + 0.5f * Sin(freq * t + 4.188f) * Cos(freq * t * 0.7f + 2.0f);
+		// Blue channel: different phase
+		Float b			= 0.5f + 0.5f * Sin(freq * t + 4.188f) * Cos(freq * t * 0.7f + 2.0f);
 
-		  // Apply gamma correction for smoother appearance
-		  r				  = Pow(Clamp(r, 0.0f, 1.0f), 0.8f);
-		  g				  = Pow(Clamp(g, 0.0f, 1.0f), 0.8f);
-		  b				  = Pow(Clamp(b, 0.0f, 1.0f), 0.8f);
+		// Apply gamma correction for smoother appearance
+		r				= Pow(Clamp(r, 0.0f, 1.0f), 0.8f);
+		g				= Pow(Clamp(g, 0.0f, 1.0f), 0.8f);
+		b				= Pow(Clamp(b, 0.0f, 1.0f), 0.8f);
 
-		  // Boost saturation slightly
-		  Float intensity = MakeFloat(1.2f);
-		  r				  = Clamp(r * intensity, 0.0f, 1.0f);
-		  g				  = Clamp(g * intensity, 0.0f, 1.0f);
-		  b				  = Clamp(b * intensity, 0.0f, 1.0f);
+		// Boost saturation slightly
+		Float intensity = MakeFloat(1.2f);
+		r				= Clamp(r * intensity, 0.0f, 1.0f);
+		g				= Clamp(g * intensity, 0.0f, 1.0f);
+		b				= Clamp(b * intensity, 0.0f, 1.0f);
 
-		  color			  = MakeFloat3(r, g, b);
-	  });
+		color			= MakeFloat3(r, g, b);
+	});
 
-	  Return(color);
+	Return(color);
 };
 
 // =============================================================================

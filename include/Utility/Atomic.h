@@ -38,10 +38,10 @@ inline IR::Value::Expr<float> BuildAtomicFloatOp(const std::string &opName, cons
 		return IR::Value::Expr<float>(std::make_unique<IR::Node::RawCodeNode>(code));
 	}
 
-	std::string bufName = targetExpr.substr(0, bracketPos);
+	std::string bufName	  = targetExpr.substr(0, bracketPos);
 	std::string indexExpr = targetExpr.substr(bracketPos);
 
-	auto *ctx = IR::Builder::Builder::Get().Context();
+	auto	   *ctx		  = IR::Builder::Builder::Get().Context();
 	if (ctx) {
 		ctx->RegisterFloatAtomicBuffer(bufName);
 	}
@@ -59,8 +59,8 @@ inline IR::Value::Expr<float> BuildAtomicFloatOp(const std::string &opName, cons
 	} else if (opName == "atomicExchange") {
 		casNewValExpr = valueExpr;
 	} else {
-		return IR::Value::Expr<float>(std::make_unique<IR::Node::RawCodeNode>(
-			opName + "(" + targetExpr + ", " + valueExpr + ")"));
+		return IR::Value::Expr<float>(
+			std::make_unique<IR::Node::RawCodeNode>(opName + "(" + targetExpr + ", " + valueExpr + ")"));
 	}
 
 	std::string code;

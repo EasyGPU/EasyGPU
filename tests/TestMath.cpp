@@ -371,14 +371,14 @@ Runtime::Buffer<float> bufferY(y_values);
 Runtime::Buffer<float> bufferOutput(N);
 
 Kernel::Kernel1D	   kernel(
-		  [&, N](Var<int> &id) {
-		  auto x   = bufferX.Bind();
-		  auto y   = bufferY.Bind();
-		  auto out = bufferOutput.Bind();
+	[&, N](Var<int> &id) {
+		auto x	 = bufferX.Bind();
+		auto y	 = bufferY.Bind();
+		auto out = bufferOutput.Bind();
 
-		  out[id]  = CopySign(x[id], y[id]);
-		  },
-		  static_cast<int>(N));
+		out[id]	 = CopySign(x[id], y[id]);
+	},
+	static_cast<int>(N));
 
 kernel.Dispatch(1, true);
 bufferOutput.Download(output);
@@ -402,14 +402,14 @@ Runtime::Buffer<float> bufferY(y_values);
 Runtime::Buffer<float> bufferOutput(N);
 
 Kernel::Kernel1D	   kernel(
-		  [&, N](Var<int> &id) {
-		  auto x   = bufferX.Bind();
-		  auto y   = bufferY.Bind();
-		  auto out = bufferOutput.Bind();
+	[&, N](Var<int> &id) {
+		auto x	 = bufferX.Bind();
+		auto y	 = bufferY.Bind();
+		auto out = bufferOutput.Bind();
 
-		  out[id]  = CopySign(x[id], y[id]);
-		  },
-		  static_cast<int>(N));
+		out[id]	 = CopySign(x[id], y[id]);
+	},
+	static_cast<int>(N));
 
 kernel.Dispatch(1, true);
 bufferOutput.Download(output);

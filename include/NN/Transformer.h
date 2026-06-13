@@ -35,26 +35,22 @@
 
 namespace GPU::NN {
 
-template <typename T, size_t BlockSize, size_t EmbedDim, size_t NumHeads>
-class TransformerBlock {
+template <typename T, size_t BlockSize, size_t EmbedDim, size_t NumHeads> class TransformerBlock {
 	static_assert(std::is_same_v<T, float>, "TransformerBlock only supports float");
 	static_assert(EmbedDim % NumHeads == 0, "EmbedDim must be divisible by NumHeads");
-	static constexpr size_t MLPDim = 4 * EmbedDim;
+	static constexpr size_t MLPDim	 = 4 * EmbedDim;
 
 	// Per-batch scratch region sizes (in floats)
-	static constexpr size_t K_REGION   = BlockSize * EmbedDim;
-	static constexpr size_t V_REGION   = BlockSize * EmbedDim;
-	static constexpr size_t A_REGION   = BlockSize * EmbedDim;
-	static constexpr size_t M_REGION   = BlockSize * MLPDim;
-	static constexpr size_t REGIONS    = 7; // K(1) + V(1) + A(1) + M(4) = 7 × BE
+	static constexpr size_t K_REGION = BlockSize * EmbedDim;
+	static constexpr size_t V_REGION = BlockSize * EmbedDim;
+	static constexpr size_t A_REGION = BlockSize * EmbedDim;
+	static constexpr size_t M_REGION = BlockSize * MLPDim;
+	static constexpr size_t REGIONS	 = 7; // K(1) + V(1) + A(1) + M(4) = 7 × BE
 
 public:
 	TransformerBlock(size_t batchSize, unsigned seed = 42)
-		: batchSize_(batchSize),
-		  attn_(seed),
-		  norm1_(), norm2_(),
-		  scratchBuf_(batchSize * REGIONS * BlockSize * EmbedDim,
-		              Runtime::BufferMode::ReadWrite) {
+		: batchSize_(batchSize), attn_(seed), norm1_(), norm2_(),
+		  scratchBuf_(batchSize * REGIONS * BlockSize * EmbedDim, Runtime::BufferMode::ReadWrite) {
 		// Compute region base offsets within scratch buffer
 		int bs = static_cast<int>(batchSize);
 		int be = static_cast<int>(BlockSize * EmbedDim);
@@ -66,17 +62,17 @@ public:
 		std::vector<T> d1(MLPDim * EmbedDim);
 		std::vector<T> d2(EmbedDim * MLPDim);
 
-		float range = std::sqrt(6.0f / static_cast<float>(EmbedDim + MLPDim));
-		unsigned s1 = seed + 10, s2 = seed + 11;
+		float		   range = std::sqrt(6.0f / static_cast<float>(EmbedDim + MLPDim));
+		unsigned	   s1 = seed + 10, s2 = seed + 11;
 
 		for (size_t j = 0; j < MLPDim; j++)
 			for (size_t i = 0; i < EmbedDim; i++) {
-				s1 = s1 * 1664525u + 1013904223u;
+				s1					 = s1 * 1664525u + 1013904223u;
 				d1[j * EmbedDim + i] = (static_cast<float>(static_cast<double>(s1) / UINT32_MAX) * 2.0f - 1.0f) * range;
 			}
 		for (size_t j = 0; j < EmbedDim; j++)
 			for (size_t i = 0; i < MLPDim; i++) {
-				s2 = s2 * 1664525u + 1013904223u;
+				s2				   = s2 * 1664525u + 1013904223u;
 				d2[j * MLPDim + i] = (static_cast<float>(static_cast<double>(s2) / UINT32_MAX) * 2.0f - 1.0f) * range;
 			}
 
@@ -104,14 +100,12 @@ public:
 	 * @param pos    Current position (0..blockSize-1)
 	 * @param offset Base offset for embed-dim buffers = batchIdx * blockSize * embedDim
 	 */
-	void Forward(const IR::Value::BufferRef<T> &x,
-				 const IR::Value::Var<int> &pos,
-				 const IR::Value::Expr<int> &offset) {
-		constexpr int E = static_cast<int>(EmbedDim);
-		constexpr int M = static_cast<int>(MLPDim);
+	void Forward(const IR::Value::BufferRef<T> &x, const IR::Value::Var<int> &pos, const IR::Value::Expr<int> &offset) {
+		constexpr int		 E	  = static_cast<int>(EmbedDim);
+		constexpr int		 M	  = static_cast<int>(MLPDim);
 
-		IR::Value::Expr<int> po = offset + pos * E;
-		IR::Value::Expr<int> poM = po * MakeInt(static_cast<int>(MLPDim / EmbedDim));
+		IR::Value::Expr<int> po	  = offset + pos * E;
+		IR::Value::Expr<int> poM  = po * MakeInt(static_cast<int>(MLPDim / EmbedDim));
 
 		// Region base offsets as DSL expressions
 		IR::Value::Expr<int> kOff = MakeInt(kBase_);
@@ -122,9 +116,8 @@ public:
 		// --- RMSNorm → Attention → residual add ---
 		norm1_.Forward(x, scratchRef_, aOff + po);
 		attn_.Forward(scratchRef_, aOff, kOff, vOff, aOff, mOff, pos, offset);
-		GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &d) {
-			x[po + d] = x[po + d] + scratchRef_[aOff + po + d];
-		});
+		GPU::Flow::For(MakeInt(0), MakeInt(E),
+					   [&](IR::Value::Var<int> &d) { x[po + d] = x[po + d] + scratchRef_[aOff + po + d]; });
 
 		// --- RMSNorm → MLP → residual add ---
 		norm2_.Forward(x, scratchRef_, aOff + po);
@@ -142,32 +135,37 @@ public:
 
 		GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &o) {
 			IR::Value::Var<T> sum = MakeFloat(0.0f);
-			GPU::Flow::For(MakeInt(0), MakeInt(M), [&](IR::Value::Var<int> &h) {
-				sum = sum + fc2Ref_(o, h) * scratchRef_[mOff + poM + h];
-			});
+			GPU::Flow::For(MakeInt(0), MakeInt(M),
+						   [&](IR::Value::Var<int> &h) { sum = sum + fc2Ref_(o, h) * scratchRef_[mOff + poM + h]; });
 			x[po + o] = x[po + o] + sum;
 		});
 	}
 
-	CausalSelfAttention<T, EmbedDim, NumHeads> &Attention() { return attn_; }
-	Tensor<T, MLPDim, EmbedDim> &FC1() { return fc1W_; }
-	Tensor<T, EmbedDim, MLPDim> &FC2() { return fc2W_; }
-	static constexpr size_t ParamCount = CausalSelfAttention<T, EmbedDim, NumHeads>::TotalSize
-		+ MLPDim * EmbedDim + EmbedDim * MLPDim;
+	CausalSelfAttention<T, EmbedDim, NumHeads> &Attention() {
+		return attn_;
+	}
+	Tensor<T, MLPDim, EmbedDim> &FC1() {
+		return fc1W_;
+	}
+	Tensor<T, EmbedDim, MLPDim> &FC2() {
+		return fc2W_;
+	}
+	static constexpr size_t ParamCount =
+		CausalSelfAttention<T, EmbedDim, NumHeads>::TotalSize + MLPDim * EmbedDim + EmbedDim * MLPDim;
 
 private:
-	size_t batchSize_;
-	int kBase_, vBase_, aBase_, mBase_;
+	size_t									   batchSize_;
+	int										   kBase_, vBase_, aBase_, mBase_;
 	CausalSelfAttention<T, EmbedDim, NumHeads> attn_;
-	RMSNorm<T, EmbedDim> norm1_, norm2_;
+	RMSNorm<T, EmbedDim>					   norm1_, norm2_;
 
-	Tensor<T, MLPDim, EmbedDim> fc1W_;
-	Tensor<T, EmbedDim, MLPDim> fc2W_;
-	TensorRef<T, MLPDim, EmbedDim> fc1Ref_;
-	TensorRef<T, EmbedDim, MLPDim> fc2Ref_;
+	Tensor<T, MLPDim, EmbedDim>				   fc1W_;
+	Tensor<T, EmbedDim, MLPDim>				   fc2W_;
+	TensorRef<T, MLPDim, EmbedDim>			   fc1Ref_;
+	TensorRef<T, EmbedDim, MLPDim>			   fc2Ref_;
 
-	Runtime::Buffer<T> scratchBuf_;
-	IR::Value::BufferRef<T> scratchRef_;
+	Runtime::Buffer<T>						   scratchBuf_;
+	IR::Value::BufferRef<T>					   scratchRef_;
 };
 
 } // namespace GPU::NN

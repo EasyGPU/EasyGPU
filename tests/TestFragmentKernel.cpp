@@ -75,8 +75,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int nCmdShow) {
 	const int HEIGHT = 720;
 
 	HWND	  hwnd	 = CreateWindowEx(
-		   0, CLASS_NAME, TEXT("EasyGPU FragmentKernel - Comprehensive Test (Press 'P' for profiling)"),
-		   WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, WIDTH, HEIGHT, nullptr, nullptr, hInstance, nullptr);
+		0, CLASS_NAME, TEXT("EasyGPU FragmentKernel - Comprehensive Test (Press 'P' for profiling)"),
+		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, WIDTH, HEIGHT, nullptr, nullptr, hInstance, nullptr);
 
 	if (!hwnd) {
 		MessageBoxW(nullptr, L"Failed to create window", L"Error", MB_OK);

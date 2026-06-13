@@ -66,6 +66,10 @@ public:
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
 
+	// Explicit move operations (match general Expr<T> template)
+	Expr(Expr &&)			 = default;
+	Expr &operator=(Expr &&) = default;
+
 	/**
 	 * @brief Construct a Vec2 expression from a Var<Vec2>, cloning its expression tree
 	 * @param var The source Var<Vec2> to convert
@@ -106,7 +110,7 @@ public:
 	template <CountableType IndexType> Expr<float> operator[](IndexType index) & = delete;
 
 	Expr<float>									   operator[](ExprBase index)									 &&{
-		   return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<float>								 operator[](ExprBase index) & = delete;
@@ -247,7 +251,7 @@ public:
 	template <CountableType IndexType> Expr<float> operator[](IndexType index) & = delete;
 
 	Expr<float>									   operator[](ExprBase index)									 &&{
-		   return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<float>								 operator[](ExprBase index) & = delete;
@@ -408,7 +412,7 @@ public:
 	template <CountableType IndexType> Expr<float> operator[](IndexType index) & = delete;
 
 	Expr<float>									   operator[](ExprBase index)									 &&{
-		   return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
+		return Expr<float>(std::make_unique<Node::ArrayAccessNode>(this->Release(), index.Release()));
 	}
 
 	Expr<float>								 operator[](ExprBase index) & = delete;
@@ -494,8 +498,7 @@ public:
 
 	public :
 	// Arithmetic operations
-	friend Expr<Math::Vec4>
-	operator+(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
+	friend Expr<Math::Vec4> operator+(Expr<Math::Vec4> lhs, Expr<Math::Vec4> rhs) {
 		return Expr<Math::Vec4>(
 			std::make_unique<Node::OperationNode>(Node::OperationCode::Add, lhs.Release(), rhs.Release()));
 	}
