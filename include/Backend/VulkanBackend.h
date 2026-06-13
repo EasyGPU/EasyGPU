@@ -72,6 +72,7 @@ public:
 	/** @copydoc Backend::UploadTexture */
 	void		   UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 								 const void *data) override;
+	void		   GenerateMipmaps(TextureHandle texture) override;
 	/** @copydoc Backend::UploadTexture3D */
 	void UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 						 uint32_t depth, const void *data) override;
@@ -177,9 +178,11 @@ private:
 		VkImage				 image		   = nullptr;
 		VkDeviceMemory		 memory		   = nullptr;
 		VkImageView			 view		   = nullptr;
+		VkImageView			 sampledView   = nullptr;
 		uint32_t			 width		   = 0;
 		uint32_t			 height		   = 0;
 		uint32_t			 depth		   = 1;
+		uint32_t			 mipLevels	   = 1;
 		PixelFormat			 format		   = PixelFormat::RGBA8;
 		VkFormat			 vkFormat	   = VK_FORMAT_UNDEFINED;
 		VkImageLayout		 currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -457,6 +460,7 @@ private:
 	// Descriptor resources
 	VkDescriptorPool								 _descriptorPool		  = nullptr;
 	VkSampler										 _defaultSampler		  = nullptr;
+	VkSampler										 _mipmapSampler		  = nullptr;
 	VkPipelineCache									 _pipelineCache			  = nullptr;
 	std::vector<VkDescriptorSet>					 _inFlightDescriptorSets;
 

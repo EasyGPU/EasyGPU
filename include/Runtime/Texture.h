@@ -33,6 +33,11 @@
 
 namespace GPU::Runtime {
 
+enum class MipmapMode {
+	None,
+	Generate
+};
+
 // Forward declaration
 class PBOBuffer;
 
@@ -395,6 +400,11 @@ public:
 		CreateTexture(nullptr);
 	}
 
+	Texture2D(uint32_t width, uint32_t height, MipmapMode mipmapMode)
+		: _width(width), _height(height), _format(Format), _mipmapMode(mipmapMode) {
+		CreateTexture(nullptr);
+	}
+
 	/**
 	 * @brief Create a 2D texture and upload initial data.
 	 * @param width Texture width in pixels.
@@ -405,9 +415,16 @@ public:
 		CreateTexture(data);
 	}
 
+	Texture2D(uint32_t width, uint32_t height, const void *data, MipmapMode mipmapMode)
+		: _width(width), _height(height), _format(Format), _mipmapMode(mipmapMode) {
+		CreateTexture(data);
+		if (data && _mipmapMode == MipmapMode::Generate)
+			GenerateMipmaps();
+	}
+
 	Texture2D(Texture2D &&other) noexcept
 		: _textureHandle(other._textureHandle), _width(other._width), _height(other._height), _format(other._format),
-		  _boundBinding(other._boundBinding), _uploadPool(std::move(other._uploadPool)),
+		  _mipmapMode(other._mipmapMode), _boundBinding(other._boundBinding), _uploadPool(std::move(other._uploadPool)),
 		  _downloadPool(std::move(other._downloadPool)), _currentUploadPBO(other._currentUploadPBO),
 		  _currentDownloadPBO(other._currentDownloadPBO) {
 		other._textureHandle	  = Backend::INVALID_TEXTURE_HANDLE;
@@ -425,6 +442,7 @@ public:
 			_width					  = other._width;
 			_height					  = other._height;
 			_format					  = other._format;
+			_mipmapMode				  = other._mipmapMode;
 			_boundBinding			  = other._boundBinding;
 			_uploadPool				  = std::move(other._uploadPool);
 			_downloadPool			  = std::move(other._downloadPool);
@@ -465,6 +483,8 @@ public:
 		}
 
 		backend->UploadTexture(_textureHandle, 0, 0, _width, _height, data);
+		if (_mipmapMode == MipmapMode::Generate)
+			backend->GenerateMipmaps(_textureHandle);
 	}
 
 	void UploadSubRegion(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data) {
@@ -483,6 +503,15 @@ public:
 		}
 
 		backend->UploadTexture(_textureHandle, x, y, w, h, data);
+		if (_mipmapMode == MipmapMode::Generate)
+			backend->GenerateMipmaps(_textureHandle);
+	}
+
+	void GenerateMipmaps() {
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (backend && _textureHandle != Backend::INVALID_TEXTURE_HANDLE)
+			backend->GenerateMipmaps(_textureHandle);
 	}
 
 	/**
@@ -670,6 +699,9 @@ public:
 	[[nodiscard]] uint32_t GetHeight() const {
 		return _height;
 	}
+	[[nodiscard]] uint32_t GetMipLevels() const {
+		return _mipmapMode == MipmapMode::Generate ? CalculateMipLevels(_width, _height) : 1;
+	}
 	static constexpr PixelFormat GetFormat() {
 		return Format;
 	}
@@ -701,6 +733,7 @@ private:
 		desc.width		 = _width;
 		desc.height		 = _height;
 		desc.depth		 = 1;
+		desc.mipLevels	 = GetMipLevels();
 		desc.format		 = ToBackendPixelFormat(_format);
 		desc.initialData = initialData;
 
@@ -722,10 +755,21 @@ private:
 	}
 
 private:
+	static uint32_t CalculateMipLevels(uint32_t width, uint32_t height) {
+		uint32_t levels = 1;
+		while (width > 1 || height > 1) {
+			width  = std::max(1u, width / 2);
+			height = std::max(1u, height / 2);
+			++levels;
+		}
+		return levels;
+	}
+
 	Backend::TextureHandle	 _textureHandle = Backend::INVALID_TEXTURE_HANDLE;
 	uint32_t				 _width			= 0;
 	uint32_t				 _height		= 0;
 	PixelFormat				 _format		= Format;
+	MipmapMode				 _mipmapMode	= MipmapMode::None;
 	int						 _boundBinding	= -1;
 
 	std::unique_ptr<PBOPool> _uploadPool;

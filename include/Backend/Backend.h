@@ -96,6 +96,7 @@ struct TextureDesc {
 	uint32_t	width		= 0;
 	uint32_t	height		= 0;
 	uint32_t	depth		= 1;
+	uint32_t	mipLevels	= 1;
 	PixelFormat format		= PixelFormat::RGBA8;
 	const void *initialData = nullptr;
 };
@@ -383,6 +384,8 @@ public:
 	 */
 	virtual void		  UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 										const void *data)												  = 0;
+	/** @brief Generate all mip levels from level zero. */
+	virtual void		  GenerateMipmaps(TextureHandle texture)											  = 0;
 	/**
 	 * @brief Upload voxel data to a 3D texture region.
 	 * @param texture Texture handle.

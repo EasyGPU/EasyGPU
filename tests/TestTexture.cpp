@@ -77,7 +77,20 @@ std::cout << "Created 256x256 RGBA8 texture";
 END_TEST
 
 // =============================================================================
-// Test 2: Texture creation from raw buffer
+// Test 2: Mipmapped texture creation and automatic regeneration
+// =============================================================================
+TEST(texture_mipmaps)
+const int			 W = 64, H = 32;
+std::vector<uint8_t> pixels(W * H * 4, 255);
+Texture2D<PixelFormat::RGBA8> tex(W, H, MipmapMode::Generate);
+ASSERT(tex.GetMipLevels() == 7);
+tex.Upload(pixels.data());
+tex.GenerateMipmaps();
+std::cout << "Generated " << tex.GetMipLevels() << " mip levels";
+END_TEST
+
+// =============================================================================
+// Test 3: Texture creation from raw buffer
 // =============================================================================
 TEST(texture_create_from_buffer)
 const int			 W = 64, H = 64;
@@ -758,6 +771,7 @@ int main() {
 
 	try {
 		test_texture_create_empty();
+		test_texture_mipmaps();
 		test_texture_create_from_buffer();
 		test_texture_upload_download();
 		test_texture_move();

@@ -44,6 +44,7 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 - [Structs](#structs)
 - [Textures](#textures)
 - [Texture Samplers](#texture-samplers)
+- [Mipmaps](mipmaps.md)
 - [Shared Memory](#shared-memory)
 - [Atomic Operations](#atomic-operations)
 - [Active Compaction](#active-compaction)
@@ -832,6 +833,7 @@ struct RenderPassBeginDesc {
 | `Draw(vc, ic, fv, fi)` | Non-indexed draw |
 | `DrawIndexed(ic, ic, fi, vo, fi)` | Indexed draw |
 | `CreateDepthBuffer(w, h)` / `DestroyDepthBuffer(h)` | Depth buffer management |
+| `GenerateMipmaps(texture)` | Generate all allocated mip levels from level zero |
 
 **Error Handling**
 
@@ -843,7 +845,7 @@ struct RenderPassBeginDesc {
 
 - Uses `VK_KHR_dynamic_rendering` (loaded via `vkGetDeviceProcAddr`)
 - Queue family selected with `VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT`
-- Depth format: `VK_FORMAT_D16_UNORM` (universal support)
+- Depth format: `VK_FORMAT_D32_SFLOAT`
 - Compute operations unaffected when graphics is unavailable
 
 ---
@@ -1473,6 +1475,15 @@ Expr<int> Ceil(Expr<float> x);      // Ceiling (round up)
 | `MakeFloat(1.0f)` | Create `Var<float>` from literal | No (just wraps the value) |
 | `ToInt(Var<float>)` | Convert `Var<float>` to `Var<int>` | Yes (truncation) |
 | `MakeInt(5)` | Create `Var<int>` from literal | No (just wraps the value) |
+
+### Screen-Space Derivatives
+
+```cpp
+Expr<T> Ddx(Expr<T> value);  // GLSL dFdx()
+Expr<T> Ddy(Expr<T> value);  // GLSL dFdy()
+```
+
+Screen-space derivatives are valid only in fragment shaders. They are commonly used with `TextureSampler2D::SampleGrad()` to control mip selection after discontinuous UV operations.
 
 ### Vector Math
 
@@ -3244,6 +3255,8 @@ Texture2D<PixelFormat::RGBA8> texture(width, height);
 ```cpp
 Texture2D<PixelFormat::RGBA8> tex(width, height);              // Empty texture
 Texture2D<PixelFormat::RGBA8> tex(width, height, data);        // With initial data
+Texture2D<PixelFormat::RGBA8> tex(width, height, MipmapMode::Generate);
+Texture2D<PixelFormat::RGBA8> tex(width, height, data, MipmapMode::Generate);
 ```
 
 **Methods:**
@@ -3252,11 +3265,13 @@ Texture2D<PixelFormat::RGBA8> tex(width, height, data);        // With initial d
 |:-------|:------------|
 | `Upload(const void* data)` | Upload pixel data to GPU (synchronous) |
 | `UploadSubRegion(x, y, w, h, data)` | Upload partial data |
+| `GenerateMipmaps()` | Regenerate all mip levels from level zero |
 | `Download(void* outData)` | Download pixel data from GPU (synchronous) |
 | `Download(std::vector<T>& outData)` | Download to vector |
 | `Bind()` | Bind to current kernel (returns TextureRef) |
 | `GetWidth()` | Get texture width |
 | `GetHeight()` | Get texture height |
+| `GetMipLevels()` | Get the allocated mip-level count |
 | `GetHandle()` | Get OpenGL texture ID |
 | `GetSizeInBytes()` | Get total size in bytes |
 
@@ -3412,7 +3427,8 @@ FragmentKernel2D kernel([&](Float2 fragCoord, Float2 resolution, Var<Vec4>& frag
 | Method | Description |
 |:-------|:------------|
 | `Sample(uv)` | Sample texture at normalized UV coordinates (0-1) |
-| `SampleLod(uv, lod)` | Sample with explicit mipmap level |
+| `SampleLevel(uv, level)` | Sample an explicit mip level with `textureLod()` |
+| `SampleGrad(uv, ddx, ddy)` | Sample using explicit screen-space gradients with `textureGrad()` |
 | `GetSize()` | Get texture size as `Vec2` |
 | `GetTextureWidth()` | Get width in pixels |
 | `GetTextureHeight()` | Get height in pixels |
@@ -3444,6 +3460,28 @@ FragmentKernel2D kernel([&](Float2 fragCoord, Float2 resolution, Var<Vec4>& frag
 | Coordinates | Integer pixel | Normalized UV (0-1) |
 | Filtering | Nearest only | Bilinear/trilinear |
 | GLSL | `imageLoad/Store` | `texture()` |
+
+### Mipmaps
+
+Create a mipmapped `Texture2D` with `MipmapMode::Generate`:
+
+```cpp
+Texture2D<PixelFormat::RGBA8> texture(1024, 1024, MipmapMode::Generate);
+texture.Upload(pixels.data());  // Uploads level zero and regenerates the mip chain
+```
+
+Mipmapped textures allocate the complete chain down to `1x1`. `Upload()` and `UploadSubRegion()` automatically regenerate the chain. Use `GenerateMipmaps()` for explicit regeneration.
+
+For discontinuous UV operations such as `Fract()`, preserve gradients from the unwrapped UV:
+
+```cpp
+Float2 tiled = Fract(sourceUV);
+Float4 color = sampler.SampleGrad(tiled, Ddx(sourceUV), Ddy(sourceUV));
+```
+
+`Ddx()` and `Ddy()` map to `dFdx()` and `dFdy()` and are valid only in fragment shaders.
+
+See [Mipmaps](mipmaps.md) for atlas sampling, backend behavior, and limitations.
 
 ### Complete Fragment Kernel with Textures
 

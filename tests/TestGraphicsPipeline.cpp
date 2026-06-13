@@ -231,6 +231,27 @@ int main() {
 			std::cout << "[Test 5 DoubleBeginRendering] PASS" << std::endl;
 		}
 
+		// Test 6: Allocate and generate a complete mip chain
+		{
+			const uint32_t W = 64, H = 32;
+			std::vector<uint8_t> pixels(W * H * 4, 255);
+
+			GPU::Backend::TextureDesc texDesc;
+			texDesc.width	  = W;
+			texDesc.height	  = H;
+			texDesc.mipLevels = 7;
+			texDesc.format	  = GPU::Backend::PixelFormat::RGBA8;
+			auto tex		  = backend->CreateTexture(texDesc);
+
+			backend->UploadTexture(tex, 0, 0, W, H, pixels.data());
+			backend->GenerateMipmaps(tex);
+			backend->DestroyTexture(tex);
+
+			total++;
+			passed++;
+			std::cout << "[Test 6 GenerateMipmaps] PASS" << std::endl;
+		}
+
 		backend->MakeNoneCurrent();
 
 		std::cout << "\nResults: " << passed << "/" << total << " passed" << std::endl;

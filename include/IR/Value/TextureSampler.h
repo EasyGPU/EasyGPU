@@ -208,6 +208,24 @@ public:
 		return MakeSampleVar(std::format("texture({}, vec2({}, {}))", _textureName, uv.x, uv.y));
 	}
 
+	/**
+	 * @brief Sample with explicit screen-space UV gradients for stable mip selection.
+	 */
+	[[nodiscard]] Var<SampleType> SampleGrad(const Expr<GPU::Math::Vec2> &uv, const Expr<GPU::Math::Vec2> &ddx,
+											const Expr<GPU::Math::Vec2> &ddy) const {
+		std::string uvStr  = Builder::Builder::Get().BuildNode(*uv.Node());
+		std::string ddxStr = Builder::Builder::Get().BuildNode(*ddx.Node());
+		std::string ddyStr = Builder::Builder::Get().BuildNode(*ddy.Node());
+		return MakeSampleVar(std::format("textureGrad({}, {}, {}, {})", _textureName, uvStr, ddxStr, ddyStr));
+	}
+
+	/** @brief Sample an explicit mip level. */
+	[[nodiscard]] Var<SampleType> SampleLevel(const Expr<GPU::Math::Vec2> &uv, const Expr<float> &level) const {
+		std::string uvStr	  = Builder::Builder::Get().BuildNode(*uv.Node());
+		std::string levelStr = Builder::Builder::Get().BuildNode(*level.Node());
+		return MakeSampleVar(std::format("textureLod({}, {}, {})", _textureName, uvStr, levelStr));
+	}
+
 public:
 	// =======================================================================
 	// Size accessors - textureSize(texture, lod)

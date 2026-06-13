@@ -13,6 +13,7 @@ EasyGPU provides a complete cross-platform rasterization pipeline with a C++ emb
 - [Built-in Shader Variables](#built-in-shader-variables)
 - [Uniforms and Push Constants](#uniforms-and-push-constants)
 - [OBJ Model Rendering](#obj-model-rendering)
+- [Textured Sponza Rendering](#textured-sponza-rendering)
 - [Camera and Interaction](#camera-and-interaction)
 - [Window Integration](#window-integration)
 - [Backend Reference](#backend-reference)
@@ -174,7 +175,7 @@ DepthBuffer db(1024, 768);
 pipeline.Draw(rt, db, vertexCount, true);
 ```
 
-Depth testing uses `VK_COMPARE_OP_LESS` (or `GL_LESS`) with a clear value of `1.0f`. The depth attachment format is `VK_FORMAT_D16_UNORM` (universal support across Vulkan implementations).
+Depth testing uses `VK_COMPARE_OP_LESS` with a clear value of `1.0f`. The Vulkan depth attachment format is `VK_FORMAT_D32_SFLOAT` for improved precision across large scenes.
 
 ---
 
@@ -270,6 +271,41 @@ while (window.IsOpen()) {
     presenter.Present(rt);
 }
 ```
+
+---
+
+## Textured Sponza Rendering
+
+The `examples/sponza_renderer` example demonstrates a multi-material scene using a texture atlas:
+
+- Loads OBJ geometry, MTL materials, and diffuse textures
+- Packs diffuse textures into a single atlas with edge-repeated gutters
+- Preserves unwrapped UVs through rasterization
+- Uses a generated mip chain for stable minification
+- Uses `Ddx()` / `Ddy()` with `SampleGrad()` to avoid incorrect atlas LOD selection at `Fract()` boundaries
+- Uses a `D32_SFLOAT` depth buffer and a tightened projection range for stable depth testing
+
+```cpp
+Texture2D<PixelFormat::RGBA8> atlas(
+    ATLAS_SIZE,
+    ATLAS_SIZE,
+    MipmapMode::Generate
+);
+
+// Fragment shader
+Float2 tiled = Fract(sourceUV);
+Float2 dx = Ddx(sourceUV) * atlasScale;
+Float2 dy = Ddy(sourceUV) * atlasScale;
+Float4 color = atlas.BindSampler().SampleGrad(atlasUV, dx, dy);
+```
+
+The Sponza model and texture files are external assets and are not included in the EasyGPU repository. Pass the local asset directory when launching the example:
+
+```bash
+./build/sponza_renderer /path/to/Sponza
+```
+
+See [Mipmaps](mipmaps.md) for the complete mipmap and explicit-gradient sampling API.
 
 ---
 

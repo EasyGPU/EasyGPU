@@ -6,6 +6,7 @@
 #include <Backend/OpenGLBackend.h>
 
 #include <GLAD/glad.h>
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 
@@ -277,6 +278,12 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 	}
 
 	auto [internalFormat, format, type] = GetGLPixelFormat(desc.format);
+	uint32_t mipLevels				 = std::max(1u, desc.mipLevels);
+	uint32_t maxMipLevels				 = 1;
+	for (uint32_t size = std::max(desc.width, desc.height); size > 1; size /= 2)
+		++maxMipLevels;
+	if (mipLevels > maxMipLevels)
+		throw std::invalid_argument("Texture mip level count exceeds its dimensions");
 
 	uint32_t glHandle					= 0;
 	glGenTextures(1, &glHandle);
@@ -287,8 +294,10 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 	bool is3D = desc.depth > 1;
 	if (is3D) {
 		glBindTexture(GL_TEXTURE_3D, glHandle);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER,
+						mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, mipLevels > 1 ? GL_LINEAR : GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(mipLevels - 1));
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -297,8 +306,10 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 		glBindTexture(GL_TEXTURE_3D, 0);
 	} else {
 		glBindTexture(GL_TEXTURE_2D, glHandle);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+						mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mipLevels > 1 ? GL_LINEAR : GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(mipLevels - 1));
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, desc.width, desc.height, 0, format, type, desc.initialData);
@@ -314,6 +325,7 @@ TextureHandle OpenGLBackend::CreateTexture(const TextureDesc &desc) {
 	info.internalFormat = internalFormat;
 	info.format			= format;
 	info.type			= type;
+	info.mipLevels		= mipLevels;
 	_textures[handle]	= info;
 
 	return handle;
@@ -341,6 +353,19 @@ void OpenGLBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y,
 	glBindTexture(GL_TEXTURE_2D, it->second.glHandle);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, it->second.format, it->second.type, data);
 	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void OpenGLBackend::GenerateMipmaps(TextureHandle texture) {
+	auto it = _textures.find(texture);
+	if (it == _textures.end())
+		throw std::runtime_error("Invalid texture handle");
+	if (it->second.mipLevels <= 1)
+		return;
+
+	GLenum target = it->second.depth > 1 ? GL_TEXTURE_3D : GL_TEXTURE_2D;
+	glBindTexture(target, it->second.glHandle);
+	glGenerateMipmap(target);
+	glBindTexture(target, 0);
 }
 
 void OpenGLBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,

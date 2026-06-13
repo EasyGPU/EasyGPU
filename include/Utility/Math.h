@@ -660,6 +660,20 @@ inline IR::Value::Expr<Vec4> Fract(const IR::Value::Expr<Vec4> &x) {
 	return MakeCall<Vec4>("fract", Detail::BuildParams(x));
 }
 
+/** @brief Computes screen-space derivatives. Valid in fragment shaders. */
+template <typename T> inline IR::Value::Expr<T> Ddx(const IR::Value::Expr<T> &x) {
+	return MakeCall<T>("dFdx", Detail::BuildParams(x));
+}
+template <typename T> inline IR::Value::Expr<T> Ddx(const IR::Value::Var<T> &x) {
+	return Ddx(IR::Value::Expr<T>(x));
+}
+template <typename T> inline IR::Value::Expr<T> Ddy(const IR::Value::Expr<T> &x) {
+	return MakeCall<T>("dFdy", Detail::BuildParams(x));
+}
+template <typename T> inline IR::Value::Expr<T> Ddy(const IR::Value::Var<T> &x) {
+	return Ddy(IR::Value::Expr<T>(x));
+}
+
 /** @brief Computes the modulo (remainder) of x divided by y. */
 // Mod
 inline IR::Value::Expr<float> Mod(const IR::Value::Expr<float> &x, const IR::Value::Expr<float> &y) {

@@ -658,6 +658,15 @@ if(EASYGPU_BUILD_WINDOW AND EASYGPU_BUILD_WINDOW_EXAMPLES)
             target_compile_options(obj_renderer PRIVATE /Zc:preprocessor)
         endif()
     endif()
+
+    # Sponza Atrium — textured 3D model (requires EasyGPU + EasyGPUWindow)
+    if(TARGET EasyGPU AND TARGET EasyGPUWindow)
+        add_executable(sponza_renderer examples/sponza_renderer/main.cpp)
+        target_link_libraries(sponza_renderer PRIVATE EasyGPU EasyGPUWindow)
+        if(MSVC)
+            target_compile_options(sponza_renderer PRIVATE /Zc:preprocessor)
+        endif()
+    endif()
 endif()
 
 # =============================================================================
