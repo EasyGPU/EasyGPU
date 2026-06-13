@@ -221,7 +221,7 @@ Kernel1D::FullBarrier();       // Both barriers combined
 
 ## Fragment Kernels
 
-> **Platform Note:** Fragment kernels are currently only available on **Windows**. Linux support is under development. Compute kernels work identically on both platforms.
+> **Platform Note:** Fragment kernels are currently only available on **Windows**. Linux support is under development. Compute APIs are shared across backends, but backend and driver behavior must still be qualified; see [Support Status](support-status.md).
 
 Fragment kernels use the GPU's rendering pipeline for direct pixel output to windows. Unlike compute kernels that require `Download()` to retrieve results, fragment kernels render directly to the screen with zero CPU-GPU transfer overhead.
 
@@ -563,7 +563,7 @@ kernel.Dispatch(4, true);
 
 ### UniformBuffer&lt;T&gt;
 
-Uniform Buffer Object (UBO) for passing large structs to GPU shaders. Unlike `Uniform<T>` which is limited to ~128-256 bytes (push constants), `UniformBuffer<T>` uses GPU UBO binding and supports structs up to 64KB+ in size.
+Read-only structured GPU buffer for passing large structs to kernels. Unlike `Uniform<T>`, which uses push constants on Vulkan, `UniformBuffer<T>` uses a read-only std430 storage buffer and is not constrained by the push-constant limit.
 
 ```cpp
 template<typename T>
@@ -574,10 +574,10 @@ class UniformBuffer;
 
 | Feature | `Uniform<T>` | `UniformBuffer<T>` |
 |:--------|:-------------|:-------------------|
-| Transport | Push constant / `glProgramUniform` | UBO (`glBindBufferBase`) |
-| GLSL layout | `uniform float u0;` | `layout(std140, binding=N) uniform Block { T data; };` |
-| Size limit | ~128-256 bytes | Up to max UBO size (64KB+) |
-| Layout standard | std430 | std140 |
+| Transport | Push constant / `glProgramUniform` | Read-only storage buffer |
+| GLSL layout | `uniform float u0;` | `layout(std430, binding=N) readonly buffer ...` |
+| Size limit | Device push-constant limit on Vulkan | Device storage-buffer limit |
+| Layout standard | std430 | std430 |
 | Best for | Small params (float, Vec3, Mat4) | Large structs, multiple fields |
 
 **Prerequisite — Register struct with `EASYGPU_STRUCT`:**
@@ -594,18 +594,18 @@ EASYGPU_STRUCT(MyConfig,
 
 | Constructor | Description |
 |:------------|:------------|
-| `UniformBuffer()` | Default constructor — uninitialized UBO |
+| `UniformBuffer()` | Default constructor |
 | `UniformBuffer(const T& value)` | Constructor with initial value |
 
 **Methods:**
 
 | Method | Description |
 |:-------|:------------|
-| `Load()` | Load the UBO in kernel context, returns `Var<T>` |
+| `Load()` | Load the structured buffer in kernel context, returns `Var<T>` |
 | `GetValue() const` | Get the current CPU-side value |
 | `SetValue(const T& value)` | Set the CPU-side value and upload to GPU |
 | `operator=(const T& value)` | Assign value from struct literal |
-| `GetHandle() const` | Get the backend UBO handle |
+| `GetHandle() const` | Get the backend buffer handle |
 
 **Example:**
 
@@ -613,7 +613,7 @@ EASYGPU_STRUCT(MyConfig,
 // Define config struct
 EASYGPU_STRUCT(RenderConfig, (GPU::Math::Vec3, lightDir), (float, exposure));
 
-// Create UBO
+// Create structured uniform buffer
 UniformBuffer<RenderConfig> config;
 RenderConfig cfg;
 cfg.lightDir = Vec3(0.5f, 1.0f, 0.3f);
@@ -658,13 +658,13 @@ kernel.Dispatch(1, true);
 **Generated GLSL:**
 
 ```glsl
-layout(std140, binding=0) uniform EasyGPU_UBO_0 {
-    RenderConfig data;
+layout(set=0, std430, binding=0) readonly buffer ubo_0_t {
+    RenderConfig ubo_0[];
 };
 
 void main() {
-    // c.lightDir().x() → data.lightDir.x
-    // c.exposure()     → data.exposure
+    // c.lightDir().x() → ubo_0[0].lightDir.x
+    // c.exposure()     → ubo_0[0].exposure
 }
 ```
 

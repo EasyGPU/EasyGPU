@@ -219,6 +219,7 @@ struct BackendCaps {
 	bool		supportsGraphics	   = false;
 	bool		supportsAsyncTransfer  = false;
 	bool		supportsMultiQueue	   = false;
+	bool		supportsTimestampQueries = false;
 };
 
 // ============================================================================

@@ -1323,7 +1323,7 @@ while (running) {
 
 ### Your First Fragment Kernel
 
-> **Platform Note:** Fragment kernels are currently only available on **Windows** due to X11/Wayland windowing complexity. Linux users can use compute kernels with GLFW/SDL for rendering to textures.
+> **Platform Note:** Fragment kernels are currently only available on **Windows**. Other platforms can use the supported compute backend with an application-owned windowing/rendering integration; see [Support Status](support-status.md).
 
 ```cpp
 #include <GPU.h>

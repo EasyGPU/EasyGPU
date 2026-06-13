@@ -9,18 +9,25 @@ project(EasyGPU
     LANGUAGES CXX C
 )
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 # =============================================================================
 # Options
 # =============================================================================
-option(EASYGPU_BUILD_EXAMPLES "Build example programs" ON)
-option(EASYGPU_BUILD_TESTS "Build test suite" ON)
+option(EASYGPU_BUILD_EXAMPLES "Build example programs" ${PROJECT_IS_TOP_LEVEL})
+option(EASYGPU_BUILD_TESTS "Build test suite" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
-option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ON)
+option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_ENABLE_SHADER_CACHE "Enable shader binary caching for faster startup" ON)
 set(EASYGPU_SHADER_CACHE_DIR "" CACHE STRING "Directory for shader cache (empty = use default)")
-option(EASYGPU_BUILD_WINDOW_EXAMPLES "Build window examples" ON)
+option(EASYGPU_BUILD_WINDOW_EXAMPLES "Build window examples" ${PROJECT_IS_TOP_LEVEL})
 set(EASYGPU_BACKEND "Vulkan" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
 set_property(CACHE EASYGPU_BACKEND PROPERTY STRINGS OpenGL Vulkan)
+
+if(NOT EASYGPU_BACKEND STREQUAL "OpenGL" AND NOT EASYGPU_BACKEND STREQUAL "Vulkan")
+    message(FATAL_ERROR "EASYGPU_BACKEND must be either OpenGL or Vulkan, got: ${EASYGPU_BACKEND}")
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -45,9 +52,6 @@ if(MSVC AND EASYGPU_BACKEND STREQUAL "Vulkan")
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
     add_compile_definitions(_ITERATOR_DEBUG_LEVEL=0)
 endif()
-
-# Include directories for the main library
-include_directories(include third)
 
 # =============================================================================
 # Dependencies
@@ -133,8 +137,9 @@ if(EASYGPU_BUILD_WINDOW)
     # Create minifb as an object library (linked into EasyGPUWindow)
     add_library(minifb STATIC ${MINIFB_SOURCES})
     target_include_directories(minifb PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
 
     if(WIN32)
@@ -170,6 +175,7 @@ if(EASYGPU_BUILD_WINDOW)
         source/Window/Platform/MiniFBWindowPlatform.h
         source/Window/Platform/MiniFBWindowPlatform.cpp
     )
+    add_library(EasyGPU::Window ALIAS EasyGPUWindow)
     
     target_compile_features(EasyGPUWindow PUBLIC cxx_std_20)
     target_link_libraries(EasyGPUWindow PUBLIC minifb)
@@ -188,48 +194,70 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
     find_package(Vulkan REQUIRED)
 
     set(EASYGPU_VULKAN_SDK_HINTS)
+    set(EASYGPU_GLSLANG_CONFIG_HINTS)
     if(DEFINED ENV{VULKAN_SDK})
         list(APPEND EASYGPU_VULKAN_SDK_HINTS
             "$ENV{VULKAN_SDK}/Lib"
             "$ENV{VULKAN_SDK}/Lib32"
         )
+        list(APPEND EASYGPU_GLSLANG_CONFIG_HINTS
+            "$ENV{VULKAN_SDK}/lib/cmake/glslang"
+            "$ENV{VULKAN_SDK}/Lib/cmake/glslang"
+        )
     endif()
 
-    find_library(GLSLANG_LIBRARY glslang HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-    find_library(GLSLANG_SPIRV_LIBRARY SPIRV HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-    find_library(GLSLANG_RESOURCE_LIMITS_LIBRARY glslang-default-resource-limits HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-    find_library(GLSLANG_MACHINEINDEPENDENT_LIBRARY MachineIndependent HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-    find_library(GLSLANG_OSDEPENDENT_LIBRARY OSDependent HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-    find_library(GLSLANG_GENERICCODEGEN_LIBRARY GenericCodeGen HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-    find_library(SPIRV_TOOLS_LIBRARY SPIRV-Tools HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-    find_library(SPIRV_TOOLS_OPT_LIBRARY SPIRV-Tools-opt HINTS ${EASYGPU_VULKAN_SDK_HINTS})
-
-    foreach(required_lib
-        GLSLANG_LIBRARY
-        GLSLANG_SPIRV_LIBRARY
-        GLSLANG_RESOURCE_LIMITS_LIBRARY
-        GLSLANG_MACHINEINDEPENDENT_LIBRARY
-        GLSLANG_OSDEPENDENT_LIBRARY
-        GLSLANG_GENERICCODEGEN_LIBRARY
-        SPIRV_TOOLS_LIBRARY
-        SPIRV_TOOLS_OPT_LIBRARY
+    get_filename_component(EASYGPU_VULKAN_LIBRARY_DIR "${Vulkan_LIBRARY}" DIRECTORY)
+    list(APPEND EASYGPU_GLSLANG_CONFIG_HINTS
+        "${EASYGPU_VULKAN_LIBRARY_DIR}/cmake/glslang"
+        "${EASYGPU_VULKAN_LIBRARY_DIR}/cmake/vulkan/glslang"
     )
-        if(NOT ${required_lib})
-            message(FATAL_ERROR "Missing required Vulkan/glslang dependency: ${required_lib}")
-        endif()
-    endforeach()
+    find_package(glslang CONFIG QUIET HINTS ${EASYGPU_GLSLANG_CONFIG_HINTS})
 
-    set(EASYGPU_VULKAN_LIBS
-        ${Vulkan_LIBRARY}
-        ${GLSLANG_LIBRARY}
-        ${GLSLANG_SPIRV_LIBRARY}
-        ${GLSLANG_RESOURCE_LIMITS_LIBRARY}
-        ${GLSLANG_MACHINEINDEPENDENT_LIBRARY}
-        ${GLSLANG_OSDEPENDENT_LIBRARY}
-        ${GLSLANG_GENERICCODEGEN_LIBRARY}
-        ${SPIRV_TOOLS_LIBRARY}
-        ${SPIRV_TOOLS_OPT_LIBRARY}
-    )
+    if(TARGET glslang::SPIRV AND TARGET glslang::glslang-default-resource-limits)
+        set(EASYGPU_USE_GLSLANG_PACKAGE ON)
+        set(EASYGPU_VULKAN_LIBS
+            Vulkan::Vulkan
+            glslang::SPIRV
+            glslang::glslang-default-resource-limits
+        )
+    else()
+        set(EASYGPU_USE_GLSLANG_PACKAGE OFF)
+        find_library(GLSLANG_LIBRARY glslang HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(GLSLANG_SPIRV_LIBRARY SPIRV HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(GLSLANG_RESOURCE_LIMITS_LIBRARY glslang-default-resource-limits HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(GLSLANG_MACHINEINDEPENDENT_LIBRARY MachineIndependent HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(GLSLANG_OSDEPENDENT_LIBRARY OSDependent HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(GLSLANG_GENERICCODEGEN_LIBRARY GenericCodeGen HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(SPIRV_TOOLS_LIBRARY SPIRV-Tools HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(SPIRV_TOOLS_OPT_LIBRARY SPIRV-Tools-opt HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+
+        foreach(required_lib
+            GLSLANG_LIBRARY
+            GLSLANG_SPIRV_LIBRARY
+            GLSLANG_RESOURCE_LIMITS_LIBRARY
+            GLSLANG_MACHINEINDEPENDENT_LIBRARY
+            GLSLANG_OSDEPENDENT_LIBRARY
+            GLSLANG_GENERICCODEGEN_LIBRARY
+            SPIRV_TOOLS_LIBRARY
+            SPIRV_TOOLS_OPT_LIBRARY
+        )
+            if(NOT ${required_lib})
+                message(FATAL_ERROR "Missing required Vulkan/glslang dependency: ${required_lib}")
+            endif()
+        endforeach()
+
+        set(EASYGPU_VULKAN_LIBS
+            Vulkan::Vulkan
+            ${GLSLANG_LIBRARY}
+            ${GLSLANG_SPIRV_LIBRARY}
+            ${GLSLANG_RESOURCE_LIMITS_LIBRARY}
+            ${GLSLANG_MACHINEINDEPENDENT_LIBRARY}
+            ${GLSLANG_OSDEPENDENT_LIBRARY}
+            ${GLSLANG_GENERICCODEGEN_LIBRARY}
+            ${SPIRV_TOOLS_LIBRARY}
+            ${SPIRV_TOOLS_OPT_LIBRARY}
+        )
+    endif()
 endif()
 
 if(EASYGPU_BACKEND STREQUAL "OpenGL")
@@ -375,6 +403,7 @@ add_library(EasyGPU STATIC
     include/Runtime/Texture.h
     include/Runtime/TextureSlot.h
     include/Runtime/Uniform.h
+    include/Runtime/UniformBuffer.h
     include/Runtime/Context.h
     source/Runtime/Context.cpp
     include/Runtime/PixelFormat.h
@@ -434,6 +463,11 @@ add_library(EasyGPU STATIC
     include/GPU.h
     source/IR/Node/Load.cpp
 )
+add_library(EasyGPU::EasyGPU ALIAS EasyGPU)
+set_target_properties(EasyGPU PROPERTIES EXPORT_NAME EasyGPU)
+if(TARGET EasyGPUWindow)
+    set_target_properties(EasyGPUWindow PROPERTIES EXPORT_NAME Window)
+endif()
 
 target_compile_features(EasyGPU PUBLIC cxx_std_20)
 if(EASYGPU_BACKEND STREQUAL "OpenGL")
@@ -444,8 +478,11 @@ endif()
 
 if(EASYGPU_BACKEND STREQUAL "Vulkan")
     target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_VULKAN)
-    target_include_directories(EasyGPU PUBLIC ${Vulkan_INCLUDE_DIR})
-    target_link_libraries(EasyGPU PUBLIC ${EASYGPU_VULKAN_LIBS})
+    target_include_directories(EasyGPU PUBLIC $<BUILD_INTERFACE:${Vulkan_INCLUDE_DIR}>)
+    target_link_libraries(EasyGPU PUBLIC
+        "$<BUILD_INTERFACE:${EASYGPU_VULKAN_LIBS}>"
+        "$<INSTALL_INTERFACE:Vulkan::Vulkan;EasyGPU::VulkanDependencies>"
+    )
 else()
     target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_OPENGL)
 endif()
@@ -476,62 +513,21 @@ target_include_directories(EasyGPU PUBLIC
 # =============================================================================
 if(EASYGPU_BUILD_TESTS)
     enable_testing()
-    
-    set(EASYGPU_TEST_SOURCES
-        tests/TestBroadcastConstruct.cpp
-        tests/TestVec.cpp
-        tests/TestStruct.cpp
-        tests/TestDSL.cpp
-        tests/TestKernel1D.cpp
-        tests/TestBuffer.cpp
-        tests/TestBufferSlot.cpp
-        tests/TestTexture.cpp
-        tests/TestTexture3D.cpp
-        tests/TestTextureSlot.cpp
-        tests/TestSlotMixed.cpp
-        tests/TestSlotPingPong.cpp
-        tests/TestSlotError.cpp
-        tests/TestCallable.cpp
-        tests/TestInspector.cpp
-        tests/TestProfiler.cpp
-        tests/TestDispatch.cpp
-        tests/TestArray.cpp
-        tests/TestUniform.cpp
-        tests/TestTernary.cpp
-        tests/TestSharedMemory.cpp
-        tests/TestShaderCache.cpp
-        tests/TestKernelCache.cpp
-        tests/TestBreakContinue.cpp
-        tests/TestExpression.cpp
-        tests/TestFlowDoWhile.cpp
-        tests/TestFlowFor.cpp
-        tests/TestFlowIf.cpp
-        tests/TestIfBuffer.cpp
-        tests/TestMath.cpp
-        tests/TestEdgeCases.cpp
-        tests/TestStressLargeScale.cpp
-        tests/TestMultiKernelSequence.cpp
-        tests/TestNestedControlFlow.cpp
-        tests/TestTextureFormats.cpp
-        tests/TestCallableAdvanced.cpp
-        tests/TestAtomicAdvanced.cpp
-        tests/TestMathPrecision.cpp
-        tests/TestMatrixFull.cpp
-        tests/TestUniformAdvanced.cpp
-        tests/TestADCore.cpp
-        tests/TestADStress.cpp
-        tests/TestNN.cpp
-        tests/TestGraphicsPipeline.cpp
-    )
+
+    file(GLOB EASYGPU_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/Test*.cpp")
+    list(FILTER EASYGPU_TEST_SOURCES EXCLUDE REGEX "/TestFragmentKernel\\.cpp$")
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})
         get_filename_component(test_name ${test_source} NAME_WE)
         add_executable(${test_name} ${test_source})
         target_link_libraries(${test_name} PRIVATE EasyGPU)
         if(MSVC)
-            target_compile_options(${test_name} PRIVATE /Zc:preprocessor)
+            target_compile_options(${test_name} PRIVATE /Zc:preprocessor /UNDEBUG /Od)
+        else()
+            target_compile_options(${test_name} PRIVATE -UNDEBUG -O0)
         endif()
         add_test(NAME ${test_name} COMMAND ${test_name})
+        set_tests_properties(${test_name} PROPERTIES TIMEOUT 120 LABELS "EasyGPU")
     endforeach()
 endif()
 
@@ -589,6 +585,65 @@ if(EASYGPU_BUILD_EXAMPLES)
     endforeach()
     
 endif()
+
+# =============================================================================
+# Installation and CMake package export
+# =============================================================================
+set(EASYGPU_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/EasyGPU")
+
+install(TARGETS EasyGPU
+    EXPORT EasyGPUTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+if(TARGET GLAD)
+    install(TARGETS GLAD EXPORT EasyGPUTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
+
+if(TARGET EasyGPUWindow)
+    install(TARGETS EasyGPUWindow minifb
+        EXPORT EasyGPUTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif()
+
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY third/GLAD/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/GLAD FILES_MATCHING PATTERN "*.h")
+if(TARGET EasyGPUWindow)
+    install(DIRECTORY third/minifb/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
+
+configure_package_config_file(
+    cmake/EasyGPUConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/EasyGPUConfig.cmake"
+    INSTALL_DESTINATION "${EASYGPU_INSTALL_CMAKEDIR}"
+)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/EasyGPUConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(EXPORT EasyGPUTargets
+    FILE EasyGPUTargets.cmake
+    NAMESPACE EasyGPU::
+    DESTINATION "${EASYGPU_INSTALL_CMAKEDIR}"
+)
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/EasyGPUConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/EasyGPUConfigVersion.cmake"
+    DESTINATION "${EASYGPU_INSTALL_CMAKEDIR}"
+)
 
 # =============================================================================
 # Fragment Kernel Tester (Windows + EasyX)

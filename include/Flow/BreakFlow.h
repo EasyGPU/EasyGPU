@@ -23,6 +23,9 @@ namespace GPU::Flow {
  *   });
  */
 inline void Break() {
+	if (!IR::Builder::Builder::Get().Context()) {
+		throw std::runtime_error("Break() called outside of Kernel definition");
+	}
 	auto breakNode = std::make_unique<IR::Node::BreakNode>();
 	IR::Builder::Builder::Get().Build(*breakNode, true);
 }

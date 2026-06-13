@@ -405,4 +405,4 @@ Ensure the pipeline was created with depth enabled. The `GraphicsPipeline` DSL c
 
 **"Pipeline push constant size exceeds device limit"**
 
-Your `Uniform<T>` struct is too large. Maximum push constant size varies by GPU (128 to 256 bytes). Reduce the struct size or switch to a UBO (Uniform Buffer Object) via `UniformBuffer<T>`.
+Your `Uniform<T>` struct is too large. Maximum push constant size varies by GPU (128 to 256 bytes). Reduce the struct size or use a read-only structured `UniformBuffer<T>` where supported by the shader path.

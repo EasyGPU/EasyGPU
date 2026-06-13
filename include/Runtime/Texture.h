@@ -426,7 +426,7 @@ public:
 		: _textureHandle(other._textureHandle), _width(other._width), _height(other._height), _format(other._format),
 		  _mipmapMode(other._mipmapMode), _boundBinding(other._boundBinding), _uploadPool(std::move(other._uploadPool)),
 		  _downloadPool(std::move(other._downloadPool)), _currentUploadPBO(other._currentUploadPBO),
-		  _currentDownloadPBO(other._currentDownloadPBO) {
+		  _currentDownloadPBO(other._currentDownloadPBO), _lifetimeToken(std::move(other._lifetimeToken)) {
 		other._textureHandle	  = Backend::INVALID_TEXTURE_HANDLE;
 		other._width			  = 0;
 		other._height			  = 0;
@@ -448,6 +448,7 @@ public:
 			_downloadPool			  = std::move(other._downloadPool);
 			_currentUploadPBO		  = other._currentUploadPBO;
 			_currentDownloadPBO		  = other._currentDownloadPBO;
+			_lifetimeToken			  = std::move(other._lifetimeToken);
 			other._textureHandle	  = Backend::INVALID_TEXTURE_HANDLE;
 			other._width			  = 0;
 			other._height			  = 0;
@@ -693,6 +694,9 @@ public:
 	[[nodiscard]] Backend::TextureHandle GetHandle() const {
 		return _textureHandle;
 	}
+	[[nodiscard]] std::weak_ptr<void> GetLifetimeToken() const {
+		return _lifetimeToken;
+	}
 	[[nodiscard]] uint32_t GetWidth() const {
 		return _width;
 	}
@@ -776,6 +780,7 @@ private:
 	std::unique_ptr<PBOPool> _downloadPool;
 	PBOBuffer				*_currentUploadPBO	 = nullptr;
 	PBOBuffer				*_currentDownloadPBO = nullptr;
+	std::shared_ptr<void>	 _lifetimeToken = std::make_shared<int>(0);
 };
 
 /** @brief Convenience typedef for RGBA8 2D texture. */
@@ -815,7 +820,7 @@ public:
 		: _textureHandle(other._textureHandle), _width(other._width), _height(other._height), _depth(other._depth),
 		  _format(other._format), _boundBinding(other._boundBinding), _uploadPool(std::move(other._uploadPool)),
 		  _downloadPool(std::move(other._downloadPool)), _currentUploadPBO(other._currentUploadPBO),
-		  _currentDownloadPBO(other._currentDownloadPBO) {
+		  _currentDownloadPBO(other._currentDownloadPBO), _lifetimeToken(std::move(other._lifetimeToken)) {
 		other._textureHandle	  = Backend::INVALID_TEXTURE_HANDLE;
 		other._width			  = 0;
 		other._height			  = 0;
@@ -838,6 +843,7 @@ public:
 			_downloadPool			  = std::move(other._downloadPool);
 			_currentUploadPBO		  = other._currentUploadPBO;
 			_currentDownloadPBO		  = other._currentDownloadPBO;
+			_lifetimeToken			  = std::move(other._lifetimeToken);
 			other._textureHandle	  = Backend::INVALID_TEXTURE_HANDLE;
 			other._width			  = 0;
 			other._height			  = 0;
@@ -1051,6 +1057,9 @@ public:
 	[[nodiscard]] Backend::TextureHandle GetHandle() const {
 		return _textureHandle;
 	}
+	[[nodiscard]] std::weak_ptr<void> GetLifetimeToken() const {
+		return _lifetimeToken;
+	}
 	[[nodiscard]] uint32_t GetWidth() const {
 		return _width;
 	}
@@ -1118,6 +1127,7 @@ private:
 	std::unique_ptr<PBOPool> _downloadPool;
 	PBOBuffer				*_currentUploadPBO	 = nullptr;
 	PBOBuffer				*_currentDownloadPBO = nullptr;
+	std::shared_ptr<void>	 _lifetimeToken = std::make_shared<int>(0);
 };
 
 /** @brief Convenience typedef for RGBA8 3D texture. */

@@ -124,6 +124,12 @@ public:
 	 * @return true if compilation succeeded, false otherwise.
 	 */
 	bool		Compile(std::string &errorMessage);
+	bool		Validate() {
+		return Compile();
+	}
+	bool		Validate(std::string &errorMessage) {
+		return Compile(errorMessage);
+	}
 
 private:
 	KernelBuildContext _context;
@@ -173,6 +179,12 @@ public:
 	 * @return true if compilation succeeded, false otherwise.
 	 */
 	bool		Compile(std::string &errorMessage);
+	bool		Validate() {
+		return Compile();
+	}
+	bool		Validate(std::string &errorMessage) {
+		return Compile(errorMessage);
+	}
 
 private:
 	KernelBuildContext _context;
@@ -218,6 +230,12 @@ public:
 	 * @return true if compilation succeeded, false otherwise.
 	 */
 	bool		Compile(std::string &errorMessage);
+	bool		Validate() {
+		return Compile();
+	}
+	bool		Validate(std::string &errorMessage) {
+		return Compile(errorMessage);
+	}
 
 private:
 	KernelBuildContext _context;

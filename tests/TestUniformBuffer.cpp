@@ -186,11 +186,11 @@ int main() {
 
 		std::string		  code = kernel.GetCode();
 
-		if (code.find("uniform EasyGPU_UBO_") == std::string::npos) {
-			throw std::runtime_error("UBO declaration not found");
+		if (code.find("readonly buffer ubo_") == std::string::npos) {
+			throw std::runtime_error("Uniform buffer declaration not found");
 		}
-		if (code.find("layout(std140") == std::string::npos) {
-			throw std::runtime_error("std140 layout not found");
+		if (code.find("std430") == std::string::npos) {
+			throw std::runtime_error("std430 layout not found");
 		}
 		if (code.find("MyUBOConfig") == std::string::npos) {
 			throw std::runtime_error("Struct type name not found in:\n" + code);

@@ -24,6 +24,9 @@ namespace GPU::Flow {
  *   });
  */
 inline void Continue() {
+	if (!IR::Builder::Builder::Get().Context()) {
+		throw std::runtime_error("Continue() called outside of Kernel definition");
+	}
 	auto continueNode = std::make_unique<IR::Node::ContinueNode>();
 	IR::Builder::Builder::Get().Build(*continueNode, true);
 }

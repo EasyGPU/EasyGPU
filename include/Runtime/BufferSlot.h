@@ -131,6 +131,7 @@ public:
 	void Attach(Buffer<T> &buffer) {
 		_bufferHandle = buffer.GetHandle();
 		_bufferPtr	  = &buffer;
+		_lifetimeToken = buffer.GetLifetimeToken();
 		_mode		  = static_cast<int>(buffer.GetMode());
 	}
 
@@ -140,6 +141,7 @@ public:
 	void Detach() {
 		_bufferHandle = Backend::INVALID_BUFFER_HANDLE;
 		_bufferPtr	  = nullptr;
+		_lifetimeToken.reset();
 	}
 
 	/**
@@ -147,7 +149,7 @@ public:
 	 * @return true if attached, false otherwise
 	 */
 	bool IsAttached() const override {
-		return _bufferHandle != Backend::INVALID_BUFFER_HANDLE;
+		return _bufferHandle != Backend::INVALID_BUFFER_HANDLE && !_lifetimeToken.expired();
 	}
 
 	/**
@@ -179,6 +181,9 @@ public:
 		auto *context = IR::Builder::Builder::Get().Context();
 		if (!context) {
 			throw std::runtime_error("BufferSlot::Bind() called outside of Kernel definition");
+		}
+		if (_bufferPtr != nullptr && _lifetimeToken.expired()) {
+			throw std::runtime_error("BufferSlot::Bind() attached buffer has been destroyed");
 		}
 
 		// Register this slot with the context
@@ -235,6 +240,7 @@ protected:
 private:
 	Backend::BufferHandle _bufferHandle = Backend::INVALID_BUFFER_HANDLE; // Currently attached buffer handle
 	Buffer<T>			 *_bufferPtr	= nullptr;						  // Currently attached buffer pointer
+	std::weak_ptr<void>	  _lifetimeToken;
 
 	// Grant KernelBuildContext access to protected members
 	friend class KernelBuildContext;

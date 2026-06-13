@@ -174,7 +174,14 @@ unsigned int KernelProfiler::BeginQuery() {
 	if (backend == nullptr)
 		return 0;
 
-	return backend->BeginQuery();
+	unsigned int query = backend->BeginQuery();
+	if (query != 0)
+		return query;
+
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
+	query = _nextCpuQuery++;
+	_cpuQueryStarts[query] = std::chrono::steady_clock::now();
+	return query;
 #else
 	unsigned int query = AcquireQuery();
 	if (query != 0) {
@@ -196,6 +203,19 @@ void KernelProfiler::EndQuery(unsigned int queryId, const std::string &kernelNam
 	auto *backend = Runtime::Context::GetBackend();
 	if (backend == nullptr)
 		return;
+
+	{
+		std::lock_guard<std::recursive_mutex> lock(_mutex);
+		auto it = _cpuQueryStarts.find(queryId);
+		if (it != _cpuQueryStarts.end()) {
+			backend->Finish();
+			double elapsedMs =
+				std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - it->second).count();
+			_cpuQueryStarts.erase(it);
+			RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
+			return;
+		}
+	}
 
 	uint64_t elapsedNanos = backend->EndQuery(queryId);
 	double	 elapsedMs	  = static_cast<double>(elapsedNanos) / 1'000'000.0;
@@ -234,7 +254,14 @@ unsigned int KernelProfiler::BeginQueryOnCurrentContext() {
 	if (backend == nullptr)
 		return 0;
 
-	return backend->BeginQuery();
+	unsigned int query = backend->BeginQuery();
+	if (query != 0)
+		return query;
+
+	std::lock_guard<std::recursive_mutex> lock(_mutex);
+	query = _nextCpuQuery++;
+	_cpuQueryStarts[query] = std::chrono::steady_clock::now();
+	return query;
 #else
 	// No context switch - use current context
 	unsigned int query = AcquireQuery();
@@ -256,6 +283,19 @@ void KernelProfiler::EndQueryOnCurrentContext(unsigned int queryId, const std::s
 	auto *backend = Runtime::Context::GetBackend();
 	if (backend == nullptr)
 		return;
+
+	{
+		std::lock_guard<std::recursive_mutex> lock(_mutex);
+		auto it = _cpuQueryStarts.find(queryId);
+		if (it != _cpuQueryStarts.end()) {
+			backend->Finish();
+			double elapsedMs =
+				std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - it->second).count();
+			_cpuQueryStarts.erase(it);
+			RecordExecution(kernelName, groupX, groupY, groupZ, elapsedMs);
+			return;
+		}
+	}
 
 	uint64_t elapsedNanos = backend->EndQuery(queryId);
 	double	 elapsedMs	  = static_cast<double>(elapsedNanos) / 1'000'000.0;

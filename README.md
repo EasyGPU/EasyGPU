@@ -79,7 +79,7 @@ int main() {
 
 **For experienced developers:**
 - Zero vendor lock-in (OpenGL 4.3+ or Vulkan 1.1+, cross-platform)
-- Minimal dependencies (only GLAD, ~500KB)
+- Explicit dependency model: bundled GLAD for OpenGL; Vulkan SDK, glslang, and SPIRV-Tools for Vulkan
 - Clean C++20 interface without heavy template metaprogramming
 - First-class Vulkan backend for compute workloads, profiling, textures, uniforms, and descriptor-backed resource binding
 
@@ -87,7 +87,7 @@ int main() {
 
 - C++20 compatible compiler (GCC 11+, Clang 14+, MSVC 2022+, Apple Clang 14+)
 - OpenGL 4.3+ or Vulkan 1.1+
-- CMake 3.21+ (optional)
+- CMake 3.21+
 - **Windows:** No additional dependencies
 - **Linux:** X11 development libraries (`libx11-dev` on Ubuntu/Debian)
 - **macOS:** No additional dependencies — uses Cocoa/CoreGraphics (built-in)
@@ -151,16 +151,16 @@ square.Dispatch(16, true);
 
 ### Cross-Platform Support
 
-Runs natively on Windows, Linux, and macOS with zero code changes. The same kernel code works identically across platforms.
+EasyGPU keeps the kernel DSL backend-independent. Actual feature availability depends on the selected backend, driver, and platform; see [Support Status](docs/support-status.md).
 
 | Platform | Compute Kernels | Graphics Pipeline | Backend |
 |:---------|:---------------|:------------------|:--------|
-| **Windows** | ✅ Full support | ✅ Vulkan | WGL / Vulkan |
-| **Linux** | ✅ Full support | ✅ Vulkan | GLX / Vulkan |
-| **macOS** | ✅ Full support | ✅ Vulkan | Vulkan (MoltenVK) |
+| **Windows** | OpenGL / Vulkan | Vulkan | OpenGL is continuously built |
+| **Linux** | OpenGL / Vulkan | Vulkan | OpenGL is continuously built |
+| **macOS** | Vulkan via MoltenVK | Vulkan via MoltenVK | Locally validated; GPU timestamp profiling uses a synchronized fallback |
 
 ```cpp
-// This code runs identically on Windows, Linux, and macOS
+// The kernel DSL source is shared across supported backends and platforms
 Kernel1D transform([](Int i) {
     data[i] = Sqrt(data[i] * 2.0f);
 });
@@ -183,7 +183,7 @@ For new projects, Vulkan is the recommended default. OpenGL remains available fo
 
 ### Graphics Pipeline — Rasterization in C++ DSL
 
-Write vertex and fragment shaders as C++ lambdas. The framework compiles them to GLSL/SPIR-V and renders via Vulkan dynamic rendering (`VK_KHR_dynamic_rendering`). Full support for depth testing, push-constant uniforms, SSBO vertex data, and `Varying<T>` interpolation.
+Write vertex and fragment shaders as C++ lambdas. The framework compiles them to GLSL/SPIR-V and renders via Vulkan dynamic rendering (`VK_KHR_dynamic_rendering`). The preview API includes depth testing, push-constant uniforms, SSBO vertex data, and `Varying<T>` interpolation.
 
 ```cpp
 Varying<Vec3> vColor;
@@ -644,7 +644,7 @@ FetchContent_Declare(
     GIT_TAG v0.2.0
 )
 FetchContent_MakeAvailable(easygpu)
-target_link_libraries(your_target EasyGPU)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
 ```
 
 To build EasyGPU itself with the Vulkan backend:
@@ -665,7 +665,25 @@ If you want OpenGL explicitly:
 cmake -S . -B build -DEASYGPU_BACKEND=OpenGL
 ```
 
-**Manual:** Copy `include/` to your project, configure the backend via `#define EASYGPU_BACKEND_VULKAN` or `#define EASYGPU_BACKEND_OPENGL` before including GPU.h, and link against the corresponding API (Vulkan or OpenGL).
+**Installed package:**
+
+```bash
+cmake --install build --prefix /your/prefix
+```
+
+```cmake
+find_package(EasyGPU CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
+```
+
+EasyGPU is a compiled library; copying only `include/` is not a supported installation method.
+
+The installed package exports:
+
+- `EasyGPU::EasyGPU` — Core compute and graphics library
+- `EasyGPU::Window` — Optional window component when built with `EASYGPU_BUILD_WINDOW=ON`
+
+The package configuration resolves the selected backend dependencies for downstream projects. A package-consumer fixture in `tests/package-consumer` verifies that an installed package can be discovered, compiled, linked, and executed.
 
 ### Using EasyGPU in Your Own CMake Project
 
@@ -686,7 +704,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(easygpu)
 
-target_link_libraries(your_target PRIVATE EasyGPU)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
 ```
 
 To switch back to OpenGL in your own project, change only one line:
@@ -696,6 +714,24 @@ set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
 ```
 
 No kernel rewrite is required.
+
+### Reliability and Validation
+
+- Every `tests/Test*.cpp` source is automatically registered with CTest, except the optional Windows EasyX fragment tester.
+- Release tests keep assertions enabled and use deterministic test compilation settings.
+- Buffer and texture slots detect access after the attached resource has been destroyed.
+- Shader and pipeline creation use explicit lifetime management and exception-safe cleanup.
+- Vulkan profiling uses native timestamp queries where reliable. MoltenVK uses a synchronized CPU timing fallback to avoid device-loss failures.
+- Vulkan pipeline-cache data accelerates pipeline creation but never replaces the required live shader module.
+
+Run the complete configured test suite with:
+
+```bash
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+See [Support Status](docs/support-status.md) for capability maturity and qualification expectations.
 
 ### First Program
 
@@ -966,6 +1002,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [Window Component](docs/window.md) — Cross-platform window for interactive visualization
 - [Graphics Pipeline](docs/graphics-pipeline.md) — Vertex + Fragment shader DSL, Varying\<T\>, depth testing, OBJ rendering
 - [Shader Cache](docs/shader-cache.md) — Automatic kernel compilation caching
+- [Support Status](docs/support-status.md) — Capability maturity, platform notes, and verification policy
 - [Common Patterns](docs/patterns.md)
 - [Unref - Independent Variable Copies](docs/unref.md)
 - [FAQ](docs/faq.md)
@@ -1045,11 +1082,11 @@ cd build && ctest
 | Option | Default | Description |
 |:-------|:--------|:------------|
 | `EASYGPU_BACKEND` | `Vulkan` | Backend API: `OpenGL` or `Vulkan` |
-| `EASYGPU_BUILD_EXAMPLES` | `ON` | Build examples |
-| `EASYGPU_BUILD_TESTS` | `ON` | Build tests |
+| `EASYGPU_BUILD_EXAMPLES` | Top-level only | Build examples |
+| `EASYGPU_BUILD_TESTS` | Top-level only | Build tests |
 | `EASYGPU_BUILD_FRAGMENT_TESTER` | `OFF` | Build the Windows FragmentKernel tester |
-| `EASYGPU_BUILD_WINDOW` | `ON` | Build the window component |
-| `EASYGPU_BUILD_WINDOW_EXAMPLES` | `ON` | Build window examples |
+| `EASYGPU_BUILD_WINDOW` | Top-level only | Build the window component |
+| `EASYGPU_BUILD_WINDOW_EXAMPLES` | Top-level only | Build window examples |
 
 ---
 

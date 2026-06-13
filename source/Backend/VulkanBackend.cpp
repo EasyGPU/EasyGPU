@@ -349,6 +349,12 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.supportsGraphics		  = true;
 				_caps.supportsAsyncTransfer	  = false;
 				_caps.supportsMultiQueue	  = false;
+				_caps.supportsTimestampQueries = queueFamilies[i].timestampValidBits != 0;
+#ifdef __APPLE__
+				// MoltenVK timestamp queries are not reliable across all supported
+				// macOS/GPU combinations. Use the profiler's synchronized CPU fallback.
+				_caps.supportsTimestampQueries = false;
+#endif
 				_timestampPeriod			  = limits.timestampPeriod;
 				_maxPushConstantSize		  = limits.maxPushConstantsSize;
 				return;
@@ -374,6 +380,10 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.supportsGraphics		  = false;
 				_caps.supportsAsyncTransfer	  = false;
 				_caps.supportsMultiQueue	  = false;
+				_caps.supportsTimestampQueries = queueFamilies[i].timestampValidBits != 0;
+#ifdef __APPLE__
+				_caps.supportsTimestampQueries = false;
+#endif
 				_timestampPeriod			  = limits.timestampPeriod;
 				_maxPushConstantSize		  = limits.maxPushConstantsSize;
 				return;
@@ -524,6 +534,10 @@ void VulkanBackend::CreateDefaultSampler() {
 }
 
 void VulkanBackend::CreateQueryPool() {
+	if (!_caps.supportsTimestampQueries) {
+		return;
+	}
+
 	VkQueryPoolCreateInfo queryPoolInfo = {};
 	queryPoolInfo.sType					= VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
 	queryPoolInfo.queryType				= VK_QUERY_TYPE_TIMESTAMP;
@@ -581,9 +595,6 @@ void VulkanBackend::BeginCommandBuffer() {
 	CheckVkResult(result, "vkBeginCommandBuffer");
 
 	_commandBufferRecording = true;
-
-	// Reset query pool indices
-	_nextQueryIndex			= 0;
 }
 
 void VulkanBackend::EndCommandBuffer() {
@@ -2335,6 +2346,10 @@ void VulkanBackend::Finish() {
 uint32_t VulkanBackend::BeginQuery() {
 	std::lock_guard<std::mutex> lock(_mutex);
 
+	if (!_queryPool) {
+		return 0;
+	}
+
 	EnsureCommandBuffer();
 
 	uint32_t queryIndex = _nextQueryIndex;
@@ -2346,7 +2361,9 @@ uint32_t VulkanBackend::BeginQuery() {
 	}
 
 	vkCmdResetQueryPool(_commandBuffer, _queryPool, queryIndex, 2);
-	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, _queryPool, queryIndex);
+	// TOP/BOTTOM_OF_PIPE are supported for timestamp queries even on devices
+	// that do not expose timestamps at every graphics/compute pipeline stage.
+	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, _queryPool, queryIndex);
 
 	_nextQueryIndex += 2;
 
@@ -2372,7 +2389,7 @@ uint32_t VulkanBackend::BeginQuery() {
 uint64_t VulkanBackend::EndQuery(uint32_t query) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	if (query == 0) {
+	if (query == 0 || !_queryPool) {
 		return 0;
 	}
 	const uint32_t querySlot = query - 1;
@@ -2383,7 +2400,7 @@ uint64_t VulkanBackend::EndQuery(uint32_t query) {
 	EnsureCommandBuffer();
 
 	uint32_t queryIndex = _queries[querySlot].queryIndex;
-	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, _queryPool, queryIndex + 1);
+	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, _queryPool, queryIndex + 1);
 
 	// Flush commands and get results
 	EndCommandBuffer();

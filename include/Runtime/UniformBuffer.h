@@ -117,9 +117,9 @@ public:
 
 	/**
 	 * @brief Get the current host-side value (thread-safe).
-	 * @return Const reference to the stored value.
+	 * @return A copy of the stored value.
 	 */
-	[[nodiscard]] const T &GetValue() const {
+	[[nodiscard]] T GetValue() const {
 		std::lock_guard<std::mutex> lock(_mutex);
 		return _value;
 	}
@@ -181,7 +181,11 @@ private:
 		std::vector<unsigned char>	  gpuData(gpuSize, 0);
 		converter.ConvertToGPU(&_value, gpuData.data(), 1);
 
-		_uboHandle = backend->CreateUniformBuffer(gpuSize, gpuData.data());
+		Backend::BufferDesc desc;
+		desc.sizeInBytes = gpuSize;
+		desc.mode = Backend::BufferMode::Read;
+		desc.initialData = gpuData.data();
+		_uboHandle = backend->CreateBuffer(desc);
 	}
 
 	void Upload() {
@@ -198,7 +202,7 @@ private:
 			converter.ConvertToGPU(&_value, gpuData.data(), 1);
 		}
 
-		backend->UploadUniformBuffer(_uboHandle, gpuData.data(), gpuSize);
+		backend->UploadBuffer(_uboHandle, 0, gpuSize, gpuData.data());
 	}
 
 	T					  _value{};

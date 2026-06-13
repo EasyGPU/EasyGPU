@@ -283,7 +283,7 @@ layout(local_size_x = {}) in;
 	static void AppendForwardMath(std::string &src, const std::string &inputBase, const std::string &outputBase,
 								  bool writeOutput) {
 		for (size_t i = 0; i < InFeatures; i++)
-			src += std::format("    float x{} = input[{} + {}u];\n", i, inputBase, i);
+			src += std::format("    float x{} = inputData[{} + {}u];\n", i, inputBase, i);
 		src += "\n";
 
 		for (size_t h = 0; h < HiddenFeatures; h++) {
@@ -307,7 +307,7 @@ layout(local_size_x = {}) in;
 
 	static std::string BuildForwardShader(size_t batch) {
 		std::string src	 = Header();
-		src				+= "layout(std430, binding = 0) readonly buffer InputBuf { float input[]; };\n";
+		src				+= "layout(std430, binding = 0) readonly buffer InputBuf { float inputData[]; };\n";
 		src				+= "layout(std430, binding = 1) buffer OutputBuf { float outData[]; };\n";
 		src				+= "layout(std430, binding = 2) readonly buffer W1Buf { float w1[]; };\n";
 		src				+= "layout(std430, binding = 3) readonly buffer B1Buf { float b1[]; };\n";
@@ -327,7 +327,7 @@ layout(local_size_x = {}) in;
 
 	static std::string BuildTrainShader(size_t batch) {
 		std::string src	 = Header();
-		src				+= "layout(std430, binding = 0) readonly buffer InputBuf { float input[]; };\n";
+		src				+= "layout(std430, binding = 0) readonly buffer InputBuf { float inputData[]; };\n";
 		src				+= "layout(std430, binding = 1) readonly buffer TargetBuf { float target[]; };\n";
 		src				+= "layout(std430, binding = 2) readonly buffer W1Buf { float w1[]; };\n";
 		src				+= "layout(std430, binding = 3) readonly buffer B1Buf { float b1[]; };\n";

@@ -139,6 +139,7 @@ public:
 	void Attach(Texture2D<Format> &texture) {
 		_texture	   = &texture;
 		_textureHandle = texture.GetHandle();
+		_lifetimeToken = texture.GetLifetimeToken();
 		_width		   = texture.GetWidth();
 		_height		   = texture.GetHeight();
 	}
@@ -149,6 +150,7 @@ public:
 	void Detach() {
 		_texture	   = nullptr;
 		_textureHandle = Backend::INVALID_TEXTURE_HANDLE;
+		_lifetimeToken.reset();
 		_width = _height = 0;
 	}
 
@@ -157,7 +159,7 @@ public:
 	 * @return true if attached, false otherwise
 	 */
 	bool IsAttached() const override {
-		return _textureHandle != Backend::INVALID_TEXTURE_HANDLE;
+		return _textureHandle != Backend::INVALID_TEXTURE_HANDLE && !_lifetimeToken.expired();
 	}
 
 	/**
@@ -208,6 +210,9 @@ public:
 		if (!context) {
 			throw std::runtime_error("TextureSlot::Bind() called outside of Kernel definition");
 		}
+		if (_texture != nullptr && _lifetimeToken.expired()) {
+			throw std::runtime_error("TextureSlot::Bind() attached texture has been destroyed");
+		}
 
 		_sampledBinding = false;
 
@@ -231,6 +236,9 @@ public:
 		if (!context) {
 			throw std::runtime_error("TextureSlot::BindSampler() called outside of Kernel definition");
 		}
+		if (_texture != nullptr && _lifetimeToken.expired()) {
+			throw std::runtime_error("TextureSlot::BindSampler() attached texture has been destroyed");
+		}
 
 		_sampledBinding = true;
 
@@ -250,6 +258,7 @@ private:
 	Backend::TextureHandle _textureHandle = Backend::INVALID_TEXTURE_HANDLE; // Currently attached texture handle
 	uint32_t			   _width		  = 0;
 	uint32_t			   _height		  = 0;
+	std::weak_ptr<void>	   _lifetimeToken;
 
 	// Grant KernelBuildContext access to protected members
 	friend class KernelBuildContext;
@@ -280,14 +289,16 @@ public:
 	 */
 	void Attach(Texture3D<Format> &texture) {
 		_texture = &texture;
+		_lifetimeToken = texture.GetLifetimeToken();
 	}
 
 	void Detach() {
 		_texture = nullptr;
+		_lifetimeToken.reset();
 	}
 
 	bool IsAttached() const override {
-		return _texture != nullptr;
+		return _texture != nullptr && !_lifetimeToken.expired();
 	}
 
 	/**
@@ -333,6 +344,9 @@ public:
 		if (!context) {
 			throw std::runtime_error("Texture3DSlot::Bind() called outside of Kernel definition");
 		}
+		if (_texture != nullptr && _lifetimeToken.expired()) {
+			throw std::runtime_error("Texture3DSlot::Bind() attached texture has been destroyed");
+		}
 
 		_sampledBinding = false;
 		context->RegisterTextureSlot(this);
@@ -350,6 +364,9 @@ public:
 		if (!context) {
 			throw std::runtime_error("Texture3DSlot::BindSampler() called outside of Kernel definition");
 		}
+		if (_texture != nullptr && _lifetimeToken.expired()) {
+			throw std::runtime_error("Texture3DSlot::BindSampler() attached texture has been destroyed");
+		}
 
 		_sampledBinding = true;
 		context->RegisterTextureSlot(this);
@@ -360,6 +377,7 @@ public:
 
 private:
 	Texture3D<Format> *_texture = nullptr;
+	std::weak_ptr<void> _lifetimeToken;
 
 	friend class KernelBuildContext;
 };

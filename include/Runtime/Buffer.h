@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -190,7 +191,7 @@ public:
 	Buffer(Buffer &&other) noexcept
 		: _bufferHandle(other._bufferHandle), _count(other._count), _elementSize(other._elementSize),
 		  _mode(other._mode), _boundBinding(other._boundBinding), _layoutConverter(std::move(other._layoutConverter)),
-		  _moved(other._moved) {
+		  _moved(other._moved), _lifetimeToken(std::move(other._lifetimeToken)) {
 		other._bufferHandle = Backend::INVALID_BUFFER_HANDLE;
 		other._count		= 0;
 		other._elementSize	= 0;
@@ -209,6 +210,7 @@ public:
 			_boundBinding		= other._boundBinding;
 			_layoutConverter	= std::move(other._layoutConverter);
 			_moved				= other._moved;
+			_lifetimeToken		= std::move(other._lifetimeToken);
 			other._bufferHandle = Backend::INVALID_BUFFER_HANDLE;
 			other._count		= 0;
 			other._elementSize	= 0;
@@ -349,6 +351,9 @@ public:
 	[[nodiscard]] Backend::BufferHandle GetHandle() const {
 		return _bufferHandle;
 	}
+	[[nodiscard]] std::weak_ptr<void> GetLifetimeToken() const {
+		return _lifetimeToken;
+	}
 
 	/**
 	 * @brief Get the number of elements in the buffer.
@@ -434,6 +439,7 @@ private:
 	int									   _boundBinding	= -1;
 	std::unique_ptr<Meta::LayoutConverter> _layoutConverter = nullptr;
 	bool								   _moved			= false; // Track if buffer has been moved from
+	std::shared_ptr<void>				   _lifetimeToken	= std::make_shared<int>(0);
 };
 
 } // namespace GPU::Runtime

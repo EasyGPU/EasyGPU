@@ -13,6 +13,7 @@
 #include <IR/Node/ArrayAccess.h>
 #include <IR/Node/LoadUniform.h>
 #include <IR/Node/Operation.h>
+#include <IR/Node/RawCode.h>
 #include <IR/Node/Ternary.h>
 
 #include <IR/Builder/Builder.h>
@@ -28,6 +29,11 @@
 #include <type_traits>
 
 namespace GPU::IR::Value {
+/** @brief Create an explicitly typed expression node from trusted raw GLSL. */
+[[nodiscard]] inline std::unique_ptr<Node::Node> RawCode(std::string code) {
+	return std::make_unique<Node::RawCodeNode>(std::move(code));
+}
+
 // Forward declaration of Var for Expr constructor
 template <ScalarType T> class Var;
 

@@ -198,6 +198,8 @@ private:
 
 	// Track which thread started each query to prevent cross-thread use
 	std::unordered_map<unsigned int, std::thread::id>		   _queryOwners;
+	std::unordered_map<unsigned int, std::chrono::steady_clock::time_point> _cpuQueryStarts;
+	unsigned int											   _nextCpuQuery = 0x80000000u;
 };
 
 // ===================================================================================

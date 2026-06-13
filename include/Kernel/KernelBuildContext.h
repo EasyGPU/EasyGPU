@@ -428,6 +428,7 @@ protected:
 	// Slot support for dynamic resource switching
 	std::vector<Runtime::BufferSlotBase *>					 _bufferSlots;
 	std::vector<Runtime::TextureSlotBase *>					 _textureSlots;
+	std::unordered_map<void *, std::string>					 _uniformBufferNames;
 
 	// Per-context slot binding mappings (required because slots are shared across kernels)
 	std::unordered_map<Runtime::BufferSlotBase *, uint32_t>	 _bufferSlotBindings;

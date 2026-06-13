@@ -11,22 +11,24 @@ EasyGPU is an embedded domain-specific language (eDSL) that lets you write GPU c
 | | EasyGPU | CUDA | Vulkan Compute |
 |:--|:--|:--|:--|
 | Setup | Minutes | Hours | Days |
-| Dependencies | ~500KB GLAD | 2GB+ SDK | Complex setup |
+| Dependencies | GLAD or Vulkan SDK toolchain | CUDA Toolkit | Vulkan SDK |
 | Code verbosity | Low | Medium | High |
-| Cross-platform | Yes (OpenGL/Vulkan) | NVIDIA only | Yes |
+| Cross-platform | Backend-dependent; see Support Status | NVIDIA only | Yes |
 | Learning curve | Low | Medium | High |
 
 EasyGPU trades some performance for extreme ease of use and minimal setup.
 
 ### Is it production-ready?
 
-EasyGPU is suitable for:
+EasyGPU uses production-oriented resource ownership, validation, CMake package exports, and GPU-backed tests. However, application teams must qualify the exact backend, driver, and workload they ship. See [Support Status](support-status.md) for the continuously verified configurations and known limitations.
+
+EasyGPU is particularly suitable for:
 - Learning GPU programming
 - Prototyping algorithms
 - Small to medium compute workloads
 - Educational purposes
 
-For maximum performance in production, consider CUDA, ROCm, or hand-tuned Vulkan. EasyGPU now offers a Vulkan backend as well, which closes much of the integration gap while preserving the DSL workflow.
+For workloads that require vendor-specific peak performance, advanced queue scheduling, or a formally stable ABI, evaluate CUDA, ROCm, or hand-tuned Vulkan alongside EasyGPU.
 
 ---
 
@@ -43,8 +45,17 @@ FetchContent_Declare(
     GIT_TAG v0.2.0
 )
 FetchContent_MakeAvailable(easygpu)
-target_link_libraries(your_target EasyGPU)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
 ```
+
+For an installed package:
+
+```cmake
+find_package(EasyGPU CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
+```
+
+Do not copy only the public headers. EasyGPU contains compiled implementation code and backend dependency metadata.
 
 Vulkan is the default backend. To configure it explicitly in your project:
 
@@ -90,15 +101,13 @@ If you are using the Vulkan backend, this question usually does not apply becaus
 
 ### Linker errors (undefined references)
 
-If using the OpenGL backend, make sure to link OpenGL:
+Always link the exported target:
 
 ```cmake
-target_link_libraries(your_target EasyGPU OpenGL::GL)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
 ```
 
-On Linux: `target_link_libraries(your_target EasyGPU GL)`
-
-If using the Vulkan backend, ensure the Vulkan SDK and `glslang`/`SPIRV-Tools` libraries are discoverable by CMake (`VULKAN_SDK` environment variable).
+It propagates the dependencies for the backend selected when EasyGPU was configured. For Vulkan packages, ensure the Vulkan SDK and `glslang`/`SPIRV-Tools` libraries remain discoverable by CMake, typically through `VULKAN_SDK`.
 
 ---
 
@@ -292,6 +301,8 @@ kernel.Dispatch(100, true);
 // Print timing report
 KernelProfiler::PrintReport(kernel);
 ```
+
+The profiler uses native backend timestamp queries when they are reported as reliable. On macOS through MoltenVK, it uses a synchronized CPU timing fallback because native timestamp-query usage can cause device-loss failures on affected configurations.
 
 ---
 
@@ -523,7 +534,7 @@ The graphics API includes `CreateGraphicsPipeline`, `BeginRendering`, `EndRender
 
 ### Can I pass large structs to shaders?
 
-Yes, use `UniformBuffer<T>` for structs larger than ~128 bytes. It uses GPU Uniform Buffer Objects (UBO) with std140 layout, supporting sizes up to 64KB+.
+Yes, use `UniformBuffer<T>` for structs larger than the push-constant limit. It uses a read-only std430 storage buffer and is limited by the backend's storage-buffer capacity.
 
 ```cpp
 EASYGPU_STRUCT(MyConfig, (Vec3, color), (float, exposure), (Mat4, transform));

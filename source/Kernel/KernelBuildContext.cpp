@@ -11,6 +11,7 @@
 #include <Runtime/BufferSlot.h>
 #include <Runtime/Context.h>
 #include <Runtime/TextureSlot.h>
+#include <Runtime/UniformBuffer.h>
 
 #include <format>
 #include <iostream>
@@ -604,10 +605,20 @@ void KernelBuildContext::RegisterVarying(const std::string &name, const std::str
 }
 
 std::string KernelBuildContext::RegisterUniformBuffer(const std::string &typeName, void *ubo, size_t gpuSize) {
-	(void)ubo;
-	// For now, return a placeholder name. Full UBO support is a separate feature.
-	std::string name = std::string("ubo_") + typeName;
-	return name;
+	(void)gpuSize;
+	auto existing = _uniformBufferNames.find(ubo);
+	if (existing != _uniformBufferNames.end()) {
+		return existing->second + "[0]";
+	}
+
+	auto		*uniformBuffer = static_cast<Runtime::UniformBufferBase *>(ubo);
+	uint32_t	 binding		  = AllocateBindingSlot();
+	std::string name		  = std::format("ubo_{}", binding);
+
+	RegisterBuffer(binding, typeName, name, Backend::BUFFER_MODE_READ_ONLY);
+	BindRuntimeBuffer(binding, uniformBuffer->GetHandle());
+	_uniformBufferNames.emplace(ubo, name);
+	return name + "[0]";
 }
 
 } // namespace GPU::Kernel

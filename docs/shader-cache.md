@@ -88,6 +88,8 @@ std::cout << "Cached shaders: " << entries
 | **OpenGL** | ✅ Yes | `glGetProgramBinary` / `glProgramBinary` |
 | **Vulkan** | ✅ Yes | `VkPipelineCache` |
 
+On Vulkan, cached pipeline data accelerates `vkCreateComputePipelines`; it is not a serialized replacement for the compute shader module. EasyGPU keeps a valid shader module alive for the complete pipeline-creation call, including cache-assisted creation.
+
 ### Checking Backend Capabilities
 
 ```cpp
@@ -144,3 +146,4 @@ set(EASYGPU_ENABLE_SHADER_CACHE OFF CACHE BOOL "" FORCE)
 - Cache is **not persisted** to disk — restarting the application clears the cache
 - Each kernel context maintains its own cache entry
 - Maximum cache size is limited only by available system memory
+- Vulkan cache compatibility remains driver-specific; invalid or unusable cache data falls back to source pipeline creation

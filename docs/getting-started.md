@@ -6,7 +6,7 @@ This guide will get you running your first GPU program in under 10 minutes.
 
 EasyGPU is an embedded domain-specific language (eDSL) that lets you write GPU compute kernels using standard C++ syntax. Instead of learning GLSL or dealing with complex graphics APIs, you write GPU code that looks like regular C++.
 
-That same kernel code can now run through either the Vulkan compute backend (default) or the OpenGL compute backend. For a modern explicit compute stack, Vulkan is the recommended default. For simple setup with minimal dependencies, OpenGL is also fully supported.
+That same kernel code can run through either the Vulkan compute backend (default) or the OpenGL compute backend on their supported platforms. For a modern explicit compute stack, Vulkan is the recommended default. See [Support Status](support-status.md) for the configurations currently verified by the project.
 
 **Traditional GPU programming:**
 ```cpp
@@ -54,7 +54,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(easygpu)
 
-target_link_libraries(your_target EasyGPU)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
 ```
 
 Vulkan is the default backend. If you want to explicitly configure it in your own project:
@@ -72,11 +72,24 @@ To select the OpenGL backend instead:
 set(EASYGPU_BACKEND OpenGL CACHE STRING "EasyGPU backend" FORCE)
 ```
 
-### Method 2: Copy Headers
+### Method 2: Installed CMake Package
 
-1. Copy the `include/` directory to your project
-2. Add `#define EASYGPU_BACKEND_OPENGL` (or `EASYGPU_BACKEND_VULKAN`) before `#include <GPU.h>`
-3. Link with the corresponding API (`-lGL` on Linux, `-lopengl32` on Windows for OpenGL; Vulkan SDK libs for Vulkan)
+Install a configured build:
+
+```bash
+cmake --install build --prefix /your/prefix
+```
+
+Consume it from another CMake project:
+
+```cmake
+find_package(EasyGPU CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
+```
+
+EasyGPU contains compiled implementation sources and backend dependencies. Copying only the headers is not supported.
+
+The installed package exports `EasyGPU::EasyGPU` and, when enabled during the EasyGPU build, `EasyGPU::Window`. The repository includes `tests/package-consumer` as a minimal downstream package-consumption example.
 
 ## Your First Program
 
@@ -144,18 +157,6 @@ cmake --build .
 ./first_kernel
 ```
 
-Direct compilation with OpenGL backend (Linux):
-```bash
-g++ -std=c++20 first_kernel.cpp -lGL -lX11 -o first_kernel
-./first_kernel
-```
-
-Direct compilation with OpenGL backend (Windows with MSVC):
-```bash
-cl /std:c++20 first_kernel.cpp opengl32.lib
-first_kernel.exe
-```
-
 With CMake and Vulkan backend (macOS):
 ```bash
 mkdir build && cd build
@@ -164,7 +165,7 @@ cmake --build .
 ./first_kernel
 ```
 
-> **Note:** Direct one-file compilation is only suitable for the OpenGL path. The Vulkan backend (default) requires CMake to configure the Vulkan SDK, `glslang`, and `SPIRV-Tools` dependencies correctly. On macOS, only the Vulkan backend is supported; OpenGL is available on Windows and Linux.
+> **Note:** CMake is the supported build path for both backends. The Vulkan backend requires the Vulkan SDK, `glslang`, and `SPIRV-Tools`. On macOS, use Vulkan through MoltenVK.
 
 ## Understanding the Basics
 

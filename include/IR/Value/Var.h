@@ -849,7 +849,8 @@ public:
 	 * @return Reference to this variable
 	 */
 	VarBase &operator++() {
-		static_assert(std::is_same_v<Type, int>, "Prefix increment only supported for 'int'");
+		static_assert(std::is_same_v<Type, int> || std::is_same_v<Type, float>,
+					  "Prefix increment only supported for scalar arithmetic variables");
 
 		auto increment = std::make_unique<Node::IncrementNode>(Node::IncrementDirection::Increment, this->Load(), true);
 		Builder::Builder::Get().Build(*increment, true);
@@ -862,7 +863,8 @@ public:
 	 * @return Expression representing the value before increment
 	 */
 	[[nodiscard("post-increment returns a new value; discarding it loses the result")]] Expr<Type> operator++(int) {
-		static_assert(std::is_same_v<Type, int>, "Postfix increment only supported for 'int'");
+		static_assert(std::is_same_v<Type, int> || std::is_same_v<Type, float>,
+					  "Postfix increment only supported for scalar arithmetic variables");
 
 		auto increment =
 			std::make_unique<Node::IncrementNode>(Node::IncrementDirection::Increment, this->Load(), false);
@@ -875,7 +877,8 @@ public:
 	 * @return Reference to this variable
 	 */
 	VarBase &operator--() {
-		static_assert(std::is_same_v<Type, int>, "Prefix decrement only supported for 'int'");
+		static_assert(std::is_same_v<Type, int> || std::is_same_v<Type, float>,
+					  "Prefix decrement only supported for scalar arithmetic variables");
 
 		auto increment = std::make_unique<Node::IncrementNode>(Node::IncrementDirection::Decrement, this->Load(), true);
 		Builder::Builder::Get().Build(*increment, true);
@@ -888,7 +891,8 @@ public:
 	 * @return Expression representing the value before decrement
 	 */
 	[[nodiscard("post-decrement returns a new value; discarding it loses the result")]] Expr<Type> operator--(int) {
-		static_assert(std::is_same_v<Type, int>, "Postfix decrement only supported for 'int'");
+		static_assert(std::is_same_v<Type, int> || std::is_same_v<Type, float>,
+					  "Postfix decrement only supported for scalar arithmetic variables");
 
 		auto increment =
 			std::make_unique<Node::IncrementNode>(Node::IncrementDirection::Decrement, this->Load(), false);

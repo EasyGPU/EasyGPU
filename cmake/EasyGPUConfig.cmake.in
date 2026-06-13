@@ -1,0 +1,63 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+set(EasyGPU_BACKEND "@EASYGPU_BACKEND@")
+set(EasyGPU_WITH_WINDOW @EASYGPU_BUILD_WINDOW@)
+
+if(EasyGPU_BACKEND STREQUAL "Vulkan")
+    find_dependency(Vulkan)
+
+    get_filename_component(_easygpu_vulkan_library_dir "${Vulkan_LIBRARY}" DIRECTORY)
+    set(_easygpu_vulkan_library_hints
+        "${_easygpu_vulkan_library_dir}"
+        "$ENV{VULKAN_SDK}/lib"
+        "$ENV{VULKAN_SDK}/Lib"
+        "$ENV{VULKAN_SDK}/Lib32"
+    )
+
+    set(_easygpu_glslang_dependencies)
+    foreach(_easygpu_dependency IN ITEMS
+        glslang
+        SPIRV
+        glslang-default-resource-limits
+        MachineIndependent
+        OSDependent
+        GenericCodeGen
+        SPIRV-Tools
+        SPIRV-Tools-opt
+    )
+        string(MAKE_C_IDENTIFIER "${_easygpu_dependency}" _easygpu_dependency_id)
+        find_library(_easygpu_${_easygpu_dependency_id}_library
+            NAMES "${_easygpu_dependency}"
+            HINTS ${_easygpu_vulkan_library_hints}
+        )
+        if(NOT _easygpu_${_easygpu_dependency_id}_library)
+            set(EasyGPU_FOUND FALSE)
+            set(EasyGPU_NOT_FOUND_MESSAGE "Missing Vulkan/glslang dependency: ${_easygpu_dependency}")
+            return()
+        endif()
+        list(APPEND _easygpu_glslang_dependencies "${_easygpu_${_easygpu_dependency_id}_library}")
+    endforeach()
+
+    if(NOT TARGET EasyGPU::VulkanDependencies)
+        add_library(EasyGPU::VulkanDependencies INTERFACE IMPORTED)
+        set_property(TARGET EasyGPU::VulkanDependencies PROPERTY
+            INTERFACE_LINK_LIBRARIES "${_easygpu_glslang_dependencies}"
+        )
+    endif()
+
+    unset(_easygpu_dependency)
+    unset(_easygpu_dependency_id)
+    unset(_easygpu_glslang_dependencies)
+    unset(_easygpu_vulkan_library_dir)
+    unset(_easygpu_vulkan_library_hints)
+elseif(UNIX AND NOT APPLE)
+    find_dependency(OpenGL)
+    find_dependency(X11)
+    find_dependency(OpenSSL)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/EasyGPUTargets.cmake")
+
+check_required_components(EasyGPU)

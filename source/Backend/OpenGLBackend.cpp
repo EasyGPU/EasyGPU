@@ -172,6 +172,7 @@ BackendCaps OpenGLBackend::GetCaps() const {
 
 	caps.supportsAsyncTransfer = caps.supportsComputeShaders;
 	caps.supportsMultiQueue	   = false;
+	caps.supportsTimestampQueries = true;
 
 	return caps;
 }

@@ -50,6 +50,29 @@ private:
 	IR::Builder::BuilderContext *_previousContext;
 };
 
+/**
+ * RAII guard for backend shader handles during pipeline creation.
+ */
+class ShaderGuard {
+public:
+	ShaderGuard(Backend::Backend &backend, Backend::ShaderHandle shader) : _backend(backend), _shader(shader) {}
+
+	~ShaderGuard() {
+		if (_shader != Backend::INVALID_SHADER_HANDLE) {
+			_backend.DestroyShader(_shader);
+		}
+	}
+
+	ShaderGuard(const ShaderGuard &)			= delete;
+	ShaderGuard &operator=(const ShaderGuard &) = delete;
+	ShaderGuard(ShaderGuard &&)					= delete;
+	ShaderGuard &operator=(ShaderGuard &&)		= delete;
+
+private:
+	Backend::Backend		&_backend;
+	Backend::ShaderHandle _shader;
+};
+
 // ===================================================================================
 // KernelBase - Common functionality
 // ===================================================================================
@@ -114,6 +137,19 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 		// Get the complete shader code
 		std::string shaderSource	= context.GetCompleteCode();
 
+		// Vulkan pipeline cache data accelerates pipeline creation but does not
+		// replace the shader module required by vkCreateComputePipelines.
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type			 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode	 = shaderSource;
+		shaderDesc.entryPoint	 = "main";
+
+		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
+		if (shader == Backend::INVALID_SHADER_HANDLE) {
+			throw std::runtime_error("Failed to create compute shader");
+		}
+		ShaderGuard shaderGuard(*backend, shader);
+
 		// Try to load from binary cache first
 		bool		loadedFromCache = false;
 		if (backend->SupportsPipelineCache()) {
@@ -124,6 +160,7 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 			if (entry && entry->dataSize > 0) {
 				// Try to create pipeline from cached binary
 				Backend::PipelineDesc pipelineDesc;
+				pipelineDesc.computeShader	  = shader;
 				pipelineDesc.workGroupSizeX	  = context.WorkSizeX;
 				pipelineDesc.workGroupSizeY	  = context.WorkSizeY;
 				pipelineDesc.workGroupSizeZ	  = context.WorkSizeZ;
@@ -159,17 +196,6 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 
 		// If not loaded from cache, compile from source
 		if (!loadedFromCache) {
-			// Create compute shader
-			Backend::ShaderDesc shaderDesc;
-			shaderDesc.type				 = Backend::ShaderType::Compute;
-			shaderDesc.sourceCode		 = shaderSource;
-			shaderDesc.entryPoint		 = "main";
-
-			Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
-			if (shader == Backend::INVALID_SHADER_HANDLE) {
-				throw std::runtime_error("Failed to create compute shader");
-			}
-
 			// Create pipeline
 			Backend::PipelineDesc pipelineDesc;
 			pipelineDesc.computeShader	  = shader;
@@ -197,7 +223,6 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 
 			pipeline = backend->CreatePipeline(pipelineDesc);
 			if (pipeline == Backend::INVALID_PIPELINE_HANDLE) {
-				backend->DestroyShader(shader);
 				throw std::runtime_error("Failed to create compute pipeline");
 			}
 
@@ -214,8 +239,6 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 				}
 			}
 
-			// Shader can be destroyed after linking (it's referenced by the pipeline)
-			backend->DestroyShader(shader);
 		}
 
 		// Cache the pipeline handle for future dispatches in this session
@@ -586,7 +609,7 @@ std::string Kernel1D::GetName() const {
 void Kernel1D::Dispatch(int GroupX, bool sync) {
 	auto		&profiler = KernelProfiler::GetInstance();
 	unsigned int queryId  = profiler.BeginQuery();
-	ExecuteComputeDispatch(_context, GroupX, 1, 1, sync);
+	ExecuteComputeDispatch(_context, GroupX, 1, 1, sync && queryId == 0);
 	profiler.EndQuery(queryId, _name, GroupX, 1, 1);
 }
 
@@ -632,7 +655,7 @@ std::string Kernel2D::GetName() const {
 void Kernel2D::Dispatch(int GroupX, int GroupY, bool sync) {
 	auto		&profiler = KernelProfiler::GetInstance();
 	unsigned int queryId  = profiler.BeginQuery();
-	ExecuteComputeDispatch(_context, GroupX, GroupY, 1, sync);
+	ExecuteComputeDispatch(_context, GroupX, GroupY, 1, sync && queryId == 0);
 	profiler.EndQuery(queryId, _name, GroupX, GroupY, 1);
 }
 
@@ -684,7 +707,7 @@ std::string Kernel3D::GetName() const {
 void Kernel3D::Dispatch(int GroupX, int GroupY, int GroupZ, bool sync) {
 	auto		&profiler = KernelProfiler::GetInstance();
 	unsigned int queryId  = profiler.BeginQuery();
-	ExecuteComputeDispatch(_context, GroupX, GroupY, GroupZ, sync);
+	ExecuteComputeDispatch(_context, GroupX, GroupY, GroupZ, sync && queryId == 0);
 	profiler.EndQuery(queryId, _name, GroupX, GroupY, GroupZ);
 }
 

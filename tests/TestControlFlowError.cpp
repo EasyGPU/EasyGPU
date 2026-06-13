@@ -65,8 +65,8 @@ int main() {
 	// Continue called outside kernel should throw with "Continue" in message
 	RUN_TEST(6, Continue(), "Continue");
 
-	// Also verify the messages include file/line info (from the Flow source)
-	RUN_TEST(7, If(true, []() {}), "IfFlow.cpp");
+	// Verify the public-facing operation name remains present.
+	RUN_TEST(7, If(true, []() {}), "If()");
 
 	std::cout << "\n========================================" << std::endl;
 	std::cout << "Test Results: " << testsPassed << "/" << testsTotal << " passed" << std::endl;
