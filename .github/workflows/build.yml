@@ -11,7 +11,9 @@ jobs:
   # Windows Build (OpenGL)
   # ============================================================================
   build-windows:
-    runs-on: windows-latest
+    # Pin to the VS 2022 image because this job explicitly requests the
+    # "Visual Studio 17 2022" CMake generator.
+    runs-on: windows-2022
     steps:
     - uses: actions/checkout@v4
       with:
