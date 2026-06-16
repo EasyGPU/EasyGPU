@@ -179,6 +179,9 @@ private:
 
 	// Alias map: alias variable → canonical variable (e.g. v95 → v85)
 	std::unordered_map<std::string, std::string>	 _aliasMap;
+
+	// Generated temporary adjoint variable -> GLSL type
+	std::unordered_map<std::string, std::string>	 _tempTypes;
 };
 
 } // namespace GPU::AD

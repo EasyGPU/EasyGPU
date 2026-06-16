@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -385,6 +386,27 @@ public:
 	 */
 	virtual void		  UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 										const void *data)												  = 0;
+	/**
+	 * @brief Upload pixel data to a 2D texture region from a backend buffer.
+	 * @param texture Texture handle.
+	 * @param x Destination x offset.
+	 * @param y Destination y offset.
+	 * @param width Region width in pixels.
+	 * @param height Region height in pixels.
+	 * @param source Buffer handle containing tightly-packed source pixels.
+	 * @param sourceOffset Byte offset into the source buffer.
+	 */
+	virtual void		  UploadTextureFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+												  uint32_t height, BufferHandle source, size_t sourceOffset) {
+		(void)texture;
+		(void)x;
+		(void)y;
+		(void)width;
+		(void)height;
+		(void)source;
+		(void)sourceOffset;
+		throw std::runtime_error("Backend does not support texture upload from buffer");
+	}
 	/** @brief Generate all mip levels from level zero. */
 	virtual void		  GenerateMipmaps(TextureHandle texture)										  = 0;
 	/**
@@ -401,6 +423,23 @@ public:
 	virtual void		  UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
 										  uint32_t height, uint32_t depth, const void *data)			  = 0;
 	/**
+	 * @brief Upload voxel data to a 3D texture region from a backend buffer.
+	 */
+	virtual void		  UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
+													uint32_t width, uint32_t height, uint32_t depth,
+													BufferHandle source, size_t sourceOffset) {
+		(void)texture;
+		(void)x;
+		(void)y;
+		(void)z;
+		(void)width;
+		(void)height;
+		(void)depth;
+		(void)source;
+		(void)sourceOffset;
+		throw std::runtime_error("Backend does not support 3D texture upload from buffer");
+	}
+	/**
 	 * @brief Download pixel data from a 2D texture region.
 	 * @param texture Texture handle.
 	 * @param x Source x offset.
@@ -411,6 +450,20 @@ public:
 	 */
 	virtual void		 DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 										 void *outData)													  = 0;
+	/**
+	 * @brief Download pixel data from a 2D texture region into a backend buffer.
+	 */
+	virtual void		 DownloadTextureToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+												 uint32_t height, BufferHandle destination, size_t destinationOffset) {
+		(void)texture;
+		(void)x;
+		(void)y;
+		(void)width;
+		(void)height;
+		(void)destination;
+		(void)destinationOffset;
+		throw std::runtime_error("Backend does not support texture download to buffer");
+	}
 	/**
 	 * @brief Download voxel data from a 3D texture region.
 	 * @param texture Texture handle.
@@ -424,6 +477,23 @@ public:
 	 */
 	virtual void		 DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
 										   uint32_t height, uint32_t depth, void *outData)				  = 0;
+	/**
+	 * @brief Download voxel data from a 3D texture region into a backend buffer.
+	 */
+	virtual void		 DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
+												   uint32_t width, uint32_t height, uint32_t depth,
+												   BufferHandle destination, size_t destinationOffset) {
+		(void)texture;
+		(void)x;
+		(void)y;
+		(void)z;
+		(void)width;
+		(void)height;
+		(void)depth;
+		(void)destination;
+		(void)destinationOffset;
+		throw std::runtime_error("Backend does not support 3D texture download to buffer");
+	}
 
 	/**
 	 * @brief Compile and create a shader module.

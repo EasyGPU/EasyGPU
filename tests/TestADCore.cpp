@@ -559,6 +559,21 @@ CHECK_CONTAINS(r.backwardCode, "+=");
 CHECK_CONTAINS(r.backwardCode, "d_v");
 END_TEST
 
+TEST(ad_vec3_scalar_mul_backward_types)
+auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<Vec3>  v = MakeFloat3(1.0f, 2.0f, 3.0f);
+	Var<float> s;
+	s				 = 2.0f;
+	Var<Vec3> result = v * s;
+	tape.MarkLoss(result.VarName(), "vec3");
+});
+CHECK_CONTAINS(r.backwardCode, "vec3 _adj");
+CHECK_CONTAINS(r.backwardCode, "dot(");
+if (r.backwardCode.find("float _adj0_ = d_v") != std::string::npos) {
+	throw std::runtime_error("Vector adjoint temporary was declared as float:\n" + r.backwardCode);
+}
+END_TEST
+
 TEST(ad_vec3_dot)
 auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
 	Var<Vec3>  a = MakeFloat3(1.0f, 0.0f, 0.0f);
@@ -1236,6 +1251,7 @@ int main() {
 	// Section 6: Vector operations
 	test_ad_vec3_add();
 	test_ad_vec3_scalar_mul();
+	test_ad_vec3_scalar_mul_backward_types();
 	test_ad_vec3_dot();
 	test_ad_vec3_cross();
 	test_ad_vec3_length();

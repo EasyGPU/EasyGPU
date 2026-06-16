@@ -72,16 +72,25 @@ public:
 	/** @copydoc Backend::UploadTexture */
 	void		   UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 								 const void *data) override;
+	void		   UploadTextureFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+										   uint32_t height, BufferHandle source, size_t sourceOffset) override;
 	void		   GenerateMipmaps(TextureHandle texture) override;
 	/** @copydoc Backend::UploadTexture3D */
 	void UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 						 uint32_t depth, const void *data) override;
+	void UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+								   uint32_t height, uint32_t depth, BufferHandle source, size_t sourceOffset) override;
 	/** @copydoc Backend::DownloadTexture */
 	void DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 						 void *outData) override;
+	void DownloadTextureToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+								 BufferHandle destination, size_t destinationOffset) override;
 	/** @copydoc Backend::DownloadTexture3D */
 	void DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 						   uint32_t depth, void *outData) override;
+	void DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+								   uint32_t height, uint32_t depth, BufferHandle destination,
+								   size_t destinationOffset) override;
 
 	/** @copydoc Backend::CreateShader */
 	ShaderHandle		 CreateShader(const ShaderDesc &desc) override;
@@ -257,6 +266,8 @@ private:
 	 */
 	void UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 							   uint32_t depth, const void *data);
+	void CopyBufferToTexture(TextureInfo &info, VkBuffer sourceBuffer, size_t sourceOffset, uint32_t x, uint32_t y,
+							 uint32_t z, uint32_t width, uint32_t height, uint32_t depth);
 	/**
 	 * @brief Download voxel data from a texture using a staging buffer.
 	 * @param info Texture info structure.
@@ -270,6 +281,8 @@ private:
 	 */
 	void DownloadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 								 uint32_t depth, void *outData);
+	void CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset, uint32_t x,
+							 uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth);
 	/** @brief Wait for all pending GPU work to finish. */
 	void EnsureNoPendingGpuWork();
 	/**

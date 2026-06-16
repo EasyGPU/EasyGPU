@@ -21,6 +21,26 @@
 
 namespace GPU::AD {
 
+namespace {
+bool IsScalarAdjointType(const std::string &type) {
+	return type == "float";
+}
+
+bool IsVectorAdjointType(const std::string &type) {
+	return type == "vec2" || type == "vec3" || type == "vec4";
+}
+
+std::string ReduceForInput(const TapeEntry &entry, size_t inputIndex, const std::string &expr) {
+	if (inputIndex >= entry.inputs.size())
+		return expr;
+	const std::string &inputType = entry.inputs[inputIndex].glslType;
+	if (IsScalarAdjointType(inputType) && IsVectorAdjointType(entry.output.glslType)) {
+		return std::format("dot({}, {}(1.0))", expr, entry.output.glslType);
+	}
+	return expr;
+}
+} // namespace
+
 // =============================================================================
 // Constructor & Rule Registration
 // =============================================================================
@@ -50,15 +70,16 @@ void AdjointGenerator::RegisterArithmeticRules() {
 	// --- Mul: z = a * b  →  d_a += d_z * b;  d_b += d_z * a ---
 	_arithmeticRules[static_cast<int>(Op::Mul)] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 													 const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], std::format("({})*({})", dOut, in[1]));
-		gen->EmitAccumulate(in[1], std::format("({})*({})", dOut, in[0]));
+		gen->EmitAccumulate(in[0], ReduceForInput(e, 0, std::format("({})*({})", dOut, in[1])));
+		gen->EmitAccumulate(in[1], ReduceForInput(e, 1, std::format("({})*({})", dOut, in[0])));
 	};
 
 	// --- Div: z = a / b  →  d_a += d_z / b;  d_b += -d_z * a / (b*b) ---
 	_arithmeticRules[static_cast<int>(Op::Div)] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 													 const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], std::format("({})/({})", dOut, in[1]));
-		gen->EmitAccumulate(in[1], std::format("-(({})*({}))/(({})*({}))", dOut, in[0], in[1], in[1]));
+		gen->EmitAccumulate(in[0], ReduceForInput(e, 0, std::format("({})/({})", dOut, in[1])));
+		gen->EmitAccumulate(in[1],
+							ReduceForInput(e, 1, std::format("-(({})*({}))/(({})*({}))", dOut, in[0], in[1], in[1])));
 	};
 
 	// --- Neg: z = -a  →  d_a += -d_z ---
@@ -334,20 +355,23 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 		gen->EmitAccumulate(in[1], std::format("({})*(({})-({}))/length({})", dOut, in[1], in[0], diff));
 	};
 
-	// reflect(I, N)  →  d_I += d_out;  d_N += -2*dot(N,I)*d_out - 2*dot(d_out,I)*N
-	// Simplified: treat as not differentiable w.r.t. N (normal is usually fixed)
+	// reflect(I, N) = I - 2 * dot(N, I) * N
 	_intrinsicRules["reflect"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 									const std::vector<std::string> &in) {
-		std::string dotNI = std::format("dot({},{})", in[1], in[0]);
-		gen->EmitAccumulate(in[0], std::format("({})-2.0*({})*({})", dOut, in[1], dotNI));
+		std::string dotNdOut = std::format("dot({},{})", in[1], dOut);
+		std::string dotNI	= std::format("dot({},{})", in[1], in[0]);
+		gen->EmitAccumulate(in[0], std::format("({})-2.0*({})*({})", dOut, in[1], dotNdOut));
+		gen->EmitAccumulate(in[1], std::format("-2.0*(({})*({})+({})*({}))", in[0], dotNdOut, dOut, dotNI));
 	};
 
-	// refract(I, N, eta)  →  approximate gradient for I
+	// refract has a branch at total internal reflection. Keep it explicitly
+	// non-differentiated until a complete piecewise rule is implemented.
 	_intrinsicRules["refract"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 									const std::vector<std::string> &in) {
-		if (in.size() >= 3) {
-			gen->EmitAccumulate(in[0], dOut);
-		}
+		(void)gen;
+		(void)e;
+		(void)dOut;
+		(void)in;
 	};
 
 	// faceforward(N, I, Nref) — discrete sign-based, zero gradient
@@ -370,6 +394,7 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	_adjTable.Clear();
 	_bodyLines.clear();
 	_paramWritebacks.clear();
+	_tempTypes.clear();
 
 	if (tape.Size() == 0)
 		return "";
@@ -724,7 +749,30 @@ void AdjointGenerator::EmitAccumulate(const std::string &inputName, const std::s
 	std::string adjName = _adjTable.Get(inputName);
 	if (adjName.empty())
 		return;
-	EmitLine(std::format("{} += {};", ResolveAliases(adjName), ResolveAliases(gradExpr)));
+	std::string resolvedAdj  = ResolveAliases(adjName);
+	std::string resolvedGrad = ResolveAliases(gradExpr);
+	std::string adjType	   = _adjTable.GetTypeForAdjoint(adjName);
+	if (IsScalarAdjointType(adjType)) {
+		std::string gradType;
+		for (const auto &[tmpName, tmpType] : _tempTypes) {
+			if (resolvedGrad.find(tmpName) != std::string::npos && IsVectorAdjointType(tmpType)) {
+				gradType = tmpType;
+				break;
+			}
+		}
+		if (gradType.empty()) {
+			for (const char *vecType : {"vec2", "vec3", "vec4"}) {
+				if (resolvedGrad.find(std::string(vecType) + "(") != std::string::npos) {
+					gradType = vecType;
+					break;
+				}
+			}
+		}
+		if (!gradType.empty()) {
+			resolvedGrad = std::format("dot({}, {}(1.0))", resolvedGrad, gradType);
+		}
+	}
+	EmitLine(std::format("{} += {};", resolvedAdj, resolvedGrad));
 }
 
 void AdjointGenerator::EmitLine(const std::string &line) {
@@ -871,7 +919,8 @@ std::string AdjointGenerator::ZeroOf(const std::string &glslType) {
 
 std::string AdjointGenerator::SaveAndZeroAdjoint(const std::string &adjName, const std::string &glslType) {
 	std::string tmpName = std::format("_adj{}_", _tmpCounter++);
-	EmitLine(std::format("float {} = {};", tmpName, adjName));
+	_tempTypes[tmpName] = glslType;
+	EmitLine(std::format("{} {} = {};", glslType, tmpName, adjName));
 	EmitLine(std::format("{} = {};", adjName, ZeroOf(glslType)));
 	return tmpName;
 }

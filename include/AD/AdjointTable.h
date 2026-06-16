@@ -46,6 +46,11 @@ public:
 	bool		Has(const std::string &varName) const;
 
 	/**
+	 * Get the GLSL type for an adjoint variable, empty string if unknown.
+	 */
+	std::string GetTypeForAdjoint(const std::string &adjName) const;
+
+	/**
 	 * Get all (adjointName, glslType) pairs for GLSL variable declarations.
 	 * Each pair represents: "glslType adjointName = glslType(0);"
 	 */

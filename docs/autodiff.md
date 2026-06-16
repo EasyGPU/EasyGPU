@@ -462,7 +462,7 @@ Vector math operations are fully supported with correct gradient rules:
 | `distance(a, b)` | `Distance(a, b)` | `d_a += d_out * (a-b) / dist`, `d_b -= same` |
 | `normalize(v)` | `Normalize(v)` | `d_v += d_out * (I - n*nᵀ) / length(v)` |
 | `reflect(I, N)` | `Reflect(I, N)` | Standard reflect derivative |
-| `refract(I, N, eta)` | `Refract(I, N, eta)` | Standard refract derivative |
+| `refract(I, N, eta)` | `Refract(I, N, eta)` | Zero gradient until the branch-aware derivative is implemented |
 
 ```cpp
 Var<Vec3> normal; normal = MakeFloat3(0, 1, 0);
@@ -759,7 +759,7 @@ See [API Reference](api-reference.md#neural-network) for the full NN API.
 
 - Differentiate through arithmetic (+, -, *, /, -x)
 - Differentiate through ~30 intrinsic functions (sin, cos, exp, log, sqrt, pow, etc.)
-- Differentiate through vector operations (dot, cross, length, normalize, distance, reflect, refract)
+- Differentiate through vector operations (dot, cross, length, normalize, distance, reflect)
 - Differentiate through user-defined Callables (including nested and control-flow-containing Callables)
 - Differentiate through if/else branches, for loops, and nested combinations
 - Handle compound assignments (+=, -=) with correct gradient accumulation
@@ -768,6 +768,7 @@ See [API Reference](api-reference.md#neural-network) for the full NN API.
 
 ### What the AD system does NOT support
 
+- **Refract gradients** — `Refract()` currently emits a zero gradient until the branch-aware derivative is implemented.
 - **While loops** — The tape cannot determine the number of iterations at record time, which is needed for reversing the loop. Use `For` with a fixed bound instead.
 - **Break/Continue** inside loops — The tape records linear sequences; early exits break the reversal invariant.
 - **Swizzle writes** (`v.xyz = something`) — Swizzle reads are supported (e.g., `v.xyz * 2.0f`), but swizzle writes require special handling not yet implemented.

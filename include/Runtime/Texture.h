@@ -370,7 +370,7 @@ public:
 			if (pbo->GetState() != PBOBuffer::State::Idle) {
 				pbo->Wait();
 				pbo->DeleteFence();
-				pbo->SetState(PBOBuffer::State::Idle);
+				pbo->SetState(pbo->IsDownload() ? PBOBuffer::State::Ready : PBOBuffer::State::Idle);
 			}
 		}
 	}
@@ -562,6 +562,9 @@ public:
 	}
 
 	bool UploadAsync(const void *data) {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
+			return false;
+		}
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
@@ -572,16 +575,25 @@ public:
 		}
 
 		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
 
 		size_t dataSize = _width * _height * GetBytesPerPixel();
 		pbo->CopyData(data, dataSize);
-		Upload(data);
+		backend->UploadTextureFromBuffer(_textureHandle, 0, 0, _width, _height, pbo->GetHandle(), 0);
+		if (_mipmapMode == MipmapMode::Generate)
+			backend->GenerateMipmaps(_textureHandle);
 		pbo->SetState(PBOBuffer::State::Uploading);
 		pbo->InsertFence();
 		return true;
 	}
 
 	bool UploadAsyncStream(const void *data, uint32_t timeoutMs = 1000) {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
+			return false;
+		}
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
@@ -592,10 +604,16 @@ public:
 		}
 
 		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
 
 		size_t dataSize = _width * _height * GetBytesPerPixel();
 		pbo->CopyData(data, dataSize);
-		Upload(data);
+		backend->UploadTextureFromBuffer(_textureHandle, 0, 0, _width, _height, pbo->GetHandle(), 0);
+		if (_mipmapMode == MipmapMode::Generate)
+			backend->GenerateMipmaps(_textureHandle);
 
 		pbo->SetState(PBOBuffer::State::Uploading);
 		pbo->InsertFence();
@@ -603,11 +621,29 @@ public:
 		return true;
 	}
 
-	/**
-	 * Experimental / Not fully implemented
-	 */
 	bool DownloadAsync() {
-		throw std::runtime_error("Async texture transfer is not yet fully implemented");
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE) {
+			return false;
+		}
+		if (!_downloadPool) {
+			InitDownloadPBOPool(2);
+		}
+		_downloadPool->UpdateStates();
+		PBOBuffer *pbo = _downloadPool->AcquireIdle();
+		if (!pbo) {
+			return false;
+		}
+
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+
+		backend->DownloadTextureToBuffer(_textureHandle, 0, 0, _width, _height, pbo->GetHandle(), 0);
+		pbo->SetState(PBOBuffer::State::Downloading);
+		pbo->InsertFence();
+		return true;
 	}
 
 	bool GetDownloadData(void *outData) {
@@ -930,6 +966,9 @@ public:
 	}
 
 	bool UploadAsync(const void *data) {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
+			return false;
+		}
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
@@ -939,15 +978,22 @@ public:
 			return false;
 		}
 		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
 		size_t dataSize = _width * _height * _depth * GetBytesPerPixel();
 		pbo->CopyData(data, dataSize);
-		Upload(data);
+		backend->UploadTexture3DFromBuffer(_textureHandle, 0, 0, 0, _width, _height, _depth, pbo->GetHandle(), 0);
 		pbo->SetState(PBOBuffer::State::Uploading);
 		pbo->InsertFence();
 		return true;
 	}
 
 	bool UploadAsyncStream(const void *data, uint32_t timeoutMs = 1000) {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
+			return false;
+		}
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
@@ -956,9 +1002,13 @@ public:
 			throw std::runtime_error("UploadAsyncStream timeout - no idle PBO available");
 		}
 		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
 		size_t dataSize = _width * _height * _depth * GetBytesPerPixel();
 		pbo->CopyData(data, dataSize);
-		Upload(data);
+		backend->UploadTexture3DFromBuffer(_textureHandle, 0, 0, 0, _width, _height, _depth, pbo->GetHandle(), 0);
 		pbo->SetState(PBOBuffer::State::Uploading);
 		pbo->InsertFence();
 		return true;
@@ -974,6 +1024,11 @@ public:
 			return false;
 		}
 		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		backend->DownloadTexture3DToBuffer(_textureHandle, 0, 0, 0, _width, _height, _depth, pbo->GetHandle(), 0);
 		pbo->SetState(PBOBuffer::State::Downloading);
 		pbo->InsertFence();
 		return true;

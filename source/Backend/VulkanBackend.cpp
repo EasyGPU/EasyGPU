@@ -85,6 +85,54 @@ static void CheckVkResult(VkResult result, const char *operation) {
 	}
 }
 
+static size_t PixelFormatByteSize(PixelFormat format) {
+	switch (format) {
+	case PixelFormat::R8:
+		return 1;
+	case PixelFormat::RG8:
+		return 2;
+	case PixelFormat::RGBA8:
+	case PixelFormat::R32F:
+	case PixelFormat::R32I:
+	case PixelFormat::R32UI:
+	case PixelFormat::RG16F:
+		return 4;
+	case PixelFormat::RG32F:
+	case PixelFormat::RGBA16F:
+	case PixelFormat::RG32I:
+	case PixelFormat::RG32UI:
+		return 8;
+	case PixelFormat::RGBA32F:
+	case PixelFormat::RGBA32I:
+	case PixelFormat::RGBA32UI:
+		return 16;
+	case PixelFormat::R16F:
+		return 2;
+	}
+	return 4;
+}
+
+struct ScopedVulkanBuffer {
+	VkDevice	   device = nullptr;
+	VkBuffer	   buffer = nullptr;
+	VkDeviceMemory memory = nullptr;
+
+	ScopedVulkanBuffer() = default;
+	ScopedVulkanBuffer(VkDevice device_) : device(device_) {
+	}
+	~ScopedVulkanBuffer() {
+		if (buffer) {
+			vkDestroyBuffer(device, buffer, nullptr);
+		}
+		if (memory) {
+			vkFreeMemory(device, memory, nullptr);
+		}
+	}
+
+	ScopedVulkanBuffer(const ScopedVulkanBuffer &)			 = delete;
+	ScopedVulkanBuffer &operator=(const ScopedVulkanBuffer &) = delete;
+};
+
 // =============================================================================
 // glslang Initialization Helper
 // =============================================================================
@@ -1241,6 +1289,26 @@ void VulkanBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y,
 	UploadTextureInternal(it->second, x, y, 0, width, height, 1, data);
 }
 
+void VulkanBackend::UploadTextureFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+											uint32_t height, BufferHandle source, size_t sourceOffset) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(source);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid source buffer handle");
+	}
+	size_t dataSize = static_cast<size_t>(width) * height * PixelFormatByteSize(texIt->second.format);
+	if (sourceOffset + dataSize > bufIt->second.size) {
+		throw std::runtime_error("UploadTextureFromBuffer range exceeds source buffer size");
+	}
+
+	CopyBufferToTexture(texIt->second, bufIt->second.buffer, sourceOffset, x, y, 0, width, height, 1);
+}
+
 void VulkanBackend::GenerateMipmaps(TextureHandle texture) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
@@ -1323,6 +1391,27 @@ void VulkanBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t 
 	UploadTextureInternal(it->second, x, y, z, width, height, depth, data);
 }
 
+void VulkanBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
+											 uint32_t width, uint32_t height, uint32_t depth, BufferHandle source,
+											 size_t sourceOffset) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(source);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid source buffer handle");
+	}
+	size_t dataSize = static_cast<size_t>(width) * height * depth * PixelFormatByteSize(texIt->second.format);
+	if (sourceOffset + dataSize > bufIt->second.size) {
+		throw std::runtime_error("UploadTexture3DFromBuffer range exceeds source buffer size");
+	}
+
+	CopyBufferToTexture(texIt->second, bufIt->second.buffer, sourceOffset, x, y, z, width, height, depth);
+}
+
 void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
 										  uint32_t height, uint32_t depth, const void *data) {
 	if (data == nullptr && (width != 0 || height != 0 || depth != 0)) {
@@ -1335,57 +1424,7 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 		return;
 	}
 
-	// Calculate data size based on format
-	uint32_t pixelSize = 4; // Default to 4 bytes
-	switch (info.format) {
-	case PixelFormat::R8:
-		pixelSize = 1;
-		break;
-	case PixelFormat::RG8:
-		pixelSize = 2;
-		break;
-	case PixelFormat::RGBA8:
-		pixelSize = 4;
-		break;
-	case PixelFormat::R32F:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RG32F:
-		pixelSize = 8;
-		break;
-	case PixelFormat::RGBA32F:
-		pixelSize = 16;
-		break;
-	case PixelFormat::R16F:
-		pixelSize = 2;
-		break;
-	case PixelFormat::RG16F:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RGBA16F:
-		pixelSize = 8;
-		break;
-	case PixelFormat::R32I:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RG32I:
-		pixelSize = 8;
-		break;
-	case PixelFormat::RGBA32I:
-		pixelSize = 16;
-		break;
-	case PixelFormat::R32UI:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RG32UI:
-		pixelSize = 8;
-		break;
-	case PixelFormat::RGBA32UI:
-		pixelSize = 16;
-		break;
-	}
-
-	size_t			   dataSize	   = width * height * depth * pixelSize;
+	size_t			   dataSize	   = static_cast<size_t>(width) * height * depth * PixelFormatByteSize(info.format);
 
 	// Create staging buffer
 	VkBufferCreateInfo stagingInfo = {};
@@ -1394,24 +1433,34 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 	stagingInfo.usage			   = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	stagingInfo.sharingMode		   = VK_SHARING_MODE_EXCLUSIVE;
 
-	VkBuffer stagingBuffer		   = nullptr;
-	VkResult result				   = vkCreateBuffer(_device, &stagingInfo, nullptr, &stagingBuffer);
+	ScopedVulkanBuffer staging(_device);
+	VkResult result				   = vkCreateBuffer(_device, &stagingInfo, nullptr, &staging.buffer);
 	CheckVkResult(result, "vkCreateBuffer (staging)");
 
-	VkDeviceMemory stagingMemory = nullptr;
-	AllocateBufferMemory(stagingBuffer, stagingMemory,
+	AllocateBufferMemory(staging.buffer, staging.memory,
 						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dataSize);
 
-	result = vkBindBufferMemory(_device, stagingBuffer, stagingMemory, 0);
+	result = vkBindBufferMemory(_device, staging.buffer, staging.memory, 0);
 	CheckVkResult(result, "vkBindBufferMemory (staging)");
 
 	// Copy data to staging buffer
 	void *mapped = nullptr;
-	result		 = vkMapMemory(_device, stagingMemory, 0, dataSize, 0, &mapped);
+	result		 = vkMapMemory(_device, staging.memory, 0, dataSize, 0, &mapped);
 	CheckVkResult(result, "vkMapMemory");
 	std::memcpy(mapped, data, dataSize);
-	vkUnmapMemory(_device, stagingMemory);
+	vkUnmapMemory(_device, staging.memory);
 
+	CopyBufferToTexture(info, staging.buffer, 0, x, y, z, width, height, depth);
+}
+
+void VulkanBackend::CopyBufferToTexture(TextureInfo &info, VkBuffer sourceBuffer, size_t sourceOffset, uint32_t x,
+										uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth) {
+	if (x + width > info.width || y + height > info.height || z + depth > info.depth) {
+		throw std::runtime_error("UploadTexture region exceeds texture bounds");
+	}
+	if (width == 0 || height == 0 || depth == 0) {
+		return;
+	}
 	EnsureCommandBuffer();
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -1419,7 +1468,7 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 
 	// Copy buffer to image
 	VkBufferImageCopy region			   = {};
-	region.bufferOffset					   = 0;
+	region.bufferOffset					   = sourceOffset;
 	region.bufferRowLength				   = 0;
 	region.bufferImageHeight			   = 0;
 	region.imageSubresource.aspectMask	   = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1429,17 +1478,13 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 	region.imageOffset = {static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
 	region.imageExtent = {width, height, depth};
 
-	vkCmdCopyBufferToImage(_commandBuffer, stagingBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+	vkCmdCopyBufferToImage(_commandBuffer, sourceBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	EndCommandBuffer();
 	SubmitCommandBuffer(true);
-
-	// Cleanup staging
-	vkDestroyBuffer(_device, stagingBuffer, nullptr);
-	vkFreeMemory(_device, stagingMemory, nullptr);
 }
 
 void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
@@ -1454,6 +1499,26 @@ void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 	DownloadTextureInternal(it->second, x, y, 0, width, height, 1, outData);
 }
 
+void VulkanBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+											uint32_t height, BufferHandle destination, size_t destinationOffset) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(destination);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid destination buffer handle");
+	}
+	size_t dataSize = static_cast<size_t>(width) * height * PixelFormatByteSize(texIt->second.format);
+	if (destinationOffset + dataSize > bufIt->second.size) {
+		throw std::runtime_error("DownloadTextureToBuffer range exceeds destination buffer size");
+	}
+
+	CopyTextureToBuffer(texIt->second, bufIt->second.buffer, destinationOffset, x, y, 0, width, height, 1);
+}
+
 void VulkanBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
 									  uint32_t height, uint32_t depth, void *outData) {
 	std::lock_guard<std::mutex> lock(_mutex);
@@ -1464,6 +1529,27 @@ void VulkanBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_
 	}
 
 	DownloadTextureInternal(it->second, x, y, z, width, height, depth, outData);
+}
+
+void VulkanBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
+											 uint32_t width, uint32_t height, uint32_t depth,
+											 BufferHandle destination, size_t destinationOffset) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(destination);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid destination buffer handle");
+	}
+	size_t dataSize = static_cast<size_t>(width) * height * depth * PixelFormatByteSize(texIt->second.format);
+	if (destinationOffset + dataSize > bufIt->second.size) {
+		throw std::runtime_error("DownloadTexture3DToBuffer range exceeds destination buffer size");
+	}
+
+	CopyTextureToBuffer(texIt->second, bufIt->second.buffer, destinationOffset, x, y, z, width, height, depth);
 }
 
 void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
@@ -1478,63 +1564,7 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 		return;
 	}
 
-	// Flush pending commands
-	if (_commandBufferRecording) {
-		EndCommandBuffer();
-		SubmitCommandBuffer(true);
-	}
-
-	// Calculate data size
-	uint32_t pixelSize = 4;
-	switch (info.format) {
-	case PixelFormat::R8:
-		pixelSize = 1;
-		break;
-	case PixelFormat::RG8:
-		pixelSize = 2;
-		break;
-	case PixelFormat::RGBA8:
-		pixelSize = 4;
-		break;
-	case PixelFormat::R32F:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RG32F:
-		pixelSize = 8;
-		break;
-	case PixelFormat::RGBA32F:
-		pixelSize = 16;
-		break;
-	case PixelFormat::R16F:
-		pixelSize = 2;
-		break;
-	case PixelFormat::RG16F:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RGBA16F:
-		pixelSize = 8;
-		break;
-	case PixelFormat::R32I:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RG32I:
-		pixelSize = 8;
-		break;
-	case PixelFormat::RGBA32I:
-		pixelSize = 16;
-		break;
-	case PixelFormat::R32UI:
-		pixelSize = 4;
-		break;
-	case PixelFormat::RG32UI:
-		pixelSize = 8;
-		break;
-	case PixelFormat::RGBA32UI:
-		pixelSize = 16;
-		break;
-	}
-
-	size_t			   dataSize	   = width * height * depth * pixelSize;
+	size_t			   dataSize	   = static_cast<size_t>(width) * height * depth * PixelFormatByteSize(info.format);
 
 	// Create staging buffer
 	VkBufferCreateInfo stagingInfo = {};
@@ -1543,16 +1573,35 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 	stagingInfo.usage			   = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	stagingInfo.sharingMode		   = VK_SHARING_MODE_EXCLUSIVE;
 
-	VkBuffer stagingBuffer		   = nullptr;
-	VkResult result				   = vkCreateBuffer(_device, &stagingInfo, nullptr, &stagingBuffer);
+	ScopedVulkanBuffer staging(_device);
+	VkResult result				   = vkCreateBuffer(_device, &stagingInfo, nullptr, &staging.buffer);
 	CheckVkResult(result, "vkCreateBuffer (staging)");
 
-	VkDeviceMemory stagingMemory = nullptr;
-	AllocateBufferMemory(stagingBuffer, stagingMemory,
+	AllocateBufferMemory(staging.buffer, staging.memory,
 						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, dataSize);
 
-	result = vkBindBufferMemory(_device, stagingBuffer, stagingMemory, 0);
+	result = vkBindBufferMemory(_device, staging.buffer, staging.memory, 0);
 	CheckVkResult(result, "vkBindBufferMemory (staging)");
+
+	CopyTextureToBuffer(info, staging.buffer, 0, x, y, z, width, height, depth);
+
+	// Map and copy data
+	void *mapped = nullptr;
+	result		 = vkMapMemory(_device, staging.memory, 0, dataSize, 0, &mapped);
+	CheckVkResult(result, "vkMapMemory");
+	std::memcpy(outData, mapped, dataSize);
+	vkUnmapMemory(_device, staging.memory);
+}
+
+void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset,
+										uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+										uint32_t depth) {
+	if (x + width > info.width || y + height > info.height || z + depth > info.depth) {
+		throw std::runtime_error("DownloadTexture region exceeds texture bounds");
+	}
+	if (width == 0 || height == 0 || depth == 0) {
+		return;
+	}
 
 	EnsureCommandBuffer();
 
@@ -1561,7 +1610,7 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 
 	// Copy image to buffer
 	VkBufferImageCopy region			   = {};
-	region.bufferOffset					   = 0;
+	region.bufferOffset					   = destinationOffset;
 	region.bufferRowLength				   = 0;
 	region.bufferImageHeight			   = 0;
 	region.imageSubresource.aspectMask	   = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1571,24 +1620,13 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 	region.imageOffset = {static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
 	region.imageExtent = {width, height, depth};
 
-	vkCmdCopyImageToBuffer(_commandBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &region);
+	vkCmdCopyImageToBuffer(_commandBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationBuffer, 1, &region);
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	EndCommandBuffer();
 	SubmitCommandBuffer(true);
-
-	// Map and copy data
-	void *mapped = nullptr;
-	result		 = vkMapMemory(_device, stagingMemory, 0, dataSize, 0, &mapped);
-	CheckVkResult(result, "vkMapMemory");
-	std::memcpy(outData, mapped, dataSize);
-	vkUnmapMemory(_device, stagingMemory);
-
-	// Cleanup
-	vkDestroyBuffer(_device, stagingBuffer, nullptr);
-	vkFreeMemory(_device, stagingMemory, nullptr);
 }
 
 // =============================================================================

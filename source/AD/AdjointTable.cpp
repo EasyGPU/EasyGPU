@@ -71,6 +71,15 @@ bool AdjointTable::Has(const std::string &varName) const {
 	return _map.count(varName) > 0;
 }
 
+std::string AdjointTable::GetTypeForAdjoint(const std::string &adjName) const {
+	std::string baseName = adjName;
+	if (auto bracketPos = baseName.find('['); bracketPos != std::string::npos) {
+		baseName = baseName.substr(0, bracketPos);
+	}
+	auto it = _types.find(baseName);
+	return it != _types.end() ? it->second : "";
+}
+
 std::vector<std::pair<std::string, std::string>> AdjointTable::AllDeclarations() const {
 	std::vector<std::pair<std::string, std::string>> decls;
 	for (const auto &adjName : _insertionOrder) {

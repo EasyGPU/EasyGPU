@@ -354,6 +354,25 @@ void OpenGLBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y,
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void OpenGLBackend::UploadTextureFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+											uint32_t height, BufferHandle source, size_t sourceOffset) {
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(source);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid source buffer handle");
+	}
+
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, bufIt->second.glHandle);
+	glBindTexture(GL_TEXTURE_2D, texIt->second.glHandle);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, texIt->second.format, texIt->second.type,
+					reinterpret_cast<const void *>(sourceOffset));
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+}
+
 void OpenGLBackend::GenerateMipmaps(TextureHandle texture) {
 	auto it = _textures.find(texture);
 	if (it == _textures.end())
@@ -377,6 +396,26 @@ void OpenGLBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t 
 	glBindTexture(GL_TEXTURE_3D, it->second.glHandle);
 	glTexSubImage3D(GL_TEXTURE_3D, 0, x, y, z, width, height, depth, it->second.format, it->second.type, data);
 	glBindTexture(GL_TEXTURE_3D, 0);
+}
+
+void OpenGLBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
+											 uint32_t width, uint32_t height, uint32_t depth, BufferHandle source,
+											 size_t sourceOffset) {
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(source);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid source buffer handle");
+	}
+
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, bufIt->second.glHandle);
+	glBindTexture(GL_TEXTURE_3D, texIt->second.glHandle);
+	glTexSubImage3D(GL_TEXTURE_3D, 0, x, y, z, width, height, depth, texIt->second.format, texIt->second.type,
+					reinterpret_cast<const void *>(sourceOffset));
+	glBindTexture(GL_TEXTURE_3D, 0);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
 void OpenGLBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
@@ -403,6 +442,30 @@ void OpenGLBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void OpenGLBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+											uint32_t height, BufferHandle destination, size_t destinationOffset) {
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(destination);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid destination buffer handle");
+	}
+
+	(void)x;
+	(void)y;
+	(void)width;
+	(void)height;
+
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, bufIt->second.glHandle);
+	glBindTexture(GL_TEXTURE_2D, texIt->second.glHandle);
+	glGetTexImage(GL_TEXTURE_2D, 0, texIt->second.format, texIt->second.type,
+				  reinterpret_cast<void *>(destinationOffset));
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+}
+
 void OpenGLBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
 									  uint32_t height, uint32_t depth, void *outData) {
 	auto it = _textures.find(texture);
@@ -420,6 +483,33 @@ void OpenGLBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_
 	glBindTexture(GL_TEXTURE_3D, it->second.glHandle);
 	glGetTexImage(GL_TEXTURE_3D, 0, it->second.format, it->second.type, outData);
 	glBindTexture(GL_TEXTURE_3D, 0);
+}
+
+void OpenGLBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
+											 uint32_t width, uint32_t height, uint32_t depth,
+											 BufferHandle destination, size_t destinationOffset) {
+	auto texIt = _textures.find(texture);
+	if (texIt == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufIt = _buffers.find(destination);
+	if (bufIt == _buffers.end()) {
+		throw std::runtime_error("Invalid destination buffer handle");
+	}
+
+	(void)x;
+	(void)y;
+	(void)z;
+	(void)width;
+	(void)height;
+	(void)depth;
+
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, bufIt->second.glHandle);
+	glBindTexture(GL_TEXTURE_3D, texIt->second.glHandle);
+	glGetTexImage(GL_TEXTURE_3D, 0, texIt->second.format, texIt->second.type,
+				  reinterpret_cast<void *>(destinationOffset));
+	glBindTexture(GL_TEXTURE_3D, 0);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
 ShaderHandle OpenGLBackend::CreateShader(const ShaderDesc &desc) {

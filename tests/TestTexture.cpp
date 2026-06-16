@@ -151,6 +151,35 @@ ASSERT(match);
 std::cout << "Upload/Download verified for " << W << "x" << H << " texture";
 END_TEST
 
+TEST(texture_async_upload_download)
+const int			 W = 16, H = 16;
+std::vector<uint8_t> uploadPixels(W * H * 4);
+for (int i = 0; i < W * H; ++i) {
+	uploadPixels[i * 4 + 0] = static_cast<uint8_t>(i % 251);
+	uploadPixels[i * 4 + 1] = static_cast<uint8_t>((i * 3) % 251);
+	uploadPixels[i * 4 + 2] = static_cast<uint8_t>((i * 7) % 251);
+	uploadPixels[i * 4 + 3] = 255;
+}
+
+Texture2D<PixelFormat::RGBA8> tex(W, H);
+tex.InitUploadPBOPool(2);
+ASSERT(tex.UploadAsync(uploadPixels.data()));
+tex.Sync();
+
+tex.InitDownloadPBOPool(2);
+ASSERT(tex.DownloadAsync());
+tex.Sync();
+
+std::vector<uint8_t> downloadPixels(W * H * 4, 0);
+ASSERT(tex.GetDownloadData(downloadPixels.data()));
+for (size_t i = 0; i < uploadPixels.size(); ++i) {
+	if (downloadPixels[i] != uploadPixels[i]) {
+		throw std::runtime_error("Async texture roundtrip mismatch at byte " + std::to_string(i));
+	}
+}
+std::cout << "Async PBO upload/download verified";
+END_TEST
+
 // =============================================================================
 // Test 4: Texture move semantics
 // =============================================================================
@@ -774,6 +803,7 @@ int main() {
 		test_texture_mipmaps();
 		test_texture_create_from_buffer();
 		test_texture_upload_download();
+		test_texture_async_upload_download();
 		test_texture_move();
 		test_texture_bind_api_inspector();
 		test_texture_sampler_compute();
