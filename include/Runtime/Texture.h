@@ -565,6 +565,18 @@ public:
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
 			return false;
 		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		if (!backend->GetCaps().supportsAsyncTransfer) {
+			backend->UploadTexture(_textureHandle, 0, 0, _width, _height, data);
+			if (_mipmapMode == MipmapMode::Generate)
+				backend->GenerateMipmaps(_textureHandle);
+			return true;
+		}
+
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
@@ -572,12 +584,6 @@ public:
 		PBOBuffer *pbo = _uploadPool->AcquireIdle();
 		if (!pbo) {
 			return false;
-		}
-
-		Runtime::Context::GetInstance().MakeCurrent();
-		auto *backend = Context::GetBackend();
-		if (!backend) {
-			throw std::runtime_error("Backend not available");
 		}
 
 		size_t dataSize = _width * _height * GetBytesPerPixel();
@@ -594,6 +600,18 @@ public:
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
 			return false;
 		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		if (!backend->GetCaps().supportsAsyncTransfer) {
+			backend->UploadTexture(_textureHandle, 0, 0, _width, _height, data);
+			if (_mipmapMode == MipmapMode::Generate)
+				backend->GenerateMipmaps(_textureHandle);
+			return true;
+		}
+
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
@@ -601,12 +619,6 @@ public:
 		PBOBuffer *pbo = _uploadPool->AcquireIdleBlocking(timeoutMs);
 		if (!pbo) {
 			throw std::runtime_error("UploadAsyncStream timeout - no idle PBO available");
-		}
-
-		Runtime::Context::GetInstance().MakeCurrent();
-		auto *backend = Context::GetBackend();
-		if (!backend) {
-			throw std::runtime_error("Backend not available");
 		}
 
 		size_t dataSize = _width * _height * GetBytesPerPixel();
@@ -638,6 +650,14 @@ public:
 		auto *backend = Context::GetBackend();
 		if (!backend) {
 			throw std::runtime_error("Backend not available");
+		}
+		if (!backend->GetCaps().supportsAsyncTransfer) {
+			size_t				 dataSize = _width * _height * GetBytesPerPixel();
+			std::vector<uint8_t> temp(dataSize);
+			backend->DownloadTexture(_textureHandle, 0, 0, _width, _height, temp.data());
+			backend->UploadBuffer(pbo->GetHandle(), 0, dataSize, temp.data());
+			pbo->SetState(PBOBuffer::State::Ready);
+			return true;
 		}
 
 		backend->DownloadTextureToBuffer(_textureHandle, 0, 0, _width, _height, pbo->GetHandle(), 0);
@@ -969,6 +989,15 @@ public:
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
 			return false;
 		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		if (!backend->GetCaps().supportsAsyncTransfer) {
+			backend->UploadTexture3D(_textureHandle, 0, 0, 0, _width, _height, _depth, data);
+			return true;
+		}
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
@@ -976,11 +1005,6 @@ public:
 		PBOBuffer *pbo = _uploadPool->AcquireIdle();
 		if (!pbo) {
 			return false;
-		}
-		Runtime::Context::GetInstance().MakeCurrent();
-		auto *backend = Context::GetBackend();
-		if (!backend) {
-			throw std::runtime_error("Backend not available");
 		}
 		size_t dataSize = _width * _height * _depth * GetBytesPerPixel();
 		pbo->CopyData(data, dataSize);
@@ -994,17 +1018,21 @@ public:
 		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE || data == nullptr) {
 			return false;
 		}
+		Runtime::Context::GetInstance().MakeCurrent();
+		auto *backend = Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+		if (!backend->GetCaps().supportsAsyncTransfer) {
+			backend->UploadTexture3D(_textureHandle, 0, 0, 0, _width, _height, _depth, data);
+			return true;
+		}
 		if (!_uploadPool) {
 			InitUploadPBOPool(2);
 		}
 		PBOBuffer *pbo = _uploadPool->AcquireIdleBlocking(timeoutMs);
 		if (!pbo) {
 			throw std::runtime_error("UploadAsyncStream timeout - no idle PBO available");
-		}
-		Runtime::Context::GetInstance().MakeCurrent();
-		auto *backend = Context::GetBackend();
-		if (!backend) {
-			throw std::runtime_error("Backend not available");
 		}
 		size_t dataSize = _width * _height * _depth * GetBytesPerPixel();
 		pbo->CopyData(data, dataSize);
@@ -1027,6 +1055,14 @@ public:
 		auto *backend = Context::GetBackend();
 		if (!backend) {
 			throw std::runtime_error("Backend not available");
+		}
+		if (!backend->GetCaps().supportsAsyncTransfer) {
+			size_t				 dataSize = _width * _height * _depth * GetBytesPerPixel();
+			std::vector<uint8_t> temp(dataSize);
+			backend->DownloadTexture3D(_textureHandle, 0, 0, 0, _width, _height, _depth, temp.data());
+			backend->UploadBuffer(pbo->GetHandle(), 0, dataSize, temp.data());
+			pbo->SetState(PBOBuffer::State::Ready);
+			return true;
 		}
 		backend->DownloadTexture3DToBuffer(_textureHandle, 0, 0, 0, _width, _height, _depth, pbo->GetHandle(), 0);
 		pbo->SetState(PBOBuffer::State::Downloading);

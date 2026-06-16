@@ -243,6 +243,7 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 
 	std::vector<TapeVar>	 inputs;
 	std::vector<std::string> inputGradExprs;
+	std::vector<std::string> inputGradTypes;
 
 	auto					 isLiteralName = [](const std::string &name) {
 		if (name.empty())
@@ -264,8 +265,8 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 
 	auto nodeExpr = [](const GPU::IR::Node::Node &node) { return GPU::IR::Builder::Builder::Get().BuildNode(node); };
 
-	auto addLeaf  = [this, &inputs, &inputGradExprs, &isLiteralName](const GPU::IR::Node::Node &node,
-																	 const std::string		   &coeff) {
+	auto addLeaf  = [this, &inputs, &inputGradExprs, &inputGradTypes, &isLiteralName](
+						const GPU::IR::Node::Node &node, const std::string &coeff, const std::string &coeffType) {
 		std::string n = TryExtractVarName(node);
 		if (n.empty())
 			n = ExtractVarName(node);
@@ -278,12 +279,13 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 			t = "float";
 		inputs.push_back(TapeVar{n, t, IsParameter(n)});
 		inputGradExprs.push_back(coeff);
+		inputGradTypes.push_back(coeffType);
 	};
 
-	std::function<void(const GPU::IR::Node::Node &, const std::string &)> collect;
-	collect = [&](const GPU::IR::Node::Node &node, const std::string &upstream) {
+	std::function<void(const GPU::IR::Node::Node &, const std::string &, const std::string &)> collect;
+	collect = [&](const GPU::IR::Node::Node &node, const std::string &upstream, const std::string &upstreamType) {
 		if (node.Type() != GPU::IR::Node::NodeType::Operation) {
-			addLeaf(node, upstream);
+			addLeaf(node, upstream, upstreamType);
 			return;
 		}
 
@@ -296,47 +298,49 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 		switch (opNode.Code()) {
 		case GPU::IR::Node::OperationCode::Add:
 			if (rhs) {
-				collect(*lhs, upstream);
-				collect(*rhs, upstream);
+				collect(*lhs, upstream, upstreamType);
+				collect(*rhs, upstream, upstreamType);
 			}
 			break;
 		case GPU::IR::Node::OperationCode::Sub:
 			if (rhs) {
-				collect(*lhs, upstream);
-				collect(*rhs, std::format("-({})", upstream));
+				collect(*lhs, upstream, upstreamType);
+				collect(*rhs, std::format("-({})", upstream), upstreamType);
 			}
 			break;
 		case GPU::IR::Node::OperationCode::Mul:
 			if (rhs) {
 				std::string lhsExpr = nodeExpr(*lhs);
 				std::string rhsExpr = nodeExpr(*rhs);
-				collect(*lhs, std::format("({})*({})", upstream, rhsExpr));
-				collect(*rhs, std::format("({})*({})", upstream, lhsExpr));
+				collect(*lhs, std::format("({})*({})", upstream, rhsExpr), upstreamType);
+				collect(*rhs, std::format("({})*({})", upstream, lhsExpr), upstreamType);
 			}
 			break;
 		case GPU::IR::Node::OperationCode::Div:
 			if (rhs) {
 				std::string lhsExpr = nodeExpr(*lhs);
 				std::string rhsExpr = nodeExpr(*rhs);
-				collect(*lhs, std::format("({})/({})", upstream, rhsExpr));
-				collect(*rhs, std::format("-(({})*({})/(({})*({})))", upstream, lhsExpr, rhsExpr, rhsExpr));
+				collect(*lhs, std::format("({})/({})", upstream, rhsExpr), upstreamType);
+				collect(*rhs, std::format("-(({})*({})/(({})*({})))", upstream, lhsExpr, rhsExpr, rhsExpr),
+						upstreamType);
 			}
 			break;
 		case GPU::IR::Node::OperationCode::Neg:
-			collect(*lhs, std::format("-({})", upstream));
+			collect(*lhs, std::format("-({})", upstream), upstreamType);
 			break;
 		default:
 			break;
 		}
 	};
 
-	collect(op, "1.0");
+	collect(op, "1.0", output.glslType);
 	if (inputs.empty())
 		return;
 
 	auto entry			 = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, output, inputs);
 	entry.binaryOp		 = code;
 	entry.inputGradExprs = std::move(inputGradExprs);
+	entry.inputGradTypes = std::move(inputGradTypes);
 	_entries.push_back(std::move(entry));
 
 	PropagateActive(output, inputs);

@@ -79,35 +79,35 @@ public:
 private:
 	// ---- Entry processing -------------------------------------------------
 
-	void			   ProcessEntry(const TapeEntry &entry);
-	void			   ProcessBinaryOp(const TapeEntry &entry);
-	void			   ProcessUnaryOp(const TapeEntry &entry);
-	void			   ProcessExpressionGradient(const TapeEntry &entry);
-	void			   ProcessIntrinsic1(const TapeEntry &entry);
-	void			   ProcessIntrinsic2(const TapeEntry &entry);
-	void			   ProcessIntrinsic3(const TapeEntry &entry);
-	void			   ProcessTernary(const TapeEntry &entry);
-	void			   ProcessCompoundAssign(const TapeEntry &entry);
-	void			   ProcessControlFlowBegin(const TapeEntry &entry);
-	void			   ProcessControlFlowEnd();
-	void			   ProcessCall(const TapeEntry &entry);
-	void			   ProcessReturn(const TapeEntry &entry);
+	void ProcessEntry(const TapeEntry &entry);
+	void ProcessBinaryOp(const TapeEntry &entry);
+	void ProcessUnaryOp(const TapeEntry &entry);
+	void ProcessExpressionGradient(const TapeEntry &entry);
+	void ProcessIntrinsic1(const TapeEntry &entry);
+	void ProcessIntrinsic2(const TapeEntry &entry);
+	void ProcessIntrinsic3(const TapeEntry &entry);
+	void ProcessTernary(const TapeEntry &entry);
+	void ProcessCompoundAssign(const TapeEntry &entry);
+	void ProcessControlFlowBegin(const TapeEntry &entry);
+	void ProcessControlFlowEnd();
+	void ProcessCall(const TapeEntry &entry);
+	void ProcessReturn(const TapeEntry &entry);
 
 	// ---- Control flow helpers ---------------------------------------------
 
 	/** Add a generated line to the current collector frame (or top-level body). */
-	void			   EmitLine(const std::string &line);
+	void EmitLine(const std::string &line);
 
 	/** Push a new control flow collector frame. */
-	void			   PushControlFrame();
+	void PushControlFrame();
 
 	/** Pop the top frame, wrap its contents, and emit to the parent frame. */
-	void			   PopControlFrameAndWrap(const TapeEntry &beginEntry);
+	void PopControlFrameAndWrap(const TapeEntry &beginEntry);
 
 	// ---- Gradient rule helpers --------------------------------------------
 
-	/** Emit: d_input += expression; */
-	void			   EmitAccumulate(const std::string &inputName, const std::string &gradExpr);
+	/** Emit: d_input += expression; reducing vector expressions for scalar adjoints when needed. */
+	void EmitAccumulate(const std::string &inputName, const std::string &gradExpr, const std::string &gradType = "");
 
 	/** Save current adjoint of result to temp, zero it, return temp name.
 	 *  Correctly handles variable reassignment: when a variable is redefined,

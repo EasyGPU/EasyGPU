@@ -574,6 +574,36 @@ if (r.backwardCode.find("float _adj0_ = d_v") != std::string::npos) {
 }
 END_TEST
 
+TEST(ad_vec3_scalar_expression_gradient_type_recording)
+GPU::AD::GradientTape tape;
+GPU::IR::Builder::Builder::Get().SetGradientTape(&tape);
+GPU::Kernel::InspectorKernel1D kernel([&](Var<int> &id) {
+	Var<float> s;
+	s			= 2.0f;
+	Var<Vec3> v = MakeFloat3(1.0f, 2.0f, 3.0f);
+	Var<Vec3> y = (s * v) + v;
+	tape.MarkLoss(y.VarName(), "vec3");
+});
+GPU::IR::Builder::Builder::Get().SetGradientTape(nullptr);
+
+bool sawVectorCoeffForScalarInput = false;
+for (size_t i = 0; i < tape.Size(); ++i) {
+	const auto &entry = tape[i];
+	if (entry.kind != GPU::AD::TapeOpKind::ExpressionGradient)
+		continue;
+	for (size_t j = 0; j < entry.inputs.size() && j < entry.inputGradTypes.size(); ++j) {
+		if (entry.inputs[j].glslType == "float" && entry.inputGradTypes[j] == "vec3") {
+			sawVectorCoeffForScalarInput = true;
+		}
+	}
+}
+ASSERT(sawVectorCoeffForScalarInput);
+
+GPU::AD::AdjointGenerator gen;
+std::string				  backwardCode = gen.Generate(tape, false);
+CHECK_CONTAINS(backwardCode, "dot(");
+END_TEST
+
 TEST(ad_vec3_dot)
 auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
 	Var<Vec3>  a = MakeFloat3(1.0f, 0.0f, 0.0f);
@@ -1266,6 +1296,7 @@ int main() {
 	test_ad_vec3_add();
 	test_ad_vec3_scalar_mul();
 	test_ad_vec3_scalar_mul_backward_types();
+	test_ad_vec3_scalar_expression_gradient_type_recording();
 	test_ad_vec3_dot();
 	test_ad_vec3_cross();
 	test_ad_vec3_length();
