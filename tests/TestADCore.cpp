@@ -723,6 +723,20 @@ auto decls = table.AllDeclarations();
 ASSERT(decls.size() == 2);
 END_TEST
 
+TEST(ad_adjoint_table_clear_resets_array_sizes)
+GPU::AD::AdjointTable table;
+std::string			  adj = table.GetOrCreate("buf0[0]", "float");
+table.SetArraySize(adj, 4);
+ASSERT(table.GetArraySize(adj) == 4);
+table.Clear();
+ASSERT(table.GetArraySize(adj) == 0);
+std::string adjAfterClear = table.GetOrCreate("buf0", "float");
+auto		decls		  = table.AllDeclarations();
+ASSERT(adjAfterClear == "d_buf0");
+ASSERT(decls.size() == 1);
+ASSERT(decls[0].second == "float");
+END_TEST
+
 TEST(ad_active_propagation)
 GPU::AD::GradientTape tape2;
 tape2.RegisterParameter("p0", "float");
@@ -1268,6 +1282,7 @@ int main() {
 	// Section 9: Parameter and adjoint table
 	test_ad_params_multiple();
 	test_ad_adjoint_table();
+	test_ad_adjoint_table_clear_resets_array_sizes();
 	test_ad_active_propagation();
 
 	// Section 10: Parameter gradient

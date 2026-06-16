@@ -110,6 +110,7 @@ void AdjointTable::Clear() {
 	_map.clear();
 	_baseMap.clear();
 	_types.clear();
+	_arraySizes.clear();
 	_insertionOrder.clear();
 }
 
