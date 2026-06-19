@@ -191,12 +191,15 @@ private:
 
 	std::string				  CombinedSignature(const std::vector<CombinedSlot> &slots, size_t totalSize) const;
 
+	static std::string		  BuildCombinedReduceShader(const std::vector<CombinedSlot> &slots, size_t totalSize);
 	static std::string		  BuildCombinedAdamShader(const std::vector<CombinedSlot> &slots, size_t totalSize);
 
 	void					  StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> &gradParams, bool sync);
 
 	void					  EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
+	void					  EnsureCombinedReducePipeline(const std::vector<CombinedSlot> &slots, size_t totalSize);
 	void					  UploadCombinedHyperParams(size_t totalSize, size_t sampleCount);
+	void					  DispatchCombinedReduce(const std::vector<CombinedSlot> &slots, size_t totalSize);
 	void					  DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync);
 
 	static std::string		  BuildAdamShader(size_t paramSize, size_t sampleCount, int gradOffset, int gradStride);
@@ -213,11 +216,15 @@ private:
 	std::vector<ParamSlotGPU> params_;
 	std::unique_ptr<Runtime::Buffer<float>> _flatM;
 	std::unique_ptr<Runtime::Buffer<float>> _flatV;
+	std::unique_ptr<Runtime::Buffer<float>> _meanGrad;
 	std::unique_ptr<Runtime::Buffer<float>> _combinedHyper;
 	size_t									_flatMSize		  = 0;
 	Backend::ShaderHandle					_combinedShader	  = Backend::INVALID_SHADER_HANDLE;
 	Backend::PipelineHandle					_combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+	Backend::ShaderHandle					_combinedReduceShader	= Backend::INVALID_SHADER_HANDLE;
+	Backend::PipelineHandle					_combinedReducePipeline = Backend::INVALID_PIPELINE_HANDLE;
 	std::string								_combinedSignature;
+	std::string								_combinedReduceSignature;
 };
 
 // =============================================================================

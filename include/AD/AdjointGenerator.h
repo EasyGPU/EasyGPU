@@ -33,6 +33,13 @@ struct AdjointBody {
 	std::vector<std::string>						 lines;
 	/** (paramName, adjName) pairs for gradient write-back. */
 	std::vector<std::pair<std::string, std::string>> writebacks;
+	/** Whole-buffer parameter gradient write-backs. */
+	struct BufferWriteback {
+		std::string bufferName;
+		std::string adjName;
+		size_t		elementCount = 0;
+	};
+	std::vector<BufferWriteback> bufferWritebacks;
 	/** GLSL definitions of adjoint functions for Callable bodies. */
 	std::string										 callableAdjointFunctions;
 };
@@ -170,6 +177,7 @@ private:
 
 	// Parameter names that need gradient write-back
 	std::vector<std::pair<std::string, std::string>> _paramWritebacks;
+	std::vector<AdjointBody::BufferWriteback>		 _bufferParamWritebacks;
 
 	// Reference to the main tape (for sub-tape access during Call processing)
 	const GradientTape								*_tape = nullptr;

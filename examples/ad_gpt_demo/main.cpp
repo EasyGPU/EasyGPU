@@ -277,7 +277,7 @@ int main() {
 				posEmb.Setup();
 				transformer.Setup();
 				auto lmRef = lmHeadTensor.Bind();
-				lmRef.ForEachParam([](auto &p) { AD::Param(p); });
+				lmRef.RegisterAsParam();
 
 				Flow::For(MakeInt(0), MakeInt(B), [&](Var<int> &pos) {
 					Expr<int> po	  = seqBase + pos * E;

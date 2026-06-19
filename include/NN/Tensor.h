@@ -7,14 +7,14 @@
  * Tensor<T, Dims...> wraps a Buffer<T> and provides:
  *   - Multi-dimensional CPU indexing: W(i, j)
  *   - DSL kernel integration via Bind() → TensorRef
- *   - Batch parameter registration via ForEachParam()
+ *   - Batch parameter registration via RegisterAsParam()
  *
  * Usage:
  *   Tensor<float, 128, 64> W(data);
  *   // In kernel:
  *   auto W_ref = W.Bind();
  *   auto w = W_ref(i, j);               // Var<float>
- *   W_ref.ForEachParam([](auto& w) { AD::Param(w); });
+ *   W_ref.RegisterAsParam();
  *
  *   // Training loop:
  *   W.Upload();  // push CPU data to GPU
@@ -35,6 +35,10 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+namespace GPU::AD {
+template <typename T> int ParamBuffer(const IR::Value::BufferRef<T> &buffer, size_t elementCount);
+}
 
 namespace GPU::NN {
 
@@ -118,6 +122,11 @@ public:
 	 */
 	template <typename F> void ForEachParam(F &&f) {
 		ForEachImpl(std::forward<F>(f), std::make_index_sequence<TotalSize>());
+	}
+
+	/** Register the whole tensor buffer as one AD parameter group. */
+	void RegisterAsParam() {
+		GPU::AD::ParamBuffer(ref_, TotalSize);
 	}
 
 	[[nodiscard]] const IR::Value::BufferRef<T> &GetBufferRef() const {

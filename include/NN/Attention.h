@@ -60,7 +60,7 @@ public:
 
 	void Setup() {
 		wRef_ = w_.Bind();
-		wRef_.ForEachParam([](auto &p) { AD::Param(p); });
+		wRef_.RegisterAsParam();
 	}
 
 	/**

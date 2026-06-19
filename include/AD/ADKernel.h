@@ -31,6 +31,7 @@
 
 #include <Backend/Backend.h>
 #include <IR/Builder/Builder.h>
+#include <IR/Value/BufferRef.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Context.h>
@@ -93,8 +94,23 @@ template <typename T> inline std::string GLSLTypeName() {
 template <typename T> inline int Param(const IR::Value::Var<T> &var) {
 	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
 	if (tape) {
-		int idx = static_cast<int>(tape->ParameterCount());
+		int idx = static_cast<int>(tape->Parameters().size());
 		tape->RegisterParameter(var.VarName(), GLSLTypeName<T>());
+		return idx;
+	}
+	return -1;
+}
+
+/**
+ * Mark a whole buffer as a trainable parameter tensor.
+ * The backward shader records one local adjoint array for the buffer and
+ * writes all element gradients with a compact loop.
+ */
+template <typename T> inline int ParamBuffer(const IR::Value::BufferRef<T> &buffer, size_t elementCount) {
+	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
+	if (tape) {
+		int idx = static_cast<int>(tape->Parameters().size() + tape->BufferParameters().size());
+		tape->RegisterBufferParameter(buffer.GetBufferName(), GLSLTypeName<T>(), elementCount);
 		return idx;
 	}
 	return -1;
@@ -191,6 +207,12 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 			paramAdjArrays[adjBaseName(adjName)] = {baseName, it->second.second};
 		}
 	}
+	for (const auto &wb : body.bufferWritebacks) {
+		auto it = groupMap.find(wb.bufferName);
+		if (it != groupMap.end()) {
+			paramAdjArrays[adjBaseName(wb.adjName)] = {wb.bufferName, it->second.second};
+		}
+	}
 
 	// Adjoint variable declarations.
 	// Parameter adjoint arrays must stay local to each invocation; otherwise
@@ -243,7 +265,7 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 		for (const auto &[adjBase, info] : paramAdjArrays) {
 			const auto &[bufBase, stride] = info;
 			std::string from			  = adjBase + "[";
-			std::string to	= std::format("_ad_grad_{}_data[gl_GlobalInvocationID.x * {} + ", bufBase, stride);
+			std::string to = std::format("_ad_grad_{}_data[int(gl_GlobalInvocationID.x) * {} + ", bufBase, stride);
 			size_t		pos = 0;
 			while ((pos = rewritten.find(from, pos)) != std::string::npos) {
 				rewritten.replace(pos, from.size(), to);
@@ -269,12 +291,30 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 		int stride = it->second.second;
 		int offset = baseWritebackCount[baseName]++;
 		if (is1D) {
-			writebacks += std::format("    _ad_grad_{}_data[gl_GlobalInvocationID.x * {} + {}] = {};\n", baseName,
-									  stride, offset, adjName);
+			writebacks += std::format("    _ad_grad_{}_data[int(gl_GlobalInvocationID.x) * {} + {}] = {};\n",
+									  baseName, stride, offset, adjName);
 		} else {
 			writebacks += std::format("    _ad_grad_{}_data[(gl_GlobalInvocationID.y * gl_NumWorkGroups.x * "
 									  "gl_WorkGroupSize.x + gl_GlobalInvocationID.x) * {} + {}] = {};\n",
 									  baseName, stride, offset, adjName);
+		}
+	}
+	for (const auto &wb : body.bufferWritebacks) {
+		if (paramAdjArrays.count(adjBaseName(wb.adjName)))
+			continue;
+		auto it = groupMap.find(wb.bufferName);
+		if (it == groupMap.end())
+			continue;
+		int stride = it->second.second;
+		if (is1D) {
+			writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) "
+									  "_ad_grad_{}_data[int(gl_GlobalInvocationID.x) * {} + int(_ad_bp)] = {}[_ad_bp];\n",
+									  wb.elementCount, wb.bufferName, stride, wb.adjName);
+		} else {
+			writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) "
+									  "_ad_grad_{}_data[(gl_GlobalInvocationID.y * gl_NumWorkGroups.x * "
+									  "gl_WorkGroupSize.x + gl_GlobalInvocationID.x) * {} + _ad_bp] = {}[_ad_bp];\n",
+									  wb.elementCount, wb.bufferName, stride, wb.adjName);
 		}
 	}
 
@@ -470,7 +510,20 @@ public:
 			pm.varName	  = paramName;
 			pm.glslType	  = paramType;
 			pm.count	  = elementCount;
+			pm.elementCount = 1;
 			pm.gradHandle = Backend::INVALID_BUFFER_HANDLE;
+			_params.push_back(pm);
+		}
+		for (const auto &param : _tape.BufferParameters()) {
+			ParamMeta pm;
+			pm.varName		 = param.bufferName;
+			pm.glslType		 = param.elementType;
+			pm.count		 = elementCount;
+			pm.elementCount = param.elementCount;
+			pm.gradOffset	 = 0;
+			pm.gradStride	 = static_cast<int>(param.elementCount);
+			pm.isBufferParam = true;
+			pm.gradHandle	 = Backend::INVALID_BUFFER_HANDLE;
 			_params.push_back(pm);
 		}
 
@@ -478,6 +531,8 @@ public:
 		{
 			std::map<std::string, std::vector<int>> groups; // baseName → param indices (deterministic order)
 			for (int i = 0; i < (int)_params.size(); i++) {
+				if (_params[i].isBufferParam)
+					continue;
 				std::string base = ExtractBaseName(_params[i].varName);
 				groups[base].push_back(i);
 			}
@@ -494,6 +549,15 @@ public:
 					_params[pi].gradOffset	= offset;
 					_params[pi].gradStride	= stride;
 				}
+			}
+			for (auto &pm : _params) {
+				if (!pm.isBufferParam)
+					continue;
+				int binding = _nextGradBinding++;
+				if (binding >= static_cast<int>(Backend::MAX_BUFFER_BINDINGS)) {
+					throw std::runtime_error("ADKernel1D: gradient buffers exceed backend buffer binding limit");
+				}
+				pm.gradBinding = binding;
 			}
 		}
 
@@ -720,6 +784,13 @@ public:
 		if (!backend)
 			return {};
 
+		if (pm.isBufferParam) {
+			size_t			   totalFloats = pm.count * pm.elementCount;
+			std::vector<float> data(totalFloats);
+			backend->DownloadBuffer(pm.gradHandle, 0, totalFloats * sizeof(float), data.data());
+			return data;
+		}
+
 		if (pm.gradStride == 1) {
 			// Fast path: param has its own buffer
 			std::vector<float> data(pm.count);
@@ -757,7 +828,10 @@ public:
 			if (pm.gradHandle == Backend::INVALID_BUFFER_HANDLE)
 				continue;
 
-			if (pm.gradStride == 1) {
+			if (pm.isBufferParam) {
+				result[i].resize(pm.count * pm.elementCount);
+				backend->DownloadBuffer(pm.gradHandle, 0, result[i].size() * sizeof(float), result[i].data());
+			} else if (pm.gradStride == 1) {
 				result[i].resize(pm.count);
 				backend->DownloadBuffer(pm.gradHandle, 0, pm.count * sizeof(float), result[i].data());
 			} else {
@@ -798,7 +872,10 @@ public:
 		return _tape;
 	}
 	size_t ParameterCount() const {
-		return _params.size();
+		size_t count = 0;
+		for (const auto &pm : _params)
+			count += pm.elementCount;
+		return count;
 	}
 	const auto &Params() const {
 		return _params;
@@ -814,15 +891,17 @@ public:
 
 	std::vector<GradientParamInfo> GradientParams() const {
 		std::vector<GradientParamInfo> out;
-		out.reserve(_params.size());
+		out.reserve(ParameterCount());
 		for (const auto &pm : _params) {
-			GradientParamInfo info;
-			info.varName	 = pm.varName;
-			info.sampleCount = pm.count;
-			info.gradOffset	 = pm.gradOffset;
-			info.gradStride	 = pm.gradStride;
-			info.gradHandle	 = pm.gradHandle;
-			out.push_back(std::move(info));
+			for (size_t elem = 0; elem < pm.elementCount; elem++) {
+				GradientParamInfo info;
+				info.varName	 = pm.isBufferParam ? std::format("{}[{}]", pm.varName, elem) : pm.varName;
+				info.sampleCount = pm.count;
+				info.gradOffset	 = pm.gradOffset + static_cast<int>(elem);
+				info.gradStride	 = pm.gradStride;
+				info.gradHandle	 = pm.gradHandle;
+				out.push_back(std::move(info));
+			}
 		}
 		return out;
 	}
@@ -832,9 +911,11 @@ private:
 		std::string			  varName;
 		std::string			  glslType;
 		size_t				  count		  = 0;
+		size_t				  elementCount = 1;
 		int					  gradBinding = 0;
 		int					  gradOffset  = 0; // offset within the interleaved group
 		int					  gradStride  = 1; // number of params in the group
+		bool				  isBufferParam = false;
 		Backend::BufferHandle gradHandle  = 0;
 	};
 

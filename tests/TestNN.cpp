@@ -662,6 +662,45 @@ TEST(nn_linear_params_are_registered) {
 	auto bw = inspector.GetBackwardCode();
 	// Should have adjoint declarations for weights and biases
 	CHECK_CONTAINS(bw, "d_");
+	ASSERT(inspector.Tape().Parameters().empty());
+	ASSERT(inspector.Tape().BufferParameters().size() == 2);
+	ASSERT(inspector.Tape().BufferParameters()[0].elementCount == 6);
+	ASSERT(inspector.Tape().BufferParameters()[1].elementCount == 2);
+}
+END_TEST
+
+TEST(nn_linear_buffer_params_codegen_is_compact) {
+	Linear<float, 16, 16> fc;
+	Buffer<float>		inBuf(16, BufferMode::Read);
+	Buffer<float>		outBuf(16, BufferMode::ReadWrite);
+
+	ADKernel1D			kernel(
+		[&](Var<int> &id) {
+			auto input	= inBuf.Bind();
+			auto output = outBuf.Bind();
+			fc.Setup();
+			fc.Forward(input, id, output);
+			Var<float> loss = output[id * 16 + 0];
+			AD::Loss(loss);
+		},
+		1, 256);
+
+	ASSERT(kernel.Tape().Parameters().empty());
+	ASSERT(kernel.Tape().BufferParameters().size() == 2);
+	ASSERT(kernel.ParameterCount() == 16 * 16 + 16);
+
+	auto gradParams = kernel.GradientParams();
+	ASSERT(gradParams.size() == 16 * 16 + 16);
+	ASSERT(gradParams[0].gradOffset == 0);
+	ASSERT(gradParams[255].gradOffset == 255);
+	ASSERT(gradParams[256].gradOffset == 0);
+	ASSERT(gradParams[0].gradStride == 256);
+	ASSERT(gradParams[256].gradStride == 16);
+
+	auto combined = kernel.CombinedCode();
+	CHECK_CONTAINS(combined, "_ad_grad_");
+	CHECK_CONTAINS(combined, "int(gl_GlobalInvocationID.x) * 256");
+	ASSERT(combined.find("for (uint _ad_bp") == std::string::npos);
 }
 END_TEST
 
@@ -1239,6 +1278,7 @@ int main() {
 	test_nn_linear_reset();
 	test_nn_linear_setup_forward_inspector();
 	test_nn_linear_params_are_registered();
+	test_nn_linear_buffer_params_codegen_is_compact();
 	test_nn_fused_mlp2_forward_matches_cpu();
 	test_nn_fused_mlp2_trainer_codegen_is_specialized();
 	test_nn_fused_mlp2_trainer_forward_identity_16();

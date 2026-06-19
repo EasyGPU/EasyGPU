@@ -416,6 +416,7 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	_adjTable.Clear();
 	_bodyLines.clear();
 	_paramWritebacks.clear();
+	_bufferParamWritebacks.clear();
 	_tempTypes.clear();
 
 	if (tape.Size() == 0)
@@ -432,6 +433,9 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	}
 	for (const auto &[paramName, paramType] : tape.Parameters()) {
 		activeSet.insert(paramName);
+	}
+	for (const auto &param : tape.BufferParameters()) {
+		activeSet.insert(param.bufferName);
 	}
 
 	// Extract base buffer name from a variable name.
@@ -498,6 +502,10 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	for (const auto &[paramName, paramType] : tape.Parameters()) {
 		_adjTable.GetOrCreate(paramName, paramType);
 	}
+	for (const auto &param : tape.BufferParameters()) {
+		std::string adjName = _adjTable.GetOrCreate(param.bufferName + "[0]", param.elementType);
+		_adjTable.SetArraySize(adjName, param.elementCount);
+	}
 
 	// Count how many registered parameters belong to each buffer base.
 	{
@@ -555,6 +563,16 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 				_paramWritebacks.emplace_back(ResolveAliases(paramName), ResolveAliases(adjName));
 			}
 		}
+		for (const auto &param : tape.BufferParameters()) {
+			std::string adjName = _adjTable.Get(param.bufferName + "[0]");
+			auto		bpos	= adjName.find('[');
+			if (bpos != std::string::npos)
+				adjName = adjName.substr(0, bpos);
+			if (!adjName.empty()) {
+				_bufferParamWritebacks.push_back(
+					{ResolveAliases(param.bufferName), ResolveAliases(adjName), param.elementCount});
+			}
+		}
 	}
 
 	// Step 6: Assemble final GLSL
@@ -567,6 +585,7 @@ AdjointBody AdjointGenerator::GenerateBody(const GradientTape &tape, bool writeB
 	body.declarations = _adjTable.AllDeclarations();
 	body.lines		  = std::move(_bodyLines);
 	body.writebacks	  = std::move(_paramWritebacks);
+	body.bufferWritebacks = std::move(_bufferParamWritebacks);
 	return body;
 }
 
@@ -1204,7 +1223,16 @@ std::string AdjointGenerator::Assemble() {
 
 	// Adjoint variable declarations with zero initialization
 	for (const auto &[adjName, glslType] : _adjTable.AllDeclarations()) {
-		code << std::format("    {} {} = {}(0);\n", glslType, adjName, glslType);
+		auto bracketPos = glslType.find('[');
+		if (bracketPos == std::string::npos) {
+			code << std::format("    {} {} = {}(0);\n", glslType, adjName, glslType);
+		} else {
+			std::string elemType = glslType.substr(0, bracketPos);
+			std::string arrSize	 = glslType.substr(bracketPos);
+			code << std::format("    {} {}{};\n", elemType, adjName, arrSize);
+			code << std::format("    for (uint _ad_i = 0u; _ad_i < {}u; ++_ad_i) {}[_ad_i] = {}(0);\n",
+								_adjTable.GetArraySize(adjName), adjName, elemType);
+		}
 	}
 
 	code << "\n";
@@ -1217,6 +1245,10 @@ std::string AdjointGenerator::Assemble() {
 	// Parameter gradient write-back
 	for (const auto &[paramName, adjName] : _paramWritebacks) {
 		code << std::format("    {} = {};\n", paramName, adjName);
+	}
+	for (const auto &wb : _bufferParamWritebacks) {
+		code << std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) {}[_ad_bp] = {}[_ad_bp];\n",
+							wb.elementCount, wb.bufferName, wb.adjName);
 	}
 
 	code << "}\n";

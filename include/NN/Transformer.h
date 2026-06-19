@@ -87,8 +87,8 @@ public:
 
 		fc1Ref_ = fc1W_.Bind();
 		fc2Ref_ = fc2W_.Bind();
-		fc1Ref_.ForEachParam([](auto &p) { AD::Param(p); });
-		fc2Ref_.ForEachParam([](auto &p) { AD::Param(p); });
+		fc1Ref_.RegisterAsParam();
+		fc2Ref_.RegisterAsParam();
 
 		scratchRef_ = scratchBuf_.Bind();
 	}

@@ -67,7 +67,7 @@ void GPUAdam::Step(AD::ADKernel1D &kernel, bool sync) {
 	step_++;
 	auto gradParams = kernel.GradientParams();
 
-	if (params_.size() * 2 + 3 <= Backend::MAX_BUFFER_BINDINGS) {
+	if (params_.size() * 2 + 4 <= Backend::MAX_BUFFER_BINDINGS) {
 		StepCombined(gradParams, sync);
 		return;
 	}
@@ -143,19 +143,54 @@ std::string GPUAdam::CombinedSignature(const std::vector<CombinedSlot> &slots, s
 	return sig;
 }
 
+std::string GPUAdam::BuildCombinedReduceShader(const std::vector<CombinedSlot> &slots, size_t totalSize) {
+	const size_t n	 = slots.size();
+	std::string	 src = "#version 430\nlayout(local_size_x = 256) in;\n\n";
+	for (size_t i = 0; i < n; i++) {
+		src +=
+			std::format("layout(std430, binding = {}) readonly buffer GradBuf{} {{ float grad{}[]; }};\n", i, i, i);
+	}
+	src += std::format("layout(std430, binding = {}) buffer MeanGradBuf {{ float meanGrad[]; }};\n\n", n);
+	src += "shared float scratch[256];\n\n";
+	src += "void main() {\n";
+	src += "    uint i = gl_WorkGroupID.x;\n";
+	src += "    uint tid = gl_LocalInvocationID.x;\n";
+	src += std::format("    if (i >= {}u) return;\n\n", totalSize);
+
+	for (size_t si = 0; si < n; si++) {
+		const auto &s  = slots[si];
+		src			  += std::format("    if (i >= {}u && i < {}u) {{\n", s.base, s.base + s.size);
+		src			  += std::format("        uint j = i - {}u;\n", s.base);
+		src			  += "        float sum = 0.0;\n";
+		src			  += std::format("        for (uint sidx = tid; sidx < {}u; sidx += 256u) {{\n", s.sampleCount);
+		src += std::format("            sum += grad{}[sidx * {}u + ({}u + j)];\n", si, s.gradStride, s.gradOffset);
+		src += "        }\n";
+		src += "        scratch[tid] = sum;\n";
+		src += "        barrier();\n";
+		src += "        for (uint stride = 128u; stride > 0u; stride >>= 1u) {\n";
+		src += "            if (tid < stride) scratch[tid] += scratch[tid + stride];\n";
+		src += "            barrier();\n";
+		src += "        }\n";
+		src += std::format("        if (tid == 0u) meanGrad[i] = scratch[0] * {};\n",
+						   s.sampleCount == 0 ? 0.0f : 1.0f / static_cast<float>(s.sampleCount));
+		src += "        return;\n";
+		src += "    }\n";
+	}
+
+	src += "}\n";
+	return src;
+}
+
 std::string GPUAdam::BuildCombinedAdamShader(const std::vector<CombinedSlot> &slots, size_t totalSize) {
 	const size_t n	 = slots.size();
 	std::string	 src = "#version 430\nlayout(local_size_x = 256) in;\n\n";
 	for (size_t i = 0; i < n; i++) {
 		src += std::format("layout(std430, binding = {}) buffer WeightBuf{} {{ float weight{}[]; }};\n", i, i, i);
 	}
-	for (size_t i = 0; i < n; i++) {
-		src +=
-			std::format("layout(std430, binding = {}) readonly buffer GradBuf{} {{ float grad{}[]; }};\n", n + i, i, i);
-	}
-	src += std::format("layout(std430, binding = {}) buffer FirstMomentBuf {{ float m[]; }};\n", 2 * n);
-	src += std::format("layout(std430, binding = {}) buffer SecondMomentBuf {{ float v[]; }};\n", 2 * n + 1);
-	src += std::format("layout(std430, binding = {}) readonly buffer HyperBuf {{ float h[]; }};\n\n", 2 * n + 2);
+	src += std::format("layout(std430, binding = {}) readonly buffer MeanGradBuf {{ float meanGrad[]; }};\n", n);
+	src += std::format("layout(std430, binding = {}) buffer FirstMomentBuf {{ float m[]; }};\n", n + 1);
+	src += std::format("layout(std430, binding = {}) buffer SecondMomentBuf {{ float v[]; }};\n", n + 2);
+	src += std::format("layout(std430, binding = {}) readonly buffer HyperBuf {{ float h[]; }};\n\n", n + 3);
 	src += "void main() {\n";
 	src += "    uint i = gl_GlobalInvocationID.x;\n";
 	src += std::format("    if (i >= {}u) return;\n\n", totalSize);
@@ -164,11 +199,7 @@ std::string GPUAdam::BuildCombinedAdamShader(const std::vector<CombinedSlot> &sl
 		const auto &s  = slots[si];
 		src			  += std::format("    if (i >= {}u && i < {}u) {{\n", s.base, s.base + s.size);
 		src			  += std::format("        uint j = i - {}u;\n", s.base);
-		src			  += "        float g = 0.0;\n";
-		src			  += std::format("        for (uint sidx = 0u; sidx < {}u; ++sidx) {{\n", s.sampleCount);
-		src += std::format("            g += grad{}[sidx * {}u + ({}u + j)];\n", si, s.gradStride, s.gradOffset);
-		src += "        }\n";
-		src += "        g *= h[8];\n";
+		src			  += "        float g = meanGrad[i];\n";
 		src += std::format("        if (h[4] > 0.0) g += 2.0 * h[4] * weight{}[j];\n", si);
 		src += "        if (h[5] > 0.0) g = clamp(g, -h[5], h[5]);\n";
 		src += "        m[i] = h[1] * m[i] + (1.0 - h[1]) * g;\n";
@@ -190,9 +221,54 @@ void GPUAdam::StepCombined(const std::vector<AD::ADKernel1D::GradientParamInfo> 
 	if (totalSize == 0)
 		return;
 
+	EnsureCombinedReducePipeline(slots, totalSize);
 	EnsureCombinedPipeline(slots, totalSize);
 	UploadCombinedHyperParams(totalSize, slots.empty() ? 0 : slots[0].sampleCount);
+	DispatchCombinedReduce(slots, totalSize);
 	DispatchCombined(slots, totalSize, sync);
+}
+
+void GPUAdam::EnsureCombinedReducePipeline(const std::vector<CombinedSlot> &slots, size_t totalSize) {
+	std::string sig = CombinedSignature(slots, totalSize);
+	if (_combinedReducePipeline != Backend::INVALID_PIPELINE_HANDLE && _combinedReduceSignature == sig)
+		return;
+
+	Runtime::Context::GetInstance().MakeCurrent();
+	auto *backend = Runtime::Context::GetBackend();
+	if (!backend)
+		throw std::runtime_error("GPUAdam backend not available");
+
+	if (_combinedReducePipeline != Backend::INVALID_PIPELINE_HANDLE)
+		backend->DestroyPipeline(_combinedReducePipeline);
+	if (_combinedReduceShader != Backend::INVALID_SHADER_HANDLE)
+		backend->DestroyShader(_combinedReduceShader);
+
+	if (!_meanGrad || _flatMSize != totalSize) {
+		std::vector<float> zeros(totalSize, 0.0f);
+		_meanGrad = std::make_unique<Runtime::Buffer<float>>(zeros, Runtime::BufferMode::ReadWrite);
+	}
+
+	Backend::ShaderDesc shaderDesc;
+	shaderDesc.type		  = Backend::ShaderType::Compute;
+	shaderDesc.sourceCode = BuildCombinedReduceShader(slots, totalSize);
+	_combinedReduceShader = backend->CreateShader(shaderDesc);
+
+	Backend::PipelineDesc pipelineDesc;
+	pipelineDesc.computeShader	= _combinedReduceShader;
+	pipelineDesc.workGroupSizeX = 256;
+	const uint32_t bindingCount = static_cast<uint32_t>(slots.size() + 1);
+	for (uint32_t binding = 0; binding < bindingCount; binding++) {
+		Backend::ResourceLayoutEntry entry;
+		entry.binding  = binding;
+		entry.type	   = Backend::BindingType::Buffer;
+		entry.readOnly = binding < slots.size();
+		pipelineDesc.resources.push_back(entry);
+	}
+	_combinedReducePipeline = backend->CreatePipeline(pipelineDesc);
+	if (_combinedReducePipeline == Backend::INVALID_PIPELINE_HANDLE)
+		throw std::runtime_error("GPUAdam failed to create combined reduce pipeline");
+
+	_combinedReduceSignature = std::move(sig);
 }
 
 void GPUAdam::EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, size_t totalSize) {
@@ -214,6 +290,7 @@ void GPUAdam::EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, siz
 		std::vector<float> zeros(totalSize, 0.0f);
 		_flatM	   = std::make_unique<Runtime::Buffer<float>>(zeros, Runtime::BufferMode::ReadWrite);
 		_flatV	   = std::make_unique<Runtime::Buffer<float>>(zeros, Runtime::BufferMode::ReadWrite);
+		_meanGrad  = std::make_unique<Runtime::Buffer<float>>(zeros, Runtime::BufferMode::ReadWrite);
 		_flatMSize = totalSize;
 	}
 
@@ -225,12 +302,12 @@ void GPUAdam::EnsureCombinedPipeline(const std::vector<CombinedSlot> &slots, siz
 	Backend::PipelineDesc pipelineDesc;
 	pipelineDesc.computeShader	= _combinedShader;
 	pipelineDesc.workGroupSizeX = 256;
-	const uint32_t bindingCount = static_cast<uint32_t>(slots.size() * 2 + 3);
+	const uint32_t bindingCount = static_cast<uint32_t>(slots.size() + 4);
 	for (uint32_t binding = 0; binding < bindingCount; binding++) {
 		Backend::ResourceLayoutEntry entry;
 		entry.binding  = binding;
 		entry.type	   = Backend::BindingType::Buffer;
-		entry.readOnly = binding >= slots.size() && binding < slots.size() * 2 || binding == bindingCount - 1;
+		entry.readOnly = binding == slots.size() || binding == bindingCount - 1;
 		pipelineDesc.resources.push_back(entry);
 	}
 	_combinedPipeline = backend->CreatePipeline(pipelineDesc);
@@ -261,6 +338,31 @@ void GPUAdam::UploadCombinedHyperParams(size_t totalSize, size_t sampleCount) {
 	_combinedHyper->Upload(h);
 }
 
+void GPUAdam::DispatchCombinedReduce(const std::vector<CombinedSlot> &slots, size_t totalSize) {
+	auto *backend = Runtime::Context::GetBackend();
+	if (!backend)
+		throw std::runtime_error("GPUAdam backend not available");
+
+	backend->BindPipeline(_combinedReducePipeline);
+	std::vector<Backend::ResourceBinding> bindings;
+	auto addBuffer = [&](uint32_t binding, Backend::BufferHandle handle, bool readOnly) {
+		Backend::ResourceBinding rb;
+		rb.binding	= binding;
+		rb.type		= Backend::BindingType::Buffer;
+		rb.buffer	= handle;
+		rb.readOnly = readOnly;
+		bindings.push_back(rb);
+	};
+	const uint32_t n = static_cast<uint32_t>(slots.size());
+	for (uint32_t i = 0; i < n; i++)
+		addBuffer(i, slots[i].gradHandle, true);
+	addBuffer(n, _meanGrad->GetHandle(), false);
+
+	backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
+	backend->Dispatch(static_cast<uint32_t>(totalSize), 1, 1);
+	backend->MemoryBarrier(Backend::BarrierType::Buffer);
+}
+
 void GPUAdam::DispatchCombined(const std::vector<CombinedSlot> &slots, size_t totalSize, bool sync) {
 	auto *backend = Runtime::Context::GetBackend();
 	if (!backend)
@@ -279,11 +381,10 @@ void GPUAdam::DispatchCombined(const std::vector<CombinedSlot> &slots, size_t to
 	const uint32_t n = static_cast<uint32_t>(slots.size());
 	for (uint32_t i = 0; i < n; i++)
 		addBuffer(i, slots[i].weightHandle, false);
-	for (uint32_t i = 0; i < n; i++)
-		addBuffer(n + i, slots[i].gradHandle, true);
-	addBuffer(2 * n, _flatM->GetHandle(), false);
-	addBuffer(2 * n + 1, _flatV->GetHandle(), false);
-	addBuffer(2 * n + 2, _combinedHyper->GetHandle(), true);
+	addBuffer(n, _meanGrad->GetHandle(), true);
+	addBuffer(n + 1, _flatM->GetHandle(), false);
+	addBuffer(n + 2, _flatV->GetHandle(), false);
+	addBuffer(n + 3, _combinedHyper->GetHandle(), true);
 
 	backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
 	backend->Dispatch(static_cast<uint32_t>((totalSize + 255) / 256), 1, 1);
@@ -426,6 +527,14 @@ void GPUAdam::ReleasePipelines() {
 	if (_combinedShader != Backend::INVALID_SHADER_HANDLE) {
 		backend->DestroyShader(_combinedShader);
 		_combinedShader = Backend::INVALID_SHADER_HANDLE;
+	}
+	if (_combinedReducePipeline != Backend::INVALID_PIPELINE_HANDLE) {
+		backend->DestroyPipeline(_combinedReducePipeline);
+		_combinedReducePipeline = Backend::INVALID_PIPELINE_HANDLE;
+	}
+	if (_combinedReduceShader != Backend::INVALID_SHADER_HANDLE) {
+		backend->DestroyShader(_combinedReduceShader);
+		_combinedReduceShader = Backend::INVALID_SHADER_HANDLE;
 	}
 	for (auto &ps : params_) {
 		if (ps.pipeline != Backend::INVALID_PIPELINE_HANDLE) {

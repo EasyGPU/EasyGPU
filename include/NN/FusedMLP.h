@@ -92,10 +92,10 @@ public:
 		b2Ref_ = b2_.Bind();
 
 		if (registerParams) {
-			w1Ref_.ForEachParam([](auto &p) { AD::Param(p); });
-			b1Ref_.ForEachParam([](auto &p) { AD::Param(p); });
-			w2Ref_.ForEachParam([](auto &p) { AD::Param(p); });
-			b2Ref_.ForEachParam([](auto &p) { AD::Param(p); });
+			w1Ref_.RegisterAsParam();
+			b1Ref_.RegisterAsParam();
+			w2Ref_.RegisterAsParam();
+			b2Ref_.RegisterAsParam();
 		}
 	}
 

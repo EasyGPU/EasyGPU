@@ -39,6 +39,12 @@ class ReturnNode;
 
 namespace GPU::AD {
 
+struct BufferParam {
+	std::string bufferName;
+	std::string elementType;
+	size_t		elementCount = 0;
+};
+
 /**
  * The gradient tape records every differentiable operation during the forward pass.
  *
@@ -74,6 +80,14 @@ public:
 	 * to GPU buffers after the backward pass.
 	 */
 	void						  RegisterParameter(const std::string &name, const std::string &glslType);
+
+	/**
+	 * Register a whole buffer as a differentiable parameter tensor.
+	 * Buffer parameters share one adjoint array and one gradient SSBO instead
+	 * of registering one tape parameter per element.
+	 */
+	void						  RegisterBufferParameter(const std::string &bufferName, const std::string &elementType,
+														  size_t elementCount);
 
 	/** Check if a variable name corresponds to a registered parameter. */
 	bool						  IsParameter(const std::string &name) const;
@@ -169,9 +183,14 @@ public:
 		return _paramList;
 	}
 
+	/** Get all registered buffer-level parameters. */
+	const std::vector<BufferParam> &BufferParameters() const {
+		return _bufferParamList;
+	}
+
 	/** Get the number of registered parameters. */
 	size_t ParameterCount() const {
-		return _paramList.size();
+		return _paramList.size() + _bufferParamList.size();
 	}
 
 private:
@@ -216,6 +235,10 @@ private:
 
 	// Ordered parameter list preserving registration order
 	std::vector<std::pair<std::string, std::string>> _paramList;
+
+	// Buffer-level parameters (buffer name -> metadata)
+	std::unordered_map<std::string, BufferParam>	 _bufferParameters;
+	std::vector<BufferParam>						 _bufferParamList;
 
 	// The scalar loss variable
 	std::optional<TapeVar>							 _lossVar;

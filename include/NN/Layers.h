@@ -99,8 +99,8 @@ public:
 	void Setup() {
 		weightRef_ = weight_.Bind();
 		biasRef_   = bias_.Bind();
-		weightRef_.ForEachParam([](auto &w) { AD::Param(w); });
-		biasRef_.ForEachParam([](auto &b) { AD::Param(b); });
+		weightRef_.RegisterAsParam();
+		biasRef_.RegisterAsParam();
 	}
 
 	/**

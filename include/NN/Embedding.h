@@ -44,7 +44,7 @@ public:
 
 	void Setup() {
 		weightRef_ = weight_.Bind();
-		weightRef_.ForEachParam([](auto &w) { AD::Param(w); });
+		weightRef_.RegisterAsParam();
 	}
 
 	/** Gather embedding vector at tokenId, write to out starting at outOffset. */
@@ -94,7 +94,7 @@ public:
 
 	void Setup() {
 		weightRef_ = weight_.Bind();
-		weightRef_.ForEachParam([](auto &w) { AD::Param(w); });
+		weightRef_.RegisterAsParam();
 	}
 
 	void Forward(const IR::Value::Expr<int> &pos, const IR::Value::BufferRef<T> &out,

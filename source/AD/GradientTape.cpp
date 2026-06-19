@@ -23,6 +23,7 @@
 #include <IR/Node/Store.h>
 #include <IR/Node/Ternary.h>
 
+#include <algorithm>
 #include <format>
 #include <functional>
 
@@ -102,8 +103,45 @@ void GradientTape::RegisterParameter(const std::string &name, const std::string 
 	}
 }
 
+void GradientTape::RegisterBufferParameter(const std::string &bufferName, const std::string &elementType,
+										   size_t elementCount) {
+	if (bufferName.empty() || elementCount == 0)
+		return;
+
+	auto it = _bufferParameters.find(bufferName);
+	if (it == _bufferParameters.end()) {
+		BufferParam param;
+		param.bufferName	= bufferName;
+		param.elementType	= elementType;
+		param.elementCount	= elementCount;
+		_bufferParamList.push_back(param);
+		_bufferParameters.emplace(bufferName, std::move(param));
+	} else {
+		it->second.elementType	= elementType;
+		it->second.elementCount = std::max(it->second.elementCount, elementCount);
+		for (auto &param : _bufferParamList) {
+			if (param.bufferName == bufferName) {
+				param.elementType	= elementType;
+				param.elementCount = it->second.elementCount;
+				break;
+			}
+		}
+	}
+
+	_activeNames.insert(bufferName);
+	if (!_varTypes.count(bufferName)) {
+		_varTypes[bufferName] = elementType;
+	}
+}
+
 bool GradientTape::IsParameter(const std::string &name) const {
-	return _parameters.count(name) > 0;
+	if (_parameters.count(name) > 0)
+		return true;
+	auto bpos = name.find('[');
+	if (bpos != std::string::npos) {
+		return _bufferParameters.count(name.substr(0, bpos)) > 0;
+	}
+	return _bufferParameters.count(name) > 0;
 }
 
 void GradientTape::MarkLoss(const std::string &name, const std::string &glslType) {
