@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.21)
 # Project Information
 # =============================================================================
 project(EasyGPU
-    VERSION 0.2.0
+    VERSION 2.0.0
     DESCRIPTION "A C++20 embedded DSL for GPU programming"
     LANGUAGES CXX C
 )

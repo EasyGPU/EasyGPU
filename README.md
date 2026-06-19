@@ -641,7 +641,7 @@ include(FetchContent)
 FetchContent_Declare(
     easygpu
     GIT_REPOSITORY https://github.com/easygpu/EasyGPU.git
-    GIT_TAG v0.2.0
+    GIT_TAG v2.0.0
 )
 FetchContent_MakeAvailable(easygpu)
 target_link_libraries(your_target PRIVATE EasyGPU::EasyGPU)
@@ -700,7 +700,7 @@ set(EASYGPU_BUILD_FRAGMENT_TESTER OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     easygpu
     GIT_REPOSITORY https://github.com/easygpu/EasyGPU.git
-    GIT_TAG v0.2.0
+    GIT_TAG v2.0.0
 )
 FetchContent_MakeAvailable(easygpu)
 
