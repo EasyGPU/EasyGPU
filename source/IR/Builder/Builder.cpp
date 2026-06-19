@@ -57,12 +57,18 @@ Builder &Builder::Get() {
 void Builder::Bind(BuilderContext &Context) {
 	// Push current context to stack before binding new one (support nested definitions)
 	if (_context != nullptr) {
+		if (_contextStack.size() >= kMaxContextStackDepth) {
+			throw std::runtime_error("EasyGPU builder context stack exceeded maximum nesting depth");
+		}
 		_contextStack.push(_context);
 	}
 	_context = &Context;
 }
 
 void Builder::Unbind() {
+	if (_context == nullptr) {
+		throw std::runtime_error("EasyGPU builder Unbind() called with no active context");
+	}
 	// Restore previous context from stack if available
 	if (!_contextStack.empty()) {
 		_context = _contextStack.top();

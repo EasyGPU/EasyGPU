@@ -109,6 +109,9 @@ private:
 	/** Emit: d_input += expression; reducing vector expressions for scalar adjoints when needed. */
 	void EmitAccumulate(const std::string &inputName, const std::string &gradExpr, const std::string &gradType = "");
 
+	/** Emit a typed temporary initialized with expr and return the temp name. */
+	std::string		   EmitTemp(const std::string &glslType, const std::string &expr);
+
 	/** Save current adjoint of result to temp, zero it, return temp name.
 	 *  Correctly handles variable reassignment: when a variable is redefined,
 	 *  its gradient accumulator must be reset before propagating upstream. */

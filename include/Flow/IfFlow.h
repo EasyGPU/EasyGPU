@@ -47,7 +47,7 @@ public:
 	ScopedCodeCollect &operator=(const ScopedCodeCollect &) = delete;
 
 private:
-	CodeCollectContext						   &_collectContext;
+	CodeCollectContext							   &_collectContext;
 	std::optional<IR::Builder::Builder::ScopedBind> _bindGuard;
 };
 

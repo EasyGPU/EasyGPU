@@ -134,7 +134,8 @@ struct GradBufGroup {
  * thread i writes its S parameter gradients at positions [i*S .. i*S+S-1].
  */
 inline std::string MergeForwardBackward(const std::string &forwardCode, const AdjointBody &body, int workSizeX,
-										int workSizeY, int workSizeZ, const std::vector<GradBufGroup> &gradBufGroups) {
+										int workSizeY, int workSizeZ,
+										const std::vector<GradBufGroup> &gradBufGroups, int adjPoolBinding) {
 	auto mainPos = forwardCode.find("void main()");
 	if (mainPos == std::string::npos)
 		throw std::runtime_error("MergeForwardBackward: 'void main()' not found");
@@ -209,7 +210,7 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 		}
 	}
 	if (!adjArrayNames.empty()) {
-		gradBufDecls += "layout(std430, binding = 20) buffer _adj_pool {\n";
+		gradBufDecls += std::format("layout(std430, binding = {}) buffer _adj_pool {{\n", adjPoolBinding);
 		for (size_t ai = 0; ai < adjArrayNames.size(); ai++) {
 			const std::string &adjNm = adjArrayNames[ai];
 			// Extract array size from body.declarations (e.g. "float[1024]" → "[1024]")
@@ -461,6 +462,8 @@ public:
 			_forwardCode   = _forwardKernel->GetCode();
 		}
 
+		_nextGradBinding = static_cast<int>(_forwardKernel->GetContext().GetNextBinding());
+
 		// Phase 2: Record parameter → buffer mapping, group by source buffer
 		for (const auto &[paramName, paramType] : _tape.Parameters()) {
 			ParamMeta pm;
@@ -481,6 +484,9 @@ public:
 
 			for (auto &[baseName, indices] : groups) {
 				int binding = _nextGradBinding++;
+				if (binding >= static_cast<int>(Backend::MAX_BUFFER_BINDINGS)) {
+					throw std::runtime_error("ADKernel1D: gradient buffers exceed backend buffer binding limit");
+				}
 				int stride	= (int)indices.size();
 				for (int offset = 0; offset < stride; offset++) {
 					int pi					= indices[offset];
@@ -617,6 +623,13 @@ public:
 			}
 		}
 
+		if (_adjPoolSize > 0) {
+			_adjPoolBinding = _nextGradBinding++;
+			if (_adjPoolBinding >= static_cast<int>(Backend::MAX_BUFFER_BINDINGS)) {
+				throw std::runtime_error("ADKernel1D: adjoint pool exceeds backend buffer binding limit");
+			}
+		}
+
 		// Phase 4: Build grouped gradient buffer list for merge
 		std::vector<GradBufGroup> gradBufGroups;
 		{
@@ -634,7 +647,7 @@ public:
 
 		// Phase 5: Merge forward + backward into combined GLSL
 		if (!_body.lines.empty() || !_body.declarations.empty()) {
-			_combinedCode = MergeForwardBackward(_forwardCode, _body, groupSize, 1, 1, gradBufGroups);
+			_combinedCode = MergeForwardBackward(_forwardCode, _body, groupSize, 1, 1, gradBufGroups, _adjPoolBinding);
 
 			// Insert thread ID bounds guard so threads beyond elementCount
 			// do not read/write past undersized input/adjoint buffers.
@@ -912,13 +925,18 @@ private:
 			backend->DestroyBuffer(_adjPoolHandle);
 			_adjPoolHandle = Backend::INVALID_BUFFER_HANDLE;
 		}
-		for (auto &[_, cp] : _clearPipelines) {
-			if (cp.pipeline != Backend::INVALID_PIPELINE_HANDLE)
-				backend->DestroyPipeline(cp.pipeline);
-			if (cp.shader != Backend::INVALID_SHADER_HANDLE)
-				backend->DestroyShader(cp.shader);
+		if (_clearCountBuffer != Backend::INVALID_BUFFER_HANDLE) {
+			backend->DestroyBuffer(_clearCountBuffer);
+			_clearCountBuffer = Backend::INVALID_BUFFER_HANDLE;
 		}
-		_clearPipelines.clear();
+		if (_clearPipeline.pipeline != Backend::INVALID_PIPELINE_HANDLE) {
+			backend->DestroyPipeline(_clearPipeline.pipeline);
+			_clearPipeline.pipeline = Backend::INVALID_PIPELINE_HANDLE;
+		}
+		if (_clearPipeline.shader != Backend::INVALID_SHADER_HANDLE) {
+			backend->DestroyShader(_clearPipeline.shader);
+			_clearPipeline.shader = Backend::INVALID_SHADER_HANDLE;
+		}
 	}
 
 	void ClearBufferGPU(Backend::BufferHandle handle, size_t floatCount) {
@@ -931,21 +949,21 @@ private:
 		if (!backend)
 			throw std::runtime_error("Backend not available");
 
-		auto &cp = _clearPipelines[floatCount];
+		auto &cp = _clearPipeline;
 		if (cp.pipeline == Backend::INVALID_PIPELINE_HANDLE) {
 			Backend::ShaderDesc shaderDesc;
 			shaderDesc.type		  = Backend::ShaderType::Compute;
 			shaderDesc.entryPoint = "main";
-			shaderDesc.sourceCode = std::format(R"GLSL(#version 430
+			shaderDesc.sourceCode = R"GLSL(#version 430
 layout(local_size_x = 256) in;
-layout(std430, binding = 0) buffer ClearBuf {{ float data[]; }};
-void main() {{
+layout(std430, binding = 0) buffer ClearBuf { float data[]; };
+layout(std430, binding = 1) buffer ClearCountBuf { uint clearCount; };
+void main() {
 	uint i = gl_GlobalInvocationID.x;
-	if (i >= {}u) return;
+	if (i >= clearCount) return;
 	data[i] = 0.0;
-}}
-)GLSL",
-												floatCount);
+}
+)GLSL";
 			cp.shader			  = backend->CreateShader(shaderDesc);
 
 			Backend::PipelineDesc pipeDesc;
@@ -956,18 +974,39 @@ void main() {{
 			entry.type	   = Backend::BindingType::Buffer;
 			entry.readOnly = false;
 			pipeDesc.resources.push_back(entry);
+			Backend::ResourceLayoutEntry countEntry;
+			countEntry.binding  = 1;
+			countEntry.type	   = Backend::BindingType::Buffer;
+			countEntry.readOnly = true;
+			pipeDesc.resources.push_back(countEntry);
 			cp.pipeline = backend->CreatePipeline(pipeDesc);
 			if (cp.pipeline == Backend::INVALID_PIPELINE_HANDLE)
 				throw std::runtime_error("ADKernel1D: failed to create GPU clear pipeline");
 		}
 
 		backend->BindPipeline(cp.pipeline);
-		Backend::ResourceBinding rb;
-		rb.binding	= 0;
-		rb.type		= Backend::BindingType::Buffer;
-		rb.buffer	= handle;
-		rb.readOnly = false;
-		backend->BindResources(&rb, 1);
+
+		if (_clearCountBuffer == Backend::INVALID_BUFFER_HANDLE) {
+			uint32_t			initial = 0;
+			Backend::BufferDesc desc;
+			desc.sizeInBytes = sizeof(uint32_t);
+			desc.mode		 = Backend::BufferMode::Read;
+			desc.initialData = &initial;
+			_clearCountBuffer = backend->CreateBuffer(desc);
+		}
+		uint32_t count32 = static_cast<uint32_t>(floatCount);
+		backend->UploadBuffer(_clearCountBuffer, 0, sizeof(uint32_t), &count32);
+
+		Backend::ResourceBinding bindings[2];
+		bindings[0].binding  = 0;
+		bindings[0].type	   = Backend::BindingType::Buffer;
+		bindings[0].buffer   = handle;
+		bindings[0].readOnly = false;
+		bindings[1].binding  = 1;
+		bindings[1].type	   = Backend::BindingType::Buffer;
+		bindings[1].buffer   = _clearCountBuffer;
+		bindings[1].readOnly = true;
+		backend->BindResources(bindings, 2);
 		backend->Dispatch(static_cast<uint32_t>((floatCount + 255) / 256), 1, 1);
 		backend->MemoryBarrier(Backend::BarrierType::Buffer);
 	}
@@ -1014,7 +1053,7 @@ void main() {{
 		// Combined adjoint pool SSBO binding
 		if (_adjPoolHandle != Backend::INVALID_BUFFER_HANDLE) {
 			Backend::ResourceBinding rb;
-			rb.binding = 20;
+			rb.binding = static_cast<uint32_t>(_adjPoolBinding);
 			rb.type	   = Backend::BindingType::Buffer;
 			rb.buffer  = _adjPoolHandle;
 			bindings.push_back(rb);
@@ -1073,7 +1112,7 @@ void main() {{
 		// Combined adjoint pool SSBO
 		if (!_adjArrays.empty()) {
 			Backend::ResourceLayoutEntry entry;
-			entry.binding  = 20;
+			entry.binding  = static_cast<uint32_t>(_adjPoolBinding);
 			entry.type	   = Backend::BindingType::Buffer;
 			entry.readOnly = false;
 			pipeDesc.resources.push_back(entry);
@@ -1100,13 +1139,15 @@ void main() {{
 	AdjointBody								  _body;
 
 	std::vector<ParamMeta>					  _params;
-	int										  _nextGradBinding = 10;
+	int										  _nextGradBinding = 0;
 	std::vector<AdjArrayMeta>				  _adjArrays;
 	size_t									  _adjPoolSize		= 0;
+	int										  _adjPoolBinding	= -1;
 	Backend::BufferHandle					  _adjPoolHandle	= Backend::INVALID_BUFFER_HANDLE;
 
 	Backend::PipelineHandle					  _combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
-	std::unordered_map<size_t, ClearPipeline> _clearPipelines;
+	ClearPipeline							  _clearPipeline;
+	Backend::BufferHandle					  _clearCountBuffer = Backend::INVALID_BUFFER_HANDLE;
 };
 
 } // namespace GPU::AD

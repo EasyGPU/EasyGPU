@@ -35,10 +35,12 @@
 #include <Runtime/Context.h>
 #include <Runtime/DepthBuffer.h>
 #include <Runtime/Texture.h>
+#include <Utility/Meta/StructMeta.h>
 #include <Utility/Meta/Std430Layout.h>
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -104,20 +106,21 @@ public:
 	 * @param stride Vertex stride in bytes.
 	 */
 	void SetVertexBuffer(Backend::BufferHandle bufferHandle, uint32_t stride) {
-		auto *backend = Runtime::Context::GetBackend();
-		if (!backend)
-			return;
-		backend->BindVertexBuffer(bufferHandle, stride);
-		_hasVertexBuffer = true;
+		if (bufferHandle == Backend::INVALID_BUFFER_HANDLE || stride == 0) {
+			throw std::runtime_error("GraphicsPipeline::SetVertexBuffer requires a valid buffer and non-zero stride");
+		}
+		_vertexBufferHandle = bufferHandle;
+		_vertexStride		= stride;
+		_hasVertexBuffer	= true;
 	}
 
 	/** @brief Bind an index buffer (uint32_t indices). */
 	void SetIndexBuffer(Backend::BufferHandle bufferHandle) {
-		auto *backend = Runtime::Context::GetBackend();
-		if (!backend)
-			return;
-		backend->BindIndexBuffer(bufferHandle);
-		_hasIndexBuffer = true;
+		if (bufferHandle == Backend::INVALID_BUFFER_HANDLE) {
+			throw std::runtime_error("GraphicsPipeline::SetIndexBuffer requires a valid buffer");
+		}
+		_indexBufferHandle = bufferHandle;
+		_hasIndexBuffer	   = true;
 	}
 
 	void SetIndexCount(uint32_t count) {
@@ -160,15 +163,21 @@ private:
 	template <typename VertexType>
 	void BuildShaders(const VertexFunc<VertexType> &vertexFunc, const FragmentFunc &fragmentFunc) {
 		_context = std::make_unique<GraphicsBuildContext>();
+		{
+			GraphicsPipelineBuilderGuard guard(IR::Builder::Builder::Get(), *_context);
+			GPU::Meta::RegisterStructWithDependencies<VertexType>();
+		}
 
 		// Auto-generate vertex layout
 		std::vector<Backend::VertexLayoutEntry> layout;
 		GenerateVertexLayout<VertexType>(layout);
 		_context->SetVertexLayout(layout);
+		_context->SetVertexInputSetupCode(GenerateVertexInputSetupCode<VertexType>());
 		_vertexLayout = std::move(layout);
 
 		// Stage 1: Vertex Shader
 		{
+			_context->BeginVSStage();
 			GraphicsPipelineBuilderGuard	guard(IR::Builder::Builder::Get(), *_context);
 			IR::Value::Var<VertexType>		in_vert("_in_vertex", true);
 			IR::Value::Var<GPU::Math::Vec4> gl_Position("gl_Position", true);
@@ -179,6 +188,7 @@ private:
 
 		// Stage 2: Fragment Shader
 		{
+			_context->BeginFSStage();
 			GraphicsPipelineBuilderGuard	guard(IR::Builder::Builder::Get(), *_context);
 			IR::Value::Var<GPU::Math::Vec4> fragColor("fragColor", true);
 			fragmentFunc(fragColor);
@@ -192,6 +202,7 @@ private:
 		_context = std::make_unique<GraphicsBuildContext>();
 
 		{
+			_context->BeginVSStage();
 			GraphicsPipelineBuilderGuard	guard(IR::Builder::Builder::Get(), *_context);
 			IR::Value::Var<GPU::Math::Vec4> gl_Position("gl_Position", true);
 			vertexFunc(gl_Position);
@@ -200,6 +211,7 @@ private:
 		_vsCode = _context->GetVertexShaderCode();
 
 		{
+			_context->BeginFSStage();
 			GraphicsPipelineBuilderGuard	guard(IR::Builder::Builder::Get(), *_context);
 			IR::Value::Var<GPU::Math::Vec4> fragColor("fragColor", true);
 			fragmentFunc(fragColor);
@@ -219,11 +231,65 @@ private:
 	 *  Uses a single vec4 attribute slot covering the full struct. */
 	template <typename T> static void GenerateVertexLayout(std::vector<Backend::VertexLayoutEntry> &layout) {
 		layout.clear();
-		Backend::VertexLayoutEntry entry;
-		entry.location = 0;
-		entry.offset   = 0;
-		entry.format   = Backend::PixelFormat::RGBA8;
-		layout.push_back(entry);
+		auto formatForGLSLType = [](const std::string &type) -> Backend::PixelFormat {
+			if (type == "float")
+				return Backend::PixelFormat::R32F;
+			if (type == "vec2")
+				return Backend::PixelFormat::RG32F;
+			if (type == "vec3")
+				return Backend::PixelFormat::RGB32F;
+			if (type == "vec4")
+				return Backend::PixelFormat::RGBA32F;
+			if (type == "int")
+				return Backend::PixelFormat::R32I;
+			if (type == "ivec2")
+				return Backend::PixelFormat::RG32I;
+			if (type == "ivec3")
+				return Backend::PixelFormat::RGB32I;
+			if (type == "ivec4")
+				return Backend::PixelFormat::RGBA32I;
+			if (type == "uint")
+				return Backend::PixelFormat::R32UI;
+			if (type == "uvec2")
+				return Backend::PixelFormat::RG32UI;
+			if (type == "uvec3")
+				return Backend::PixelFormat::RGB32UI;
+			if (type == "uvec4")
+				return Backend::PixelFormat::RGBA32UI;
+			throw std::runtime_error("GraphicsPipeline: unsupported vertex attribute GLSL type: " + type);
+		};
+
+		if constexpr (GPU::Meta::StructMeta<T>::isRegistered) {
+			auto fields = GPU::Meta::StructMeta<T>::GetFieldInfos();
+			layout.reserve(fields.size());
+			for (uint32_t i = 0; i < fields.size(); ++i) {
+				Backend::VertexLayoutEntry entry;
+				entry.location = i;
+				entry.offset	  = static_cast<uint32_t>(fields[i].cppOffset);
+				entry.format	  = formatForGLSLType(fields[i].glslType);
+				layout.push_back(entry);
+			}
+		} else {
+			Backend::VertexLayoutEntry entry;
+			entry.location = 0;
+			entry.offset	  = 0;
+			entry.format	  = formatForGLSLType(std::string(GPU::Meta::GetGLSLTypeName<T>()));
+			layout.push_back(entry);
+		}
+	}
+
+	template <typename T> static std::string GenerateVertexInputSetupCode() {
+		if constexpr (GPU::Meta::StructMeta<T>::isRegistered) {
+			std::string code =
+				std::format("{} _in_vertex;\n", std::string(GPU::Meta::StructMeta<T>::glslTypeName));
+			auto fields = GPU::Meta::StructMeta<T>::GetFieldInfos();
+			for (uint32_t i = 0; i < fields.size(); ++i) {
+				code += std::format("_in_vertex.{} = a_{};\n", fields[i].name, i);
+			}
+			return code;
+		} else {
+			return std::format("{} _in_vertex = a_0;\n", std::string(GPU::Meta::GetGLSLTypeName<T>()));
+		}
 	}
 
 	std::string								_name;
@@ -240,6 +306,9 @@ private:
 
 	bool									_hasVertexBuffer   = false;
 	bool									_hasIndexBuffer	   = false;
+	Backend::BufferHandle					_vertexBufferHandle = Backend::INVALID_BUFFER_HANDLE;
+	uint32_t								_vertexStride	   = 0;
+	Backend::BufferHandle					_indexBufferHandle = Backend::INVALID_BUFFER_HANDLE;
 	uint32_t								_indexCount		   = 0;
 };
 

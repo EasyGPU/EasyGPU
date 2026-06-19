@@ -352,6 +352,7 @@ private:
 	Builder() = default;
 
 private:
+	static constexpr size_t	 kMaxContextStackDepth = 16;
 	BuilderContext				*_context = nullptr;
 	std::stack<BuilderContext *> _contextStack; // Stack for nested kernel definitions
 	GPU::AD::GradientTape		*_gradientTape	 = nullptr;

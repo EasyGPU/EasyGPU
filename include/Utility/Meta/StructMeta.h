@@ -11,6 +11,7 @@
 #include <concepts>
 #include <cstring>
 #include <format>
+#include <vector>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -31,6 +32,14 @@ namespace GPU::Meta {
  */
 template <typename T> struct StructMeta {
 	static constexpr bool isRegistered = false;
+};
+
+struct StructFieldInfo {
+	std::string name;
+	std::string glslType;
+	size_t		cppOffset = 0;
+	size_t		gpuOffset = 0;
+	size_t		gpuSize	  = 0;
 };
 
 /**
@@ -781,6 +790,15 @@ inline void CopyMemberFromGPU(const char *srcElem, char *dstElem, size_t &gpuOff
 		gpuOffset += gpuSize;                                                                                          \
 	}
 
+#define EASYGPU_FIELD_INFO(type, name)                                                                                 \
+	{                                                                                                                  \
+		size_t gpuAlign = GPU::Meta::GetStd430Alignment<type>();                                                       \
+		gpuOffset		= (gpuOffset + gpuAlign - 1) & ~(gpuAlign - 1);                                                \
+		fields.push_back({#name, std::string(GPU::Meta::GetGLSLTypeName<type>()), offsetof(_EasyGPU_CurrentStruct, name), \
+						  gpuOffset, GPU::Meta::GetFieldGPULayoutSize<type>()});                                      \
+		gpuOffset += GPU::Meta::GetFieldGPULayoutSize<type>();                                                        \
+	}
+
 #define EASYGPU_SEQ_LAYOUT_1(P1)					 EASYGPU_LAYOUT_FIELD P1
 #define EASYGPU_SEQ_LAYOUT_2(P1, P2)				 EASYGPU_SEQ_LAYOUT_1(P1) EASYGPU_LAYOUT_FIELD P2
 #define EASYGPU_SEQ_LAYOUT_3(P1, P2, P3)			 EASYGPU_SEQ_LAYOUT_2(P1, P2) EASYGPU_LAYOUT_FIELD P3
@@ -808,6 +826,32 @@ inline void CopyMemberFromGPU(const char *srcElem, char *dstElem, size_t &gpuOff
 #define EASYGPU_SEQ_LAYOUT_16(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15, P16)                   \
 	EASYGPU_SEQ_LAYOUT_15(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15) EASYGPU_LAYOUT_FIELD P16
 
+#define EASYGPU_SEQ_FIELD_INFO_1(P1)						   EASYGPU_FIELD_INFO P1
+#define EASYGPU_SEQ_FIELD_INFO_2(P1, P2)					   EASYGPU_SEQ_FIELD_INFO_1(P1) EASYGPU_FIELD_INFO P2
+#define EASYGPU_SEQ_FIELD_INFO_3(P1, P2, P3)				   EASYGPU_SEQ_FIELD_INFO_2(P1, P2) EASYGPU_FIELD_INFO P3
+#define EASYGPU_SEQ_FIELD_INFO_4(P1, P2, P3, P4)			   EASYGPU_SEQ_FIELD_INFO_3(P1, P2, P3) EASYGPU_FIELD_INFO P4
+#define EASYGPU_SEQ_FIELD_INFO_5(P1, P2, P3, P4, P5)		   EASYGPU_SEQ_FIELD_INFO_4(P1, P2, P3, P4) EASYGPU_FIELD_INFO P5
+#define EASYGPU_SEQ_FIELD_INFO_6(P1, P2, P3, P4, P5, P6)	   EASYGPU_SEQ_FIELD_INFO_5(P1, P2, P3, P4, P5) EASYGPU_FIELD_INFO P6
+#define EASYGPU_SEQ_FIELD_INFO_7(P1, P2, P3, P4, P5, P6, P7) EASYGPU_SEQ_FIELD_INFO_6(P1, P2, P3, P4, P5, P6) EASYGPU_FIELD_INFO P7
+#define EASYGPU_SEQ_FIELD_INFO_8(P1, P2, P3, P4, P5, P6, P7, P8)                                                       \
+	EASYGPU_SEQ_FIELD_INFO_7(P1, P2, P3, P4, P5, P6, P7) EASYGPU_FIELD_INFO P8
+#define EASYGPU_SEQ_FIELD_INFO_9(P1, P2, P3, P4, P5, P6, P7, P8, P9)                                                   \
+	EASYGPU_SEQ_FIELD_INFO_8(P1, P2, P3, P4, P5, P6, P7, P8) EASYGPU_FIELD_INFO P9
+#define EASYGPU_SEQ_FIELD_INFO_10(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10)                                             \
+	EASYGPU_SEQ_FIELD_INFO_9(P1, P2, P3, P4, P5, P6, P7, P8, P9) EASYGPU_FIELD_INFO P10
+#define EASYGPU_SEQ_FIELD_INFO_11(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11)                                        \
+	EASYGPU_SEQ_FIELD_INFO_10(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10) EASYGPU_FIELD_INFO P11
+#define EASYGPU_SEQ_FIELD_INFO_12(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12)                                   \
+	EASYGPU_SEQ_FIELD_INFO_11(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11) EASYGPU_FIELD_INFO P12
+#define EASYGPU_SEQ_FIELD_INFO_13(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13)                              \
+	EASYGPU_SEQ_FIELD_INFO_12(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12) EASYGPU_FIELD_INFO P13
+#define EASYGPU_SEQ_FIELD_INFO_14(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14)                         \
+	EASYGPU_SEQ_FIELD_INFO_13(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13) EASYGPU_FIELD_INFO P14
+#define EASYGPU_SEQ_FIELD_INFO_15(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15)                    \
+	EASYGPU_SEQ_FIELD_INFO_14(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14) EASYGPU_FIELD_INFO P15
+#define EASYGPU_SEQ_FIELD_INFO_16(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15, P16)               \
+	EASYGPU_SEQ_FIELD_INFO_15(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15) EASYGPU_FIELD_INFO P16
+
 // Dispatcher
 #define EASYGPU_DO_DECL(N, ...)	  EASYGPU_CAT(EASYGPU_SEQ_DECL_, N)(__VA_ARGS__)
 #define EASYGPU_DO_GLSL(N, ...)	  EASYGPU_CAT(EASYGPU_SEQ_GLSL_, N)(__VA_ARGS__)
@@ -826,6 +870,10 @@ inline void CopyMemberFromGPU(const char *srcElem, char *dstElem, size_t &gpuOff
 #define EASYGPU_DO_CONVERT_FROM_GPU(N, ...)                                                                            \
 	size_t gpuOffset = 0;                                                                                              \
 	EASYGPU_CAT(EASYGPU_SEQ_CONVERT_FROM_GPU_, N)(__VA_ARGS__)
+
+#define EASYGPU_DO_FIELD_INFO(N, ...)                                                                                  \
+	size_t gpuOffset = 0;                                                                                              \
+	EASYGPU_CAT(EASYGPU_SEQ_FIELD_INFO_, N)(__VA_ARGS__)
 
 // Uniform upload helpers for struct types
 #define EASYGPU_UPLOAD_UNIFORM_FLOAT(program, locationPrefix, value, name)                                             \
@@ -1029,6 +1077,12 @@ inline void DispatchUploadUniformField(uint32_t program, const std::string &unif
 		/* Get std430 layout definition for buffer usage */                                                            \
 		static std::string GetStd430Definition() {                                                                     \
 			return ExpandedDefinition();                                                                               \
+		}                                                                                                              \
+		static std::vector<GPU::Meta::StructFieldInfo> GetFieldInfos() {                                               \
+			std::vector<GPU::Meta::StructFieldInfo> fields;                                                            \
+			fields.reserve(EASYGPU_ARG_COUNT(__VA_ARGS__));                                                            \
+			EASYGPU_DO_FIELD_INFO(EASYGPU_ARG_COUNT(__VA_ARGS__), __VA_ARGS__)                                         \
+			return fields;                                                                                             \
 		}                                                                                                              \
                                                                                                                        \
 		/* Convert CPU struct to GLSL initialization string */                                                         \

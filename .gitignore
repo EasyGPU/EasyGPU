@@ -100,3 +100,5 @@ generated/
 BUILD.md
 
 CMakeSettings.json
+
+opencode.json

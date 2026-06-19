@@ -58,6 +58,8 @@ inline Backend::PixelFormat ToBackendPixelFormat(PixelFormat format) {
 		return Backend::PixelFormat::R32F;
 	case PixelFormat::RG32F:
 		return Backend::PixelFormat::RG32F;
+	case PixelFormat::RGB32F:
+		return Backend::PixelFormat::RGB32F;
 	case PixelFormat::RGBA32F:
 		return Backend::PixelFormat::RGBA32F;
 	case PixelFormat::R16F:
@@ -70,12 +72,16 @@ inline Backend::PixelFormat ToBackendPixelFormat(PixelFormat format) {
 		return Backend::PixelFormat::R32I;
 	case PixelFormat::RG32I:
 		return Backend::PixelFormat::RG32I;
+	case PixelFormat::RGB32I:
+		return Backend::PixelFormat::RGB32I;
 	case PixelFormat::RGBA32I:
 		return Backend::PixelFormat::RGBA32I;
 	case PixelFormat::R32UI:
 		return Backend::PixelFormat::R32UI;
 	case PixelFormat::RG32UI:
 		return Backend::PixelFormat::RG32UI;
+	case PixelFormat::RGB32UI:
+		return Backend::PixelFormat::RGB32UI;
 	case PixelFormat::RGBA32UI:
 		return Backend::PixelFormat::RGBA32UI;
 	default:

@@ -247,15 +247,23 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// min(a, b)  →  subgradient: pass to whichever is smaller
 	_intrinsicRules["min"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], std::format("({})*step({},{})", dOut, in[0], in[1]));
-		gen->EmitAccumulate(in[1], std::format("({})*(1.0-step({},{}))", dOut, in[0], in[1]));
+		std::string a	   = gen->EmitTemp(e.inputs[0].glslType, in[0]);
+		std::string b	   = gen->EmitTemp(e.inputs[1].glslType, in[1]);
+		std::string maskType = IsVectorAdjointType(e.output.glslType) ? e.output.glslType : "float";
+		std::string choose = gen->EmitTemp(maskType, std::format("step({},{})", a, b));
+		gen->EmitAccumulate(in[0], std::format("({})*({})", dOut, choose));
+		gen->EmitAccumulate(in[1], std::format("({})*(1.0-({}))", dOut, choose));
 	};
 
 	// max(a, b)  →  subgradient: pass to whichever is larger
 	_intrinsicRules["max"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], std::format("({})*(1.0-step({},{}))", dOut, in[0], in[1]));
-		gen->EmitAccumulate(in[1], std::format("({})*step({},{})", dOut, in[0], in[1]));
+		std::string a	   = gen->EmitTemp(e.inputs[0].glslType, in[0]);
+		std::string b	   = gen->EmitTemp(e.inputs[1].glslType, in[1]);
+		std::string maskType = IsVectorAdjointType(e.output.glslType) ? e.output.glslType : "float";
+		std::string choose = gen->EmitTemp(maskType, std::format("step({},{})", a, b));
+		gen->EmitAccumulate(in[0], std::format("({})*(1.0-({}))", dOut, choose));
+		gen->EmitAccumulate(in[1], std::format("({})*({})", dOut, choose));
 	};
 
 	// mod(x, y)  →  d_x += d_out;  d_y += -d_out * trunc(x/y)
@@ -275,9 +283,15 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// clamp(x, lo, hi)  →  piecewise gradient
 	_intrinsicRules["clamp"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								  const std::vector<std::string> &in) {
-		gen->EmitAccumulate(in[0], std::format("({})*step({},{})*(1.0-step({},{}))", dOut, in[1], in[0], in[2], in[0]));
-		gen->EmitAccumulate(in[1], std::format("({})*(1.0-step({},{}))", dOut, in[1], in[0]));
-		gen->EmitAccumulate(in[2], std::format("({})*step({},{})", dOut, in[2], in[0]));
+		std::string x		  = gen->EmitTemp(e.inputs[0].glslType, in[0]);
+		std::string lo		  = gen->EmitTemp(e.inputs[1].glslType, in[1]);
+		std::string hi		  = gen->EmitTemp(e.inputs[2].glslType, in[2]);
+		std::string maskType  = IsVectorAdjointType(e.output.glslType) ? e.output.glslType : "float";
+		std::string aboveLo	  = gen->EmitTemp(maskType, std::format("step({},{})", lo, x));
+		std::string aboveHi	  = gen->EmitTemp(maskType, std::format("step({},{})", hi, x));
+		gen->EmitAccumulate(in[0], std::format("({})*({})*(1.0-({}))", dOut, aboveLo, aboveHi));
+		gen->EmitAccumulate(in[1], std::format("({})*(1.0-({}))", dOut, aboveLo));
+		gen->EmitAccumulate(in[2], std::format("({})*({})", dOut, aboveHi));
 	};
 
 	// mix(a, b, t)  →  d_a += d_out * (1-t);  d_b += d_out * t;  d_t += d_out * (b-a)
@@ -640,7 +654,15 @@ void AdjointGenerator::ProcessExpressionGradient(const TapeEntry &entry) {
 	const size_t count	= std::min(entry.inputs.size(), entry.inputGradExprs.size());
 	for (size_t i = 0; i < count; i++) {
 		const std::string gradType = i < entry.inputGradTypes.size() ? entry.inputGradTypes[i] : entry.output.glslType;
-		EmitAccumulate(entry.inputs[i].name, std::format("({})*({})", adjSrc, entry.inputGradExprs[i]), gradType);
+		std::string		  coeff	   = entry.inputGradExprs[i];
+		if (coeff.size() > 120) {
+			coeff = EmitTemp(gradType.empty() ? entry.output.glslType : gradType, coeff);
+		}
+		std::string gradExpr = std::format("({})*({})", adjSrc, coeff);
+		if (gradExpr.size() > 160) {
+			gradExpr = EmitTemp(gradType.empty() ? entry.output.glslType : gradType, gradExpr);
+		}
+		EmitAccumulate(entry.inputs[i].name, gradExpr, gradType);
 	}
 }
 
@@ -767,7 +789,21 @@ void AdjointGenerator::EmitAccumulate(const std::string &inputName, const std::s
 			resolvedGrad = std::format("dot({}, {}(1.0))", resolvedGrad, gradType);
 		}
 	}
+	if (resolvedGrad.size() > 120) {
+		resolvedGrad = EmitTemp(adjType.empty() ? "float" : adjType, resolvedGrad);
+	}
 	EmitLine(std::format("{} += {};", resolvedAdj, resolvedGrad));
+}
+
+std::string AdjointGenerator::EmitTemp(const std::string &glslType, const std::string &expr) {
+	std::string type = glslType.empty() ? "float" : glslType;
+	if (type.find('[') != std::string::npos) {
+		type = "float";
+	}
+	std::string tmp = std::format("_ad_tmp{}", _tmpCounter++);
+	_tempTypes[tmp] = type;
+	EmitLine(std::format("{} {} = {};", type, tmp, ResolveAliases(expr)));
+	return tmp;
 }
 
 void AdjointGenerator::EmitLine(const std::string &line) {

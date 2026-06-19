@@ -102,6 +102,10 @@ static size_t PixelFormatByteSize(PixelFormat format) {
 	case PixelFormat::RG32I:
 	case PixelFormat::RG32UI:
 		return 8;
+	case PixelFormat::RGB32F:
+	case PixelFormat::RGB32I:
+	case PixelFormat::RGB32UI:
+		return 12;
 	case PixelFormat::RGBA32F:
 	case PixelFormat::RGBA32I:
 	case PixelFormat::RGBA32UI:
@@ -1645,6 +1649,8 @@ VkFormat VulkanBackend::GetVkFormat(PixelFormat format) {
 		return VK_FORMAT_R32_SFLOAT;
 	case PixelFormat::RG32F:
 		return VK_FORMAT_R32G32_SFLOAT;
+	case PixelFormat::RGB32F:
+		return VK_FORMAT_R32G32B32_SFLOAT;
 	case PixelFormat::RGBA32F:
 		return VK_FORMAT_R32G32B32A32_SFLOAT;
 	case PixelFormat::R16F:
@@ -1657,12 +1663,16 @@ VkFormat VulkanBackend::GetVkFormat(PixelFormat format) {
 		return VK_FORMAT_R32_SINT;
 	case PixelFormat::RG32I:
 		return VK_FORMAT_R32G32_SINT;
+	case PixelFormat::RGB32I:
+		return VK_FORMAT_R32G32B32_SINT;
 	case PixelFormat::RGBA32I:
 		return VK_FORMAT_R32G32B32A32_SINT;
 	case PixelFormat::R32UI:
 		return VK_FORMAT_R32_UINT;
 	case PixelFormat::RG32UI:
 		return VK_FORMAT_R32G32_UINT;
+	case PixelFormat::RGB32UI:
+		return VK_FORMAT_R32G32B32_UINT;
 	case PixelFormat::RGBA32UI:
 		return VK_FORMAT_R32G32B32A32_UINT;
 	default:
@@ -2757,17 +2767,28 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 			uint32_t size = 4; // Default float size
 			switch (entry.format) {
 			case PixelFormat::R32F:
+			case PixelFormat::R32I:
+			case PixelFormat::R32UI:
 				size = 4;
 				break;
 			case PixelFormat::RG32F:
+			case PixelFormat::RG32I:
+			case PixelFormat::RG32UI:
 				size = 8;
 				break;
-			case PixelFormat::RGBA32F:
+			case PixelFormat::RGB32F:
+			case PixelFormat::RGB32I:
+			case PixelFormat::RGB32UI:
 				size = 12;
-				break; // vec3
+				break;
 			case PixelFormat::RGBA8:
+				size = 4;
+				break;
+			case PixelFormat::RGBA32F:
+			case PixelFormat::RGBA32I:
+			case PixelFormat::RGBA32UI:
 				size = 16;
-				break; // vec4
+				break;
 			default:
 				size = 16;
 				break;

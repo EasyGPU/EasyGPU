@@ -5,11 +5,58 @@
 
 #include <GPU.h>
 #include <iostream>
+#include <stdexcept>
 #include <vector>
+
+EASYGPU_STRUCT(GraphicsTestVertex, (GPU::Math::Vec3, position), (GPU::Math::Vec2, uv), (float, weight));
 
 int main() {
 	try {
 		std::cout << "=== Graphics Pipeline Tests ===" << std::endl;
+
+		int passed = 0, total = 0;
+
+		// Test 0: DSL graphics pipeline derives vertex layout from EASYGPU_STRUCT metadata.
+		{
+			if (GPU::Runtime::GetBytesPerPixel(GPU::Runtime::PixelFormat::RGB32F) != 12 ||
+				GPU::Runtime::GetChannelCount(GPU::Runtime::PixelFormat::RGB32F) != 3) {
+				std::cout << "[Test 0] FAIL: RGB32F format metadata is incorrect" << std::endl;
+				return 1;
+			}
+			bool caughtRGBImageQualifier = false;
+			try {
+				(void)GPU::Runtime::GetGLSLFormatQualifier(GPU::Runtime::PixelFormat::RGB32F);
+			} catch (const std::invalid_argument &) {
+				caughtRGBImageQualifier = true;
+			}
+			if (!caughtRGBImageQualifier) {
+				std::cout << "[Test 0] FAIL: RGB32F image qualifier should be rejected" << std::endl;
+				return 1;
+			}
+			GPU::Kernel::GraphicsPipeline::VertexFunc<GraphicsTestVertex> vertexFunc =
+				[](GPU::IR::Value::Var<GraphicsTestVertex> &vertex,
+				   GPU::IR::Value::Var<GPU::Math::Vec4> &gl_Position) {
+					auto pos	= vertex.position();
+					gl_Position = MakeFloat4(pos.x(), pos.y(), pos.z(), vertex.weight());
+				};
+			GPU::Kernel::GraphicsPipeline::FragmentFunc fragmentFunc =
+				[](GPU::IR::Value::Var<GPU::Math::Vec4> &fragColor) {
+					fragColor = MakeFloat4(1.0f, 0.0f, 0.0f, 1.0f);
+				};
+			GPU::Kernel::GraphicsPipeline pipe(vertexFunc, fragmentFunc);
+			std::string src = pipe.GetShaderSource();
+			if (src.find("struct GraphicsTestVertex") == std::string::npos ||
+				src.find("layout(location=0) in vec3 a_0;") == std::string::npos ||
+				src.find("layout(location=1) in vec2 a_1;") == std::string::npos ||
+				src.find("layout(location=2) in float a_2;") == std::string::npos ||
+				src.find("_in_vertex.position = a_0;") == std::string::npos) {
+				std::cout << "[Test 0] FAIL: struct vertex layout not reflected in shader source" << std::endl;
+				return 1;
+			}
+			total++;
+			passed++;
+			std::cout << "[Test 0 StructVertexLayoutSource] PASS" << std::endl;
+		}
 
 		GPU::Runtime::AutoInitContext();
 		auto *backend = GPU::Runtime::Context::GetBackend();
@@ -24,8 +71,6 @@ int main() {
 			backend->MakeNoneCurrent();
 			return 0;
 		}
-
-		int			passed = 0, total = 0;
 
 		const char *vsSrc =
 			"#version 450\nvoid main() {\n\tvec2 pos;\n\tpos.x = float((gl_VertexIndex & 1) << 2) - 1.0;\n\tpos.y = "

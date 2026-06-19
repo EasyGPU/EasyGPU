@@ -118,6 +118,13 @@ public:
 	uint32_t	AllocateBindingSlot() override;
 
 	/**
+	 * @brief Get the next available binding slot without allocating it.
+	 */
+	uint32_t	GetNextBinding() const {
+		return _nextBinding;
+	}
+
+	/**
 	 * @brief Register a buffer with the given binding slot.
 	 * @param binding The binding slot index.
 	 * @param typeName The GLSL type name for the buffer element.

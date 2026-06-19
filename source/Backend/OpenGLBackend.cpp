@@ -829,6 +829,8 @@ std::tuple<uint32_t, uint32_t, uint32_t> OpenGLBackend::GetGLPixelFormat(PixelFo
 		return {GL_R32F, GL_RED, GL_FLOAT};
 	case PixelFormat::RG32F:
 		return {GL_RG32F, GL_RG, GL_FLOAT};
+	case PixelFormat::RGB32F:
+		return {GL_RGB32F, GL_RGB, GL_FLOAT};
 	case PixelFormat::RGBA32F:
 		return {GL_RGBA32F, GL_RGBA, GL_FLOAT};
 	case PixelFormat::R16F:
@@ -841,12 +843,16 @@ std::tuple<uint32_t, uint32_t, uint32_t> OpenGLBackend::GetGLPixelFormat(PixelFo
 		return {GL_R32I, GL_RED_INTEGER, GL_INT};
 	case PixelFormat::RG32I:
 		return {GL_RG32I, GL_RG_INTEGER, GL_INT};
+	case PixelFormat::RGB32I:
+		return {GL_RGB32I, GL_RGB_INTEGER, GL_INT};
 	case PixelFormat::RGBA32I:
 		return {GL_RGBA32I, GL_RGBA_INTEGER, GL_INT};
 	case PixelFormat::R32UI:
 		return {GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT};
 	case PixelFormat::RG32UI:
 		return {GL_RG32UI, GL_RG_INTEGER, GL_UNSIGNED_INT};
+	case PixelFormat::RGB32UI:
+		return {GL_RGB32UI, GL_RGB_INTEGER, GL_UNSIGNED_INT};
 	case PixelFormat::RGBA32UI:
 		return {GL_RGBA32UI, GL_RGBA_INTEGER, GL_UNSIGNED_INT};
 	default:
@@ -866,6 +872,8 @@ uint32_t OpenGLBackend::GetGLImageFormat(PixelFormat format) {
 		return GL_R32F;
 	case PixelFormat::RG32F:
 		return GL_RG32F;
+	case PixelFormat::RGB32F:
+		return GL_RGB32F;
 	case PixelFormat::RGBA32F:
 		return GL_RGBA32F;
 	case PixelFormat::R16F:
@@ -878,12 +886,16 @@ uint32_t OpenGLBackend::GetGLImageFormat(PixelFormat format) {
 		return GL_R32I;
 	case PixelFormat::RG32I:
 		return GL_RG32I;
+	case PixelFormat::RGB32I:
+		return GL_RGB32I;
 	case PixelFormat::RGBA32I:
 		return GL_RGBA32I;
 	case PixelFormat::R32UI:
 		return GL_R32UI;
 	case PixelFormat::RG32UI:
 		return GL_RG32UI;
+	case PixelFormat::RGB32UI:
+		return GL_RGB32UI;
 	case PixelFormat::RGBA32UI:
 		return GL_RGBA32UI;
 	default:

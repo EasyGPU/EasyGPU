@@ -1110,6 +1110,66 @@ CHECK_CONTAINS(kernel.GetCombinedCode(), "exp");
 CHECK_CONTAINS(kernel.GetCombinedCode(), "+=");
 END_TEST
 
+TEST(ad_kernel_1d_grad_bindings_follow_forward_bindings)
+GPU::Runtime::Buffer<float> a(8);
+GPU::Runtime::Buffer<float> b(8);
+GPU::Runtime::Buffer<float> w(8);
+GPU::AD::ADKernel1D kernel(
+	[&](GPU::IR::Value::Var<int> &id) {
+		auto		  ar = a.Bind();
+		auto		  br = b.Bind();
+		auto		  wr = w.Bind();
+		Var<float> x	= ar[id] + br[id];
+		Var<float> p	= wr[id];
+		Var<float> loss = x * p;
+		GPU::AD::Param(p);
+		GPU::AD::Loss(loss);
+	},
+	8);
+std::string code = kernel.CombinedCode();
+CHECK_CONTAINS(code, "binding = 3");
+CHECK_CONTAINS(code, "_ad_grad_");
+END_TEST
+
+TEST(ad_expression_gradient_uses_temporaries_for_long_coefficients)
+auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<float> a;
+	a = 1.1f;
+	Var<float> b;
+	b = 1.2f;
+	Var<float> c;
+	c = 1.3f;
+	Var<float> d;
+	d = 1.4f;
+	Var<float> e;
+	e = 1.5f;
+	Var<float> f;
+	f = 1.6f;
+	Var<float> g;
+	g = 1.7f;
+	Var<float> h;
+	h = 1.8f;
+	Var<float> i;
+	i = 1.9f;
+	Var<float> j;
+	j = 2.0f;
+	Var<float> k;
+	k = 2.1f;
+	Var<float> l;
+	l = 2.2f;
+	Var<float> m;
+	m = 2.3f;
+	Var<float> n;
+	n = 2.4f;
+	Var<float> o;
+	o = 2.5f;
+	tape.RegisterParameter(a.VarName(), "float");
+	Var<float> y = ((((((((((((((Expr<float>(a) * b) * c) * d) * e) * f) * g) * h) * i) * j) * k) * l) * m) * n) * o);
+	tape.MarkLoss(y.VarName(), "float");
+});
+CHECK_CONTAINS(r.backwardCode, "_ad_tmp");
+END_TEST
+
 // =============================================================================
 // SECTION 16: AdjointInspector3D and AdjointKernel2D
 // =============================================================================
@@ -1341,6 +1401,8 @@ int main() {
 	test_ad_kernel_merged_with_gradbufs();
 	test_ad_kernel_1d_api();
 	test_ad_kernel_1d_sigmoid();
+	test_ad_kernel_1d_grad_bindings_follow_forward_bindings();
+	test_ad_expression_gradient_uses_temporaries_for_long_coefficients();
 	test_ad_inspector_3d_basic();
 	test_ad_inspector_3d_vector();
 	test_ad_kernel_2d_basic();

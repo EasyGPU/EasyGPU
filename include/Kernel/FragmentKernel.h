@@ -22,9 +22,6 @@
 
 namespace GPU::Kernel {
 
-// Forward declaration
-class FragmentKernelBuilderGuard;
-
 /**
  * @brief 2D Fragment Kernel for pixel-based GPU rendering.
  *

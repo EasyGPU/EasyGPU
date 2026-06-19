@@ -16,6 +16,7 @@
 #include <Kernel/KernelBuildContext.h>
 
 #include <string>
+#include <stdexcept>
 #include <vector>
 
 namespace GPU::Kernel {
@@ -81,6 +82,13 @@ public:
 	void SetVertexLayout(const std::vector<Backend::VertexLayoutEntry> &layout);
 
 	/**
+	 * @brief Set the GLSL used to construct the user vertex variable from attributes.
+	 */
+	void SetVertexInputSetupCode(std::string code) {
+		_vertexInputSetupCode = std::move(code);
+	}
+
+	/**
 	 * @brief Get the vertex layout entries.
 	 */
 	const std::vector<Backend::VertexLayoutEntry> &GetVertexLayout() const {
@@ -115,6 +123,11 @@ public:
 	 */
 	std::string GetTextureDeclarations() const override;
 
+	/**
+	 * @brief Push stage-specific translated GLSL code.
+	 */
+	void PushTranslatedCode(std::string Code) override;
+
 protected:
 	/** @brief Generate common GLSL headers (#version, extensions, structs). */
 	std::string GenerateCommonHeaders();
@@ -141,21 +154,49 @@ public:
 
 	/** @brief Call before executing VS lambda: captures current _code as VS body. */
 	void EndVSStage() {
+		if (_stage != ShaderStage::VS) {
+			throw std::runtime_error("GraphicsBuildContext::EndVSStage called outside vertex stage");
+		}
 		_vsBodyCode = std::move(_code);
 		_code.clear();
+		_stage = ShaderStage::Idle;
 	}
 
 	/** @brief Call after executing FS lambda: captures current _code as FS body. */
 	void EndFSStage() {
+		if (_stage != ShaderStage::FS) {
+			throw std::runtime_error("GraphicsBuildContext::EndFSStage called outside fragment stage");
+		}
 		_fsBodyCode = std::move(_code);
 		_code.clear();
+		_stage = ShaderStage::Done;
+	}
+
+	void BeginVSStage() {
+		if (_stage != ShaderStage::Idle) {
+			throw std::runtime_error("GraphicsBuildContext::BeginVSStage called in invalid state");
+		}
+		_code.clear();
+		_stage = ShaderStage::VS;
+	}
+
+	void BeginFSStage() {
+		if (_stage != ShaderStage::Idle) {
+			throw std::runtime_error("GraphicsBuildContext::BeginFSStage called in invalid state");
+		}
+		_code.clear();
+		_stage = ShaderStage::FS;
 	}
 
 protected:
+	enum class ShaderStage { Idle, VS, FS, Done };
+
 	std::vector<VaryingInfo>				_varyings;
 	std::vector<Backend::VertexLayoutEntry> _vertexLayout;
 	std::string								_vsBodyCode;
 	std::string								_fsBodyCode;
+	std::string								_vertexInputSetupCode;
+	ShaderStage							_stage = ShaderStage::Idle;
 };
 
 } // namespace GPU::Kernel

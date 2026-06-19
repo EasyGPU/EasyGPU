@@ -77,6 +77,12 @@ void GraphicsPipeline::DrawImpl(Backend::TextureHandle colorHandle, Backend::Tex
 	auto *backend = Runtime::Context::GetBackend();
 	if (!backend)
 		throw std::runtime_error("Backend not available");
+	if (!_simpleVertexInput && vertexCount > 0 && !_hasVertexBuffer) {
+		throw std::runtime_error("GraphicsPipeline::Draw requires a vertex buffer for this pipeline");
+	}
+	if (indexed && !_hasIndexBuffer) {
+		throw std::runtime_error("GraphicsPipeline::DrawIndexed requires an index buffer");
+	}
 
 	Backend::RenderPassBeginDesc rpDesc;
 	rpDesc.colorAttachment = colorHandle;
@@ -93,6 +99,12 @@ void GraphicsPipeline::DrawImpl(Backend::TextureHandle colorHandle, Backend::Tex
 	backend->SetViewport(0, 0, width, height);
 	backend->SetScissor(0, 0, width, height);
 	backend->BindPipeline(_pipeline);
+	if (_hasVertexBuffer) {
+		backend->BindVertexBuffer(_vertexBufferHandle, _vertexStride);
+	}
+	if (indexed) {
+		backend->BindIndexBuffer(_indexBufferHandle);
+	}
 
 	// Bind resources
 	std::vector<Backend::ResourceBinding> bindings;

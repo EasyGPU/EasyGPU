@@ -530,8 +530,12 @@ void GradientTape::EndForLoop() {
 	_entries.push_back(std::move(entry));
 }
 
-bool GradientTape::IsActive() {
+bool GradientTape::IsTapeActive() {
 	return ::GPU::IR::Builder::Builder::Get().GetGradientTape() != nullptr;
+}
+
+bool GradientTape::IsActive() {
+	return IsTapeActive();
 }
 
 // =============================================================================

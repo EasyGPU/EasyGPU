@@ -43,6 +43,13 @@ void GraphicsBuildContext::SetVertexLayout(const std::vector<Backend::VertexLayo
 	_vertexLayout = layout;
 }
 
+void GraphicsBuildContext::PushTranslatedCode(std::string Code) {
+	if (_stage != ShaderStage::VS && _stage != ShaderStage::FS) {
+		throw std::runtime_error("GraphicsBuildContext: translated code emitted outside a shader stage");
+	}
+	KernelBuildContext::PushTranslatedCode(std::move(Code));
+}
+
 // ===================================================================
 // Code Generation
 // ===================================================================
@@ -96,8 +103,11 @@ std::string GraphicsBuildContext::GenerateVertexInputs() {
 		case Backend::PixelFormat::RG32F:
 			glslType = "vec2";
 			break;
-		case Backend::PixelFormat::RGBA32F:
+		case Backend::PixelFormat::RGB32F:
 			glslType = "vec3";
+			break;
+		case Backend::PixelFormat::RGBA32F:
+			glslType = "vec4";
 			break;
 		case Backend::PixelFormat::RGBA8:
 			glslType = "vec4";
@@ -108,8 +118,11 @@ std::string GraphicsBuildContext::GenerateVertexInputs() {
 		case Backend::PixelFormat::RG32I:
 			glslType = "ivec2";
 			break;
-		case Backend::PixelFormat::RGBA32I:
+		case Backend::PixelFormat::RGB32I:
 			glslType = "ivec3";
+			break;
+		case Backend::PixelFormat::RGBA32I:
+			glslType = "ivec4";
 			break;
 		case Backend::PixelFormat::R32UI:
 			glslType = "uint";
@@ -117,8 +130,11 @@ std::string GraphicsBuildContext::GenerateVertexInputs() {
 		case Backend::PixelFormat::RG32UI:
 			glslType = "uvec2";
 			break;
-		case Backend::PixelFormat::RGBA32UI:
+		case Backend::PixelFormat::RGB32UI:
 			glslType = "uvec3";
+			break;
+		case Backend::PixelFormat::RGBA32UI:
+			glslType = "uvec4";
 			break;
 		default:
 			glslType = "vec4";
@@ -159,6 +175,16 @@ std::string GraphicsBuildContext::GenerateVaryingInputs() {
 std::string GraphicsBuildContext::GenerateVertexShaderMain() {
 	std::ostringstream oss;
 	oss << "void main() {\n";
+
+	if (!_vertexInputSetupCode.empty()) {
+		std::istringstream setupStream(_vertexInputSetupCode);
+		std::string		   line;
+		while (std::getline(setupStream, line)) {
+			if (!line.empty()) {
+				oss << "\t" << line << "\n";
+			}
+		}
+	}
 
 	if (!_vsBodyCode.empty()) {
 		std::istringstream codeStream(_vsBodyCode);

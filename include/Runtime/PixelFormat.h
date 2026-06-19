@@ -9,6 +9,7 @@
 #define EASYGPU_PIXELFORMAT_H
 
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 
@@ -28,6 +29,7 @@ enum class PixelFormat {
 	// 32-bit float formats
 	R32F,	 // Single channel, 32-bit float
 	RG32F,	 // Two channels, 32-bit float each
+	RGB32F,	 // Three channels, 32-bit float each
 	RGBA32F, // Four channels, 32-bit float each
 
 	// 16-bit float formats (optional but useful)
@@ -38,11 +40,13 @@ enum class PixelFormat {
 	// 32-bit signed integer formats
 	R32I,	 // Single channel, 32-bit int
 	RG32I,	 // Two channels, 32-bit int each
+	RGB32I,	 // Three channels, 32-bit int each
 	RGBA32I, // Four channels, 32-bit int each
 
 	// 32-bit unsigned integer formats
 	R32UI,	  // Single channel, 32-bit uint
 	RG32UI,	  // Two channels, 32-bit uint each
+	RGB32UI,  // Three channels, 32-bit uint each
 	RGBA32UI, // Four channels, 32-bit uint each
 };
 
@@ -62,6 +66,8 @@ inline std::string GetGLSLFormatQualifier(PixelFormat fmt) {
 		return "r32f";
 	case PixelFormat::RG32F:
 		return "rg32f";
+	case PixelFormat::RGB32F:
+		throw std::invalid_argument("RGB32F cannot be used as a GLSL image format qualifier");
 	case PixelFormat::RGBA32F:
 		return "rgba32f";
 	case PixelFormat::R16F:
@@ -74,12 +80,16 @@ inline std::string GetGLSLFormatQualifier(PixelFormat fmt) {
 		return "r32i";
 	case PixelFormat::RG32I:
 		return "rg32i";
+	case PixelFormat::RGB32I:
+		throw std::invalid_argument("RGB32I cannot be used as a GLSL image format qualifier");
 	case PixelFormat::RGBA32I:
 		return "rgba32i";
 	case PixelFormat::R32UI:
 		return "r32ui";
 	case PixelFormat::RG32UI:
 		return "rg32ui";
+	case PixelFormat::RGB32UI:
+		throw std::invalid_argument("RGB32UI cannot be used as a GLSL image format qualifier");
 	case PixelFormat::RGBA32UI:
 		return "rgba32ui";
 	}
@@ -95,10 +105,12 @@ inline const char *GetGLSLImageType(PixelFormat fmt) {
 	switch (fmt) {
 	case PixelFormat::R32I:
 	case PixelFormat::RG32I:
+	case PixelFormat::RGB32I:
 	case PixelFormat::RGBA32I:
 		return "iimage2D";
 	case PixelFormat::R32UI:
 	case PixelFormat::RG32UI:
+	case PixelFormat::RGB32UI:
 	case PixelFormat::RGBA32UI:
 		return "uimage2D";
 	default:
@@ -114,10 +126,12 @@ inline const char *GetGLSLSamplerType(PixelFormat fmt) {
 	switch (fmt) {
 	case PixelFormat::R32I:
 	case PixelFormat::RG32I:
+	case PixelFormat::RGB32I:
 	case PixelFormat::RGBA32I:
 		return "isampler2D";
 	case PixelFormat::R32UI:
 	case PixelFormat::RG32UI:
+	case PixelFormat::RGB32UI:
 	case PixelFormat::RGBA32UI:
 		return "usampler2D";
 	default:
@@ -140,6 +154,8 @@ inline size_t GetBytesPerPixel(PixelFormat fmt) {
 		return 4;
 	case PixelFormat::RG32F:
 		return 8;
+	case PixelFormat::RGB32F:
+		return 12;
 	case PixelFormat::RGBA32F:
 		return 16;
 	case PixelFormat::R16F:
@@ -152,12 +168,16 @@ inline size_t GetBytesPerPixel(PixelFormat fmt) {
 		return 4;
 	case PixelFormat::RG32I:
 		return 8;
+	case PixelFormat::RGB32I:
+		return 12;
 	case PixelFormat::RGBA32I:
 		return 16;
 	case PixelFormat::R32UI:
 		return 4;
 	case PixelFormat::RG32UI:
 		return 8;
+	case PixelFormat::RGB32UI:
+		return 12;
 	case PixelFormat::RGBA32UI:
 		return 16;
 	}
@@ -181,6 +201,10 @@ inline int GetChannelCount(PixelFormat fmt) {
 	case PixelFormat::RG32I:
 	case PixelFormat::RG32UI:
 		return 2;
+	case PixelFormat::RGB32F:
+	case PixelFormat::RGB32I:
+	case PixelFormat::RGB32UI:
+		return 3;
 	case PixelFormat::RGBA8:
 	case PixelFormat::RGBA32F:
 	case PixelFormat::RGBA16F:
@@ -198,6 +222,7 @@ inline bool IsFloatFormat(PixelFormat fmt) {
 	switch (fmt) {
 	case PixelFormat::R32F:
 	case PixelFormat::RG32F:
+	case PixelFormat::RGB32F:
 	case PixelFormat::RGBA32F:
 	case PixelFormat::R16F:
 	case PixelFormat::RG16F:
@@ -215,9 +240,11 @@ inline bool IsIntegerFormat(PixelFormat fmt) {
 	switch (fmt) {
 	case PixelFormat::R32I:
 	case PixelFormat::RG32I:
+	case PixelFormat::RGB32I:
 	case PixelFormat::RGBA32I:
 	case PixelFormat::R32UI:
 	case PixelFormat::RG32UI:
+	case PixelFormat::RGB32UI:
 	case PixelFormat::RGBA32UI:
 		return true;
 	default:
@@ -232,6 +259,7 @@ inline bool IsSignedIntegerFormat(PixelFormat fmt) {
 	switch (fmt) {
 	case PixelFormat::R32I:
 	case PixelFormat::RG32I:
+	case PixelFormat::RGB32I:
 	case PixelFormat::RGBA32I:
 		return true;
 	default:
@@ -249,6 +277,7 @@ inline bool IsUnsignedIntegerFormat(PixelFormat fmt) {
 	case PixelFormat::RGBA8:
 	case PixelFormat::R32UI:
 	case PixelFormat::RG32UI:
+	case PixelFormat::RGB32UI:
 	case PixelFormat::RGBA32UI:
 		return true;
 	default:

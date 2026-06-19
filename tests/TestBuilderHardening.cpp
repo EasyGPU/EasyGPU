@@ -182,6 +182,18 @@ static void test_barrier_flags_are_contiguous() {
 	static_assert(static_cast<uint32_t>(Backend::BarrierType::All) == 7u);
 }
 
+static void test_unbind_without_context_throws() {
+	auto &builder = Builder::Get();
+	assert(builder.Context() == nullptr);
+	bool caught = false;
+	try {
+		builder.Unbind();
+	} catch (const std::runtime_error &) {
+		caught = true;
+	}
+	assert(caught);
+}
+
 int main() {
 	std::cout << "========================================\n";
 	std::cout << "  EasyGPU Builder Hardening Tests       \n";
@@ -193,6 +205,7 @@ int main() {
 	test_expr_modulo_type_constraints();
 	test_buffer_type_names();
 	test_barrier_flags_are_contiguous();
+	test_unbind_without_context_throws();
 
 	std::cout << "All builder hardening tests passed.\n";
 	return 0;

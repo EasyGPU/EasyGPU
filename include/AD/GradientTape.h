@@ -109,8 +109,11 @@ public:
 	/** End a for loop body. */
 	void		EndForLoop();
 
-	/** Check if the tape is currently active (has been set on the Builder). */
-	static bool IsActive();
+	/** Check if any tape is currently active on the Builder. */
+	static bool IsTapeActive();
+
+	/** Deprecated: use IsTapeActive() to avoid confusion with IsActive(name). */
+	[[deprecated("Use GradientTape::IsTapeActive()")]] static bool IsActive();
 
 	// ---- Sub-tape support (for Callable body recording) --------------------
 
