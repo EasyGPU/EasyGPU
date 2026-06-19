@@ -20,6 +20,7 @@
 #include <GLAD/glad.h>
 
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 
 namespace GPU::Kernel {
@@ -303,20 +304,23 @@ void FragmentKernel2D::EnsureShaderCompiled() {
 	std::string fsSource = _context->GetFragmentShaderSource();
 
 	try {
+		auto shaderDeleter = [](uint32_t *shader) {
+			if (shader && *shader) {
+				glDeleteShader(*shader);
+			}
+			delete shader;
+		};
+
 		// Compile vertex shader
-		uint32_t vs = Runtime::ShaderCompiler::CompileShader(GL_VERTEX_SHADER, vsSource);
+		std::unique_ptr<uint32_t, decltype(shaderDeleter)> vs(
+			new uint32_t(Runtime::ShaderCompiler::CompileShader(GL_VERTEX_SHADER, vsSource)), shaderDeleter);
 
 		// Compile fragment shader
-		uint32_t fs = Runtime::ShaderCompiler::CompileShader(GL_FRAGMENT_SHADER, fsSource);
+		std::unique_ptr<uint32_t, decltype(shaderDeleter)> fs(
+			new uint32_t(Runtime::ShaderCompiler::CompileShader(GL_FRAGMENT_SHADER, fsSource)), shaderDeleter);
 
 		// Link program
-		try {
-			_shaderProgram = Runtime::ShaderCompiler::LinkProgram({vs, fs});
-		} catch (...) {
-			glDeleteShader(vs);
-			glDeleteShader(fs);
-			throw;
-		}
+		_shaderProgram = Runtime::ShaderCompiler::LinkProgram({*vs, *fs});
 
 		// Cache the program
 		_context->SetCachedPipeline(static_cast<GPU::Backend::PipelineHandle>(_shaderProgram));

@@ -161,6 +161,12 @@ public:
 
 	PBOBuffer &operator=(PBOBuffer &&other) noexcept {
 		if (this != &other) {
+#if !defined(EASYGPU_BACKEND_VULKAN)
+			if (_fence) {
+				glDeleteSync(_fence);
+				_fence = nullptr;
+			}
+#endif
 			if (_pboHandle != Backend::INVALID_BUFFER_HANDLE) {
 				auto *backend = Context::GetBackend();
 				if (backend) {
@@ -171,6 +177,10 @@ public:
 			_size			 = other._size;
 			_isDownload		 = other._isDownload;
 			_state			 = other._state;
+#if !defined(EASYGPU_BACKEND_VULKAN)
+			_fence			 = other._fence;
+			other._fence	 = nullptr;
+#endif
 			other._pboHandle = Backend::INVALID_BUFFER_HANDLE;
 			other._size		 = 0;
 		}
@@ -1049,6 +1059,9 @@ public:
 	}
 
 	bool DownloadAsync() {
+		if (_textureHandle == Backend::INVALID_TEXTURE_HANDLE) {
+			return false;
+		}
 		if (!_downloadPool) {
 			InitDownloadPBOPool(2);
 		}

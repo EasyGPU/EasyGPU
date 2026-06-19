@@ -15,22 +15,13 @@
 
 namespace GPU::Runtime {
 
-// Static members
-std::unique_ptr<Context> Context::_instance;
-bool					 Context::_destroyed = false;
-
 Context					&Context::GetInstance() {
-	if (!_instance) {
-		if (_destroyed) {
-			_destroyed = false;
-		}
-		_instance.reset(new Context());
-	}
+	static Context instance;
 	// Auto-initialize on first access
-	if (!_instance->_initialized) {
-		_instance->Initialize();
+	if (!instance._initialized) {
+		instance.Initialize();
 	}
-	return *_instance;
+	return instance;
 }
 
 Backend::Backend *Context::GetBackend() {
@@ -39,7 +30,6 @@ Backend::Backend *Context::GetBackend() {
 
 Context::~Context() {
 	DestroyBackend();
-	_destroyed = true;
 }
 
 void Context::Initialize() {

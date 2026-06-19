@@ -26,7 +26,7 @@ std::unique_ptr<Node> CallNode::Clone() const {
 	std::vector<std::unique_ptr<Node>> clonedArgs;
 	clonedArgs.reserve(_arguments.size());
 	for (const auto &arg : _arguments) {
-		clonedArgs.push_back(arg->Clone());
+		clonedArgs.push_back(arg ? arg->Clone() : nullptr);
 	}
 	return std::make_unique<CallNode>(_funcName, std::move(clonedArgs));
 }

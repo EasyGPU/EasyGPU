@@ -916,7 +916,7 @@ private:
 		int					  gradOffset  = 0; // offset within the interleaved group
 		int					  gradStride  = 1; // number of params in the group
 		bool				  isBufferParam = false;
-		Backend::BufferHandle gradHandle  = 0;
+		Backend::BufferHandle gradHandle  = Backend::INVALID_BUFFER_HANDLE;
 	};
 
 	struct AdjArrayMeta {

@@ -113,9 +113,6 @@ private:
 private:
 	bool							  _initialized = false;
 	std::unique_ptr<Backend::Backend> _backend;
-
-	static std::unique_ptr<Context>	  _instance;
-	static bool						  _destroyed;
 };
 
 /**

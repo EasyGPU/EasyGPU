@@ -182,6 +182,12 @@ public:
 	void InvalidateTextures();
 
 private:
+	struct ImageBinding {
+		GLuint texture = 0;
+		GLenum format = GL_RGBA8;
+		GLenum access = GL_READ_WRITE;
+	};
+
 	// Currently bound shader program (0 = none)
 	GLuint								   _currentProgram;
 
@@ -189,7 +195,7 @@ private:
 	std::array<GLuint, MAX_SSBO_BINDINGS>  _ssboBindings;
 
 	// Image texture bindings - indexed by binding point
-	std::array<GLuint, MAX_IMAGE_BINDINGS> _imageBindings;
+	std::array<ImageBinding, MAX_IMAGE_BINDINGS> _imageBindings;
 
 	// Sampler texture bindings - indexed by texture unit
 	std::array<GLuint, MAX_TEXTURE_UNITS>  _textureBindings;

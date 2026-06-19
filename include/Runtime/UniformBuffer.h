@@ -81,6 +81,10 @@ public:
 	}
 	UniformBuffer &operator=(UniformBuffer &&other) noexcept {
 		if (this != &other) {
+			auto *backend = Context::GetBackend();
+			if (backend && _uboHandle != Backend::INVALID_BUFFER_HANDLE) {
+				backend->DestroyBuffer(_uboHandle);
+			}
 			_value			 = std::move(other._value);
 			_uboHandle		 = other._uboHandle;
 			other._uboHandle = Backend::INVALID_BUFFER_HANDLE;

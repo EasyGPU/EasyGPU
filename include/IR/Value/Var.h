@@ -959,7 +959,7 @@ public:
 	 * @param Other The other Var to move from
 	 * @return Reference to this Var
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}

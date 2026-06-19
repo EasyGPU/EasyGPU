@@ -162,7 +162,7 @@ public:
 	 * @brief Get all profiling records (trace mode).
 	 * @return Vector of KernelProfileRecord entries.
 	 */
-	const std::vector<KernelProfileRecord> &GetRecords() const;
+	std::vector<KernelProfileRecord> GetRecords() const;
 
 	/**
 	 * @brief Get all kernel statistics.

@@ -217,6 +217,12 @@ private:
 		bool	 active	 = false;
 	};
 
+	struct ImageBindingInfo {
+		uint32_t texture = 0;
+		uint32_t format	 = 0;
+		uint32_t access	 = 0;
+	};
+
 	/** @brief Initialize platform-specific window and context resources. */
 	void	 InitializePlatform();
 	/** @brief Clean up platform-specific resources. */
@@ -305,8 +311,7 @@ private:
 
 	uint32_t										 _currentProgram	 = 0;
 	std::array<uint32_t, MAX_BUFFER_BINDINGS>		 _boundBuffers{};
-	std::array<uint32_t, MAX_TEXTURE_BINDINGS>		 _boundTextures{};
-	std::array<uint32_t, MAX_TEXTURE_BINDINGS>		 _boundTextureFormats{};
+	std::array<ImageBindingInfo, MAX_TEXTURE_BINDINGS> _boundImages{};
 };
 
 Backend *CreateOpenGLBackend();

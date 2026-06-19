@@ -7,9 +7,16 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <sstream>
 #include <unordered_set>
 
 namespace GPU::Runtime {
+
+namespace {
+std::string SpacesFor(int count) {
+	return std::string(std::max(0, count), ' ');
+}
+} // namespace
 
 // =============================================================================
 // ShaderException Implementation
@@ -79,7 +86,7 @@ std::string ShaderCompileException::FormatBeautifulError() const {
 	oss << Bold << Red << LeftT << Repeat(Horizontal, width - 2) << RightT << Reset << "\n";
 
 	// Source code preview (first 20 lines max)
-	oss << Bold << Cyan << Vertical << " Source Preview:" << std::string(width - 17, ' ') << Vertical << Reset << "\n";
+	oss << Bold << Cyan << Vertical << " Source Preview:" << SpacesFor(width - 17) << Vertical << Reset << "\n";
 
 	std::istringstream sourceStream(_source);
 	std::string		   line;
@@ -93,13 +100,14 @@ std::string ShaderCompileException::FormatBeautifulError() const {
 			line = line.substr(0, width - 18) + "...";
 		}
 		oss << Dim << Vertical << Reset << " " << Cyan << lineStr << " │ " << Reset << line
-			<< std::string(width - 10 - lineStr.length() - line.length(), ' ') << Dim << Vertical << Reset << "\n";
+			<< SpacesFor(width - 10 - static_cast<int>(lineStr.length()) - static_cast<int>(line.length())) << Dim
+			<< Vertical << Reset << "\n";
 		lineNum++;
 	}
 
 	if (lineNum > maxLines) {
 		oss << Dim << Vertical << "     ... " << (lineNum - maxLines) << " more lines ..."
-			<< std::string(width - 30, ' ') << Vertical << Reset << "\n";
+			<< SpacesFor(width - 30) << Vertical << Reset << "\n";
 	}
 
 	oss << Bold << Red << BottomLeft << Repeat(Horizontal, width - 2) << BottomRight << Reset << "\n";
@@ -130,11 +138,11 @@ std::string ShaderLinkException::FormatBeautifulError() const {
 		<< Repeat(Horizontal, width - 2 - padding - (int)title.length()) << TopRight << Reset << "\n";
 
 	oss << Bold << Red << Vertical << Reset << " " << Red << CrossX << " Error: " << Reset << _message
-		<< std::string(width - 12 - _message.length(), ' ') << Bold << Red << Vertical << Reset << "\n";
+		<< SpacesFor(width - 12 - static_cast<int>(_message.length())) << Bold << Red << Vertical << Reset << "\n";
 
 	// Attached shaders info
 	oss << Bold << Yellow << LeftT << Repeat(Horizontal, width - 2) << RightT << Reset << "\n";
-	oss << Bold << Yellow << Vertical << " Attached Shaders:" << std::string(width - 19, ' ') << Vertical << Reset
+	oss << Bold << Yellow << Vertical << " Attached Shaders:" << SpacesFor(width - 19) << Vertical << Reset
 		<< "\n";
 
 	for (const auto &[type, name] : _attachedShaders) {
@@ -154,8 +162,8 @@ std::string ShaderLinkException::FormatBeautifulError() const {
 			break;
 		}
 		std::string info = std::format("  • {}: {}", typeName, name);
-		oss << Yellow << Vertical << Reset << info << std::string(width - 2 - info.length(), ' ') << Yellow << Vertical
-			<< Reset << "\n";
+		oss << Yellow << Vertical << Reset << info << SpacesFor(width - 2 - static_cast<int>(info.length())) << Yellow
+			<< Vertical << Reset << "\n";
 	}
 
 	oss << Bold << Red << BottomLeft << Repeat(Horizontal, width - 2) << BottomRight << Reset << "\n";
@@ -320,8 +328,8 @@ std::vector<ShaderDiagnostic> ShaderCompiler::ParseErrorLog(const std::string &l
 			diagnostics.emplace_back(sev, message, "", lineNum, 0);
 		} else if (std::regex_search(line, match, intelRegex)) {
 			std::string	  severity = match[1].str();
-			int			  lineNum  = std::stoi(match[3].str());
-			std::string	  message  = match[4].str();
+			int			  lineNum  = std::stoi(match[2].str());
+			std::string	  message  = match[3].str();
 
 			ErrorSeverity sev	   = (severity == "ERROR") ? ErrorSeverity::Error : ErrorSeverity::Warning;
 			diagnostics.emplace_back(sev, message, "", lineNum, 0);
@@ -442,7 +450,7 @@ std::string ShaderErrorFormatter::Repeat(const char *ch, int count) {
 std::string ShaderErrorFormatter::PadRight(const std::string &s, int width) {
 	if ((int)s.length() >= width)
 		return s;
-	return s + std::string(width - s.length(), ' ');
+	return s + SpacesFor(width - static_cast<int>(s.length()));
 }
 
 } // namespace GPU::Runtime

@@ -84,6 +84,8 @@ public:
 		BuildShadersSimple(vertexFunc, fragmentFunc);
 	}
 
+	~GraphicsPipeline() override;
+
 	void SetName(const std::string &name) {
 		_name = name;
 	}

@@ -45,19 +45,22 @@ template <typename T, size_t BlockSize, size_t EmbedDim, size_t NumHeads> class 
 	static constexpr size_t V_REGION = BlockSize * EmbedDim;
 	static constexpr size_t A_REGION = BlockSize * EmbedDim;
 	static constexpr size_t M_REGION = BlockSize * MLPDim;
-	static constexpr size_t REGIONS	 = 7; // K(1) + V(1) + A(1) + M(4) = 7 × BE
+	static constexpr size_t DOTS_REGION = NumHeads * BlockSize;
+	static constexpr size_t SCRATCH_PER_BATCH = K_REGION + V_REGION + A_REGION + M_REGION + DOTS_REGION;
 
 public:
 	TransformerBlock(size_t batchSize, unsigned seed = 42)
 		: batchSize_(batchSize), attn_(seed), norm1_(), norm2_(),
-		  scratchBuf_(batchSize * REGIONS * BlockSize * EmbedDim, Runtime::BufferMode::ReadWrite) {
+		  scratchBuf_(batchSize * SCRATCH_PER_BATCH, Runtime::BufferMode::ReadWrite) {
 		// Compute region base offsets within scratch buffer
 		int bs = static_cast<int>(batchSize);
 		int be = static_cast<int>(BlockSize * EmbedDim);
+		int mr = static_cast<int>(M_REGION);
 		kBase_ = 0;
 		vBase_ = bs * be;
 		aBase_ = 2 * bs * be;
 		mBase_ = 3 * bs * be;
+		dotsBase_ = mBase_ + bs * mr;
 
 		std::vector<T> d1(MLPDim * EmbedDim);
 		std::vector<T> d2(EmbedDim * MLPDim);
@@ -112,10 +115,11 @@ public:
 		IR::Value::Expr<int> vOff = MakeInt(vBase_);
 		IR::Value::Expr<int> aOff = MakeInt(aBase_);
 		IR::Value::Expr<int> mOff = MakeInt(mBase_);
+		IR::Value::Expr<int> dotsOff = MakeInt(dotsBase_);
 
 		// --- RMSNorm → Attention → residual add ---
 		norm1_.Forward(x, scratchRef_, aOff + po);
-		attn_.Forward(scratchRef_, aOff, kOff, vOff, aOff, mOff, pos, offset);
+		attn_.Forward(scratchRef_, aOff, kOff, vOff, aOff, dotsOff, pos, offset, MakeInt(static_cast<int>(BlockSize)));
 		GPU::Flow::For(MakeInt(0), MakeInt(E),
 					   [&](IR::Value::Var<int> &d) { x[po + d] = x[po + d] + scratchRef_[aOff + po + d]; });
 
@@ -155,7 +159,7 @@ public:
 
 private:
 	size_t									   batchSize_;
-	int										   kBase_, vBase_, aBase_, mBase_;
+	int										   kBase_, vBase_, aBase_, mBase_, dotsBase_;
 	CausalSelfAttention<T, EmbedDim, NumHeads> attn_;
 	RMSNorm<T, EmbedDim>					   norm1_, norm2_;
 

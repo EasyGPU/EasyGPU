@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -46,21 +47,19 @@ bool ReadFloats(FILE *f, float *data, size_t count);
  * @param tensors One or more Tensor<float, Dims...> references
  */
 template <typename... Tensors> void SaveWeights(const std::string &path, Tensors &...tensors) {
-	FILE *f = std::fopen(path.c_str(), "wb");
+	std::unique_ptr<FILE, decltype(&std::fclose)> f(std::fopen(path.c_str(), "wb"), &std::fclose);
 	if (!f)
 		throw std::runtime_error("SaveWeights: cannot open " + path + " for writing");
 
 	uint32_t numTensors = static_cast<uint32_t>(sizeof...(Tensors));
-	detail::WriteU32(f, numTensors);
+	detail::WriteU32(f.get(), numTensors);
 
 	auto saveOne = [&](auto &tensor) {
 		uint64_t count = static_cast<uint64_t>(tensor.Size());
-		detail::WriteU64(f, count);
-		detail::WriteFloats(f, tensor.Data(), count);
+		detail::WriteU64(f.get(), count);
+		detail::WriteFloats(f.get(), tensor.Data(), count);
 	};
 	(saveOne(tensors), ...);
-
-	std::fclose(f);
 }
 
 /**
@@ -71,12 +70,12 @@ template <typename... Tensors> void SaveWeights(const std::string &path, Tensors
  * @param tensors One or more Tensor<float, Dims...> references (must match saved layout)
  */
 template <typename... Tensors> void LoadWeights(const std::string &path, Tensors &...tensors) {
-	FILE *f = std::fopen(path.c_str(), "rb");
+	std::unique_ptr<FILE, decltype(&std::fclose)> f(std::fopen(path.c_str(), "rb"), &std::fclose);
 	if (!f)
 		throw std::runtime_error("LoadWeights: cannot open " + path + " for reading");
 
 	uint32_t numTensors = 0;
-	if (!detail::ReadU32(f, numTensors))
+	if (!detail::ReadU32(f.get(), numTensors))
 		throw std::runtime_error("LoadWeights: failed to read tensor count");
 
 	if (numTensors != static_cast<uint32_t>(sizeof...(Tensors)))
@@ -85,17 +84,15 @@ template <typename... Tensors> void LoadWeights(const std::string &path, Tensors
 
 	auto loadOne = [&](auto &tensor) {
 		uint64_t count = 0;
-		if (!detail::ReadU64(f, count))
+		if (!detail::ReadU64(f.get(), count))
 			throw std::runtime_error("LoadWeights: failed to read tensor size");
 		if (count != static_cast<uint64_t>(tensor.Size()))
 			throw std::runtime_error("LoadWeights: tensor size mismatch");
-		if (!detail::ReadFloats(f, tensor.Data(), count))
+		if (!detail::ReadFloats(f.get(), tensor.Data(), count))
 			throw std::runtime_error("LoadWeights: failed to read tensor data");
 		tensor.Upload();
 	};
 	(loadOne(tensors), ...);
-
-	std::fclose(f);
 }
 
 } // namespace GPU::NN

@@ -32,8 +32,6 @@ namespace GPU::NN {
 template <typename T, size_t EmbedDim, size_t NumHeads> class CausalSelfAttention {
 	static_assert(std::is_same_v<T, float>, "CausalSelfAttention only supports float");
 	static_assert(EmbedDim % NumHeads == 0, "EmbedDim must be divisible by NumHeads");
-	static_assert(NumHeads <= 4 * EmbedDim,
-				  "CausalSelfAttention dots scratch must fit in TransformerBlock MLP scratch region");
 	static constexpr size_t HeadDim	   = EmbedDim / NumHeads;
 
 	// Weight tensor layout: [4][EmbedDim][EmbedDim]
@@ -77,13 +75,13 @@ public:
 	void Forward(const IR::Value::BufferRef<T> &scratch, const IR::Value::Expr<int> &xOff,
 				 const IR::Value::Expr<int> &kOff, const IR::Value::Expr<int> &vOff, const IR::Value::Expr<int> &aOff,
 				 const IR::Value::Expr<int> &dotsOff, const IR::Value::Var<int> &pos,
-				 const IR::Value::Expr<int> &offset) {
+				 const IR::Value::Expr<int> &offset, const IR::Value::Expr<int> &blockSize) {
 		constexpr int		 E		  = static_cast<int>(EmbedDim);
 		constexpr int		 H		  = static_cast<int>(NumHeads);
 		constexpr int		 HD		  = static_cast<int>(HeadDim);
 
 		IR::Value::Expr<int> po		  = offset + pos * E;
-		IR::Value::Expr<int> dotsBase = dotsOff + offset * MakeInt(4);
+		IR::Value::Expr<int> dotsBase = dotsOff + (offset / (blockSize * MakeInt(E))) * MakeInt(H) * blockSize;
 
 		// --- Q/K/V projections for current position ---
 		GPU::Flow::For(MakeInt(0), MakeInt(E), [&](IR::Value::Var<int> &o) {
@@ -121,14 +119,14 @@ public:
 					dot					 = dot + qk;
 				});
 				dot								   = dot / MakeFloat(std::sqrt(static_cast<float>(HD)));
-				scratch[dotsBase + h * endPos + t] = dot;
+				scratch[dotsBase + h * blockSize + t] = dot;
 				maxLogit						   = GPU::Math::Max(maxLogit, dot);
 			});
 
 			// Pass 2: exp(dot - max) and sum
 			IR::Value::Var<T> sumExp = MakeFloat(0.0f);
 			GPU::Flow::For(MakeInt(0), endPos, [&](IR::Value::Var<int> &t) {
-				IR::Value::Var<T> dot_t = scratch[dotsBase + h * endPos + t];
+				IR::Value::Var<T> dot_t = scratch[dotsBase + h * blockSize + t];
 				IR::Value::Var<T> dm	= dot_t - maxLogit;
 				IR::Value::Var<T> edm	= GPU::Math::Exp(dm);
 				sumExp					= sumExp + edm;
@@ -139,7 +137,7 @@ public:
 				IR::Value::Var<T> sumV = MakeFloat(0.0f);
 				GPU::Flow::For(MakeInt(0), endPos, [&](IR::Value::Var<int> &t) {
 					IR::Value::Expr<int> to		= offset + t * E;
-					IR::Value::Var<T>	 dot_t2 = scratch[dotsBase + h * endPos + t];
+					IR::Value::Var<T>	 dot_t2 = scratch[dotsBase + h * blockSize + t];
 					IR::Value::Var<T>	 dm2	= dot_t2 - maxLogit;
 					IR::Value::Var<T>	 edm2	= GPU::Math::Exp(dm2);
 					IR::Value::Var<T>	 weight = edm2 / sumExp;

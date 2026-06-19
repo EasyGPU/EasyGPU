@@ -89,7 +89,7 @@ public:
 	/**
 	 * Move assignment from another Var<Vec2> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -210,7 +210,7 @@ public:
 	/**
 	 * Move assignment from another Var<Vec3> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -351,7 +351,7 @@ public:
 	/**
 	 * Move assignment from another Var<Vec4> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}

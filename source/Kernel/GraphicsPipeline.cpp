@@ -12,6 +12,25 @@
 
 namespace GPU::Kernel {
 
+GraphicsPipeline::~GraphicsPipeline() {
+	auto *backend = Runtime::Context::GetBackend();
+	if (!backend) {
+		return;
+	}
+	if (_pipeline != Backend::INVALID_PIPELINE_HANDLE) {
+		backend->DestroyPipeline(_pipeline);
+		_pipeline = Backend::INVALID_PIPELINE_HANDLE;
+	}
+	if (_fsHandle != Backend::INVALID_SHADER_HANDLE) {
+		backend->DestroyShader(_fsHandle);
+		_fsHandle = Backend::INVALID_SHADER_HANDLE;
+	}
+	if (_vsHandle != Backend::INVALID_SHADER_HANDLE) {
+		backend->DestroyShader(_vsHandle);
+		_vsHandle = Backend::INVALID_SHADER_HANDLE;
+	}
+}
+
 void GraphicsPipeline::EnsureCompiled() {
 	if (_compiled)
 		return;

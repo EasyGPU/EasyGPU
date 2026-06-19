@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <memory>
 
 // Platform-specific includes
 #ifdef _WIN32
@@ -36,10 +37,25 @@
 
 namespace GPU::Backend {
 
+namespace {
+struct FramebufferGuard {
+	uint32_t handle = 0;
+
+	~FramebufferGuard() {
+		if (handle != 0) {
+			glDeleteFramebuffers(1, &handle);
+		}
+	}
+
+	FramebufferGuard() = default;
+	FramebufferGuard(const FramebufferGuard &) = delete;
+	FramebufferGuard &operator=(const FramebufferGuard &) = delete;
+};
+} // namespace
+
 OpenGLBackend::OpenGLBackend() {
 	std::fill(_boundBuffers.begin(), _boundBuffers.end(), 0);
-	std::fill(_boundTextures.begin(), _boundTextures.end(), 0);
-	std::fill(_boundTextureFormats.begin(), _boundTextureFormats.end(), 0);
+	std::fill(_boundImages.begin(), _boundImages.end(), ImageBindingInfo{});
 }
 
 OpenGLBackend::~OpenGLBackend() {
@@ -236,10 +252,12 @@ void OpenGLBackend::DownloadBuffer(BufferHandle buffer, size_t offset, size_t si
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, it->second.glHandle);
 	void *mapped = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, offset, size, GL_MAP_READ_BIT);
-	if (mapped) {
-		std::memcpy(outData, mapped, size);
-		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+	if (!mapped) {
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+		throw std::runtime_error("Failed to map OpenGL buffer for download");
 	}
+	std::memcpy(outData, mapped, size);
+	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
@@ -427,19 +445,33 @@ void OpenGLBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t 
 	if (!outData) {
 		throw std::runtime_error("DownloadTexture: outData is null");
 	}
+	if (x + width > it->second.width || y + height > it->second.height) {
+		throw std::runtime_error("DownloadTexture region exceeds texture bounds");
+	}
 
-	// NOTE: glGetTexImage always downloads the full texture mip-level.
-	// The (x, y, width, height) parameters are reserved for future sub-region
-	// implementation (e.g. via FBO + glReadPixels). Callers must ensure outData
-	// is large enough to hold the entire texture.
-	(void)x;
-	(void)y;
-	(void)width;
-	(void)height;
+	if (x == 0 && y == 0 && width == it->second.width && height == it->second.height) {
+		glBindTexture(GL_TEXTURE_2D, it->second.glHandle);
+		glGetTexImage(GL_TEXTURE_2D, 0, it->second.format, it->second.type, outData);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		return;
+	}
 
-	glBindTexture(GL_TEXTURE_2D, it->second.glHandle);
-	glGetTexImage(GL_TEXTURE_2D, 0, it->second.format, it->second.type, outData);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	FramebufferGuard fbo;
+	glGenFramebuffers(1, &fbo.handle);
+	if (fbo.handle == 0) {
+		throw std::runtime_error("Failed to create framebuffer for texture download");
+	}
+
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo.handle);
+	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, it->second.glHandle, 0);
+	if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		throw std::runtime_error("Texture download framebuffer is incomplete");
+	}
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
+	glReadPixels(static_cast<GLint>(x), static_cast<GLint>(y), static_cast<GLsizei>(width),
+				 static_cast<GLsizei>(height), it->second.format, it->second.type, outData);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 }
 
 void OpenGLBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
@@ -452,17 +484,37 @@ void OpenGLBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, u
 	if (bufIt == _buffers.end()) {
 		throw std::runtime_error("Invalid destination buffer handle");
 	}
-
-	(void)x;
-	(void)y;
-	(void)width;
-	(void)height;
+	if (x + width > texIt->second.width || y + height > texIt->second.height) {
+		throw std::runtime_error("DownloadTextureToBuffer region exceeds texture bounds");
+	}
 
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, bufIt->second.glHandle);
-	glBindTexture(GL_TEXTURE_2D, texIt->second.glHandle);
-	glGetTexImage(GL_TEXTURE_2D, 0, texIt->second.format, texIt->second.type,
-				  reinterpret_cast<void *>(destinationOffset));
-	glBindTexture(GL_TEXTURE_2D, 0);
+	if (x == 0 && y == 0 && width == texIt->second.width && height == texIt->second.height) {
+		glBindTexture(GL_TEXTURE_2D, texIt->second.glHandle);
+		glGetTexImage(GL_TEXTURE_2D, 0, texIt->second.format, texIt->second.type,
+					  reinterpret_cast<void *>(destinationOffset));
+		glBindTexture(GL_TEXTURE_2D, 0);
+	} else {
+		FramebufferGuard fbo;
+		glGenFramebuffers(1, &fbo.handle);
+		if (fbo.handle == 0) {
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+			throw std::runtime_error("Failed to create framebuffer for texture download");
+		}
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo.handle);
+		glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texIt->second.glHandle, 0);
+		if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+			throw std::runtime_error("Texture download framebuffer is incomplete");
+		}
+		glReadBuffer(GL_COLOR_ATTACHMENT0);
+		glReadPixels(static_cast<GLint>(x), static_cast<GLint>(y), static_cast<GLsizei>(width),
+					 static_cast<GLsizei>(height), texIt->second.format, texIt->second.type,
+					 reinterpret_cast<void *>(destinationOffset));
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+	}
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
@@ -763,7 +815,7 @@ uint64_t OpenGLBackend::EndQuery(uint32_t query) {
 void OpenGLBackend::InvalidateCache() {
 	_currentProgram = 0;
 	std::fill(_boundBuffers.begin(), _boundBuffers.end(), 0);
-	std::fill(_boundTextures.begin(), _boundTextures.end(), 0);
+	std::fill(_boundImages.begin(), _boundImages.end(), ImageBindingInfo{});
 }
 
 void OpenGLBackend::BindProgram(uint32_t program) {
@@ -783,10 +835,12 @@ void OpenGLBackend::BindSSBO(uint32_t binding, uint32_t buffer) {
 void OpenGLBackend::BindImageTexture(uint32_t binding, uint32_t texture, uint32_t format, bool readOnly) {
 	if (binding < MAX_TEXTURE_BINDINGS) {
 		GLenum access = readOnly ? GL_READ_ONLY : GL_READ_WRITE;
-		if (_boundTextures[binding] != texture || _boundTextureFormats[binding] != format) {
+		auto  &cached = _boundImages[binding];
+		if (cached.texture != texture || cached.format != format || cached.access != access) {
 			glBindImageTexture(binding, texture, 0, GL_FALSE, 0, access, format);
-			_boundTextures[binding]		  = texture;
-			_boundTextureFormats[binding] = format;
+			cached.texture = texture;
+			cached.format  = format;
+			cached.access  = access;
 		}
 	}
 }

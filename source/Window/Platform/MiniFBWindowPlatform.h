@@ -43,6 +43,7 @@ public:
 
 	// Presentation
 	virtual void				   Present(const uint32_t *pixels, uint32_t width, uint32_t height) = 0;
+	virtual void				   WaitSync()														= 0;
 
 	// Events
 	virtual void				   PollEvents()														= 0;
@@ -84,6 +85,7 @@ public:
 	void									  SetTitle(const std::string &title) override;
 
 	void									  Present(const uint32_t *pixels, uint32_t width, uint32_t height) override;
+	void									  WaitSync() override;
 
 	void									  PollEvents() override;
 	void									  WaitEvents() override;

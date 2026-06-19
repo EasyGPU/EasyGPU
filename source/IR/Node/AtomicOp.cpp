@@ -40,9 +40,12 @@ bool AtomicOpNode::IsCompSwap() const {
 }
 
 std::unique_ptr<Node> AtomicOpNode::Clone() const {
+	auto targetClone = _target ? _target->Clone() : nullptr;
+	auto valueClone	 = _value ? _value->Clone() : nullptr;
 	if (IsCompSwap()) {
-		return std::make_unique<AtomicOpNode>(_target->Clone(), _compare->Clone(), _value->Clone());
+		auto compareClone = _compare ? _compare->Clone() : nullptr;
+		return std::make_unique<AtomicOpNode>(std::move(targetClone), std::move(compareClone), std::move(valueClone));
 	}
-	return std::make_unique<AtomicOpNode>(_code, _target->Clone(), _value->Clone());
+	return std::make_unique<AtomicOpNode>(_code, std::move(targetClone), std::move(valueClone));
 }
 } // namespace GPU::IR::Node

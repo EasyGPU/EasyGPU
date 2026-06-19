@@ -21,7 +21,6 @@ GLStateCache::GLStateCache()
 	  _hasAnyImageBindings(false), _hasAnyTextureBindings(false) {
 
 	_ssboBindings.fill(0);
-	_imageBindings.fill(0);
 	_textureBindings.fill(0);
 }
 
@@ -95,15 +94,20 @@ void GLStateCache::BindImageTexture(uint32_t binding, GLuint texture, GLenum for
 		return; // Silently ignore out-of-range bindings
 	}
 
-	if (_imageBindings[binding] != texture) {
+	auto &cached = _imageBindings[binding];
+	if (cached.texture != texture || cached.format != format || cached.access != access) {
 		glBindImageTexture(binding, texture, 0, GL_FALSE, 0, access, format);
-		_imageBindings[binding] = texture;
+		cached.texture = texture;
+		cached.format  = format;
+		cached.access  = access;
 
 		if (texture != 0) {
 			_hasAnyImageBindings = true;
 		} else {
 			_hasAnyImageBindings =
-				std::any_of(_imageBindings.begin(), _imageBindings.end(), [](GLuint t) { return t != 0; });
+				std::any_of(_imageBindings.begin(), _imageBindings.end(), [](const ImageBinding &binding) {
+					return binding.texture != 0;
+				});
 		}
 	}
 }
@@ -121,9 +125,9 @@ void GLStateCache::UnbindAllImageTextures() {
 	}
 
 	for (size_t i = 0; i < MAX_IMAGE_BINDINGS; ++i) {
-		if (_imageBindings[i] != 0) {
+		if (_imageBindings[i].texture != 0) {
 			glBindImageTexture(static_cast<GLuint>(i), 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
-			_imageBindings[i] = 0;
+			_imageBindings[i] = {};
 		}
 	}
 	_hasAnyImageBindings = false;
@@ -201,7 +205,7 @@ void GLStateCache::BindVAO(GLuint vao) {
 void GLStateCache::Invalidate() {
 	_currentProgram = 0;
 	_ssboBindings.fill(0);
-	_imageBindings.fill(0);
+	_imageBindings.fill({});
 	_textureBindings.fill(0);
 	_activeTextureUnit	   = 0;
 	_currentVAO			   = 0;
@@ -216,13 +220,13 @@ void GLStateCache::InvalidateProgram() {
 
 void GLStateCache::InvalidateBuffers() {
 	_ssboBindings.fill(0);
-	_imageBindings.fill(0);
+	_imageBindings.fill({});
 	_hasAnySSBOBindings	 = false;
 	_hasAnyImageBindings = false;
 }
 
 void GLStateCache::InvalidateTextures() {
-	_imageBindings.fill(0);
+	_imageBindings.fill({});
 	_textureBindings.fill(0);
 	_activeTextureUnit	   = 0;
 	_hasAnyImageBindings   = false;

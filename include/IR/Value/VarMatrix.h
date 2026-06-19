@@ -71,7 +71,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat2> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -163,7 +163,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat3> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -259,7 +259,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat4> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -348,7 +348,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat2x3> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -435,7 +435,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat2x4> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -527,7 +527,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat3x2> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -619,7 +619,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat3x4> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -716,7 +716,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat4x2> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}
@@ -813,7 +813,7 @@ public:
 	/**
 	 * Move assignment from another Var<Mat4x3> - routes through Expr path to ensure correct IR
 	 */
-	Var &operator=(Var &&Other) noexcept {
+	Var &operator=(Var &&Other) {
 		if (&Other == this) {
 			return *this;
 		}

@@ -57,8 +57,7 @@ public:
 	Expr()				= default;
 	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
 	}
-	explicit Expr(const ExprBase &base)
-		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	explicit Expr(const ExprBase &base) : ExprBase(CloneNode(base)) {
 	}
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
@@ -253,8 +252,7 @@ public:
 	Expr()				= default;
 	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
 	}
-	explicit Expr(const ExprBase &base)
-		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	explicit Expr(const ExprBase &base) : ExprBase(CloneNode(base)) {
 	}
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}
@@ -460,8 +458,7 @@ public:
 	Expr()				= default;
 	Expr(std::unique_ptr<Node::Node> Node) : ExprBase(std::move(Node)) {
 	}
-	explicit Expr(const ExprBase &base)
-		: ExprBase(std::unique_ptr<Node::Node>(const_cast<ExprBase &>(base).Release().release())) {
+	explicit Expr(const ExprBase &base) : ExprBase(CloneNode(base)) {
 	}
 	explicit Expr(ExprBase &&base) : ExprBase(base.Release()) {
 	}

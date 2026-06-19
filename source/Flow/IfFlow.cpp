@@ -113,10 +113,13 @@ void IfChain::Else(const std::function<void()> &body) {
 IfChain::~IfChain() {
 	// Only emit if we haven't already (i.e., no Else was called)
 	if (!_emitted && _originalContext) {
-		if (auto *tape = IR::Builder::Builder::Get().GetGradientTape()) {
-			tape->EndIfChain();
+		try {
+			if (auto *tape = IR::Builder::Builder::Get().GetGradientTape()) {
+				tape->EndIfChain();
+			}
+			EmitIfStatement();
+		} catch (...) {
 		}
-		EmitIfStatement();
 	}
 }
 

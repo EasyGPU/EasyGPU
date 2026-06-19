@@ -27,6 +27,7 @@ bool IncrementNode::IsPrefix() const {
 }
 
 std::unique_ptr<Node> IncrementNode::Clone() const {
-	return std::make_unique<IncrementNode>(_direction, _target->Clone(), _isPrefix);
+	auto targetClone = _target ? _target->Clone() : nullptr;
+	return std::make_unique<IncrementNode>(_direction, std::move(targetClone), _isPrefix);
 }
 } // namespace GPU::IR::Node

@@ -15,6 +15,7 @@
 #endif
 
 #include <algorithm>
+#include <ctime>
 #include <iomanip>
 #include <iostream>
 
@@ -348,7 +349,7 @@ double KernelProfiler::GetTotalTime() const {
 	return total;
 }
 
-const std::vector<KernelProfileRecord> &KernelProfiler::GetRecords() const {
+std::vector<KernelProfileRecord> KernelProfiler::GetRecords() const {
 	std::lock_guard<std::recursive_mutex> lock(_mutex);
 	return _records;
 }
@@ -388,6 +389,16 @@ bool		UseColor() {
 
 const char *Col(const char *color) {
 	return UseColor() ? color : "";
+}
+
+std::tm LocalTime(std::time_t time) {
+	std::tm tm{};
+#ifdef _WIN32
+	localtime_s(&tm, &time);
+#else
+	localtime_r(&time, &tm);
+#endif
+	return tm;
 }
 } // namespace
 
@@ -430,7 +441,7 @@ void KernelProfiler::PrintInfo(const std::string &mode) const {
 		for (size_t i = 0; i < _records.size(); ++i) {
 			const auto &record = _records[i];
 			auto		time_t = std::chrono::system_clock::to_time_t(record.timestamp);
-			auto		tm	   = *std::localtime(&time_t);
+			auto		tm	   = LocalTime(time_t);
 			char		timeStr[20];
 			std::strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &tm);
 
@@ -552,7 +563,7 @@ std::string KernelProfiler::GetFormattedOutput(const std::string &mode) const {
 
 		for (const auto &record : _records) {
 			auto time_t = std::chrono::system_clock::to_time_t(record.timestamp);
-			auto tm		= *std::localtime(&time_t);
+			auto tm		= LocalTime(time_t);
 			char timeStr[20];
 			std::strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &tm);
 

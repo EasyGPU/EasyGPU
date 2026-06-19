@@ -182,11 +182,11 @@ VulkanBackend::~VulkanBackend() {
 // =============================================================================
 
 void VulkanBackend::Initialize() {
+	std::lock_guard<std::mutex> lock(_mutex);
+
 	if (_initialized) {
 		return;
 	}
-
-	std::lock_guard<std::mutex> lock(_mutex);
 
 	try {
 		InitializeGlslang();

@@ -42,6 +42,7 @@ public:
 
 	FragmentShader(const FragmentFunc &func, uint32_t width, uint32_t height);
 	FragmentShader(const std::string &name, const FragmentFunc &func, uint32_t width, uint32_t height);
+	~FragmentShader() override;
 
 	void		SetName(const std::string &name);
 	std::string GetName() const;

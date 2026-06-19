@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <stack>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -150,6 +151,9 @@ public:
 
 	/** Get a sub-tape by index. */
 	const GradientTape &SubTape(int index) const {
+		if (index < 0 || static_cast<size_t>(index) >= _subTapes.size()) {
+			throw std::out_of_range("GradientTape::SubTape index out of range");
+		}
 		return *_subTapes[index];
 	}
 
@@ -164,6 +168,9 @@ public:
 		return _entries.size();
 	}
 	const TapeEntry &operator[](int32_t i) const {
+		if (i < 0 || static_cast<size_t>(i) >= _entries.size()) {
+			throw std::out_of_range("GradientTape entry index out of range");
+		}
 		return _entries[i];
 	}
 	const auto &Entries() const {
@@ -245,6 +252,7 @@ private:
 
 	// Sub-tape support for recording Callable function bodies
 	std::vector<std::unique_ptr<GradientTape>>		 _subTapes;
+	std::stack<GradientTape *>						 _subTapeParentStack;
 	std::stack<GradientTape *>						 _subTapeStack;
 	GradientTape									*_currentSubTape = nullptr;
 };

@@ -21,6 +21,25 @@ FragmentShader::FragmentShader(const std::string &name, const FragmentFunc &func
 	BuildShaders(func);
 }
 
+FragmentShader::~FragmentShader() {
+	auto *backend = Runtime::Context::GetBackend();
+	if (!backend) {
+		return;
+	}
+	if (_pipelineHandle != Backend::INVALID_PIPELINE_HANDLE) {
+		backend->DestroyPipeline(_pipelineHandle);
+		_pipelineHandle = Backend::INVALID_PIPELINE_HANDLE;
+	}
+	if (_fsHandle != Backend::INVALID_SHADER_HANDLE) {
+		backend->DestroyShader(_fsHandle);
+		_fsHandle = Backend::INVALID_SHADER_HANDLE;
+	}
+	if (_vsHandle != Backend::INVALID_SHADER_HANDLE) {
+		backend->DestroyShader(_vsHandle);
+		_vsHandle = Backend::INVALID_SHADER_HANDLE;
+	}
+}
+
 void FragmentShader::SetName(const std::string &name) {
 	_name = name;
 }

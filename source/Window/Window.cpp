@@ -3,8 +3,6 @@
  * @brief Implementation of window management for GPU rendering.
  */
 
-#include <MiniFB.h> // For mfb_wait_sync
-
 // Include Window headers only - avoid GPU core headers to prevent template instantiation issues
 #include "Platform/MiniFBWindowPlatform.h"
 #include <Window/AppWindow.h>
@@ -174,7 +172,7 @@ void AppWindow::Present(const uint32_t *pixels, uint32_t width, uint32_t height)
 
 	// Handle vsync
 	if (_config.vsync) {
-		mfb_wait_sync(nullptr); // Uses global timer
+		_platform->WaitSync();
 	}
 }
 

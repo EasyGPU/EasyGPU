@@ -28,6 +28,8 @@ const Node *CompoundAssignmentNode::RHS() const {
 }
 
 std::unique_ptr<Node> CompoundAssignmentNode::Clone() const {
-	return std::make_unique<CompoundAssignmentNode>(_code, _lhs->Clone(), _rhs->Clone());
+	auto lhsClone = _lhs ? _lhs->Clone() : nullptr;
+	auto rhsClone = _rhs ? _rhs->Clone() : nullptr;
+	return std::make_unique<CompoundAssignmentNode>(_code, std::move(lhsClone), std::move(rhsClone));
 }
 } // namespace GPU::IR::Node

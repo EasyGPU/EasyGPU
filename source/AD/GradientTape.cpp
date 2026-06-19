@@ -588,6 +588,7 @@ void GradientTape::PushSubTape() {
 	// all be flattened into the main tape's _subTapes and recursion in
 	// ProcessCall (via CloneSubTapesFrom) would lose them.
 	GradientTape *parent = _subTapeStack.empty() ? this : _subTapeStack.top();
+	_subTapeParentStack.push(parent);
 	_subTapeStack.push(_currentSubTape);
 	parent->_subTapes.push_back(std::move(sub));
 }
@@ -595,15 +596,20 @@ void GradientTape::PushSubTape() {
 int GradientTape::PopSubTape() {
 	if (_subTapeStack.empty())
 		return -1;
-	int index = (int)_subTapes.size(); // will be size-1 after push_back, but we already pushed
+	GradientTape *current = _currentSubTape;
+	GradientTape *parent  = _subTapeParentStack.empty() ? this : _subTapeParentStack.top();
+	int			  index	  = -1;
 	// Find the index of the current sub-tape
-	for (int i = 0; i < (int)_subTapes.size(); i++) {
-		if (_subTapes[i].get() == _currentSubTape) {
+	for (int i = 0; i < (int)parent->_subTapes.size(); i++) {
+		if (parent->_subTapes[i].get() == current) {
 			index = i;
 			break;
 		}
 	}
 	_subTapeStack.pop();
+	if (!_subTapeParentStack.empty()) {
+		_subTapeParentStack.pop();
+	}
 	_currentSubTape = _subTapeStack.empty() ? nullptr : _subTapeStack.top();
 	return index;
 }

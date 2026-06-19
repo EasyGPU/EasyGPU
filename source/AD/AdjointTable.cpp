@@ -50,6 +50,8 @@ std::string AdjointTable::Get(const std::string &varName) const {
 				return "";
 			std::string adjBase = baseIt->second;
 			auto		epos	= varName.rfind(']');
+			if (epos == std::string::npos || epos <= bpos)
+				return "";
 			std::string idxExpr = varName.substr(bpos + 1, epos - bpos - 1);
 			return adjBase + "[" + idxExpr + "]";
 		}
@@ -61,6 +63,8 @@ std::string AdjointTable::Get(const std::string &varName) const {
 	auto bpos = varName.find('[');
 	if (bpos != std::string::npos) {
 		auto		epos	= varName.rfind(']');
+		if (epos == std::string::npos || epos <= bpos)
+			return it->second;
 		std::string idxExpr = varName.substr(bpos + 1, epos - bpos - 1);
 		return it->second + "[" + idxExpr + "]";
 	}

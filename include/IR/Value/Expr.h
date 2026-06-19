@@ -24,6 +24,7 @@
 
 #include <concepts>
 #include <memory>
+#include <stdexcept>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -198,7 +199,11 @@ public:
  * @return A deep copy of the underlying IR node
  */
 [[nodiscard]] inline std::unique_ptr<Node::Node> CloneNode(const ExprBase &expr) {
-	return expr.Node()->Clone();
+	auto *node = expr.Node();
+	if (!node) {
+		throw std::runtime_error("Cannot clone an empty expression");
+	}
+	return node->Clone();
 }
 
 // Forward declaration for friend declarations
