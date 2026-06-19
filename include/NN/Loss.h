@@ -83,7 +83,8 @@ inline IR::Value::Var<float> L1Loss(const IR::Value::Var<float> &pred, const IR:
 inline IR::Value::Var<float> CrossEntropyLoss(const IR::Value::BufferRef<float> &logits, int numClasses,
 											  const IR::Value::Var<int> &targetId) {
 	// Stable log-softmax: find max logit first
-	IR::Value::Var<float> maxLogit = MakeFloat(-1e9f);
+	IR::Value::Expr<float> negInf(IR::Value::RawCode("uintBitsToFloat(0xff800000u)"));
+	IR::Value::Var<float>  maxLogit = negInf;
 	GPU::Flow::For(MakeInt(0), MakeInt(numClasses),
 				   [&](IR::Value::Var<int> &i) { maxLogit = GPU::Math::Max(maxLogit, logits[i]); });
 
@@ -106,7 +107,8 @@ inline IR::Value::Var<float> CrossEntropyLoss(const IR::Value::BufferRef<float> 
 /** Overload with explicit buffer offset. */
 inline IR::Value::Var<float> CrossEntropyLoss(const IR::Value::BufferRef<float> &logits, int numClasses,
 											  const IR::Value::Var<int> &targetId, const IR::Value::Expr<int> &offset) {
-	IR::Value::Var<float> maxLogit = MakeFloat(-1e9f);
+	IR::Value::Expr<float> negInf(IR::Value::RawCode("uintBitsToFloat(0xff800000u)"));
+	IR::Value::Var<float>  maxLogit = negInf;
 	GPU::Flow::For(MakeInt(0), MakeInt(numClasses),
 				   [&](IR::Value::Var<int> &i) { maxLogit = GPU::Math::Max(maxLogit, logits[offset + i]); });
 	IR::Value::Var<float> sumExp = MakeFloat(0.0f);

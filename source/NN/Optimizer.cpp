@@ -37,6 +37,9 @@ void Adam::Step(AD::ADKernel1D &kernel) {
 			gpu_->AddParameter(ps.size, ps.buffer->GetHandle());
 		}
 	}
+	gpu_->SetLearningRate(lr_);
+	gpu_->SetBetas(beta1_, beta2_);
+	gpu_->SetEps(eps_);
 	gpu_->SetWeightDecay(weightDecay_);
 	gpu_->SetGradClip(gradClip_);
 	gpu_->Step(kernel, false);
@@ -1153,6 +1156,8 @@ void SGD::Step(AD::ADKernel1D &kernel) {
 			gpu_->AddParameter(ps.size, ps.buffer->GetHandle());
 		}
 	}
+	gpu_->SetLearningRate(lr_);
+	gpu_->SetMomentum(momentum_);
 	gpu_->SetWeightDecay(weightDecay_);
 	gpu_->SetGradClip(gradClip_);
 	gpu_->Step(kernel, false);
@@ -1173,6 +1178,9 @@ void RMSprop::Step(AD::ADKernel1D &kernel) {
 			gpu_->AddParameter(ps.size, ps.buffer->GetHandle());
 		}
 	}
+	gpu_->SetLearningRate(lr_);
+	gpu_->SetBeta(beta_);
+	gpu_->SetEps(eps_);
 	gpu_->SetWeightDecay(weightDecay_);
 	gpu_->SetGradClip(gradClip_);
 	gpu_->Step(kernel, false);

@@ -57,6 +57,7 @@ template <typename T> IR::Value::Var<T> ApplyFusedActivation(const IR::Value::Va
 
 template <typename T, size_t InFeatures, size_t HiddenFeatures, size_t OutFeatures> class FusedMLP2 {
 	static_assert(std::is_same_v<T, float>, "FusedMLP2 only supports float");
+	static_assert(HiddenFeatures <= 512, "FusedMLP2 hidden size too large for register-based approach");
 
 public:
 	FusedMLP2(unsigned initSeed = 42, FusedActivation activation = FusedActivation::ReLU) : activation_(activation) {

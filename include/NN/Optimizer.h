@@ -70,6 +70,16 @@ public:
 	void SetGradClip(float clip) {
 		gradClip_ = clip;
 	}
+	void SetLearningRate(float lr) {
+		lr_ = lr;
+	}
+	void SetBetas(float beta1, float beta2) {
+		beta1_ = beta1;
+		beta2_ = beta2;
+	}
+	void SetEps(float eps) {
+		eps_ = eps;
+	}
 
 	void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
 		ParamSlot ps;
@@ -125,6 +135,16 @@ public:
 	}
 	void SetGradClip(float clip) {
 		gradClip_ = clip;
+	}
+	void SetLearningRate(float lr) {
+		lr_ = lr;
+	}
+	void SetBetas(float beta1, float beta2) {
+		beta1_ = beta1;
+		beta2_ = beta2;
+	}
+	void SetEps(float eps) {
+		eps_ = eps;
 	}
 
 	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
@@ -221,6 +241,12 @@ public:
 	}
 	void SetGradClip(float clip) {
 		gradClip_ = clip;
+	}
+	void SetLearningRate(float lr) {
+		lr_ = lr;
+	}
+	void SetMomentum(float momentum) {
+		momentum_ = momentum;
 	}
 
 	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
@@ -320,6 +346,15 @@ public:
 	void SetGradClip(float clip) {
 		gradClip_ = clip;
 	}
+	void SetLearningRate(float lr) {
+		lr_ = lr;
+	}
+	void SetBeta(float beta) {
+		beta_ = beta;
+	}
+	void SetEps(float eps) {
+		eps_ = eps;
+	}
 
 	template <size_t... Dims> void AddTensor(Tensor<float, Dims...> &tensor) {
 		AddParameter(tensor.Size(), tensor.GetBuffer().GetHandle());
@@ -412,6 +447,12 @@ public:
 	void SetGradClip(float clip) {
 		gradClip_ = clip;
 	}
+	void SetLearningRate(float lr) {
+		lr_ = lr;
+	}
+	void SetMomentum(float momentum) {
+		momentum_ = momentum;
+	}
 
 	void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {
 		ParamSlot ps;
@@ -459,6 +500,15 @@ public:
 	}
 	void SetGradClip(float clip) {
 		gradClip_ = clip;
+	}
+	void SetLearningRate(float lr) {
+		lr_ = lr;
+	}
+	void SetBeta(float beta) {
+		beta_ = beta;
+	}
+	void SetEps(float eps) {
+		eps_ = eps;
 	}
 
 	void AddParameter(float *data, size_t size, Runtime::Buffer<float> *buf = nullptr) {

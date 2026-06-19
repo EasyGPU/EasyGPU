@@ -32,6 +32,8 @@ namespace GPU::NN {
 template <typename T, size_t EmbedDim, size_t NumHeads> class CausalSelfAttention {
 	static_assert(std::is_same_v<T, float>, "CausalSelfAttention only supports float");
 	static_assert(EmbedDim % NumHeads == 0, "EmbedDim must be divisible by NumHeads");
+	static_assert(NumHeads <= 4 * EmbedDim,
+				  "CausalSelfAttention dots scratch must fit in TransformerBlock MLP scratch region");
 	static constexpr size_t HeadDim	   = EmbedDim / NumHeads;
 
 	// Weight tensor layout: [4][EmbedDim][EmbedDim]

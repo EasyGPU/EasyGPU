@@ -859,6 +859,24 @@ TEST(nn_tanh_activation_forward_inspector) {
 }
 END_TEST
 
+TEST(nn_rmsnorm_pow_literal_exponent_skips_literal_adjoint) {
+	RMSNorm<float, 4>  norm;
+
+	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
+		Buffer<float> buf(4, BufferMode::ReadWrite);
+		auto		  b = buf.Bind();
+
+		norm.Setup();
+		norm.Forward(b, b, MakeInt(0));
+		ctx.MarkLoss(b[0]);
+	});
+
+	auto			   bw = inspector.GetBackwardCode();
+	CHECK_NOT_CONTAINS(bw, "log(");
+	CHECK_NOT_CONTAINS(bw, "float(-0.5)");
+}
+END_TEST
+
 // =============================================================================
 // SECTION 7: Layers — Sequential
 // =============================================================================
@@ -896,6 +914,30 @@ TEST(nn_sequential_setup_forward_inspector) {
 	auto fwd = inspector.GetForwardCode();
 	CHECK_CONTAINS(fwd, "for");
 	CHECK_CONTAINS(inspector.GetBackwardCode(), "d_");
+}
+END_TEST
+
+TEST(nn_sequential_ping_pong_intermediate_buffers) {
+	Sequential<float, Linear<float, 3, 4>, Linear<float, 4, 5>, Linear<float, 5, 2>> model(8, 5);
+
+	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
+		Buffer<float> inBuf(3 * 8, BufferMode::Read);
+		Buffer<float> outBuf(2 * 8, BufferMode::ReadWrite);
+		auto		  input	 = inBuf.Bind();
+		auto		  output = outBuf.Bind();
+
+		model.Setup();
+		model.Forward(input, id, output);
+		ctx.MarkLoss(output[id * 2]);
+	});
+
+	auto			   fwd = inspector.GetForwardCode();
+	CHECK_CONTAINS(fwd, "buf2_t");
+	CHECK_CONTAINS(fwd, "buf3_t");
+	CHECK_CONTAINS(fwd, "(buf2[");
+	CHECK_CONTAINS(fwd, "(buf3[");
+	CHECK_CONTAINS(fwd, "])=(buf5[");
+	CHECK_CONTAINS(fwd, "])=(buf7[");
 }
 END_TEST
 
@@ -949,6 +991,21 @@ TEST(nn_l1_loss) {
 	ASSERT(inspector.HasBackwardCode());
 	auto fwd = inspector.GetForwardCode();
 	CHECK_CONTAINS(fwd, "abs");
+}
+END_TEST
+
+TEST(nn_cross_entropy_uses_negative_infinity) {
+	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
+		Buffer<float> logitsBuf(4, BufferMode::Read);
+		auto		  logits = logitsBuf.Bind();
+
+		Var<float>	  loss	 = CrossEntropyLoss(logits, 4, id);
+		ctx.MarkLoss(loss);
+	});
+
+	auto			   fwd = inspector.GetForwardCode();
+	CHECK_CONTAINS(fwd, "uintBitsToFloat(0xff800000u)");
+	CHECK_NOT_CONTAINS(fwd, "float(-1e+09)");
 }
 END_TEST
 
@@ -1192,13 +1249,16 @@ int main() {
 	test_nn_relu_forward_inspector();
 	test_nn_sigmoid_forward_inspector();
 	test_nn_tanh_activation_forward_inspector();
+	test_nn_rmsnorm_pow_literal_exponent_skips_literal_adjoint();
 
 	test_nn_sequential_construct();
 	test_nn_sequential_setup_forward_inspector();
+	test_nn_sequential_ping_pong_intermediate_buffers();
 
 	test_nn_mse_scalar();
 	test_nn_mse_buffer_loss();
 	test_nn_l1_loss();
+	test_nn_cross_entropy_uses_negative_infinity();
 
 	test_nn_checkpoint_save_load_roundtrip();
 	test_nn_checkpoint_single_tensor();

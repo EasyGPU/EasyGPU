@@ -30,6 +30,23 @@ bool IsVectorAdjointType(const std::string &type) {
 	return type == "vec2" || type == "vec3" || type == "vec4";
 }
 
+bool IsLiteralName(const std::string &name) {
+	if (name.empty())
+		return true;
+	if (name == "true" || name == "false")
+		return true;
+	static const char *glslTypes[] = {"float", "int",	"uint",	 "bool",  "vec2",  "vec3",	"vec4",	 "ivec2", "ivec3",
+									  "ivec4", "uvec2", "uvec3", "uvec4", "bvec2", "bvec3", "bvec4", "mat2",  "mat3",
+									  "mat4",  "dvec2", "dvec3", "dvec4", "dmat2", "dmat3", "dmat4"};
+	for (const char *t : glslTypes) {
+		size_t tlen = std::char_traits<char>::length(t);
+		if (name.compare(0, tlen, t) == 0 && name.size() > tlen && name[tlen] == '(') {
+			return true;
+		}
+	}
+	return false;
+}
+
 } // namespace
 
 // =============================================================================
@@ -247,10 +264,10 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// min(a, b)  →  subgradient: pass to whichever is smaller
 	_intrinsicRules["min"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								const std::vector<std::string> &in) {
-		std::string a	   = gen->EmitTemp(e.inputs[0].glslType, in[0]);
-		std::string b	   = gen->EmitTemp(e.inputs[1].glslType, in[1]);
+		std::string a		 = gen->EmitTemp(e.inputs[0].glslType, in[0]);
+		std::string b		 = gen->EmitTemp(e.inputs[1].glslType, in[1]);
 		std::string maskType = IsVectorAdjointType(e.output.glslType) ? e.output.glslType : "float";
-		std::string choose = gen->EmitTemp(maskType, std::format("step({},{})", a, b));
+		std::string choose	 = gen->EmitTemp(maskType, std::format("step({},{})", a, b));
 		gen->EmitAccumulate(in[0], std::format("({})*({})", dOut, choose));
 		gen->EmitAccumulate(in[1], std::format("({})*(1.0-({}))", dOut, choose));
 	};
@@ -258,10 +275,10 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// max(a, b)  →  subgradient: pass to whichever is larger
 	_intrinsicRules["max"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								const std::vector<std::string> &in) {
-		std::string a	   = gen->EmitTemp(e.inputs[0].glslType, in[0]);
-		std::string b	   = gen->EmitTemp(e.inputs[1].glslType, in[1]);
+		std::string a		 = gen->EmitTemp(e.inputs[0].glslType, in[0]);
+		std::string b		 = gen->EmitTemp(e.inputs[1].glslType, in[1]);
 		std::string maskType = IsVectorAdjointType(e.output.glslType) ? e.output.glslType : "float";
-		std::string choose = gen->EmitTemp(maskType, std::format("step({},{})", a, b));
+		std::string choose	 = gen->EmitTemp(maskType, std::format("step({},{})", a, b));
 		gen->EmitAccumulate(in[0], std::format("({})*(1.0-({}))", dOut, choose));
 		gen->EmitAccumulate(in[1], std::format("({})*({})", dOut, choose));
 	};
@@ -283,12 +300,12 @@ void AdjointGenerator::RegisterIntrinsicRules() {
 	// clamp(x, lo, hi)  →  piecewise gradient
 	_intrinsicRules["clamp"] = [](AdjointGenerator *gen, const TapeEntry &e, const std::string &dOut,
 								  const std::vector<std::string> &in) {
-		std::string x		  = gen->EmitTemp(e.inputs[0].glslType, in[0]);
-		std::string lo		  = gen->EmitTemp(e.inputs[1].glslType, in[1]);
-		std::string hi		  = gen->EmitTemp(e.inputs[2].glslType, in[2]);
-		std::string maskType  = IsVectorAdjointType(e.output.glslType) ? e.output.glslType : "float";
-		std::string aboveLo	  = gen->EmitTemp(maskType, std::format("step({},{})", lo, x));
-		std::string aboveHi	  = gen->EmitTemp(maskType, std::format("step({},{})", hi, x));
+		std::string x		 = gen->EmitTemp(e.inputs[0].glslType, in[0]);
+		std::string lo		 = gen->EmitTemp(e.inputs[1].glslType, in[1]);
+		std::string hi		 = gen->EmitTemp(e.inputs[2].glslType, in[2]);
+		std::string maskType = IsVectorAdjointType(e.output.glslType) ? e.output.glslType : "float";
+		std::string aboveLo	 = gen->EmitTemp(maskType, std::format("step({},{})", lo, x));
+		std::string aboveHi	 = gen->EmitTemp(maskType, std::format("step({},{})", hi, x));
 		gen->EmitAccumulate(in[0], std::format("({})*({})*(1.0-({}))", dOut, aboveLo, aboveHi));
 		gen->EmitAccumulate(in[1], std::format("({})*(1.0-({}))", dOut, aboveLo));
 		gen->EmitAccumulate(in[2], std::format("({})*({})", dOut, aboveHi));
@@ -417,29 +434,6 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 		activeSet.insert(paramName);
 	}
 
-	// Filter: skip literal/constant names (GLSL constructors, booleans).
-	auto isLiteral = [](const std::string &name) {
-		if (name.empty())
-			return true;
-		// Boolean literals
-		if (name == "true" || name == "false")
-			return true;
-		// GLSL type constructors: float(...), vec2(...), etc.
-		// Buffer accesses look like buf[...] and are NOT literals.
-		// Only treat as literal if it starts with a GLSL type name followed by '('.
-		static const char *glslTypes[] = {"float", "int",	"uint",	 "bool",  "vec2",  "vec3",	"vec4",
-										  "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4", "bvec2",
-										  "bvec3", "bvec4", "mat2",	 "mat3",  "mat4",  "dvec2", "dvec3",
-										  "dvec4", "dmat2", "dmat3", "dmat4"};
-		for (const char *t : glslTypes) {
-			size_t tlen = std::char_traits<char>::length(t);
-			if (name.compare(0, tlen, t) == 0 && name.size() > tlen && name[tlen] == '(') {
-				return true;
-			}
-		}
-		return false;
-	};
-
 	// Extract base buffer name from a variable name.
 	// For "buf1[expr]" -> "buf1". For "v123" -> returns "" (not a buffer).
 	auto bufBaseName = [](const std::string &name) -> std::string {
@@ -469,7 +463,7 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 			const auto &entry = tape[i];
 			if (isActive(entry.output.name)) {
 				for (const auto &in : entry.inputs) {
-					if (isLiteral(in.name))
+					if (IsLiteralName(in.name))
 						continue;
 					if (activeSet.insert(in.name).second) {
 						// Also add base buffer name for producer matching
@@ -761,6 +755,9 @@ void AdjointGenerator::ProcessCompoundAssign(const TapeEntry &entry) {
 
 void AdjointGenerator::EmitAccumulate(const std::string &inputName, const std::string &gradExpr,
 									  const std::string &gradTypeHint) {
+	if (IsLiteralName(inputName))
+		return;
+
 	std::string adjName = _adjTable.Get(inputName);
 	if (adjName.empty())
 		return;

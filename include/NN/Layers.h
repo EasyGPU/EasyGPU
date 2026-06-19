@@ -256,12 +256,14 @@ public:
 	 */
 	Sequential(size_t batchSize, size_t maxInterDim)
 		: batchSize_(batchSize), interDim_(maxInterDim),
-		  interBuf_(batchSize * maxInterDim, Runtime::BufferMode::ReadWrite) {
+		  interBufA_(batchSize * maxInterDim, Runtime::BufferMode::ReadWrite),
+		  interBufB_(batchSize * maxInterDim, Runtime::BufferMode::ReadWrite) {
 	}
 
 	/** Bind all layer parameters and the internal intermediate buffer. */
 	void Setup() {
-		interRef_ = interBuf_.Bind();
+		interRefA_ = interBufA_.Bind();
+		interRefB_ = interBufB_.Bind();
 		std::apply([](auto &...layer) { (layer.Setup(), ...); }, layers_);
 	}
 
@@ -295,17 +297,28 @@ private:
 			// Last layer — output goes to final destination
 			layer.Forward(in, threadId, finalOut);
 		} else {
-			// Intermediate layer — output goes to internal buffer
-			layer.Forward(in, threadId, interRef_);
-			ForwardStep<I + 1>(interRef_, threadId, finalOut);
+			// Alternate intermediate buffers so non-in-place layers never read
+			// and write overlapping addresses in the same forward step.
+			auto &out = InterRef<I>();
+			layer.Forward(in, threadId, out);
+			ForwardStep<I + 1>(out, threadId, finalOut);
 		}
+	}
+
+	template <size_t I> IR::Value::BufferRef<T> &InterRef() {
+		if constexpr (I % 2 == 0)
+			return interRefA_;
+		else
+			return interRefB_;
 	}
 
 	std::tuple<Layers...>	layers_;
 	size_t					batchSize_;
 	size_t					interDim_;
-	Runtime::Buffer<T>		interBuf_;
-	IR::Value::BufferRef<T> interRef_;
+	Runtime::Buffer<T>		interBufA_;
+	Runtime::Buffer<T>		interBufB_;
+	IR::Value::BufferRef<T> interRefA_;
+	IR::Value::BufferRef<T> interRefB_;
 };
 
 } // namespace GPU::NN

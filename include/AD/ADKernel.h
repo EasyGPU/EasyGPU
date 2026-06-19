@@ -984,8 +984,6 @@ void main() {
 				throw std::runtime_error("ADKernel1D: failed to create GPU clear pipeline");
 		}
 
-		backend->BindPipeline(cp.pipeline);
-
 		if (_clearCountBuffer == Backend::INVALID_BUFFER_HANDLE) {
 			uint32_t			initial = 0;
 			Backend::BufferDesc desc;
@@ -996,6 +994,8 @@ void main() {
 		}
 		uint32_t count32 = static_cast<uint32_t>(floatCount);
 		backend->UploadBuffer(_clearCountBuffer, 0, sizeof(uint32_t), &count32);
+
+		backend->BindPipeline(cp.pipeline);
 
 		Backend::ResourceBinding bindings[2];
 		bindings[0].binding  = 0;
