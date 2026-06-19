@@ -94,11 +94,9 @@ public:
 	VarBase() {
 		auto name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
-		_node	  = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
-		_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		if (!_varNode) {
-			throw Runtime::InternalIRException("Failed to create variable node in default constructor");
-		}
+		auto node = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
+		_varNode  = node.get();
+		_node	  = std::move(node);
 
 		// The variable definition is truly the statement
 		Builder::Builder::Get().Build(*_varNode, true);
@@ -111,16 +109,14 @@ public:
 	VarBase(Expr<Type> &&Value) {
 		std::string name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
-		_node			 = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
-		_varNode		 = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		if (!_varNode) {
-			throw Runtime::InternalIRException("Failed to create variable node in Expr&& constructor");
-		}
+		auto		node = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
+		_varNode		 = node.get();
+		_node			 = std::move(node);
 
-		auto lhs   = Load();
-		auto rhs   = Value.Release();
+		auto lhs		 = Load();
+		auto rhs		 = Value.Release();
 
-		auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
+		auto store		 = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
 
 		// The variable definition is truly the statement
 		Builder::Builder::Get().Build(*_varNode, true);
@@ -136,16 +132,14 @@ public:
 	VarBase(Expr<Type> &Value) {
 		std::string name = Builder::Builder::Get().ContextChecked()->AssignVarName();
 
-		_node			 = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
-		_varNode		 = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		if (!_varNode) {
-			throw std::runtime_error("Internal error: Failed to create variable node");
-		}
+		auto		node = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
+		_varNode		 = node.get();
+		_node			 = std::move(node);
 
-		auto lhs   = Load();
-		auto rhs   = Value.Release();
+		auto lhs		 = Load();
+		auto rhs		 = Value.Release();
 
-		auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
+		auto store		 = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
 
 		// The variable definition is truly the statement
 		Builder::Builder::Get().Build(*_varNode, true);
@@ -159,11 +153,9 @@ public:
 	 * @param Name The name of the variable, if keep empty it will be assigned by the context
 	 */
 	VarBase(std::string Name) {
-		_node	 = std::make_unique<Node::LocalVariableNode>(Name, TypeShaderName<Type>());
-		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		if (!_varNode) {
-			throw Runtime::InternalIRException("Failed to create variable node in named constructor");
-		}
+		auto node = std::make_unique<Node::LocalVariableNode>(Name, TypeShaderName<Type>());
+		_varNode  = node.get();
+		_node	  = std::move(node);
 	}
 
 	/**
@@ -173,11 +165,9 @@ public:
 	 * @param IsExternal Flag to indicate this is an external variable (uniform, etc.)
 	 */
 	VarBase(std::string Name, bool IsExternal) {
-		_node	 = std::make_unique<Node::LocalVariableNode>(Name, TypeShaderName<Type>(), IsExternal);
-		_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
-		if (!_varNode) {
-			throw Runtime::InternalIRException("Failed to create variable node in external constructor");
-		}
+		auto node = std::make_unique<Node::LocalVariableNode>(Name, TypeShaderName<Type>(), IsExternal);
+		_varNode  = node.get();
+		_node	  = std::move(node);
 	}
 
 	/**
@@ -189,15 +179,17 @@ public:
 		// Just mark this as external too, referencing the same name
 		if (Other._varNode && Other._varNode->IsExternal()) {
 			// Re-construct as external with the same name
-			_node	 = std::make_unique<Node::LocalVariableNode>(Other._varNode->VarName(), TypeShaderName<Type>(),
-																 true); // isExternal
-			_varNode = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+			auto node = std::make_unique<Node::LocalVariableNode>(Other._varNode->VarName(), TypeShaderName<Type>(),
+																  true); // isExternal
+			_varNode  = node.get();
+			_node	  = std::move(node);
 			// Note: Don't call Build() for external variables
 		} else {
 			// Normal copy: create new variable and copy value via IR load/store
 			auto name = Builder::Builder::Get().ContextChecked()->AssignVarName();
-			_node	  = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
-			_varNode  = dynamic_cast<Node::LocalVariableNode *>(_node.get());
+			auto node = std::make_unique<Node::LocalVariableNode>(name, TypeShaderName<Type>());
+			_varNode  = node.get();
+			_node	  = std::move(node);
 			Builder::Builder::Get().Build(*_varNode, true);
 
 			auto rhs   = Other.Load();
@@ -207,17 +199,7 @@ public:
 		}
 	}
 
-	/**
-	 * Copy constructor - creates a new variable with value copied from source
-	 * @param Other The other VarBase to copy from
-	 */
-	VarBase(const VarBase &&Other) : VarBase() {
-		// Copy value via IR load/store
-		auto rhs   = Other.Load();
-		auto lhs   = Load();
-		auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
-		Builder::Builder::Get().Build(*store, true);
-	}
+	VarBase(const VarBase &&Other) = delete;
 
 	/**
 	 * Move constructor
@@ -247,23 +229,7 @@ public:
 		return *this;
 	}
 
-	/**
-	 * Assignment from another VarBase produces IR load/store (not C++ copy)
-	 * @param Other The other to assign
-	 */
-	VarBase &operator=(const VarBase &&Other) {
-		if (&Other == this) {
-			return *this;
-		}
-
-		auto rhs   = Other.Load();
-		auto lhs   = Load();
-
-		auto store = std::make_unique<Node::StoreNode>(std::move(lhs), std::move(rhs));
-		Builder::Builder::Get().Build(*store, true);
-
-		return *this;
-	}
+	VarBase &operator=(const VarBase &&Other) = delete;
 
 	/**
 	 * Assignment from a literal value produces a uniform load + store
@@ -332,7 +298,7 @@ public:
 
 	template <ScalarType T>
 	friend Expr<T> operator%(const VarBase<T> &lhs, const VarBase<T> &rhs)
-		requires BitableType<T>;
+		requires ModuloType<T>;
 
 	template <ScalarType T>
 	friend Expr<T> operator&(const VarBase<T> &lhs, const VarBase<T> &rhs)
@@ -395,11 +361,11 @@ public:
 
 	template <ScalarType T>
 	friend Expr<T> operator%(const VarBase<T> &lhs, T rhs)
-		requires BitableType<T>;
+		requires ModuloType<T>;
 
 	template <ScalarType T>
 	friend Expr<T> operator%(T lhs, const VarBase<T> &rhs)
-		requires BitableType<T>;
+		requires ModuloType<T>;
 
 	template <ScalarType T>
 	friend Expr<T> operator&(const VarBase<T> &lhs, T rhs)
@@ -938,9 +904,10 @@ public:
 	using VarBase<Type>::operator=;
 
 	// Explicitly inherit constructors to ensure they are accessible
-	Var()			 = default;
-	Var(const Var &) = default;
-	Var(Var &&)		 = default;
+	Var()			  = default;
+	Var(const Var &)  = default;
+	Var(const Var &&) = delete;
+	Var(Var &&)		  = default;
 
 	/**
 	 * @brief Forwarding constructor: create a variable reference from an existing name
@@ -1000,6 +967,8 @@ public:
 		VarBase<Type>::operator=(Expr<Type>(Other));
 		return *this;
 	}
+
+	Var &operator=(const Var &&Other) = delete;
 };
 
 // ==================== VarBase op VarBase ====================
@@ -1033,7 +1002,7 @@ template <ScalarType Type> [[nodiscard]] Expr<Type> operator/(const VarBase<Type
 
 template <ScalarType Type>
 [[nodiscard]] Expr<Type> operator%(const VarBase<Type> &lhs, const VarBase<Type> &rhs)
-	requires BitableType<Type>
+	requires ModuloType<Type>
 {
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = rhs.Load();
@@ -1187,7 +1156,7 @@ template <ScalarType Type> [[nodiscard]] Expr<Type> operator/(const VarBase<Type
 
 template <ScalarType Type>
 [[nodiscard]] Expr<Type> operator%(const VarBase<Type> &lhs, Type rhs)
-	requires BitableType<Type>
+	requires ModuloType<Type>
 {
 	auto lhsLoad = lhs.Load();
 	auto rhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(rhs));
@@ -1312,7 +1281,7 @@ template <ScalarType Type> [[nodiscard]] Expr<Type> operator/(Type lhs, const Va
 
 template <ScalarType Type>
 [[nodiscard]] Expr<Type> operator%(Type lhs, const VarBase<Type> &rhs)
-	requires BitableType<Type>
+	requires ModuloType<Type>
 {
 	auto lhsLoad = std::make_unique<Node::LoadUniformNode>(ValueToString(lhs));
 	auto rhsLoad = rhs.Load();
@@ -1643,7 +1612,7 @@ template <ScalarType Type> [[nodiscard]] Expr<Type> operator/(const VarBase<Type
 
 template <ScalarType Type>
 [[nodiscard]] Expr<Type> operator%(const VarBase<Type> &lhs, const Expr<Type> &rhs)
-	requires BitableType<Type>
+	requires ModuloType<Type>
 {
 	return Expr<Type>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mod, lhs.Load(), CloneNode(rhs)));
 }
@@ -1667,7 +1636,7 @@ template <ScalarType Type> [[nodiscard]] Expr<Type> operator/(const Expr<Type> &
 
 template <ScalarType Type>
 [[nodiscard]] Expr<Type> operator%(const Expr<Type> &lhs, const VarBase<Type> &rhs)
-	requires BitableType<Type>
+	requires ModuloType<Type>
 {
 	return Expr<Type>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mod, CloneNode(lhs), rhs.Load()));
 }

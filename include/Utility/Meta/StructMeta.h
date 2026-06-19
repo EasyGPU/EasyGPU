@@ -49,6 +49,9 @@ template <class Type>
 concept BitableType = std::same_as<Type, float> || std::same_as<Type, int> || std::same_as<Type, bool>;
 
 template <class Type>
+concept ModuloType = std::same_as<Type, int>;
+
+template <class Type>
 concept CountableType = std::same_as<Type, float> || std::same_as<Type, int>;
 
 // ScalarTypeImpl - basic scalar types

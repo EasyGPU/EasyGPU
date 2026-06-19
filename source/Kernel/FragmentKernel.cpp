@@ -31,30 +31,7 @@ namespace GPU::Kernel {
 /**
  * RAII guard for saving and restoring builder context in FragmentKernel constructors
  */
-class FragmentKernelBuilderGuard {
-public:
-	FragmentKernelBuilderGuard(IR::Builder::Builder &builder, FragmentBuildContext &newContext)
-		: _builder(builder), _previousContext(builder.Context()) {
-		_builder.Bind(newContext);
-	}
-
-	~FragmentKernelBuilderGuard() {
-		if (_previousContext != nullptr) {
-			_builder.Bind(*_previousContext);
-		} else {
-			_builder.Unbind();
-		}
-	}
-
-	FragmentKernelBuilderGuard(const FragmentKernelBuilderGuard &)			  = delete;
-	FragmentKernelBuilderGuard &operator=(const FragmentKernelBuilderGuard &) = delete;
-	FragmentKernelBuilderGuard(FragmentKernelBuilderGuard &&)				  = delete;
-	FragmentKernelBuilderGuard &operator=(FragmentKernelBuilderGuard &&)	  = delete;
-
-private:
-	IR::Builder::Builder		&_builder;
-	IR::Builder::BuilderContext *_previousContext;
-};
+using FragmentKernelBuilderGuard = IR::Builder::Builder::ScopedBind;
 
 // ===================================================================================
 // FragmentKernel2D Implementation

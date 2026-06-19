@@ -450,15 +450,16 @@ public:
 		: _elementCount(elementCount), _workSizeX(groupSize) {
 
 		// Phase 1: Build forward kernel while recording gradient tape
-		IR::Builder::Builder::Get().SetGradientTape(&_tape);
+		{
+			auto									&builder = IR::Builder::Builder::Get();
+			IR::Builder::Builder::ScopedGradientTape tapeGuard(builder, &_tape);
 
-		_forwardKernel = std::make_unique<Kernel::Kernel1D>(std::forward<Func>(func), groupSize);
+			_forwardKernel = std::make_unique<Kernel::Kernel1D>(std::forward<Func>(func), groupSize);
 
-		// Keep tape active during GetCode() so callable body operations
-		// are recorded to sub-tapes via the sub-tape stack.
-		_forwardCode   = _forwardKernel->GetCode();
-
-		IR::Builder::Builder::Get().SetGradientTape(nullptr);
+			// Keep tape active during GetCode() so callable body operations
+			// are recorded to sub-tapes via the sub-tape stack.
+			_forwardCode   = _forwardKernel->GetCode();
+		}
 
 		// Phase 2: Record parameter → buffer mapping, group by source buffer
 		for (const auto &[paramName, paramType] : _tape.Parameters()) {

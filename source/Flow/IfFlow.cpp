@@ -16,8 +16,7 @@ namespace GPU::Flow {
 // ScopedCodeCollect
 // =============================================================================
 
-ScopedCodeCollect::ScopedCodeCollect(CodeCollectContext &collectContext)
-	: _collectContext(collectContext), _originalContext(nullptr) {
+ScopedCodeCollect::ScopedCodeCollect(CodeCollectContext &collectContext) : _collectContext(collectContext) {
 	auto *builder	 = &IR::Builder::Builder::Get();
 	_originalContext = builder->Context();
 
@@ -30,9 +29,7 @@ ScopedCodeCollect::ScopedCodeCollect(CodeCollectContext &collectContext)
 
 ScopedCodeCollect::~ScopedCodeCollect() {
 	// Restore original context
-	if (_originalContext) {
-		IR::Builder::Builder::Get().Bind(*_originalContext);
-	}
+	IR::Builder::Builder::Get().Unbind();
 }
 
 // =============================================================================
@@ -72,9 +69,8 @@ IfChain &IfChain::Elif(IR::Value::Expr<bool> &&condition, const std::function<vo
 
 	// Record elif branch marker on the gradient tape
 	if (auto *tape = builder.GetGradientTape()) {
-		builder.SetGradientTape(nullptr);
-		std::string condStr = builder.BuildNode(*condition.Node());
-		builder.SetGradientTape(tape);
+		IR::Builder::Builder::ScopedGradientTape suppressTape(builder, nullptr);
+		std::string								 condStr = builder.BuildNode(*condition.Node());
 		tape->BeginElifBranch(condStr);
 	}
 
@@ -213,9 +209,8 @@ IfChain If(IR::Value::Expr<bool> condition, const std::function<void()> &body) {
 
 	// Record if branch marker on the gradient tape
 	if (auto *tape = builder.GetGradientTape()) {
-		builder.SetGradientTape(nullptr);
-		std::string condStr = builder.BuildNode(*condition.Node());
-		builder.SetGradientTape(tape);
+		IR::Builder::Builder::ScopedGradientTape suppressTape(builder, nullptr);
+		std::string								 condStr = builder.BuildNode(*condition.Node());
 		tape->BeginIfBranch(condStr);
 	}
 

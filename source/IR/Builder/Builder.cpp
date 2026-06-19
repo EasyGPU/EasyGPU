@@ -72,13 +72,15 @@ BuilderContext *Builder::ContextChecked() {
 
 void Builder::Build(const Node::Node &Node, bool IsStatement) {
 	if (_context != nullptr) {
+		std::string code = BuildNode(Node);
+		ValidateGeneratedCode(code, IsStatement ? "statement" : "expression");
 		if (IsStatement) {
-			_context->PushTranslatedCode(std::format("{};\n", BuildNode(Node)));
+			_context->PushTranslatedCode(std::format("{};\n", code));
 			if (_gradientTape) {
 				_gradientTape->Record(Node, IsStatement);
 			}
 		} else {
-			_context->PushTranslatedCode(BuildNode(Node));
+			_context->PushTranslatedCode(code);
 		}
 	}
 }

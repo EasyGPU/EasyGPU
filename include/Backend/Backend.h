@@ -187,8 +187,8 @@ struct ResourceBinding {
 enum class BarrierType : uint32_t {
 	None	= 0,
 	Buffer	= 1 << 0,
-	Texture = 1 << 2,
-	Uniform = 1 << 3,
+	Texture = 1 << 1,
+	Uniform = 1 << 2,
 	All		= Buffer | Texture | Uniform
 };
 

@@ -11,6 +11,8 @@
 #include <IR/Builder/BuilderContext.h>
 
 #include <stack>
+#include <stdexcept>
+#include <string>
 
 namespace GPU::IR::Node {
 class Node;
@@ -49,6 +51,66 @@ namespace GPU::IR::Builder {
  */
 class Builder {
 public:
+	class ScopedBind {
+	public:
+		ScopedBind(Builder &builder, BuilderContext &context) : _builder(builder) {
+			_builder.Bind(context);
+		}
+
+		~ScopedBind() {
+			_builder.Unbind();
+		}
+
+		ScopedBind(const ScopedBind &)			  = delete;
+		ScopedBind &operator=(const ScopedBind &) = delete;
+		ScopedBind(ScopedBind &&)				  = delete;
+		ScopedBind &operator=(ScopedBind &&)	  = delete;
+
+	private:
+		Builder &_builder;
+	};
+
+	class ScopedGradientTape {
+	public:
+		ScopedGradientTape(Builder &builder, GPU::AD::GradientTape *tape)
+			: _builder(builder), _previous(builder.GetGradientTape()) {
+			_builder.SetGradientTape(tape);
+		}
+
+		~ScopedGradientTape() {
+			_builder.SetGradientTape(_previous);
+		}
+
+		ScopedGradientTape(const ScopedGradientTape &)			  = delete;
+		ScopedGradientTape &operator=(const ScopedGradientTape &) = delete;
+		ScopedGradientTape(ScopedGradientTape &&)				  = delete;
+		ScopedGradientTape &operator=(ScopedGradientTape &&)	  = delete;
+
+	private:
+		Builder				  &_builder;
+		GPU::AD::GradientTape *_previous;
+	};
+
+	class ScopedCallableBody {
+	public:
+		ScopedCallableBody(Builder &builder, bool inBody) : _builder(builder), _previous(builder.IsInCallableBody()) {
+			_builder.SetInCallableBody(inBody);
+		}
+
+		~ScopedCallableBody() {
+			_builder.SetInCallableBody(_previous);
+		}
+
+		ScopedCallableBody(const ScopedCallableBody &)			  = delete;
+		ScopedCallableBody &operator=(const ScopedCallableBody &) = delete;
+		ScopedCallableBody(ScopedCallableBody &&)				  = delete;
+		ScopedCallableBody &operator=(ScopedCallableBody &&)	  = delete;
+
+	private:
+		Builder &_builder;
+		bool	 _previous;
+	};
+
 	/**
 	 * Getting the global builder for kernel function to bind
 	 * @return The global builder for kernel function to bind
@@ -88,6 +150,17 @@ public:
 	 * @param IsStatement Whether this node is a statement or a expression
 	 */
 	void Build(const Node::Node &Node, bool IsStatement);
+
+	/**
+	 * Throw if node code generation returned an empty expression where GLSL requires code.
+	 * @param code The generated code string.
+	 * @param what Description of the expression being generated.
+	 */
+	void ValidateGeneratedCode(const std::string &code, const char *what) const {
+		if (code.empty()) {
+			throw std::runtime_error(std::string("Failed to generate GLSL code for ") + what);
+		}
+	}
 
 	/**
 	 * Set the gradient tape for automatic differentiation recording.

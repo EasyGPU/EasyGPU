@@ -98,25 +98,23 @@ std::string KernelBuildContext::GetCompleteCode() {
 	// ===================================================================
 	{
 		// Save current state
-		std::string				savedCallableBody	 = std::move(_currentCallableBody);
-		bool					savedInCallableBody	 = _inCallableBody;
-		std::stack<std::string> savedBodyStack		 = std::move(_callableBodyStack);
-		auto				   &builder				 = IR::Builder::Builder::Get();
-		bool					savedBuilderCallable = builder.IsInCallableBody();
+		std::string				savedCallableBody	= std::move(_currentCallableBody);
+		bool					savedInCallableBody = _inCallableBody;
+		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
+		auto				   &builder				= IR::Builder::Builder::Get();
 
 		// Clear state for pre-execution
 		_currentCallableBody.clear();
 		_inCallableBody = false;
-		builder.SetInCallableBody(false);
+		IR::Builder::Builder::ScopedCallableBody callableBodyGuard(builder, false);
 		while (!_callableBodyStack.empty()) {
 			_callableBodyStack.pop();
 		}
 
-		auto *prevContext = builder.Context();
-		builder.Bind(*this);
+		IR::Builder::Builder::ScopedBind bindGuard(builder, *this);
 
 		// Execute all generators to collect declarations and generate bodies
-		size_t processedCount = 0;
+		size_t							 processedCount = 0;
 		while (processedCount < _callableBodyGenerators.size()) {
 			size_t currentCount = _callableBodyGenerators.size();
 			for (size_t i = processedCount; i < currentCount; ++i) {
@@ -125,18 +123,10 @@ std::string KernelBuildContext::GetCompleteCode() {
 			processedCount = currentCount;
 		}
 
-		// Restore previous context
-		if (prevContext) {
-			builder.Bind(*prevContext);
-		} else {
-			builder.Unbind();
-		}
-
 		// Restore original state
 		_currentCallableBody = std::move(savedCallableBody);
 		_inCallableBody		 = savedInCallableBody;
 		_callableBodyStack	 = std::move(savedBodyStack);
-		builder.SetInCallableBody(savedBuilderCallable);
 	}
 
 	// ===================================================================
@@ -203,20 +193,12 @@ std::string KernelBuildContext::GetCompleteCode() {
 	// Phase 2: Generate callable bodies and output definitions
 	// ===================================================================
 	{
-		auto &builder	  = IR::Builder::Builder::Get();
-		auto *prevContext = builder.Context();
-		builder.Bind(*this);
+		auto							&builder = IR::Builder::Builder::Get();
+		IR::Builder::Builder::ScopedBind bindGuard(builder, *this);
 
-		std::string callableDefs = GenerateCallableBodies();
+		std::string						 callableDefs = GenerateCallableBodies();
 		if (!callableDefs.empty()) {
 			oss << "\n" << callableDefs;
-		}
-
-		// Restore previous context
-		if (prevContext) {
-			builder.Bind(*prevContext);
-		} else {
-			builder.Unbind();
 		}
 	}
 

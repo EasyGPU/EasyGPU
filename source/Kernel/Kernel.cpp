@@ -25,30 +25,7 @@ namespace GPU::Kernel {
 /**
  * RAII guard for saving and restoring builder context in Kernel constructors.
  */
-class KernelBuilderGuard {
-public:
-	KernelBuilderGuard(IR::Builder::Builder &builder, KernelBuildContext &newContext)
-		: _builder(builder), _previousContext(builder.Context()) {
-		_builder.Bind(newContext);
-	}
-
-	~KernelBuilderGuard() {
-		if (_previousContext != nullptr) {
-			_builder.Bind(*_previousContext);
-		} else {
-			_builder.Unbind();
-		}
-	}
-
-	KernelBuilderGuard(const KernelBuilderGuard &)			  = delete;
-	KernelBuilderGuard &operator=(const KernelBuilderGuard &) = delete;
-	KernelBuilderGuard(KernelBuilderGuard &&)				  = delete;
-	KernelBuilderGuard &operator=(KernelBuilderGuard &&)	  = delete;
-
-private:
-	IR::Builder::Builder		&_builder;
-	IR::Builder::BuilderContext *_previousContext;
-};
+using KernelBuilderGuard = IR::Builder::Builder::ScopedBind;
 
 /**
  * RAII guard for backend shader handles during pipeline creation.

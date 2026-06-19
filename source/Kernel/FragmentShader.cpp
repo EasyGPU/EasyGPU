@@ -61,9 +61,8 @@ void FragmentShader::BuildShaders(const FragmentFunc &func) {
 
 	// --- Fragment Shader ---
 	{
-		IR::Builder::Builder &builder = IR::Builder::Builder::Get();
-		auto				 *prevCtx = builder.Context();
-		builder.Bind(*_context);
+		IR::Builder::Builder			&builder = IR::Builder::Builder::Get();
+		IR::Builder::Builder::ScopedBind bindGuard(builder, *_context);
 
 		// Register the one varying we use
 		_context->RegisterVarying("v_uv", "vec2");
@@ -73,11 +72,6 @@ void FragmentShader::BuildShaders(const FragmentFunc &func) {
 		IR::Value::Var<GPU::Math::Vec4> fragColor("fragColor", true);
 
 		func(fragCoord, fragColor);
-
-		if (prevCtx)
-			builder.Bind(*prevCtx);
-		else
-			builder.Unbind();
 	}
 	_fsSource = _context->GetFragmentShaderCode();
 }

@@ -263,16 +263,17 @@ public:
 	AdjointKernel1D(Func &&kernelFunc, int workSizeX = 256) : _workSizeX(workSizeX) {
 
 		// Phase 1: Build forward kernel while recording gradient tape
-		IR::Builder::Builder::Get().SetGradientTape(&_tape);
+		{
+			auto									&builder = IR::Builder::Builder::Get();
+			IR::Builder::Builder::ScopedGradientTape tapeGuard(builder, &_tape);
 
-		_forwardKernel = std::make_unique<Kernel::InspectorKernel1D>(
-			[this, func = std::forward<Func>(kernelFunc)](IR::Value::Var<int> &id) {
-				AdjointContext ctx(_tape);
-				func(id, ctx);
-			},
-			workSizeX);
-
-		IR::Builder::Builder::Get().SetGradientTape(nullptr);
+			_forwardKernel = std::make_unique<Kernel::InspectorKernel1D>(
+				[this, func = std::forward<Func>(kernelFunc)](IR::Value::Var<int> &id) {
+					AdjointContext ctx(_tape);
+					func(id, ctx);
+				},
+				workSizeX);
+		}
 
 		_forwardCode = _forwardKernel->GetCode();
 
@@ -363,16 +364,17 @@ public:
 	AdjointKernel2D(Func &&kernelFunc, int workSizeX = 16, int workSizeY = 16)
 		: _workSizeX(workSizeX), _workSizeY(workSizeY) {
 
-		IR::Builder::Builder::Get().SetGradientTape(&_tape);
+		{
+			auto									&builder = IR::Builder::Builder::Get();
+			IR::Builder::Builder::ScopedGradientTape tapeGuard(builder, &_tape);
 
-		_forwardKernel = std::make_unique<Kernel::InspectorKernel2D>(
-			[this, func = std::forward<Func>(kernelFunc)](IR::Value::Var<int> &idX, IR::Value::Var<int> &idY) {
-				AdjointContext ctx(_tape);
-				func(idX, idY, ctx);
-			},
-			workSizeX, workSizeY);
-
-		IR::Builder::Builder::Get().SetGradientTape(nullptr);
+			_forwardKernel = std::make_unique<Kernel::InspectorKernel2D>(
+				[this, func = std::forward<Func>(kernelFunc)](IR::Value::Var<int> &idX, IR::Value::Var<int> &idY) {
+					AdjointContext ctx(_tape);
+					func(idX, idY, ctx);
+				},
+				workSizeX, workSizeY);
+		}
 
 		_forwardCode = _forwardKernel->GetCode();
 
@@ -431,17 +433,18 @@ public:
 	AdjointKernel3D(Func &&kernelFunc, int workSizeX = 8, int workSizeY = 8, int workSizeZ = 4)
 		: _workSizeX(workSizeX), _workSizeY(workSizeY), _workSizeZ(workSizeZ) {
 
-		IR::Builder::Builder::Get().SetGradientTape(&_tape);
+		{
+			auto									&builder = IR::Builder::Builder::Get();
+			IR::Builder::Builder::ScopedGradientTape tapeGuard(builder, &_tape);
 
-		_forwardKernel = std::make_unique<Kernel::InspectorKernel3D>(
-			[this, func = std::forward<Func>(kernelFunc)](IR::Value::Var<int> &idX, IR::Value::Var<int> &idY,
-														  IR::Value::Var<int> &idZ) {
-				AdjointContext ctx(_tape);
-				func(idX, idY, idZ, ctx);
-			},
-			workSizeX, workSizeY, workSizeZ);
-
-		IR::Builder::Builder::Get().SetGradientTape(nullptr);
+			_forwardKernel = std::make_unique<Kernel::InspectorKernel3D>(
+				[this, func = std::forward<Func>(kernelFunc)](IR::Value::Var<int> &idX, IR::Value::Var<int> &idY,
+															  IR::Value::Var<int> &idZ) {
+					AdjointContext ctx(_tape);
+					func(idX, idY, idZ, ctx);
+				},
+				workSizeX, workSizeY, workSizeZ);
+		}
 
 		_forwardCode = _forwardKernel->GetCode();
 

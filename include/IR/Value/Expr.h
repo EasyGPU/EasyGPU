@@ -425,7 +425,9 @@ public:
 		return Expr<T>(std::make_unique<Node::OperationNode>(Node::OperationCode::Div, CloneNode(lhs), CloneNode(rhs)));
 	}
 
-	friend Expr<T> operator%(const Expr<T> &lhs, const Expr<T> &rhs) {
+	friend Expr<T> operator%(const Expr<T> &lhs, const Expr<T> &rhs)
+		requires ModuloType<T>
+	{
 		return Expr<T>(std::make_unique<Node::OperationNode>(Node::OperationCode::Mod, CloneNode(lhs), CloneNode(rhs)));
 	}
 

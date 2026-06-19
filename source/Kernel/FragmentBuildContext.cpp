@@ -75,23 +75,21 @@ void FragmentBuildContext::GenerateCommonHeaders(std::ostringstream &oss) {
 std::string FragmentBuildContext::GetCompleteCode() {
 	// Execute all body generators first
 	{
-		std::string				savedCallableBody	 = std::move(_currentCallableBody);
-		bool					savedInCallableBody	 = _inCallableBody;
-		std::stack<std::string> savedBodyStack		 = std::move(_callableBodyStack);
+		std::string				savedCallableBody	= std::move(_currentCallableBody);
+		bool					savedInCallableBody = _inCallableBody;
+		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
 
-		auto				   &builder				 = IR::Builder::Builder::Get();
-		bool					savedBuilderCallable = builder.IsInCallableBody();
+		auto				   &builder				= IR::Builder::Builder::Get();
 		_currentCallableBody.clear();
 		_inCallableBody = false;
-		builder.SetInCallableBody(false);
+		IR::Builder::Builder::ScopedCallableBody callableBodyGuard(builder, false);
 		while (!_callableBodyStack.empty()) {
 			_callableBodyStack.pop();
 		}
 
-		auto *prevContext = builder.Context();
-		builder.Bind(*this);
+		IR::Builder::Builder::ScopedBind bindGuard(builder, *this);
 
-		size_t processedCount = 0;
+		size_t							 processedCount = 0;
 		while (processedCount < _callableBodyGenerators.size()) {
 			size_t currentCount = _callableBodyGenerators.size();
 			for (size_t i = processedCount; i < currentCount; ++i) {
@@ -100,16 +98,9 @@ std::string FragmentBuildContext::GetCompleteCode() {
 			processedCount = currentCount;
 		}
 
-		if (prevContext) {
-			builder.Bind(*prevContext);
-		} else {
-			builder.Unbind();
-		}
-
 		_currentCallableBody = std::move(savedCallableBody);
 		_inCallableBody		 = savedInCallableBody;
 		_callableBodyStack	 = std::move(savedBodyStack);
-		builder.SetInCallableBody(savedBuilderCallable);
 	}
 
 	std::ostringstream oss;
@@ -147,23 +138,21 @@ std::string FragmentBuildContext::GetVertexShaderSource() {
 std::string FragmentBuildContext::GetFragmentShaderSource() {
 	// Execute all body generators first
 	{
-		std::string				savedCallableBody	 = std::move(_currentCallableBody);
-		bool					savedInCallableBody	 = _inCallableBody;
-		std::stack<std::string> savedBodyStack		 = std::move(_callableBodyStack);
+		std::string				savedCallableBody	= std::move(_currentCallableBody);
+		bool					savedInCallableBody = _inCallableBody;
+		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
 
-		auto				   &builder				 = IR::Builder::Builder::Get();
-		bool					savedBuilderCallable = builder.IsInCallableBody();
-		_callableBodyStack.pop();
+		auto				   &builder				= IR::Builder::Builder::Get();
+		_currentCallableBody.clear();
+		_inCallableBody = false;
+		IR::Builder::Builder::ScopedCallableBody callableBodyGuard(builder, false);
 		while (!_callableBodyStack.empty()) {
-			_currentCallableBody.clear();
-			_inCallableBody = false;
-			builder.SetInCallableBody(false);
+			_callableBodyStack.pop();
 		}
 
-		auto *prevContext = builder.Context();
-		builder.Bind(*this);
+		IR::Builder::Builder::ScopedBind bindGuard(builder, *this);
 
-		size_t processedCount = 0;
+		size_t							 processedCount = 0;
 		while (processedCount < _callableBodyGenerators.size()) {
 			size_t currentCount = _callableBodyGenerators.size();
 			for (size_t i = processedCount; i < currentCount; ++i) {
@@ -172,16 +161,9 @@ std::string FragmentBuildContext::GetFragmentShaderSource() {
 			processedCount = currentCount;
 		}
 
-		if (prevContext) {
-			builder.Bind(*prevContext);
-		} else {
-			builder.Unbind();
-		}
-
 		_currentCallableBody = std::move(savedCallableBody);
 		_inCallableBody		 = savedInCallableBody;
 		_callableBodyStack	 = std::move(savedBodyStack);
-		builder.SetInCallableBody(savedBuilderCallable);
 	}
 
 	std::ostringstream oss;

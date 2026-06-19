@@ -17,12 +17,14 @@
 #include <Utility/Meta/StructMeta.h>
 #include <Utility/Vec.h>
 
+#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <format>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace GPU::Runtime {
@@ -83,79 +85,40 @@ template <typename T> struct IsStructRegistered {
 };
 
 /**
- * @brief Get the GLSL type name for registered struct types.
- * @tparam T The registered struct type.
- * @return The GLSL struct type name as defined by StructMeta.
- */
-template <typename T> std::string GetGLSLTypeNameForBuffer(T *) {
-	auto sv = std::string(GPU::Meta::StructMeta<T>::glslTypeName);
-	return std::string(sv.data(), sv.size());
-}
-
-/** @brief Get GLSL type name for float buffers. */
-inline std::string GetGLSLTypeNameForBuffer(float *) {
-	return "float";
-}
-/** @brief Get GLSL type name for int buffers. */
-inline std::string GetGLSLTypeNameForBuffer(int *) {
-	return "int";
-}
-/** @brief Get GLSL type name for bool buffers. */
-inline std::string GetGLSLTypeNameForBuffer(bool *) {
-	return "bool";
-}
-/** @brief Get GLSL type name for vec2 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::Vec2 *) {
-	return "vec2";
-}
-/** @brief Get GLSL type name for vec3 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::Vec3 *) {
-	return "vec3";
-}
-/** @brief Get GLSL type name for vec4 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::Vec4 *) {
-	return "vec4";
-}
-/** @brief Get GLSL type name for ivec2 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::IVec2 *) {
-	return "ivec2";
-}
-/** @brief Get GLSL type name for ivec3 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::IVec3 *) {
-	return "ivec3";
-}
-/** @brief Get GLSL type name for ivec4 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::IVec4 *) {
-	return "ivec4";
-}
-/** @brief Get GLSL type name for mat2 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::Mat2 *) {
-	return "mat2";
-}
-/** @brief Get GLSL type name for mat3 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::Mat3 *) {
-	return "mat3";
-}
-/** @brief Get GLSL type name for mat4 buffers. */
-inline std::string GetGLSLTypeNameForBuffer(Math::Mat4 *) {
-	return "mat4";
-}
-
-/**
  * @brief Deduce GLSL type name for buffer from template parameter.
  * @tparam T The element type to deduce GLSL type name for.
  * @return The GLSL type name string.
  */
 template <typename T> std::string GetGLSLTypeNameForBuffer() {
-	return GetGLSLTypeNameForBuffer(static_cast<T *>(nullptr));
-}
-/** @brief Specialization: GLSL type name for mat3. */
-template <> inline std::string GetGLSLTypeNameForBuffer<Math::Mat3>() {
-	return "mat3";
-}
-/** @brief Specialization: GLSL type name for mat4. */
-template <> inline std::string GetGLSLTypeNameForBuffer<Math::Mat4>() {
-	return "mat4";
+	if constexpr (std::same_as<T, float>) {
+		return "float";
+	} else if constexpr (std::same_as<T, int>) {
+		return "int";
+	} else if constexpr (std::same_as<T, bool>) {
+		return "bool";
+	} else if constexpr (std::same_as<T, Math::Vec2>) {
+		return "vec2";
+	} else if constexpr (std::same_as<T, Math::Vec3>) {
+		return "vec3";
+	} else if constexpr (std::same_as<T, Math::Vec4>) {
+		return "vec4";
+	} else if constexpr (std::same_as<T, Math::IVec2>) {
+		return "ivec2";
+	} else if constexpr (std::same_as<T, Math::IVec3>) {
+		return "ivec3";
+	} else if constexpr (std::same_as<T, Math::IVec4>) {
+		return "ivec4";
+	} else if constexpr (std::same_as<T, Math::Mat2>) {
+		return "mat2";
+	} else if constexpr (std::same_as<T, Math::Mat3>) {
+		return "mat3";
+	} else if constexpr (std::same_as<T, Math::Mat4>) {
+		return "mat4";
+	} else if constexpr (GPU::Meta::RegisteredStruct<T>) {
+		return std::string(GPU::Meta::StructMeta<T>::glslTypeName);
+	} else {
+		static_assert(GPU::Meta::RegisteredStruct<T>, "Unsupported buffer element type");
+	}
 }
 
 /**
@@ -432,6 +395,8 @@ private:
 	}
 
 private:
+	struct LifetimeTag {};
+
 	Backend::BufferHandle				   _bufferHandle	= Backend::INVALID_BUFFER_HANDLE;
 	size_t								   _count			= 0;
 	size_t								   _elementSize		= sizeof(T);
@@ -439,7 +404,7 @@ private:
 	int									   _boundBinding	= -1;
 	std::unique_ptr<Meta::LayoutConverter> _layoutConverter = nullptr;
 	bool								   _moved			= false; // Track if buffer has been moved from
-	std::shared_ptr<void>				   _lifetimeToken	= std::make_shared<int>(0);
+	std::shared_ptr<void>				   _lifetimeToken	= std::make_shared<LifetimeTag>();
 };
 
 } // namespace GPU::Runtime

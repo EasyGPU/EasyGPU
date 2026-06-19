@@ -44,27 +44,7 @@
 
 namespace GPU::Kernel {
 
-class GraphicsPipelineBuilderGuard {
-public:
-	GraphicsPipelineBuilderGuard(IR::Builder::Builder &builder, GraphicsBuildContext &newContext)
-		: _builder(builder), _previousContext(builder.Context()) {
-		_builder.Bind(newContext);
-	}
-	~GraphicsPipelineBuilderGuard() {
-		if (_previousContext)
-			_builder.Bind(*_previousContext);
-		else
-			_builder.Unbind();
-	}
-	GraphicsPipelineBuilderGuard(const GraphicsPipelineBuilderGuard &)			  = delete;
-	GraphicsPipelineBuilderGuard &operator=(const GraphicsPipelineBuilderGuard &) = delete;
-	GraphicsPipelineBuilderGuard(GraphicsPipelineBuilderGuard &&)				  = delete;
-	GraphicsPipelineBuilderGuard &operator=(GraphicsPipelineBuilderGuard &&)	  = delete;
-
-private:
-	IR::Builder::Builder		&_builder;
-	IR::Builder::BuilderContext *_previousContext;
-};
+using GraphicsPipelineBuilderGuard = IR::Builder::Builder::ScopedBind;
 
 /**
  * @brief Complete rasterization pipeline (vertex shader + fragment shader DSL).

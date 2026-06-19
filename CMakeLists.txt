@@ -388,6 +388,7 @@ add_library(EasyGPU STATIC
     include/Flow/IfFlow.h
     source/Flow/IfFlow.cpp
     include/Flow/ForFlow.h
+    source/Flow/ForFlow.cpp
     include/Flow/WhileFlow.h
     include/Flow/DoWhileFlow.h
     include/Flow/BreakFlow.h
