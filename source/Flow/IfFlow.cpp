@@ -17,19 +17,17 @@ namespace GPU::Flow {
 // =============================================================================
 
 ScopedCodeCollect::ScopedCodeCollect(CodeCollectContext &collectContext) : _collectContext(collectContext) {
-	auto *builder	 = &IR::Builder::Builder::Get();
-	_originalContext = builder->Context();
+	auto *builder		= &IR::Builder::Builder::Get();
+	auto *parentContext = builder->Context();
 
 	// Set parent for delegation
-	_collectContext.SetParentContext(_originalContext);
+	_collectContext.SetParentContext(parentContext);
 
 	// Switch to collection context
-	builder->Bind(_collectContext);
+	_bindGuard.emplace(*builder, _collectContext);
 }
 
 ScopedCodeCollect::~ScopedCodeCollect() {
-	// Restore original context
-	IR::Builder::Builder::Get().Unbind();
 }
 
 // =============================================================================

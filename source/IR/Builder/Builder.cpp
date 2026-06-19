@@ -35,6 +35,19 @@
 #include <sstream>
 
 namespace GPU::IR::Builder {
+namespace {
+bool IsLegitimateEmptyBuild(const Node::Node &node) {
+	if (node.Type() == Node::NodeType::SharedMemory) {
+		return true;
+	}
+	if (node.Type() == Node::NodeType::LocalVariable) {
+		const auto &local = static_cast<const Node::LocalVariableNode &>(node);
+		return local.IsExternal();
+	}
+	return false;
+}
+} // namespace
+
 Builder &Builder::Get() {
 	thread_local static Builder builder;
 
@@ -73,6 +86,9 @@ BuilderContext *Builder::ContextChecked() {
 void Builder::Build(const Node::Node &Node, bool IsStatement) {
 	if (_context != nullptr) {
 		std::string code = BuildNode(Node);
+		if (code.empty() && IsLegitimateEmptyBuild(Node)) {
+			return;
+		}
 		ValidateGeneratedCode(code, IsStatement ? "statement" : "expression");
 		if (IsStatement) {
 			_context->PushTranslatedCode(std::format("{};\n", code));

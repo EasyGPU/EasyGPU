@@ -17,6 +17,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -46,8 +47,8 @@ public:
 	ScopedCodeCollect &operator=(const ScopedCodeCollect &) = delete;
 
 private:
-	CodeCollectContext			&_collectContext;
-	IR::Builder::BuilderContext *_originalContext;
+	CodeCollectContext						   &_collectContext;
+	std::optional<IR::Builder::Builder::ScopedBind> _bindGuard;
 };
 
 /**

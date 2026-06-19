@@ -273,9 +273,9 @@ public:
 					func(id, ctx);
 				},
 				workSizeX);
-		}
 
-		_forwardCode = _forwardKernel->GetCode();
+			_forwardCode = _forwardKernel->GetCode();
+		}
 
 		// Phase 2: Generate adjoint body
 		AdjointGenerator gen;
@@ -374,9 +374,9 @@ public:
 					func(idX, idY, ctx);
 				},
 				workSizeX, workSizeY);
-		}
 
-		_forwardCode = _forwardKernel->GetCode();
+			_forwardCode = _forwardKernel->GetCode();
+		}
 
 		AdjointGenerator gen;
 		_body		 = gen.GenerateBody(_tape, true);
@@ -444,9 +444,9 @@ public:
 					func(idX, idY, idZ, ctx);
 				},
 				workSizeX, workSizeY, workSizeZ);
-		}
 
-		_forwardCode = _forwardKernel->GetCode();
+			_forwardCode = _forwardKernel->GetCode();
+		}
 
 		AdjointGenerator gen;
 		_body		 = gen.GenerateBody(_tape, true);

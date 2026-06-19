@@ -3,6 +3,7 @@
  * @brief Regression tests for Builder/DSL state hardening.
  */
 
+#include <AD/GradientTape.h>
 #include <Backend/Backend.h>
 #include <IR/Builder/Builder.h>
 #include <IR/Value/Expr.h>
@@ -150,8 +151,9 @@ static void test_scoped_gradient_tape_restores_previous_state() {
 
 	assert(builder.GetGradientTape() == nullptr);
 	{
-		Builder::ScopedGradientTape guard(builder, reinterpret_cast<AD::GradientTape *>(0x1));
-		assert(builder.GetGradientTape() == reinterpret_cast<AD::GradientTape *>(0x1));
+		AD::GradientTape			dummyTape;
+		Builder::ScopedGradientTape guard(builder, &dummyTape);
+		assert(builder.GetGradientTape() == &dummyTape);
 	}
 	assert(builder.GetGradientTape() == nullptr);
 }
