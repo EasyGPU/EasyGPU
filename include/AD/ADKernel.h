@@ -889,9 +889,13 @@ public:
 		Backend::BufferHandle gradHandle  = Backend::INVALID_BUFFER_HANDLE;
 	};
 
-	std::vector<GradientParamInfo> GradientParams() const {
-		std::vector<GradientParamInfo> out;
-		out.reserve(ParameterCount());
+	const std::vector<GradientParamInfo> &GradientParams() const {
+		if (_gradientParamsCached) {
+			return _cachedGradientParams;
+		}
+
+		_cachedGradientParams.clear();
+		_cachedGradientParams.reserve(ParameterCount());
 		for (const auto &pm : _params) {
 			for (size_t elem = 0; elem < pm.elementCount; elem++) {
 				GradientParamInfo info;
@@ -900,10 +904,11 @@ public:
 				info.gradOffset	 = pm.gradOffset + static_cast<int>(elem);
 				info.gradStride	 = pm.gradStride;
 				info.gradHandle	 = pm.gradHandle;
-				out.push_back(std::move(info));
+				_cachedGradientParams.push_back(std::move(info));
 			}
 		}
-		return out;
+		_gradientParamsCached = true;
+		return _cachedGradientParams;
 	}
 
 private:
@@ -929,6 +934,9 @@ private:
 		Backend::ShaderHandle	shader	 = Backend::INVALID_SHADER_HANDLE;
 		Backend::PipelineHandle pipeline = Backend::INVALID_PIPELINE_HANDLE;
 	};
+
+	mutable std::vector<GradientParamInfo> _cachedGradientParams;
+	mutable bool						   _gradientParamsCached = false;
 
 	/** Extract the base buffer name from a var name like "buf2[0]" → "buf2". */
 	static std::string ExtractBaseName(const std::string &varName) {
@@ -984,6 +992,7 @@ private:
 				}
 			}
 		}
+		_gradientParamsCached = false;
 	}
 
 	void ReleaseGradientBuffers() {
@@ -1001,6 +1010,7 @@ private:
 		for (auto &pm : _params) {
 			pm.gradHandle = Backend::INVALID_BUFFER_HANDLE;
 		}
+		_gradientParamsCached = false;
 		// Release combined adjoint pool SSBO
 		if (_adjPoolHandle != Backend::INVALID_BUFFER_HANDLE) {
 			backend->DestroyBuffer(_adjPoolHandle);

@@ -228,67 +228,8 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 	// Upload uniform values
 	context.UploadUniformValues(pipeline);
 
-	// Prepare resource bindings
-	std::vector<Backend::ResourceBinding> bindings;
-
-	// Bind all buffers to their specified binding points
-	const auto							 &bufferBindings = context.GetRuntimeBufferBindings();
-	for (const auto &[binding, handle] : bufferBindings) {
-		Backend::ResourceBinding rb;
-		rb.binding = binding;
-		rb.type	   = Backend::BindingType::Buffer;
-		rb.buffer  = static_cast<Backend::BufferHandle>(handle);
-		bindings.push_back(rb);
-	}
-
-	// Bind all textures to their specified binding points
-	const auto &textureBindings = context.GetRuntimeTextureBindings();
-	for (const auto &[binding, handle] : textureBindings) {
-		const auto *textureInfo = context.FindTextureInfo(binding);
-		if (!textureInfo) {
-			throw std::runtime_error("Runtime texture binding missing shader-side texture metadata");
-		}
-		Backend::ResourceBinding rb;
-		rb.binding	= binding;
-		rb.type		= textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
-		rb.texture	= static_cast<Backend::TextureHandle>(handle);
-		rb.format	= Runtime::ToBackendPixelFormat(textureInfo->format);
-		rb.readOnly = textureInfo->sampled;
-		bindings.push_back(rb);
-	}
-
-	// Bind all buffer slots (dynamic resource switching)
-	const auto &bufferSlots = context.GetBufferSlots();
-	for (auto *slot : bufferSlots) {
-		if (!slot->IsAttached()) {
-			throw std::runtime_error("BufferSlot not attached at dispatch time");
-		}
-		Backend::ResourceBinding rb;
-		rb.binding = context.GetBufferSlotBinding(slot);
-		rb.type	   = Backend::BindingType::Buffer;
-		rb.buffer  = slot->GetHandle();
-		bindings.push_back(rb);
-	}
-
-	// Bind all texture slots
-	const auto &textureSlots = context.GetTextureSlots();
-	for (auto *slot : textureSlots) {
-		if (!slot->IsAttached()) {
-			throw std::runtime_error("TextureSlot not attached at dispatch time");
-		}
-		uint32_t	slotBinding = context.GetTextureSlotBinding(slot);
-		const auto *textureInfo = context.FindTextureInfo(slotBinding);
-		if (!textureInfo) {
-			throw std::runtime_error("TextureSlot missing shader-side texture metadata");
-		}
-		Backend::ResourceBinding rb;
-		rb.binding	= slotBinding;
-		rb.type		= textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
-		rb.texture	= slot->GetHandle();
-		rb.format	= Runtime::ToBackendPixelFormat(slot->GetFormat());
-		rb.readOnly = textureInfo->sampled;
-		bindings.push_back(rb);
-	}
+	// Prepare resource bindings.
+	const auto &bindings = context.GetCachedBindings();
 
 	// Bind all resources
 	if (!bindings.empty()) {
@@ -298,39 +239,8 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 	// Dispatch the compute shader
 	backend->Dispatch(groupX, groupY, groupZ);
 
-	// Determine required memory barriers based on writable resources
-	Backend::BarrierType barrierType = Backend::BarrierType::None;
-
-	for (const auto &bufferInfo : context.GetBufferInfos()) {
-		if (bufferInfo.mode != GPU::Backend::BUFFER_MODE_READ_ONLY) {
-			barrierType = barrierType | Backend::BarrierType::Buffer;
-			break;
-		}
-	}
-
-	if (!HasFlag(barrierType, Backend::BarrierType::Buffer)) {
-		for (const auto *slot : context.GetBufferSlots()) {
-			if (slot->GetMode() != GPU::Backend::BUFFER_MODE_READ_ONLY) {
-				barrierType = barrierType | Backend::BarrierType::Buffer;
-				break;
-			}
-		}
-	}
-
-	for (const auto &textureInfo : context.GetTextureInfos()) {
-		if (!textureInfo.sampled) {
-			barrierType = barrierType | Backend::BarrierType::Texture;
-			break;
-		}
-	}
-
-	for (const auto *slot : context.GetTextureSlots()) {
-		if (!slot->UsesSamplerBinding()) {
-			barrierType = barrierType | Backend::BarrierType::Texture;
-			break;
-		}
-	}
-
+	// Apply pre-computed memory barriers for writable resources.
+	Backend::BarrierType barrierType = context.GetRequiredBarrierType();
 	if (barrierType != Backend::BarrierType::None) {
 		backend->MemoryBarrier(barrierType);
 	}
@@ -584,10 +494,14 @@ std::string Kernel1D::GetName() const {
 }
 
 void Kernel1D::Dispatch(int GroupX, bool sync) {
-	auto		&profiler = KernelProfiler::GetInstance();
-	unsigned int queryId  = profiler.BeginQuery();
-	ExecuteComputeDispatch(_context, GroupX, 1, 1, sync && queryId == 0);
-	profiler.EndQuery(queryId, _name, GroupX, 1, 1);
+	auto &profiler = KernelProfiler::GetInstance();
+	if (profiler.IsEnabled()) {
+		unsigned int queryId = profiler.BeginQuery();
+		ExecuteComputeDispatch(_context, GroupX, 1, 1, sync && queryId == 0);
+		profiler.EndQuery(queryId, _name, GroupX, 1, 1);
+	} else {
+		ExecuteComputeDispatch(_context, GroupX, 1, 1, sync);
+	}
 }
 
 std::string Kernel1D::GetCode() {
@@ -630,10 +544,14 @@ std::string Kernel2D::GetName() const {
 }
 
 void Kernel2D::Dispatch(int GroupX, int GroupY, bool sync) {
-	auto		&profiler = KernelProfiler::GetInstance();
-	unsigned int queryId  = profiler.BeginQuery();
-	ExecuteComputeDispatch(_context, GroupX, GroupY, 1, sync && queryId == 0);
-	profiler.EndQuery(queryId, _name, GroupX, GroupY, 1);
+	auto &profiler = KernelProfiler::GetInstance();
+	if (profiler.IsEnabled()) {
+		unsigned int queryId = profiler.BeginQuery();
+		ExecuteComputeDispatch(_context, GroupX, GroupY, 1, sync && queryId == 0);
+		profiler.EndQuery(queryId, _name, GroupX, GroupY, 1);
+	} else {
+		ExecuteComputeDispatch(_context, GroupX, GroupY, 1, sync);
+	}
 }
 
 std::string Kernel2D::GetCode() {
@@ -682,10 +600,14 @@ std::string Kernel3D::GetName() const {
 }
 
 void Kernel3D::Dispatch(int GroupX, int GroupY, int GroupZ, bool sync) {
-	auto		&profiler = KernelProfiler::GetInstance();
-	unsigned int queryId  = profiler.BeginQuery();
-	ExecuteComputeDispatch(_context, GroupX, GroupY, GroupZ, sync && queryId == 0);
-	profiler.EndQuery(queryId, _name, GroupX, GroupY, GroupZ);
+	auto &profiler = KernelProfiler::GetInstance();
+	if (profiler.IsEnabled()) {
+		unsigned int queryId = profiler.BeginQuery();
+		ExecuteComputeDispatch(_context, GroupX, GroupY, GroupZ, sync && queryId == 0);
+		profiler.EndQuery(queryId, _name, GroupX, GroupY, GroupZ);
+	} else {
+		ExecuteComputeDispatch(_context, GroupX, GroupY, GroupZ, sync);
+	}
 }
 
 std::string Kernel3D::GetCode() {

@@ -190,6 +190,8 @@ private:
 
 	// Alias map: alias variable → canonical variable (e.g. v95 → v85)
 	std::unordered_map<std::string, std::string>	 _aliasMap;
+	mutable std::vector<std::pair<std::string, std::string>> _sortedAliases;
+	mutable bool											 _sortedAliasesDirty = true;
 
 	// Generated temporary adjoint variable -> GLSL type
 	std::unordered_map<std::string, std::string>	 _tempTypes;

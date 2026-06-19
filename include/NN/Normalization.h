@@ -52,7 +52,7 @@ public:
 		ms							= ms / MakeFloat(static_cast<float>(EmbedDim));
 
 		// RMS scale: (ms + eps)^(-0.5) = 1 / sqrt(ms + eps)
-		IR::Value::Var<float> scale = GPU::Math::Pow(ms + MakeFloat(eps_), MakeFloat(-0.5f));
+		IR::Value::Var<float> scale = GPU::Math::Inversesqrt(ms + MakeFloat(eps_));
 
 		// Apply normalization
 		GPU::Flow::For(MakeInt(0), MakeInt(N),

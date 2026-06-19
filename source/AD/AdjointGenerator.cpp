@@ -981,6 +981,7 @@ void AdjointGenerator::BuildAliasMap() {
 		return;
 
 	_aliasMap.clear();
+	_sortedAliasesDirty = true;
 
 	// Helper: check if a name is a pure scalar variable (e.g. "v95")
 	auto isScalarVar = [](const std::string &name) -> bool {
@@ -1023,13 +1024,16 @@ std::string AdjointGenerator::ResolveAliases(const std::string &expr) const {
 	if (_aliasMap.empty())
 		return expr;
 
-	// Sort aliases by name length (longest first) to avoid partial replacements
-	std::vector<std::pair<std::string, std::string>> sortedAliases(_aliasMap.begin(), _aliasMap.end());
-	std::sort(sortedAliases.begin(), sortedAliases.end(),
-			  [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
+	// Sort aliases once by name length (longest first) to avoid partial replacements.
+	if (_sortedAliasesDirty) {
+		_sortedAliases.assign(_aliasMap.begin(), _aliasMap.end());
+		std::sort(_sortedAliases.begin(), _sortedAliases.end(),
+				  [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
+		_sortedAliasesDirty = false;
+	}
 
 	std::string result = expr;
-	for (const auto &[alias, canonical] : sortedAliases) {
+	for (const auto &[alias, canonical] : _sortedAliases) {
 		size_t pos = 0;
 		while ((pos = result.find(alias, pos)) != std::string::npos) {
 			// Word-boundary check: character before must not be [a-zA-Z0-9_]

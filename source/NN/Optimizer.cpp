@@ -65,7 +65,7 @@ void GPUAdam::AddParameter(size_t size, Backend::BufferHandle weightHandle) {
 
 void GPUAdam::Step(AD::ADKernel1D &kernel, bool sync) {
 	step_++;
-	auto gradParams = kernel.GradientParams();
+	const auto &gradParams = kernel.GradientParams();
 
 	if (params_.size() * 2 + 4 <= Backend::MAX_BUFFER_BINDINGS) {
 		StepCombined(gradParams, sync);
@@ -566,7 +566,7 @@ void GPUSGD::AddParameter(size_t size, Backend::BufferHandle weightHandle) {
 
 void GPUSGD::Step(AD::ADKernel1D &kernel, bool sync) {
 	step_++;
-	auto gradParams = kernel.GradientParams();
+	const auto &gradParams = kernel.GradientParams();
 
 	if (params_.size() * 2 + 2 <= Backend::MAX_BUFFER_BINDINGS) {
 		StepCombined(gradParams, sync);
@@ -917,7 +917,7 @@ void GPURMSprop::AddParameter(size_t size, Backend::BufferHandle weightHandle) {
 
 void GPURMSprop::Step(AD::ADKernel1D &kernel, bool sync) {
 	step_++;
-	auto gradParams = kernel.GradientParams();
+	const auto &gradParams = kernel.GradientParams();
 
 	if (params_.size() * 2 + 2 <= Backend::MAX_BUFFER_BINDINGS) {
 		StepCombined(gradParams, sync);

@@ -18,6 +18,7 @@
 #include <concepts>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GPU::Math {
@@ -34,8 +35,8 @@ namespace GPU::Math {
  * @return The expression which contains a function calling
  */
 template <typename T>
-IR::Value::Expr<T> MakeCall(const std::string &Name, std::vector<std::unique_ptr<IR::Node::Node>> Parameters) {
-	auto callNode = std::make_unique<IR::Node::IntrinsicCallNode>(Name, std::move(Parameters));
+IR::Value::Expr<T> MakeCall(std::string_view Name, std::vector<std::unique_ptr<IR::Node::Node>> Parameters) {
+	auto callNode = std::make_unique<IR::Node::IntrinsicCallNode>(std::string(Name), std::move(Parameters));
 	return IR::Value::Expr<T>(std::move(callNode));
 }
 

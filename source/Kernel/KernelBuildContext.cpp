@@ -228,6 +228,8 @@ void KernelBuildContext::RegisterBuffer(uint32_t binding, const std::string &typ
 										int mode) {
 	_buffers.push_back({binding, typeName, bufferName, mode});
 	_bufferBindings.push_back(binding);
+	InvalidateBindings();
+	InvalidateBarrierType();
 }
 
 std::string KernelBuildContext::GetBufferDeclarations() const {
@@ -272,6 +274,8 @@ void KernelBuildContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat 
 										 uint32_t width, uint32_t height, bool sampled) {
 	_textures.push_back({binding, format, textureName, width, height, 1, sampled});
 	_textureBindings.push_back(binding);
+	InvalidateBindings();
+	InvalidateBarrierType();
 }
 
 void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
@@ -279,6 +283,8 @@ void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelForma
 										   uint32_t depth, bool sampled) {
 	_textures.push_back({binding, format, textureName, width, height, depth, sampled});
 	_textureBindings.push_back(binding);
+	InvalidateBindings();
+	InvalidateBarrierType();
 }
 
 /**
@@ -513,6 +519,8 @@ void KernelBuildContext::RegisterBufferSlot(Runtime::BufferSlotBase *slot) {
 	slot->SetBindingInfo(static_cast<int>(binding), bufferName);
 	_bufferSlots.push_back(slot);
 	_bufferSlotBindings[slot] = binding;
+	InvalidateBindings();
+	InvalidateBarrierType();
 }
 
 void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
@@ -537,6 +545,8 @@ void KernelBuildContext::RegisterTextureSlot(Runtime::TextureSlotBase *slot) {
 	slot->SetBindingInfo(static_cast<int>(binding), textureName);
 	_textureSlots.push_back(slot);
 	_textureSlotBindings[slot] = binding;
+	InvalidateBindings();
+	InvalidateBarrierType();
 }
 
 uint32_t KernelBuildContext::GetBufferSlotBinding(Runtime::BufferSlotBase *slot) const {
@@ -553,6 +563,156 @@ uint32_t KernelBuildContext::GetTextureSlotBinding(Runtime::TextureSlotBase *slo
 		return it->second;
 	}
 	return static_cast<uint32_t>(slot->GetBinding());
+}
+
+const std::vector<Backend::ResourceBinding> &KernelBuildContext::GetCachedBindings() {
+	if (!_bindingsDirty && _bufferSlots.empty() && _textureSlots.empty()) {
+		return _cachedBindings;
+	}
+
+	if (!_bindingsDirty) {
+		if (_cachedBufferSlotHandles.size() != _bufferSlots.size() ||
+			_cachedTextureSlotHandles.size() != _textureSlots.size()) {
+			_bindingsDirty = true;
+		}
+	}
+
+	if (!_bindingsDirty) {
+		for (size_t i = 0; i < _bufferSlots.size(); ++i) {
+			auto *slot = _bufferSlots[i];
+			if (!slot->IsAttached() || slot->GetHandle() != _cachedBufferSlotHandles[i]) {
+				_bindingsDirty = true;
+				break;
+			}
+		}
+	}
+
+	if (!_bindingsDirty) {
+		for (size_t i = 0; i < _textureSlots.size(); ++i) {
+			auto *slot = _textureSlots[i];
+			if (!slot->IsAttached() || slot->GetHandle() != _cachedTextureSlotHandles[i] ||
+				slot->GetFormat() != _cachedTextureSlotFormats[i] ||
+				slot->UsesSamplerBinding() != _cachedTextureSlotSampled[i]) {
+				_bindingsDirty = true;
+				break;
+			}
+		}
+	}
+
+	if (!_bindingsDirty) {
+		return _cachedBindings;
+	}
+
+	_cachedBindings.clear();
+	_cachedBindings.reserve(_runtimeBuffers.size() + _runtimeTextures.size() + _bufferSlots.size() +
+							_textureSlots.size());
+	_cachedBufferSlotHandles.clear();
+	_cachedBufferSlotHandles.reserve(_bufferSlots.size());
+	_cachedTextureSlotHandles.clear();
+	_cachedTextureSlotHandles.reserve(_textureSlots.size());
+	_cachedTextureSlotFormats.clear();
+	_cachedTextureSlotFormats.reserve(_textureSlots.size());
+	_cachedTextureSlotSampled.clear();
+	_cachedTextureSlotSampled.reserve(_textureSlots.size());
+
+	for (const auto &[binding, handle] : _runtimeBuffers) {
+		Backend::ResourceBinding rb;
+		rb.binding = binding;
+		rb.type	   = Backend::BindingType::Buffer;
+		rb.buffer  = static_cast<Backend::BufferHandle>(handle);
+		_cachedBindings.push_back(rb);
+	}
+
+	for (const auto &[binding, handle] : _runtimeTextures) {
+		const auto *textureInfo = FindTextureInfo(binding);
+		if (!textureInfo) {
+			throw std::runtime_error("Runtime texture binding missing shader-side texture metadata");
+		}
+		Backend::ResourceBinding rb;
+		rb.binding	= binding;
+		rb.type		= textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+		rb.texture	= static_cast<Backend::TextureHandle>(handle);
+		rb.format	= Runtime::ToBackendPixelFormat(textureInfo->format);
+		rb.readOnly = textureInfo->sampled;
+		_cachedBindings.push_back(rb);
+	}
+
+	for (auto *slot : _bufferSlots) {
+		if (!slot->IsAttached()) {
+			throw std::runtime_error("BufferSlot not attached at dispatch time");
+		}
+		Backend::ResourceBinding rb;
+		rb.binding = GetBufferSlotBinding(slot);
+		rb.type	   = Backend::BindingType::Buffer;
+		rb.buffer  = slot->GetHandle();
+		_cachedBindings.push_back(rb);
+		_cachedBufferSlotHandles.push_back(rb.buffer);
+	}
+
+	for (auto *slot : _textureSlots) {
+		if (!slot->IsAttached()) {
+			throw std::runtime_error("TextureSlot not attached at dispatch time");
+		}
+		uint32_t	slotBinding = GetTextureSlotBinding(slot);
+		const auto *textureInfo = FindTextureInfo(slotBinding);
+		if (!textureInfo) {
+			throw std::runtime_error("TextureSlot missing shader-side texture metadata");
+		}
+		Backend::ResourceBinding rb;
+		rb.binding	= slotBinding;
+		rb.type		= textureInfo->sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
+		rb.texture	= slot->GetHandle();
+		rb.format	= Runtime::ToBackendPixelFormat(slot->GetFormat());
+		rb.readOnly = textureInfo->sampled;
+		_cachedBindings.push_back(rb);
+		_cachedTextureSlotHandles.push_back(rb.texture);
+		_cachedTextureSlotFormats.push_back(slot->GetFormat());
+		_cachedTextureSlotSampled.push_back(slot->UsesSamplerBinding());
+	}
+
+	_bindingsDirty = false;
+	return _cachedBindings;
+}
+
+Backend::BarrierType KernelBuildContext::GetRequiredBarrierType() {
+	if (_barrierComputed) {
+		return _requiredBarrierType;
+	}
+
+	_requiredBarrierType = Backend::BarrierType::None;
+
+	for (const auto &bufferInfo : _buffers) {
+		if (bufferInfo.mode != GPU::Backend::BUFFER_MODE_READ_ONLY) {
+			_requiredBarrierType = _requiredBarrierType | Backend::BarrierType::Buffer;
+			break;
+		}
+	}
+
+	if (!HasFlag(_requiredBarrierType, Backend::BarrierType::Buffer)) {
+		for (const auto *slot : _bufferSlots) {
+			if (slot->GetMode() != GPU::Backend::BUFFER_MODE_READ_ONLY) {
+				_requiredBarrierType = _requiredBarrierType | Backend::BarrierType::Buffer;
+				break;
+			}
+		}
+	}
+
+	for (const auto &textureInfo : _textures) {
+		if (!textureInfo.sampled) {
+			_requiredBarrierType = _requiredBarrierType | Backend::BarrierType::Texture;
+			break;
+		}
+	}
+
+	for (const auto *slot : _textureSlots) {
+		if (!slot->UsesSamplerBinding()) {
+			_requiredBarrierType = _requiredBarrierType | Backend::BarrierType::Texture;
+			break;
+		}
+	}
+
+	_barrierComputed = true;
+	return _requiredBarrierType;
 }
 
 // ===================================================================

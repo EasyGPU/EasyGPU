@@ -17,6 +17,7 @@
 #include <stack>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace GPU::Kernel {
@@ -115,12 +116,12 @@ public:
 	 * @brief Allocate a new buffer binding slot.
 	 * @return The allocated binding index.
 	 */
-	uint32_t	AllocateBindingSlot() override;
+	uint32_t AllocateBindingSlot() override;
 
 	/**
 	 * @brief Get the next available binding slot without allocating it.
 	 */
-	uint32_t	GetNextBinding() const {
+	uint32_t GetNextBinding() const {
 		return _nextBinding;
 	}
 
@@ -164,7 +165,11 @@ public:
 	 * @param bufferHandle The backend buffer handle.
 	 */
 	void BindRuntimeBuffer(uint32_t binding, Backend::BufferHandle bufferHandle) override {
-		_runtimeBuffers[binding] = bufferHandle;
+		auto it = _runtimeBuffers.find(binding);
+		if (it == _runtimeBuffers.end() || it->second != bufferHandle) {
+			_runtimeBuffers[binding] = bufferHandle;
+			InvalidateBindings();
+		}
 	}
 
 	/**
@@ -235,7 +240,11 @@ public:
 	 * @param textureHandle The backend texture handle.
 	 */
 	void			   BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) override {
-		_runtimeTextures[binding] = textureHandle;
+		auto it = _runtimeTextures.find(binding);
+		if (it == _runtimeTextures.end() || it->second != textureHandle) {
+			_runtimeTextures[binding] = textureHandle;
+			InvalidateBindings();
+		}
 	}
 
 	/**
@@ -357,14 +366,38 @@ public:
 	 * @param slot The buffer slot.
 	 * @return The binding index, or the slot's global binding if not found.
 	 */
-	uint32_t GetBufferSlotBinding(Runtime::BufferSlotBase *slot) const;
+	uint32_t									 GetBufferSlotBinding(Runtime::BufferSlotBase *slot) const;
 
 	/**
 	 * @brief Get the binding assigned to a texture slot within this kernel context.
 	 * @param slot The texture slot.
 	 * @return The binding index, or the slot's global binding if not found.
 	 */
-	uint32_t GetTextureSlotBinding(Runtime::TextureSlotBase *slot) const;
+	uint32_t									 GetTextureSlotBinding(Runtime::TextureSlotBase *slot) const;
+
+	/**
+	 * @brief Get resource bindings for dispatch, rebuilding only after resources change.
+	 */
+	const std::vector<Backend::ResourceBinding> &GetCachedBindings();
+
+	/**
+	 * @brief Mark cached resource bindings as dirty.
+	 */
+	void										 InvalidateBindings() {
+		_bindingsDirty = true;
+	}
+
+	/**
+	 * @brief Get the pre-computed barrier type for this kernel.
+	 */
+	Backend::BarrierType GetRequiredBarrierType();
+
+	/**
+	 * @brief Mark cached barrier requirements as dirty.
+	 */
+	void				 InvalidateBarrierType() {
+		_barrierComputed = false;
+	}
 
 public:
 	// ===================================================================
@@ -565,19 +598,27 @@ public:
 	}
 
 protected:
-	Backend::PipelineHandle			_cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+	Backend::PipelineHandle				  _cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
 
 	// Shader cache support
-	std::string						_shaderHash;
-	std::vector<uint8_t>			_cachedBinary;
-	uint32_t						_cachedBinaryFormat = 0;
+	std::string							  _shaderHash;
+	std::vector<uint8_t>				  _cachedBinary;
+	uint32_t							  _cachedBinaryFormat = 0;
+	std::vector<Backend::ResourceBinding> _cachedBindings;
+	std::vector<Backend::BufferHandle>	  _cachedBufferSlotHandles;
+	std::vector<Backend::TextureHandle>	  _cachedTextureSlotHandles;
+	std::vector<Runtime::PixelFormat>	  _cachedTextureSlotFormats;
+	std::vector<bool>					  _cachedTextureSlotSampled;
+	bool								  _bindingsDirty	   = true;
+	Backend::BarrierType				  _requiredBarrierType = Backend::BarrierType::None;
+	bool								  _barrierComputed	   = false;
 
-	int								_variableIndex;
-	int								_dimension;
-	std::string						_code;
-	std::unordered_set<std::string> _definedStructs;
-	std::vector<std::string>		_structNames;
-	std::vector<std::string>		_structDefinitions;
+	int									  _variableIndex;
+	int									  _dimension;
+	std::string							  _code;
+	std::unordered_set<std::string>		  _definedStructs;
+	std::vector<std::string>			  _structNames;
+	std::vector<std::string>			  _structDefinitions;
 
 	friend class Kernel;
 	friend class FragmentKernel2D;

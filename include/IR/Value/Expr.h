@@ -23,9 +23,9 @@
 #include <Utility/Vec.h>
 
 #include <concepts>
+#include <format>
 #include <memory>
 #include <stdexcept>
-#include <sstream>
 #include <string>
 #include <type_traits>
 
@@ -51,97 +51,64 @@ class ExprBase;
  * @return GLSL-formatted string representation of the value
  */
 template <typename Type> std::string	  ValueToString(const Type &Value) {
-	std::ostringstream oss;
-
 	if constexpr (std::same_as<Type, float>) {
-		oss << "float(" << Value << ")";
-		return oss.str();
+		return std::format("float({})", Value);
 	} else if constexpr (std::same_as<Type, int>) {
-		oss << "int(" << Value << ")";
-		return oss.str();
+		return std::format("int({})", Value);
 	} else if constexpr (std::same_as<Type, bool>) {
 		return Value ? "true" : "false";
 	} else if constexpr (std::same_as<Type, Math::Vec2>) {
-		oss << "vec2(float(" << Value.x << "), float(" << Value.y << "))";
-		return oss.str();
+		return std::format("vec2(float({}), float({}))", Value.x, Value.y);
 	} else if constexpr (std::same_as<Type, Math::Vec3>) {
-		oss << "vec3(float(" << Value.x << "), float(" << Value.y << "), float(" << Value.z << "))";
-		return oss.str();
+		return std::format("vec3(float({}), float({}), float({}))", Value.x, Value.y, Value.z);
 	} else if constexpr (std::same_as<Type, Math::Vec4>) {
-		oss << "vec4(float(" << Value.x << "), float(" << Value.y << "), float(" << Value.z << "), float(" << Value.w
-			<< "))";
-		return oss.str();
+		return std::format("vec4(float({}), float({}), float({}), float({}))", Value.x, Value.y, Value.z, Value.w);
 	} else if constexpr (std::same_as<Type, Math::IVec2>) {
-		oss << "ivec2(int(" << Value.x << "), int(" << Value.y << "))";
-		return oss.str();
+		return std::format("ivec2(int({}), int({}))", Value.x, Value.y);
 	} else if constexpr (std::same_as<Type, Math::IVec3>) {
-		oss << "ivec3(int(" << Value.x << "), int(" << Value.y << "), int(" << Value.z << "))";
-		return oss.str();
+		return std::format("ivec3(int({}), int({}), int({}))", Value.x, Value.y, Value.z);
 	} else if constexpr (std::same_as<Type, Math::IVec4>) {
-		oss << "ivec4(int(" << Value.x << "), int(" << Value.y << "), int(" << Value.z << "), int(" << Value.w << "))";
-		return oss.str();
+		return std::format("ivec4(int({}), int({}), int({}), int({}))", Value.x, Value.y, Value.z, Value.w);
 	} else if constexpr (std::same_as<Type, Math::Mat2>) {
-		oss << "mat2(float(" << Value.m00 << "), float(" << Value.m10 << "), "
-			<< "float(" << Value.m01 << "), float(" << Value.m11 << "))";
-		return oss.str();
+		return std::format("mat2(float({}), float({}), float({}), float({}))", Value.m00, Value.m10, Value.m01,
+						   Value.m11);
 	} else if constexpr (std::same_as<Type, Math::Mat3>) {
-		oss << "mat3("
-			<< "float(" << Value.m00 << "), float(" << Value.m10 << "), float(" << Value.m20 << "), "
-			<< "float(" << Value.m01 << "), float(" << Value.m11 << "), float(" << Value.m21 << "), "
-			<< "float(" << Value.m02 << "), float(" << Value.m12 << "), float(" << Value.m22 << "))";
-		return oss.str();
+		return std::format("mat3(float({}), float({}), float({}), float({}), float({}), float({}), float({}), "
+						   "float({}), float({}))",
+						   Value.m00, Value.m10, Value.m20, Value.m01, Value.m11, Value.m21, Value.m02, Value.m12,
+						   Value.m22);
 	} else if constexpr (std::same_as<Type, Math::Mat4>) {
-		oss << "mat4("
-			<< "float(" << Value.m00 << "), float(" << Value.m10 << "), float(" << Value.m20 << "), float(" << Value.m30
-			<< "), "
-			<< "float(" << Value.m01 << "), float(" << Value.m11 << "), float(" << Value.m21 << "), float(" << Value.m31
-			<< "), "
-			<< "float(" << Value.m02 << "), float(" << Value.m12 << "), float(" << Value.m22 << "), float(" << Value.m32
-			<< "), "
-			<< "float(" << Value.m03 << "), float(" << Value.m13 << "), float(" << Value.m23 << "), float(" << Value.m33
-			<< "))";
-		return oss.str();
+		return std::format("mat4(float({}), float({}), float({}), float({}), float({}), float({}), float({}), "
+						   "float({}), float({}), float({}), float({}), float({}), float({}), float({}), float({}), "
+						   "float({}))",
+						   Value.m00, Value.m10, Value.m20, Value.m30, Value.m01, Value.m11, Value.m21, Value.m31,
+						   Value.m02, Value.m12, Value.m22, Value.m32, Value.m03, Value.m13, Value.m23, Value.m33);
 	} else if constexpr (std::same_as<Type, Math::Mat2x3>) {
-		oss << "mat2x3("
-			<< "vec3(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << ")), "
-			<< "vec3(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << ")))";
-		return oss.str();
+		return std::format("mat2x3(vec3(float({}), float({}), float({})), vec3(float({}), float({}), float({})))",
+						   Value.c0.x, Value.c0.y, Value.c0.z, Value.c1.x, Value.c1.y, Value.c1.z);
 	} else if constexpr (std::same_as<Type, Math::Mat3x2>) {
-		oss << "mat3x2("
-			<< "vec2(float(" << Value.c0.x << "), float(" << Value.c0.y << ")), "
-			<< "vec2(float(" << Value.c1.x << "), float(" << Value.c1.y << ")), "
-			<< "vec2(float(" << Value.c2.x << "), float(" << Value.c2.y << ")))";
-		return oss.str();
+		return std::format("mat3x2(vec2(float({}), float({})), vec2(float({}), float({})), vec2(float({}), float({})))",
+						   Value.c0.x, Value.c0.y, Value.c1.x, Value.c1.y, Value.c2.x, Value.c2.y);
 	} else if constexpr (std::same_as<Type, Math::Mat2x4>) {
-		oss << "mat2x4("
-			<< "vec4(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << "), float("
-			<< Value.c0.w << ")), "
-			<< "vec4(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << "), float("
-			<< Value.c1.w << ")))";
-		return oss.str();
+		return std::format("mat2x4(vec4(float({}), float({}), float({}), float({})), vec4(float({}), float({}), "
+						   "float({}), float({})))",
+						   Value.c0.x, Value.c0.y, Value.c0.z, Value.c0.w, Value.c1.x, Value.c1.y, Value.c1.z,
+						   Value.c1.w);
 	} else if constexpr (std::same_as<Type, Math::Mat4x2>) {
-		oss << "mat4x2("
-			<< "vec2(float(" << Value.c0.x << "), float(" << Value.c0.y << ")), "
-			<< "vec2(float(" << Value.c1.x << "), float(" << Value.c1.y << ")), "
-			<< "vec2(float(" << Value.c2.x << "), float(" << Value.c2.y << ")), "
-			<< "vec2(float(" << Value.c3.x << "), float(" << Value.c3.y << ")))";
-		return oss.str();
+		return std::format("mat4x2(vec2(float({}), float({})), vec2(float({}), float({})), vec2(float({}), "
+						   "float({})), vec2(float({}), float({})))",
+						   Value.c0.x, Value.c0.y, Value.c1.x, Value.c1.y, Value.c2.x, Value.c2.y, Value.c3.x,
+						   Value.c3.y);
 	} else if constexpr (std::same_as<Type, Math::Mat3x4>) {
-		oss << "mat3x4("
-			<< "vec4(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << "), float("
-			<< Value.c0.w << ")), "
-			<< "vec4(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << "), float("
-			<< Value.c1.w << ")), "
-			<< "vec4(float(" << Value.c2.x << "), float(" << Value.c2.y << "), float(" << Value.c2.z << "), float("
-			<< Value.c2.w << ")))";
-		return oss.str();
+		return std::format("mat3x4(vec4(float({}), float({}), float({}), float({})), vec4(float({}), float({}), "
+						   "float({}), float({})), vec4(float({}), float({}), float({}), float({})))",
+						   Value.c0.x, Value.c0.y, Value.c0.z, Value.c0.w, Value.c1.x, Value.c1.y, Value.c1.z,
+						   Value.c1.w, Value.c2.x, Value.c2.y, Value.c2.z, Value.c2.w);
 	} else if constexpr (std::same_as<Type, Math::Mat4x3>) {
-		oss << "mat4x3("
-			<< "vec3(float(" << Value.c0.x << "), float(" << Value.c0.y << "), float(" << Value.c0.z << ")), "
-			<< "vec3(float(" << Value.c1.x << "), float(" << Value.c1.y << "), float(" << Value.c1.z << ")), "
-			<< "vec3(float(" << Value.c2.x << "), float(" << Value.c2.y << "), float(" << Value.c2.z << ")), "
-			<< "vec3(float(" << Value.c3.x << "), float(" << Value.c3.y << "), float(" << Value.c3.z << ")))";
-		return oss.str();
+		return std::format("mat4x3(vec3(float({}), float({}), float({})), vec3(float({}), float({}), float({})), "
+						   "vec3(float({}), float({}), float({})), vec3(float({}), float({}), float({})))",
+						   Value.c0.x, Value.c0.y, Value.c0.z, Value.c1.x, Value.c1.y, Value.c1.z, Value.c2.x,
+						   Value.c2.y, Value.c2.z, Value.c3.x, Value.c3.y, Value.c3.z);
 	} else {
 		return "unknown";
 	}
