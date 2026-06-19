@@ -234,6 +234,70 @@ ASSERT(compiled);
 std::cout << "  ✓ Simple Compile() works!\n";
 END_TEST
 
+TEST(inspector_optimized_glsl)
+std::cout << "\n  Testing optimized GLSL inspection...\n";
+
+GPU::Kernel::InspectorKernel1D kernel([](Var<int> &id) {
+	Var<float> x = Expr<float>(id) * 2.0f;
+	Var<float> y = (x + 1.0f) * (x + 1.0f);
+});
+
+std::string					   before = kernel.GetCode();
+std::string					   after  = kernel.GetOptimizedGLSL();
+
+ASSERT(!before.empty());
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(!after.empty());
+	ASSERT(after.find("#version") != std::string::npos);
+	ASSERT(after.find("main") != std::string::npos);
+} else {
+	ASSERT(after.empty());
+}
+std::cout << "  ✓ Optimized GLSL generated via SPIR-V toolchain!\n";
+END_TEST
+
+TEST(inspector_optimization_levels)
+std::cout << "\n  Testing selectable SPIR-V optimization levels...\n";
+
+GPU::Kernel::InspectorKernel1D kernel([](Var<int> &id) {
+	Var<float> x	= Expr<float>(id) * 2.0f;
+	Var<float> dead = x * 0.0f;
+	If(MakeBool(false), [&] { Var<float> y = dead + 1.0f; }).Else([&] { Var<float> z = x + 3.0f; });
+});
+
+ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Aggressive);
+
+std::string aggressive = kernel.GetOptimizedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(aggressive.find("#version") != std::string::npos);
+	ASSERT(aggressive.find("if (false)") == std::string::npos);
+} else {
+	ASSERT(aggressive.empty());
+}
+
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::None);
+ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::None);
+std::string none = kernel.GetOptimizedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(none.find("#version") != std::string::npos);
+	ASSERT(none.find("if (false)") != std::string::npos);
+} else {
+	ASSERT(none.empty());
+}
+
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Size);
+ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Size);
+std::string size = kernel.GetOptimizedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(size.find("#version") != std::string::npos);
+	ASSERT(size.find("if (false)") == std::string::npos);
+} else {
+	ASSERT(size.empty());
+}
+
+std::cout << "  ✓ Optimization levels selectable and observable!\n";
+END_TEST
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -257,6 +321,8 @@ int main() {
 		test_inspector_compile_2d();
 		test_inspector_compile_3d();
 		test_inspector_compile_simple_version();
+		test_inspector_optimized_glsl();
+		test_inspector_optimization_levels();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " tests passed\n";

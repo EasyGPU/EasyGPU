@@ -121,6 +121,7 @@ static void ExecuteComputeDispatch(KernelBuildContext &context, int groupX, int 
 		shaderDesc.type				 = Backend::ShaderType::Compute;
 		shaderDesc.sourceCode		 = shaderSource;
 		shaderDesc.entryPoint		 = "main";
+		shaderDesc.optimizationLevel = context.GetOptimizationLevel();
 
 		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
 		if (shader == Backend::INVALID_SHADER_HANDLE) {
@@ -274,6 +275,7 @@ static bool CompileShaderInternal(KernelBuildContext &context, std::string &erro
 		Backend::ShaderDesc shaderDesc;
 		shaderDesc.type				 = Backend::ShaderType::Compute;
 		shaderDesc.sourceCode		 = shaderSource;
+		shaderDesc.optimizationLevel = context.GetOptimizationLevel();
 
 		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
 		if (shader == Backend::INVALID_SHADER_HANDLE) {
@@ -287,6 +289,24 @@ static bool CompileShaderInternal(KernelBuildContext &context, std::string &erro
 		errorMessage = e.what();
 		return false;
 	}
+}
+
+static std::string GetOptimizedGLSLInternal(KernelBuildContext &context) {
+	Runtime::AutoInitContext();
+	Runtime::ContextGuard guard(Runtime::Context::GetInstance());
+
+	auto *backend = Runtime::Context::GetBackend();
+	if (!backend) {
+		throw std::runtime_error("Backend not available");
+	}
+
+	Backend::ShaderDesc shaderDesc;
+	shaderDesc.type				 = Backend::ShaderType::Compute;
+	shaderDesc.sourceCode		 = context.GetCompleteCode();
+	shaderDesc.entryPoint		 = "main";
+	shaderDesc.optimizationLevel = context.GetOptimizationLevel();
+
+	return backend->GetOptimizedGLSL(shaderDesc);
 }
 
 InspectorKernel1D::InspectorKernel1D(const std::function<void(IR::Value::Var<int> &Id)> &Func, int WorkSizeX)
@@ -305,6 +325,18 @@ void InspectorKernel1D::PrintCode() {
 
 std::string InspectorKernel1D::GetCode() {
 	return _context.GetCompleteCode();
+}
+
+std::string InspectorKernel1D::GetOptimizedGLSL() {
+	return GetOptimizedGLSLInternal(_context);
+}
+
+void InspectorKernel1D::SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+	_context.SetOptimizationLevel(level);
+}
+
+Backend::ShaderOptimizationLevel InspectorKernel1D::GetOptimizationLevel() const {
+	return _context.GetOptimizationLevel();
 }
 
 bool InspectorKernel1D::Compile() {
@@ -329,6 +361,7 @@ bool InspectorKernel1D::Compile(std::string &errorMessage) {
 		Backend::ShaderDesc shaderDesc;
 		shaderDesc.type				 = Backend::ShaderType::Compute;
 		shaderDesc.sourceCode		 = shaderSource;
+		shaderDesc.optimizationLevel = _context.GetOptimizationLevel();
 
 		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
 		if (shader == Backend::INVALID_SHADER_HANDLE) {
@@ -365,6 +398,18 @@ std::string InspectorKernel2D::GetCode() {
 	return _context.GetCompleteCode();
 }
 
+std::string InspectorKernel2D::GetOptimizedGLSL() {
+	return GetOptimizedGLSLInternal(_context);
+}
+
+void InspectorKernel2D::SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+	_context.SetOptimizationLevel(level);
+}
+
+Backend::ShaderOptimizationLevel InspectorKernel2D::GetOptimizationLevel() const {
+	return _context.GetOptimizationLevel();
+}
+
 bool InspectorKernel2D::Compile() {
 	std::string unused;
 	return Compile(unused);
@@ -386,6 +431,7 @@ bool InspectorKernel2D::Compile(std::string &errorMessage) {
 		Backend::ShaderDesc shaderDesc;
 		shaderDesc.type				 = Backend::ShaderType::Compute;
 		shaderDesc.sourceCode		 = shaderSource;
+		shaderDesc.optimizationLevel = _context.GetOptimizationLevel();
 
 		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
 		if (shader == Backend::INVALID_SHADER_HANDLE) {
@@ -425,6 +471,18 @@ std::string InspectorKernel3D::GetCode() {
 	return _context.GetCompleteCode();
 }
 
+std::string InspectorKernel3D::GetOptimizedGLSL() {
+	return GetOptimizedGLSLInternal(_context);
+}
+
+void InspectorKernel3D::SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+	_context.SetOptimizationLevel(level);
+}
+
+Backend::ShaderOptimizationLevel InspectorKernel3D::GetOptimizationLevel() const {
+	return _context.GetOptimizationLevel();
+}
+
 bool InspectorKernel3D::Compile() {
 	std::string unused;
 	return Compile(unused);
@@ -446,6 +504,7 @@ bool InspectorKernel3D::Compile(std::string &errorMessage) {
 		Backend::ShaderDesc shaderDesc;
 		shaderDesc.type				 = Backend::ShaderType::Compute;
 		shaderDesc.sourceCode		 = shaderSource;
+		shaderDesc.optimizationLevel = _context.GetOptimizationLevel();
 
 		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
 		if (shader == Backend::INVALID_SHADER_HANDLE) {
@@ -508,6 +567,18 @@ std::string Kernel1D::GetCode() {
 	return _context.GetCompleteCode();
 }
 
+std::string Kernel1D::GetOptimizedGLSL() {
+	return GetOptimizedGLSLInternal(_context);
+}
+
+void Kernel1D::SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+	_context.SetOptimizationLevel(level);
+}
+
+Backend::ShaderOptimizationLevel Kernel1D::GetOptimizationLevel() const {
+	return _context.GetOptimizationLevel();
+}
+
 Kernel2D::Kernel2D(const std::function<void(IR::Value::Var<int> &IdX, IR::Value::Var<int> &IdY)> &Func, int WorkSizeX,
 				   int WorkSizeY)
 	: _context(2), _name("Kernel2D") {
@@ -556,6 +627,18 @@ void Kernel2D::Dispatch(int GroupX, int GroupY, bool sync) {
 
 std::string Kernel2D::GetCode() {
 	return _context.GetCompleteCode();
+}
+
+std::string Kernel2D::GetOptimizedGLSL() {
+	return GetOptimizedGLSLInternal(_context);
+}
+
+void Kernel2D::SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+	_context.SetOptimizationLevel(level);
+}
+
+Backend::ShaderOptimizationLevel Kernel2D::GetOptimizationLevel() const {
+	return _context.GetOptimizationLevel();
 }
 
 Kernel3D::Kernel3D(
@@ -612,6 +695,18 @@ void Kernel3D::Dispatch(int GroupX, int GroupY, int GroupZ, bool sync) {
 
 std::string Kernel3D::GetCode() {
 	return _context.GetCompleteCode();
+}
+
+std::string Kernel3D::GetOptimizedGLSL() {
+	return GetOptimizedGLSLInternal(_context);
+}
+
+void Kernel3D::SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+	_context.SetOptimizationLevel(level);
+}
+
+Backend::ShaderOptimizationLevel Kernel3D::GetOptimizationLevel() const {
+	return _context.GetOptimizationLevel();
 }
 
 } // namespace GPU::Kernel

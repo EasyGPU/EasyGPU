@@ -113,6 +113,18 @@ public:
 	std::string GetCode();
 
 	/**
+	 * @brief Get backend-optimized GLSL after SPIR-V optimization and SPIRV-Cross decompilation.
+	 * @return Optimized GLSL dump for inspection.
+	 */
+	std::string GetOptimizedGLSL();
+
+	/** @brief Select the backend shader optimization preset used by Compile() and inspection. */
+	void		SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+
+	/** @brief Get the backend shader optimization preset. */
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
+
+	/**
 	 * @brief Compile the kernel to verify GLSL code is valid.
 	 * @return true if compilation succeeded, false otherwise.
 	 */
@@ -168,6 +180,18 @@ public:
 	std::string GetCode();
 
 	/**
+	 * @brief Get backend-optimized GLSL after SPIR-V optimization and SPIRV-Cross decompilation.
+	 * @return Optimized GLSL dump for inspection.
+	 */
+	std::string GetOptimizedGLSL();
+
+	/** @brief Select the backend shader optimization preset used by Compile() and inspection. */
+	void		SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+
+	/** @brief Get the backend shader optimization preset. */
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
+
+	/**
 	 * @brief Compile the kernel to verify GLSL code is valid.
 	 * @return true if compilation succeeded, false otherwise.
 	 */
@@ -217,6 +241,18 @@ public:
 	 * @return The full GLSL source code.
 	 */
 	std::string GetCode();
+
+	/**
+	 * @brief Get backend-optimized GLSL after SPIR-V optimization and SPIRV-Cross decompilation.
+	 * @return Optimized GLSL dump for inspection.
+	 */
+	std::string GetOptimizedGLSL();
+
+	/** @brief Select the backend shader optimization preset used by Compile() and inspection. */
+	void		SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+
+	/** @brief Get the backend shader optimization preset. */
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
 
 	/**
 	 * @brief Compile the kernel to verify GLSL code is valid.
@@ -296,6 +332,18 @@ public:
 	 */
 	std::string				  GetCode();
 
+	/**
+	 * @brief Get backend-optimized GLSL after SPIR-V optimization and SPIRV-Cross decompilation.
+	 * @return Optimized GLSL dump for inspection.
+	 */
+	std::string				  GetOptimizedGLSL();
+
+	/** @brief Select the backend shader optimization preset used by dispatch and inspection. */
+	void					  SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+
+	/** @brief Get the backend shader optimization preset. */
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
+
 	const KernelBuildContext &GetContext() const {
 		return _context;
 	}
@@ -356,6 +404,18 @@ public:
 	 * @return The full GLSL compute shader source.
 	 */
 	std::string				  GetCode();
+
+	/**
+	 * @brief Get backend-optimized GLSL after SPIR-V optimization and SPIRV-Cross decompilation.
+	 * @return Optimized GLSL dump for inspection.
+	 */
+	std::string				  GetOptimizedGLSL();
+
+	/** @brief Select the backend shader optimization preset used by dispatch and inspection. */
+	void					  SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+
+	/** @brief Get the backend shader optimization preset. */
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
 
 	const KernelBuildContext &GetContext() const {
 		return _context;
@@ -422,6 +482,18 @@ public:
 	 * @return The full GLSL compute shader source.
 	 */
 	std::string				  GetCode();
+
+	/**
+	 * @brief Get backend-optimized GLSL after SPIR-V optimization and SPIRV-Cross decompilation.
+	 * @return Optimized GLSL dump for inspection.
+	 */
+	std::string				  GetOptimizedGLSL();
+
+	/** @brief Select the backend shader optimization preset used by dispatch and inspection. */
+	void					  SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+
+	/** @brief Get the backend shader optimization preset. */
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
 
 	const KernelBuildContext &GetContext() const {
 		return _context;

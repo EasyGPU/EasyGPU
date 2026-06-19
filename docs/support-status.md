@@ -9,6 +9,7 @@ EasyGPU keeps its C++ kernel DSL backend-independent, but backend and platform c
 | Compute DSL, buffers, textures, control flow | Stable | Covered by GPU-backed tests |
 | Vulkan compute backend | Stable | Default backend; requires Vulkan SDK, glslang, and SPIRV-Tools |
 | OpenGL compute backend | Stable | OpenGL 4.3+ on Windows and Linux |
+| Vulkan SPIR-V optimization inspection | Stable | Vulkan-only; OpenGL accepts related APIs silently and returns empty inspection strings |
 | Vulkan graphics pipeline | Preview | Vulkan-only; API may still evolve |
 | Automatic differentiation | Preview | Broad code-generation coverage; qualify numerical behavior per model |
 | Neural-network helpers | Preview | Intended for small models and research workflows |

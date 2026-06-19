@@ -1131,6 +1131,54 @@ CHECK_CONTAINS(code, "binding = 3");
 CHECK_CONTAINS(code, "_ad_grad_");
 END_TEST
 
+TEST(ad_kernel_optimization_levels)
+GPU::Runtime::Buffer<float> xbuf(8);
+GPU::Runtime::Buffer<float> wbuf(8);
+GPU::AD::ADKernel1D kernel(
+	[&](GPU::IR::Value::Var<int> &id) {
+		auto		  xRef = xbuf.Bind();
+		auto		  wRef = wbuf.Bind();
+		Var<float> x	= xRef[id];
+		Var<float> w	= wRef[id];
+		Var<float> y	= x * w;
+		Var<float> dead = y * 0.0f;
+		If(MakeBool(false), [&] { Var<float> ignored = dead + 1.0f; }).Else([&] {
+			Var<float> loss = y * y;
+			GPU::AD::Loss(loss);
+		});
+		GPU::AD::Param(w);
+	},
+	8);
+
+ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Aggressive);
+std::string defaultCombined = kernel.GetOptimizedCombinedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(!defaultCombined.empty());
+	CHECK_CONTAINS(defaultCombined, "main");
+} else {
+	ASSERT(defaultCombined.empty());
+}
+
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Size);
+ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Size);
+std::string sizeCombined = kernel.GetOptimizedCombinedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(!sizeCombined.empty());
+	CHECK_CONTAINS(sizeCombined, "main");
+	ASSERT(sizeCombined.find("if (false)") == std::string::npos);
+} else {
+	ASSERT(sizeCombined.empty());
+}
+
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::None);
+std::string noneCombined = kernel.GetOptimizedCombinedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(noneCombined.find("if (false)") != std::string::npos);
+} else {
+	ASSERT(noneCombined.empty());
+}
+END_TEST
+
 TEST(ad_expression_gradient_uses_temporaries_for_long_coefficients)
 auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
 	Var<float> a;
@@ -1402,6 +1450,7 @@ int main() {
 	test_ad_kernel_1d_api();
 	test_ad_kernel_1d_sigmoid();
 	test_ad_kernel_1d_grad_bindings_follow_forward_bindings();
+	test_ad_kernel_optimization_levels();
 	test_ad_expression_gradient_uses_temporaries_for_long_coefficients();
 	test_ad_inspector_3d_basic();
 	test_ad_inspector_3d_vector();

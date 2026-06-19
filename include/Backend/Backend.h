@@ -116,11 +116,20 @@ enum class ShaderType {
 	Fragment
 };
 
+/** @brief SPIR-V optimization preset used by backends that support shader binary optimization. */
+enum class ShaderOptimizationLevel {
+	None,				  ///< Skip backend optimization passes.
+	Size,				  ///< Optimize for compact shader binary size. Maps to SPIRV-Tools -Os on Vulkan.
+	Aggressive,			  ///< Default. Use SPIRV-Tools' strongest general performance preset (-O) on Vulkan.
+	Performance = Aggressive ///< Compatibility alias for Aggressive.
+};
+
 /** @brief Descriptor for shader creation. */
 struct ShaderDesc {
-	ShaderType	type = ShaderType::Compute;
-	std::string sourceCode;
-	const char *entryPoint = "main";
+	ShaderType				type			  = ShaderType::Compute;
+	std::string				sourceCode;
+	const char			   *entryPoint		  = "main";
+	ShaderOptimizationLevel optimizationLevel = ShaderOptimizationLevel::Aggressive;
 };
 
 // ============================================================================
@@ -509,6 +518,17 @@ public:
 	 * @param shader Shader handle.
 	 */
 	virtual void		 DestroyShader(ShaderHandle shader)												  = 0;
+	/**
+	 * @brief Compile shader source, run backend optimization, and return a readable GLSL dump if supported.
+	 *
+	 * Backends that do not support optimized GLSL inspection should return an empty string.
+	 * @param desc Shader creation descriptor.
+	 * @return Backend-specific optimized GLSL representation.
+	 */
+	virtual std::string GetOptimizedGLSL(const ShaderDesc &desc) {
+		(void)desc;
+		return {};
+	}
 
 	/**
 	 * @brief Create a compute pipeline.

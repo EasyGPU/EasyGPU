@@ -541,8 +541,28 @@ public:
 	/**
 	 * @brief Invalidate the cached pipeline (force recompilation).
 	 */
-	void InvalidateCachedPipeline() {
-		_cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+	void InvalidateCachedPipeline();
+
+	/**
+	 * @brief Set SPIR-V optimization preset for backends that support it.
+	 * @param level Optimization preset used during shader compilation.
+	 */
+	void SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+		if (_optimizationLevel != level) {
+			InvalidateCachedPipeline();
+			_shaderHash.clear();
+			_cachedBinary.clear();
+			_cachedBinaryFormat = 0;
+			_optimizationLevel  = level;
+		}
+	}
+
+	/**
+	 * @brief Get SPIR-V optimization preset.
+	 * @return Optimization preset used during shader compilation.
+	 */
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const {
+		return _optimizationLevel;
 	}
 
 public:
@@ -604,6 +624,8 @@ protected:
 	std::string							  _shaderHash;
 	std::vector<uint8_t>				  _cachedBinary;
 	uint32_t							  _cachedBinaryFormat = 0;
+	Backend::ShaderOptimizationLevel	  _optimizationLevel =
+		Backend::ShaderOptimizationLevel::Aggressive;
 	std::vector<Backend::ResourceBinding> _cachedBindings;
 	std::vector<Backend::BufferHandle>	  _cachedBufferSlotHandles;
 	std::vector<Backend::TextureHandle>	  _cachedTextureSlotHandles;

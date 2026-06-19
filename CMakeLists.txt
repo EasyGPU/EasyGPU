@@ -20,6 +20,8 @@ option(EASYGPU_BUILD_TESTS "Build test suite" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
 option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_ENABLE_SHADER_CACHE "Enable shader binary caching for faster startup" ON)
+option(EASYGPU_ENABLE_SPIRV_OPT "Optimize Vulkan SPIR-V with SPIRV-Tools opt passes" ON)
+option(EASYGPU_ENABLE_SPIRV_CROSS_GLSL "Expose optimized Vulkan SPIR-V as GLSL through SPIRV-Cross" ON)
 set(EASYGPU_SHADER_CACHE_DIR "" CACHE STRING "Directory for shader cache (empty = use default)")
 option(EASYGPU_BUILD_WINDOW_EXAMPLES "Build window examples" ${PROJECT_IS_TOP_LEVEL})
 set(EASYGPU_BACKEND "Vulkan" CACHE STRING "Backend API to use (OpenGL or Vulkan)")
@@ -200,6 +202,7 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
     set(EASYGPU_GLSLANG_CONFIG_HINTS)
     if(DEFINED ENV{VULKAN_SDK})
         list(APPEND EASYGPU_VULKAN_SDK_HINTS
+            "$ENV{VULKAN_SDK}/lib"
             "$ENV{VULKAN_SDK}/Lib"
             "$ENV{VULKAN_SDK}/Lib32"
         )
@@ -218,6 +221,9 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
 
     if(TARGET glslang::SPIRV AND TARGET glslang::glslang-default-resource-limits)
         set(EASYGPU_USE_GLSLANG_PACKAGE ON)
+        if(EASYGPU_ENABLE_SPIRV_OPT AND NOT TARGET SPIRV-Tools-opt)
+            message(FATAL_ERROR "EASYGPU_ENABLE_SPIRV_OPT requires the glslang package to expose SPIRV-Tools-opt")
+        endif()
         set(EASYGPU_VULKAN_LIBS
             Vulkan::Vulkan
             glslang::SPIRV
@@ -234,7 +240,7 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
         find_library(SPIRV_TOOLS_LIBRARY SPIRV-Tools HINTS ${EASYGPU_VULKAN_SDK_HINTS})
         find_library(SPIRV_TOOLS_OPT_LIBRARY SPIRV-Tools-opt HINTS ${EASYGPU_VULKAN_SDK_HINTS})
 
-        foreach(required_lib
+        set(EASYGPU_REQUIRED_VULKAN_LIBS
             GLSLANG_LIBRARY
             GLSLANG_SPIRV_LIBRARY
             GLSLANG_RESOURCE_LIMITS_LIBRARY
@@ -242,12 +248,20 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
             GLSLANG_OSDEPENDENT_LIBRARY
             GLSLANG_GENERICCODEGEN_LIBRARY
             SPIRV_TOOLS_LIBRARY
-            SPIRV_TOOLS_OPT_LIBRARY
         )
+        if(EASYGPU_ENABLE_SPIRV_OPT)
+            list(APPEND EASYGPU_REQUIRED_VULKAN_LIBS SPIRV_TOOLS_OPT_LIBRARY)
+        endif()
+        foreach(required_lib ${EASYGPU_REQUIRED_VULKAN_LIBS})
             if(NOT ${required_lib})
                 message(FATAL_ERROR "Missing required Vulkan/glslang dependency: ${required_lib}")
             endif()
         endforeach()
+
+        set(EASYGPU_SPIRV_OPT_LIBS)
+        if(EASYGPU_ENABLE_SPIRV_OPT)
+            list(APPEND EASYGPU_SPIRV_OPT_LIBS ${SPIRV_TOOLS_OPT_LIBRARY})
+        endif()
 
         set(EASYGPU_VULKAN_LIBS
             Vulkan::Vulkan
@@ -258,7 +272,21 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
             ${GLSLANG_OSDEPENDENT_LIBRARY}
             ${GLSLANG_GENERICCODEGEN_LIBRARY}
             ${SPIRV_TOOLS_LIBRARY}
-            ${SPIRV_TOOLS_OPT_LIBRARY}
+            ${EASYGPU_SPIRV_OPT_LIBS}
+        )
+    endif()
+
+    if(EASYGPU_ENABLE_SPIRV_CROSS_GLSL)
+        find_library(SPIRV_CROSS_CORE_LIBRARY spirv-cross-core HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+        find_library(SPIRV_CROSS_GLSL_LIBRARY spirv-cross-glsl HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+
+        if(NOT SPIRV_CROSS_CORE_LIBRARY OR NOT SPIRV_CROSS_GLSL_LIBRARY)
+            message(FATAL_ERROR "EASYGPU_ENABLE_SPIRV_CROSS_GLSL requires spirv-cross-core and spirv-cross-glsl")
+        endif()
+
+        list(APPEND EASYGPU_VULKAN_LIBS
+            ${SPIRV_CROSS_GLSL_LIBRARY}
+            ${SPIRV_CROSS_CORE_LIBRARY}
         )
     endif()
 endif()
@@ -482,6 +510,12 @@ endif()
 
 if(EASYGPU_BACKEND STREQUAL "Vulkan")
     target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_VULKAN)
+    if(EASYGPU_ENABLE_SPIRV_OPT)
+        target_compile_definitions(EasyGPU PRIVATE EASYGPU_SPIRV_OPT_ENABLED)
+    endif()
+    if(EASYGPU_ENABLE_SPIRV_CROSS_GLSL)
+        target_compile_definitions(EasyGPU PRIVATE EASYGPU_SPIRV_CROSS_GLSL_ENABLED)
+    endif()
     target_include_directories(EasyGPU PUBLIC $<BUILD_INTERFACE:${Vulkan_INCLUDE_DIR}>)
     target_link_libraries(EasyGPU PUBLIC
         "$<BUILD_INTERFACE:${EASYGPU_VULKAN_LIBS}>"
@@ -548,6 +582,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         examples/volumetric_fog/main.cpp
         examples/parallel_reduction/main.cpp
         examples/histogram/main.cpp
+        examples/spirv_opt_inspection/main.cpp
         examples/image_processing/color_filter/main.cpp
         examples/image_processing/gaussian_blur/main.cpp
         examples/image_processing/box_filter/main.cpp
@@ -566,6 +601,7 @@ if(EASYGPU_BUILD_EXAMPLES)
         volumetric_fog
         parallel_reduction
         histogram
+        spirv_opt_inspection
         color_filter
         gaussian_blur
         box_filter
@@ -741,6 +777,10 @@ message(STATUS "  Build Tests: ${EASYGPU_BUILD_TESTS}")
 message(STATUS "  Build Fragment Kernel Tester: ${EASYGPU_BUILD_FRAGMENT_TESTER}")
 message(STATUS "  Build Window: ${EASYGPU_BUILD_WINDOW}")
 message(STATUS "  Shader Cache: ${EASYGPU_ENABLE_SHADER_CACHE}")
+if(EASYGPU_BACKEND STREQUAL "Vulkan")
+    message(STATUS "  SPIR-V Optimization: ${EASYGPU_ENABLE_SPIRV_OPT}")
+    message(STATUS "  SPIR-V Cross GLSL: ${EASYGPU_ENABLE_SPIRV_CROSS_GLSL}")
+endif()
 if(EASYGPU_BUILD_WINDOW)
     message(STATUS "  Build Window Examples: ${EASYGPU_BUILD_WINDOW_EXAMPLES}")
 endif()

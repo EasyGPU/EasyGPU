@@ -868,6 +868,40 @@ public:
 	std::string CombinedCode() const {
 		return _combinedCode;
 	}
+	void SetOptimizationLevel(Backend::ShaderOptimizationLevel level) {
+		if (_optimizationLevel == level) {
+			return;
+		}
+		_optimizationLevel = level;
+		_forwardKernel->SetOptimizationLevel(level);
+		ReleaseCombinedPipeline();
+		ReleaseClearPipeline();
+	}
+	Backend::ShaderOptimizationLevel GetOptimizationLevel() const {
+		return _optimizationLevel;
+	}
+	std::string GetOptimizedForwardGLSL() {
+		_forwardKernel->SetOptimizationLevel(_optimizationLevel);
+		return _forwardKernel->GetOptimizedGLSL();
+	}
+	std::string GetOptimizedCombinedGLSL() {
+		if (_combinedCode.empty()) {
+			return {};
+		}
+		Runtime::AutoInitContext();
+		Runtime::ContextGuard guard(Runtime::Context::GetInstance());
+		auto				 *backend = Runtime::Context::GetBackend();
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
+
+		Backend::ShaderDesc shaderDesc;
+		shaderDesc.type				 = Backend::ShaderType::Compute;
+		shaderDesc.sourceCode		 = _combinedCode;
+		shaderDesc.entryPoint		 = "main";
+		shaderDesc.optimizationLevel = _optimizationLevel;
+		return backend->GetOptimizedGLSL(shaderDesc);
+	}
 	const GradientTape &Tape() const {
 		return _tape;
 	}
@@ -1020,6 +1054,24 @@ private:
 			backend->DestroyBuffer(_clearCountBuffer);
 			_clearCountBuffer = Backend::INVALID_BUFFER_HANDLE;
 		}
+		ReleaseCombinedPipeline();
+		ReleaseClearPipeline();
+	}
+
+	void ReleaseCombinedPipeline() {
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend)
+			return;
+		if (_combinedPipeline != Backend::INVALID_PIPELINE_HANDLE) {
+			backend->DestroyPipeline(_combinedPipeline);
+			_combinedPipeline = Backend::INVALID_PIPELINE_HANDLE;
+		}
+	}
+
+	void ReleaseClearPipeline() {
+		auto *backend = Runtime::Context::GetBackend();
+		if (!backend)
+			return;
 		if (_clearPipeline.pipeline != Backend::INVALID_PIPELINE_HANDLE) {
 			backend->DestroyPipeline(_clearPipeline.pipeline);
 			_clearPipeline.pipeline = Backend::INVALID_PIPELINE_HANDLE;
@@ -1043,9 +1095,10 @@ private:
 		auto &cp = _clearPipeline;
 		if (cp.pipeline == Backend::INVALID_PIPELINE_HANDLE) {
 			Backend::ShaderDesc shaderDesc;
-			shaderDesc.type		  = Backend::ShaderType::Compute;
-			shaderDesc.entryPoint = "main";
-			shaderDesc.sourceCode = R"GLSL(#version 430
+			shaderDesc.type				 = Backend::ShaderType::Compute;
+			shaderDesc.entryPoint		 = "main";
+			shaderDesc.optimizationLevel = _optimizationLevel;
+			shaderDesc.sourceCode		 = R"GLSL(#version 430
 layout(local_size_x = 256) in;
 layout(std430, binding = 0) buffer ClearBuf { float data[]; };
 layout(std430, binding = 1) buffer ClearCountBuf { uint clearCount; };
@@ -1166,6 +1219,7 @@ void main() {
 		shaderDesc.type				 = Backend::ShaderType::Compute;
 		shaderDesc.sourceCode		 = _combinedCode;
 		shaderDesc.entryPoint		 = "main";
+		shaderDesc.optimizationLevel = _optimizationLevel;
 
 		Backend::ShaderHandle shader = backend->CreateShader(shaderDesc);
 		if (shader == Backend::INVALID_SHADER_HANDLE)
@@ -1225,6 +1279,8 @@ void main() {
 	std::unique_ptr<Kernel::Kernel1D>		  _forwardKernel;
 	std::string								  _forwardCode;
 	std::string								  _combinedCode;
+	Backend::ShaderOptimizationLevel		  _optimizationLevel =
+		Backend::ShaderOptimizationLevel::Aggressive;
 
 	GradientTape							  _tape;
 	AdjointBody								  _body;

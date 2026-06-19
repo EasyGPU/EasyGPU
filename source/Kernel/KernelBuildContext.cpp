@@ -23,14 +23,7 @@ KernelDimensionOutOfRange::KernelDimensionOutOfRange() : std::out_of_range("Kern
 }
 
 KernelBuildContext::~KernelBuildContext() {
-	// Destroy cached pipeline if any
-	if (_cachedPipeline != Backend::INVALID_PIPELINE_HANDLE) {
-		auto *backend = Runtime::Context::GetBackend();
-		if (backend) {
-			backend->DestroyPipeline(_cachedPipeline);
-		}
-		_cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
-	}
+	InvalidateCachedPipeline();
 }
 
 KernelBuildContext::KernelBuildContext(int Dimension) : _variableIndex(0), _nextBinding(0), _dimension(Dimension) {
@@ -48,6 +41,16 @@ KernelBuildContext::KernelBuildContext(int Dimension) : _variableIndex(0), _next
 		WorkSizeZ = 4;
 	} else {
 		throw KernelDimensionOutOfRange();
+	}
+}
+
+void KernelBuildContext::InvalidateCachedPipeline() {
+	if (_cachedPipeline != Backend::INVALID_PIPELINE_HANDLE) {
+		auto *backend = Runtime::Context::GetBackend();
+		if (backend) {
+			backend->DestroyPipeline(_cachedPipeline);
+		}
+		_cachedPipeline = Backend::INVALID_PIPELINE_HANDLE;
 	}
 }
 
@@ -736,7 +739,8 @@ std::vector<std::string> KernelBuildContext::GetSharedMemoryDeclarations() const
 // ===================================================================
 
 void KernelBuildContext::ComputeShaderHash() {
-	std::string source = GetCompleteCode();
+	std::string source = GetCompleteCode() + "\n// EasyGPUOptimizationLevel=" +
+						 std::to_string(static_cast<int>(_optimizationLevel));
 	_shaderHash		   = ShaderCache::ComputeShaderHash(source);
 }
 

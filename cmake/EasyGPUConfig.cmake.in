@@ -26,6 +26,8 @@ if(EasyGPU_BACKEND STREQUAL "Vulkan")
         GenericCodeGen
         SPIRV-Tools
         SPIRV-Tools-opt
+        spirv-cross-glsl
+        spirv-cross-core
     )
         string(MAKE_C_IDENTIFIER "${_easygpu_dependency}" _easygpu_dependency_id)
         find_library(_easygpu_${_easygpu_dependency_id}_library

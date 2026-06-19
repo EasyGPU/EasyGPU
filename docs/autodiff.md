@@ -199,6 +199,14 @@ inspector.Tape();                 // Access the underlying GradientTape
 
 `ADKernel1D` is the primary API for training on GPU. It wraps a regular `Kernel1D`, records the tape, and generates a combined forward+backward shader. Use `Forward()` for the forward pass and `Backward()` to compute gradients.
 
+On the Vulkan backend, `ADKernel1D` participates in SPIR-V optimization just like regular kernels. The default level is `Backend::ShaderOptimizationLevel::Aggressive`, which maps to SPIRV-Tools' strongest general performance recipe (`spirv-opt -O`). This is **Vulkan-backend only**; OpenGL accepts the same calls silently and optimized GLSL inspection returns an empty string.
+
+```cpp
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Aggressive);
+std::string optimizedForward  = kernel.GetOptimizedForwardGLSL();
+std::string optimizedBackward = kernel.GetOptimizedCombinedGLSL();
+```
+
 ```cpp
 #include <GPU.h>
 
@@ -887,6 +895,10 @@ public:
 
     void Forward(int groupCount, bool sync = false);
     void Backward(int groupCount, bool sync = false);
+    void SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+    Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
+    std::string GetOptimizedForwardGLSL();
+    std::string GetOptimizedCombinedGLSL();
     std::vector<float> Gradient(int paramIndex) const;
     std::vector<float> Gradient(const std::string& paramVarName) const;
 
@@ -901,6 +913,8 @@ public:
     size_t ParameterCount() const;
 };
 ```
+
+SPIR-V optimization APIs are Vulkan-backend only. On OpenGL, setters are silent no-ops for compilation and optimized GLSL getters return empty strings.
 
 ### AdjointKernel1D / 2D / 3D
 

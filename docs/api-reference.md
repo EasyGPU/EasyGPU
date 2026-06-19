@@ -25,6 +25,7 @@ The DSL API is the same on both backends. Buffer, texture, sampler, and uniform 
 
 - [Core Types](#core-types)
 - [Kernels](#kernels)
+- [Vulkan SPIR-V Optimization](#vulkan-spir-v-optimization)
 - [Fragment Kernels](#fragment-kernels)
 - [Buffers](#buffers)
 - [Uniforms](#uniforms)
@@ -148,6 +149,9 @@ Kernel1D kernel(
 | `SetName(const std::string& name)` | Set kernel name |
 | `GetName() const` | Get kernel name |
 | `GetCode()` | Get generated GLSL code |
+| `SetOptimizationLevel(Backend::ShaderOptimizationLevel level)` | Select Vulkan SPIR-V optimization preset; no-op on OpenGL |
+| `GetOptimizationLevel() const` | Get stored optimization preset |
+| `GetOptimizedGLSL()` | Vulkan only: return optimized, SPIRV-Cross decompiled GLSL; returns empty string on OpenGL |
 
 **Example:**
 
@@ -206,6 +210,24 @@ inspector.PrintCode();                    // Print GLSL
 std::string code = inspector.GetCode();   // Get GLSL
 bool ok = inspector.Compile();            // Test compilation
 ```
+
+## Vulkan SPIR-V Optimization
+
+SPIR-V optimization is **Vulkan-backend only**. OpenGL accepts the API for source compatibility and handles it silently: setting an optimization level is a no-op for OpenGL shader compilation, and optimized GLSL inspection returns an empty string.
+
+```cpp
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Aggressive);
+std::string optimized = kernel.GetOptimizedGLSL();
+```
+
+| Level | Vulkan behavior | OpenGL behavior |
+|:--|:--|:--|
+| `Backend::ShaderOptimizationLevel::None` | Skip SPIRV-Tools opt passes | No-op |
+| `Backend::ShaderOptimizationLevel::Aggressive` | Default; strongest general SPIRV-Tools performance recipe (`spirv-opt -O`) | No-op |
+| `Backend::ShaderOptimizationLevel::Performance` | Compatibility alias for `Aggressive` | No-op |
+| `Backend::ShaderOptimizationLevel::Size` | SPIRV-Tools size recipe (`spirv-opt -Os`) | No-op |
+
+The same methods are available on `Kernel1D/2D/3D` and `InspectorKernel1D/2D/3D`. For AD kernels, see [ADKernel1D](#adkernel1d) and [SPIR-V Optimization](spirv-optimization.md).
 
 ### Kernel Barriers
 
@@ -2091,6 +2113,12 @@ public:
      *  @param sync If true, wait for GPU completion before returning.
      */
     void Backward(int groupCount, bool sync = false);
+
+    /** Vulkan-only SPIR-V optimization controls. OpenGL accepts them silently. */
+    void SetOptimizationLevel(Backend::ShaderOptimizationLevel level);
+    Backend::ShaderOptimizationLevel GetOptimizationLevel() const;
+    std::string GetOptimizedForwardGLSL();
+    std::string GetOptimizedCombinedGLSL();
 
 
     // ── Gradient download ─────────────────────────────────────

@@ -602,6 +602,147 @@ kernel.Dispatch(16, true);
 
 [Learn more about Shader Cache →](docs/shader-cache.md)
 
+### SPIR-V Optimization Inspection
+
+On the Vulkan backend, EasyGPU can expose the exact shader shape after the full optimization toolchain:
+
+```text
+C++ DSL → GLSL → SPIR-V → SPIRV-Tools opt → SPIRV-Cross GLSL
+```
+
+This feature is **Vulkan-backend only**. OpenGL builds accept the same APIs for source compatibility, but `SetOptimizationLevel(...)` is a silent no-op and optimized GLSL inspection returns an empty string. See [SPIR-V Optimization](docs/spirv-optimization.md) for the full API reference.
+
+Use `GetCode()` for the original generated GLSL and `GetOptimizedGLSL()` for the optimized, SPIRV-Cross decompiled GLSL on Vulkan. The complete reproducible example lives in `examples/spirv_opt_inspection/main.cpp`:
+
+```cpp
+std::vector<Vec3> hdr(64, Vec3(1.0f, 0.5f, 0.25f));
+Buffer<Vec3> hdrInput(hdr);
+Buffer<Vec3> ldrOutput(hdr.size());
+
+Kernel1D kernel("ToneMapInspection", [&](Int i) {
+    auto src = hdrInput.Bind();
+    auto dst = ldrOutput.Bind();
+
+    Float3 color        = src[i];
+    Float  exposure     = MakeFloat(1.25f);
+    Float3 whiteBalance = MakeFloat3(1.03f, 0.98f, 0.92f);
+    Float3 balanced     = color * whiteBalance;
+    Float3 exposed      = balanced * exposure;
+
+    Float  lumaA      = Dot(exposed, MakeFloat3(0.2126f, 0.7152f, 0.0722f));
+    Float  lumaB      = Dot(exposed, MakeFloat3(0.2126f, 0.7152f, 0.0722f));
+    Float3 acesTop    = exposed * (exposed * 2.51f + MakeFloat(0.03f));
+    Float3 acesBottom = exposed * (exposed * 2.43f + MakeFloat(0.59f)) + MakeFloat(0.14f);
+    Float3 acesMapped = Clamp(acesTop / acesBottom, 0.0f, 1.0f);
+    Float  vignette   = Clamp(1.0f - Abs(lumaA - 0.5f) * 0.08f, 0.92f, 1.0f);
+    Float3 normalized = Normalize(exposed + 0.001f);
+    Float  blend      = Clamp(lumaA / (1.0f + lumaA), 0.0f, 1.0f) * 0.15f;
+    Float  dead       = (lumaB * 0.0f) + Dot(normalized, normalized) * 0.0f;
+
+    If(MakeBool(false), [&] {
+        dst[i] = MakeFloat3(dead, dead, dead);
+    }).Else([&] {
+        Float3 graded = Mix(acesMapped, normalized, blend) * vignette;
+        dst[i] = Clamp(graded, 0.0f, 1.0f);
+    });
+}, 256);
+
+std::string before = kernel.GetCode();
+std::string after  = kernel.GetOptimizedGLSL();
+```
+
+The default optimization preset is `Backend::ShaderOptimizationLevel::Aggressive`. SPIRV-Tools exposes `-O` and `-Os` as its general built-in recipes; EasyGPU maps `Aggressive` to the strongest general performance recipe available, `RegisterPerformancePasses()` / `spirv-opt -O`. You can override it per kernel:
+
+```cpp
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::None);       // no SPIRV-Tools opt passes
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Aggressive); // default, strongest general -O preset
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Size);       // optimize binary size, like spirv-opt -Os
+```
+
+`Backend::ShaderOptimizationLevel::Performance` remains available as a compatibility alias for `Aggressive`.
+
+AD kernels use the same Vulkan shader path. Forward, internal clear, and combined forward+backward shaders are optimized by default on Vulkan, and the combined AD shader can also be inspected:
+
+```cpp
+ADKernel1D trainStep([&](Int i) {
+    auto x = samples.Bind();
+    auto w = weights.Bind();
+    Float xVal = x[i];
+    Float wVal = w[i];
+    Float y = xVal * wVal;
+    Float loss = y * y;
+    AD::Param(wVal);
+    AD::Loss(loss);
+}, sampleCount);
+
+trainStep.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Size);
+std::string optimizedBackward = trainStep.GetOptimizedCombinedGLSL();
+```
+
+Reproduce the output below:
+
+```bash
+cmake -S . -B build -DEASYGPU_ENABLE_SPIRV_OPT=ON -DEASYGPU_ENABLE_SPIRV_CROSS_GLSL=ON
+cmake --build build --target spirv_opt_inspection --parallel
+./build/spirv_opt_inspection
+```
+
+**Before - real `GetCode()` excerpt, preserving the DSL's debug-friendly shape:**
+
+```glsl
+void main() {
+    int v1;
+    (v1)=((int(gl_GlobalInvocationID.x)));
+    float v2;
+    (v2)=(float(1.25));
+    vec3 v3;
+    (v3)=(vec3(float(1.03),float(0.98),float(0.92)));
+    vec3 v4;
+    (v4)=((buf0[v1])*(v3));
+    vec3 v5;
+    (v5)=((v4)*(v2));
+    float v6;
+    (v6)=(dot(v5,vec3(float(0.2126),float(0.7152),float(0.0722))));
+    float v7;
+    (v7)=(dot(v5,vec3(float(0.2126),float(0.7152),float(0.0722))));
+    vec3 v8;
+    (v8)=((v5)*(((v5)*(float(2.51)))+(float(0.03))));
+    vec3 v9;
+    (v9)=(((v5)*(((v5)*(float(2.43)))+(float(0.59))))+(float(0.14)));
+    vec3 v10;
+    (v10)=(clamp((v8)/(v9),float(0),float(1)));
+    float v11;
+    (v11)=(clamp((float(1))-((abs((v6)-(float(0.5))))*(float(0.08))),float(0.92),float(1)));
+    vec3 v12;
+    (v12)=(normalize((v5)+(float(0.001))));
+    float v13;
+    (v13)=((clamp((v6)/((v6)+(float(1))),float(0),float(1)))*(float(0.15)));
+    float v14;
+    (v14)=(((v7)*(float(0)))+((dot(v12,v12))*(float(0))));
+    if (false) {
+        (buf1[v1])=(vec3(v14,v14,v14));
+    } else {
+        vec3 v15;
+        (v15)=((mix(v10,v12,v13))*(v11));
+        (buf1[v1])=(clamp(v15,float(0),float(1)));
+    }
+}
+```
+
+**After - real `GetOptimizedGLSL()` excerpt after SPIRV-Tools opt and SPIRV-Cross:**
+
+```glsl
+void main()
+{
+    int _17 = int(gl_GlobalInvocationID.x);
+    vec3 _44 = (_33.buf0[_17] * vec3(1.0299999713897705078125, 0.980000019073486328125, 0.920000016689300537109375)) * 1.25;
+    float _51 = dot(_44, vec3(0.2125999927520751953125, 0.715200006961822509765625, 0.072200000286102294921875));
+    _123.buf1[_17] = clamp(mix(clamp((_44 * ((_44 * 2.5099999904632568359375) + vec3(0.02999999932944774627685546875))) / ((_44 * ((_44 * 2.4300000667572021484375) + vec3(0.589999973773956298828125))) + vec3(0.14000000059604644775390625)), vec3(0.0), vec3(1.0)), normalize(_44 + vec3(0.001000000047497451305389404296875)), vec3(clamp(_51 / (_51 + 1.0), 0.0, 1.0) * 0.1500000059604644775390625)) * clamp(1.0 - (abs(_51 - 0.5) * 0.07999999821186065673828125), 0.920000016689300537109375, 1.0), vec3(0.0), vec3(1.0));
+}
+```
+
+This is real output captured by running `./build/spirv_opt_inspection`. The optimized dump makes compiler effects visible: the constant debug branch disappears, zero-multiplied dead work is removed, the duplicate luminance dot product is collapsed, debug temporaries are folded, and the final tone-mapping store becomes one compact expression much closer to what the Vulkan pipeline consumes. The feature is controlled by `EASYGPU_ENABLE_SPIRV_OPT` and `EASYGPU_ENABLE_SPIRV_CROSS_GLSL`.
+
 ### Performance Notes — Exclusive OpenGL Context Mode
 
 EasyGPU operates in **exclusive mode** by default, assuming it has sole ownership of the OpenGL context within the current thread. This design choice maximizes performance by:

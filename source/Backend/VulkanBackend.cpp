@@ -18,6 +18,14 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
+#ifdef EASYGPU_SPIRV_OPT_ENABLED
+#include <spirv-tools/optimizer.hpp>
+#endif
+
+#ifdef EASYGPU_SPIRV_CROSS_GLSL_ENABLED
+#include <spirv_cross/spirv_glsl.hpp>
+#endif
+
 namespace GPU::Backend {
 
 // =============================================================================
@@ -1717,7 +1725,59 @@ VkShaderStageFlags VulkanBackend::GetVkShaderStage(ShaderType type) {
 // SPIR-V Compilation using glslang
 // =============================================================================
 
-std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type) {
+std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &spirv,
+												   ShaderOptimizationLevel optimizationLevel) {
+	if (optimizationLevel == ShaderOptimizationLevel::None) {
+		return spirv;
+	}
+
+#ifdef EASYGPU_SPIRV_OPT_ENABLED
+	spvtools::Optimizer optimizer(SPV_ENV_VULKAN_1_1);
+	switch (optimizationLevel) {
+	case ShaderOptimizationLevel::Aggressive:
+		optimizer.RegisterPerformancePasses();
+		break;
+	case ShaderOptimizationLevel::Size:
+		optimizer.RegisterSizePasses();
+		break;
+	case ShaderOptimizationLevel::None:
+		break;
+	}
+
+	std::vector<uint32_t> optimized;
+	optimizer.SetMessageConsumer([](spv_message_level_t, const char *, const spv_position_t &position,
+									const char *message) {
+		std::cerr << "SPIRV-Tools optimizer: " << position.line << ":" << position.column << ": " << message << '\n';
+	});
+
+	if (!optimizer.Run(spirv.data(), spirv.size(), &optimized)) {
+		throw std::runtime_error("SPIR-V optimization failed");
+	}
+
+	return optimized.empty() ? spirv : optimized;
+#else
+	return spirv;
+#endif
+}
+
+std::string VulkanBackend::DecompileSPIRVToGLSL(const std::vector<uint32_t> &spirv, ShaderType type) {
+#ifdef EASYGPU_SPIRV_CROSS_GLSL_ENABLED
+	spirv_cross::CompilerGLSL compiler(spirv);
+	spirv_cross::CompilerGLSL::Options options;
+	options.version		= type == ShaderType::Compute ? 430 : 450;
+	options.es			= false;
+	options.vulkan_semantics = true;
+	compiler.set_common_options(options);
+	return compiler.compile();
+#else
+	(void)spirv;
+	(void)type;
+	throw std::runtime_error("SPIRV-Cross GLSL inspection is disabled");
+#endif
+}
+
+std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
+														ShaderOptimizationLevel optimizationLevel) {
 	EShLanguage stage;
 	switch (type) {
 	case ShaderType::Compute:
@@ -1773,12 +1833,22 @@ std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslS
 		throw std::runtime_error("SPIR-V generation failed: empty output");
 	}
 
-	return spirv;
+	return OptimizeSPIRV(spirv, optimizationLevel);
 }
 
 // =============================================================================
 // Shader Management
 // =============================================================================
+
+std::string VulkanBackend::GetOptimizedGLSL(const ShaderDesc &desc) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_initialized) {
+		throw std::runtime_error("Vulkan backend not initialized");
+	}
+
+	return DecompileSPIRVToGLSL(CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel), desc.type);
+}
 
 ShaderHandle VulkanBackend::CreateShader(const ShaderDesc &desc) {
 	std::lock_guard<std::mutex> lock(_mutex);
@@ -1788,7 +1858,7 @@ ShaderHandle VulkanBackend::CreateShader(const ShaderDesc &desc) {
 	}
 
 	// Compile GLSL to SPIR-V
-	std::vector<uint32_t>	 spirv		= CompileGLSLToSPIRV(desc.sourceCode, desc.type);
+	std::vector<uint32_t>	 spirv		= CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel);
 
 	// Create shader module
 	VkShaderModuleCreateInfo createInfo = {};
