@@ -129,7 +129,7 @@ EasyGPU provides three API levels for AD, from simple inspection to full GPU tra
 |:----|:-------------|:---------|
 | `AdjointInspector1D/2D/3D` | No | Inspect generated GLSL, debug gradients, write tests |
 | `AdjointKernel1D/2D/3D` | Yes | Combined forward+backward shader, single dispatch |
-| `ADKernel1D` | Yes | Separate Forward/Backward calls, gradient download |
+| `ADKernel1D` | Yes | Separate Forward/Backward calls, GPU gradient buffers, optional gradient download |
 
 ### AdjointInspector — Offline Inspection
 
@@ -694,17 +694,17 @@ The AD engine integrates with the NN module (`include/NN/`) to eliminate boilerp
 
 ### Tensor + AD::Param
 
-`Tensor<T, Dims...>::ForEachParam()` registers every scalar element as a trainable parameter:
+`Tensor<T, Dims...>::RegisterAsParam()` registers the whole tensor buffer as a trainable parameter group:
 
 ```cpp
 Tensor<float, 128, 64> W(xavierData);
 
-// Inside kernel lambda — 8192 AD::Param calls, one line
+// Inside kernel lambda — one buffer-level parameter group
 auto W_ref = W.Bind();
-W_ref.ForEachParam([](auto &w) { AD::Param(w); });
+W_ref.RegisterAsParam();
 ```
 
-`ForEachParam` uses `std::index_sequence` + fold expressions to unroll at compile time. Each `AD::Param(w)` call records the scalar's GLSL variable name on the gradient tape and returns its index. The AD kernel groups parameters from the same source buffer into shared interleaved gradient SSBOs automatically.
+`RegisterAsParam()` records the tensor's underlying buffer once, allocates one adjoint array for the tensor, and writes all element gradients through a compact gradient SSBO layout. `ForEachParam()` is still available for legacy scalar registration, but it expands to one `AD::Param()` call per element and is not recommended for large tensors.
 
 ### Optimizer + ADKernel1D
 
@@ -723,9 +723,9 @@ for (int step = 0; step < 1000; step++) {
 
 `Adam::Step(kernel)` internally:
 1. Reads AD gradient buffers directly on the GPU
-2. Averages per-thread gradients for each scalar parameter
+2. Runs a parallel reduction dispatch to average per-thread gradients for each scalar parameter
 3. Updates flat optimizer state (`m`/`v`) in GPU buffers
-4. Applies Adam update to all registered tensor buffers in one combined dispatch when binding limits allow
+4. Applies Adam updates to all registered tensor buffers in a second dispatch when binding limits allow
 
 The optimizer tracks per-parameter `m` and `v` state vectors, matching the AD kernel's scalar parameter count exactly. This avoids the common pitfall of averaging gradients across entire tensors.
 

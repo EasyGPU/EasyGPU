@@ -27,7 +27,7 @@ EasyGPU keeps its C++ kernel DSL backend-independent, but backend and platform c
 
 - Every `tests/Test*.cpp` file, except the optional Windows EasyX fragment tester, is automatically registered with CTest.
 - Release tests explicitly keep assertions enabled.
-- The Vulkan Release suite currently contains 48 independently registered tests.
+- CTest enumerates all configured `tests/Test*.cpp` targets so the release suite grows with the repository.
 - The package-consumer fixture verifies installation, `find_package(EasyGPU)`, compilation, linking, and execution.
 - Core-only packages are verified with `EASYGPU_BUILD_WINDOW=OFF`.
 - Sanitizer builds are recommended when changing resource ownership or backend memory code.

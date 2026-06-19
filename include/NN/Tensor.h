@@ -120,7 +120,9 @@ public:
 	 * Calls f(Var<T>) for each flat-indexed element in order.
 	 * Compile-time unrolled for fixed-shape tensors.
 	 */
-	template <typename F> void ForEachParam(F &&f) {
+	template <typename F>
+	[[deprecated("Use RegisterAsParam() for Tensor parameters; ForEachParam is kept for legacy scalar registration.")]]
+	void ForEachParam(F &&f) {
 		ForEachImpl(std::forward<F>(f), std::make_index_sequence<TotalSize>());
 	}
 

@@ -570,7 +570,7 @@ See [Automatic Differentiation](autodiff.md) for the complete guide.
 
 ### Can I train models directly on GPU?
 
-Yes. `ADKernel1D` provides a complete training workflow: define parameters with `AD::Param()`, mark the loss with `AD::Loss()`, and call `Backward()` to compute gradients in a single GPU dispatch.
+Yes. `ADKernel1D` provides a complete training workflow: define scalar parameters with `AD::Param()` or tensor parameters with `TensorRef::RegisterAsParam()`, mark the loss with `AD::Loss()`, and call `Backward()` to compute gradients on the GPU. Built-in optimizers consume those gradient buffers directly on device.
 
 ### What operations are differentiable?
 

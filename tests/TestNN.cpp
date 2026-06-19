@@ -195,7 +195,19 @@ TEST(nn_tensor_ref_for_each_param_dsl) {
 
 	AdjointInspector1D inspector([&](Var<int> &id, AdjointContext &ctx) {
 		auto tref = t.Bind();
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
 		tref.ForEachParam([&](auto &w) { ctx.RegisterParameter(w); });
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 		Var<float> loss = MakeFloat(0.0f);
 		for (int i = 0; i < 8; i++)
 			loss = loss + tref[i];

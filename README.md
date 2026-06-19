@@ -230,7 +230,7 @@ EasyGPU's reverse-mode autograd records every operation during the forward pass 
 |:----|:---------|:--------------|
 | `AdjointInspector1D` | Inspect generated backward GLSL | Offline only |
 | `AdjointKernel1D` | Get combined forward+backward shader | Compile, no built-in training |
-| `ADKernel1D` | End-to-end GPU training | Dispatch, download gradients, update |
+| `ADKernel1D` | End-to-end GPU training | Dispatch, GPU gradient buffers, optimizer handoff |
 
 **Quick example — linear regression in 20 lines:**
 
@@ -265,7 +265,7 @@ auto grad_b = model.Gradient(1);  // ∂loss/∂b
 1. **Gradient tape** — Every `+`, `*`, `Exp()`, `Max()`, `Sin()`... is recorded during the forward pass
 2. **Adjoint generation** — The tape is walked backwards, applying the chain rule to emit adjoint GLSL
 3. **Combined shader** — Forward and backward code are merged into a single compute shader; gradients flow directly into SSBOs
-4. **Zero-copy gradient download** — `ADKernel1D::Gradient(p)` maps the GPU gradient buffer for CPU readback
+4. **GPU gradient buffers** — built-in optimizers consume gradients on device; `ADKernel1D::Gradient(p)` remains available for CPU inspection
 
 **30+ differentiable operations, out of the box:**
 
@@ -309,7 +309,7 @@ Building on the AD engine, EasyGPU provides a full NN training stack: compile-ti
 
 | Component | Purpose | API |
 |:----------|:--------|:----|
-| `Tensor<T, Dims...>` | Multi-dimensional weight containers with CPU/GPU sync | `.Bind()`, `.ForEachParam()`, `.Upload()`, `.Download()` |
+| `Tensor<T, Dims...>` | Multi-dimensional weight containers with CPU/GPU sync | `.Bind()`, `.RegisterAsParam()`, `.Upload()`, `.Download()` |
 | `Adam` / `SGD` / `RMSprop` | Optimizers with weight decay, gradient clipping | `.AddTensor(t)`, `.Step(kernel)` |
 | Layers | Reusable building blocks (Linear, Attention, Transformer...) | `.Setup()`, `.Forward(...)` |
 
@@ -345,14 +345,14 @@ ADKernel1D kernel([&](Var<int> &batchIdx) {
 for (int step = 0; step < 5000; step++) {
     kernel.Forward(groups, true);
     kernel.Backward(groups, true);
-    adam.Step(kernel);  // download gradients, update weights, upload
+    adam.Step(kernel);  // reduce gradients and update weights on GPU
 }
 ```
 
 **Key design decisions:**
-- **Tensor `ForEachParam()`** compiles down to per-element `AD::Param()` calls — no manual index bookkeeping
-- **Adam `Step()`** calls `DownloadAllGradients()`, averages per-thread gradients, applies Adam update per scalar, and uploads — all in one call
-- **Gradient buffer sharing** packs all parameters from one source buffer into an interleaved gradient SSBO, staying within `GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS`
+- **Tensor `RegisterAsParam()`** registers whole tensor buffers, so large weights use one buffer-level adjoint instead of thousands of scalar tape entries
+- **Adam `Step()`** consumes AD gradient buffers directly on GPU; the combined path runs a parallel reduction dispatch followed by an update dispatch
+- **Gradient buffer sharing** packs scalar parameters from one source buffer into an interleaved gradient SSBO, while tensor parameters use a compact per-buffer gradient layout
 - **Layers are purely structural** — no virtual dispatch, no runtime graph. `Setup()` registers parameters, `Forward()` emits DSL code. The compiler inlines everything.
 
 See [`ad_gpt_demo`](examples/ad_gpt_demo/main.cpp) for a full name-generating transformer and [`ad_gpt_poet_demo`](examples/ad_gpt_poet_demo/main.cpp) for poetry generation.

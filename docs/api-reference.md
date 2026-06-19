@@ -1894,7 +1894,7 @@ Reverse-mode automatic differentiation. Records operations during the forward pa
 |:------|:-------------|:--------|
 | `AdjointInspector1D/2D/3D` | No | Inspect forward + backward GLSL, debug gradients |
 | `AdjointKernel1D/2D/3D` | Yes | Combined forward+backward shader, single dispatch |
-| `ADKernel1D` | Yes | Separate Forward/Backward calls, gradient download |
+| `ADKernel1D` | Yes | Separate Forward/Backward calls, GPU gradient buffers, optional gradient download |
 
 ---
 
@@ -2036,6 +2036,10 @@ Used with `ADKernel1D`. Must be called inside the kernel lambda during construct
 /** @brief Mark a Var<T> as a trainable parameter. Returns the parameter index (0, 1, ...). */
 template <typename T>
 int AD::Param(const Var<T>& var);
+
+/** @brief Mark a whole BufferRef<T> as a trainable parameter group. */
+template <typename T>
+int AD::ParamBuffer(const BufferRef<T>& buffer, size_t elementCount);
 
 /** @brief Mark a Var<T> as the scalar loss. */
 template <typename T>
@@ -2506,8 +2510,10 @@ public:
     template <typename... Indices>
     auto operator()(Indices... indices);
 
-    /// Register every scalar element as an AD parameter.
-    /// Compile-time unrolled via std::index_sequence + fold expression.
+    /// Register the whole tensor buffer as one AD parameter group.
+    void RegisterAsParam();
+
+    /// Legacy scalar registration hook. Prefer RegisterAsParam() for tensors.
     template <typename F>
     void ForEachParam(F&& f);
 };
@@ -2524,9 +2530,9 @@ auto b = biasTensor.Bind();
 Var<float> w = W(i, j);               // weightTensor[i * stride_j + j]
 Var<float> bias = b(k);
 
-// Batch parameter registration — 8192 AD::Param calls, one line
-W.ForEachParam([](auto &p) { AD::Param(p); });
-b.ForEachParam([](auto &p) { AD::Param(p); });
+// Batch parameter registration — one buffer-level parameter group per tensor
+W.RegisterAsParam();
+b.RegisterAsParam();
 ```
 
 **Index computation:** `TensorRef::operator()` computes the flat offset at compile time using `StrideAt<I, Dims...>`. For `Tensor<float, 128, 64>`:
@@ -2539,7 +2545,7 @@ b.ForEachParam([](auto &p) { AD::Param(p); });
 
 All optimizers live in `GPU::NN`. They manage per-parameter state (first/second moments for Adam, velocity for SGD, squared average for RMSprop) and update registered tensors directly on the GPU in `Step()`.
 
-The optimizer state is flattened into one GPU buffer per state vector (`m`/`v`, velocity, or square average). When the backend binding limit allows, all registered tensor parameters are updated by a single combined compute dispatch. If the model uses too many tensor buffers for one dispatch, EasyGPU falls back to one GPU dispatch per tensor.
+The optimizer state is flattened into one GPU buffer per state vector (`m`/`v`, velocity, or square average). When the backend binding limit allows, registered tensor parameters are handled by combined GPU dispatches. Adam uses a parallel reduction dispatch to average AD gradients, then an update dispatch. If the model uses too many tensor buffers for the combined path, EasyGPU falls back to one GPU dispatch per tensor.
 
 #### Adam
 
@@ -2566,7 +2572,7 @@ public:
     void AddTensor(Tensor<float, Dims...>& tensor);
 
     /// Execute one optimization step on the GPU.
-    /// Reads AD gradient buffers, aggregates per-thread gradients,
+    /// Reads AD gradient buffers, reduces per-thread gradients,
     /// applies Adam update, and writes weights in place.
     void Step(ADKernel1D& kernel);
 
