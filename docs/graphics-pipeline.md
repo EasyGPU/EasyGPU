@@ -361,7 +361,7 @@ while (window.IsOpen()) {
 }
 ```
 
-The `TexturePresenter` downloads the GPU texture to a CPU-side `PixelBuffer` and uploads it to the window framebuffer via MiniFB.
+`TexturePresenter` displays the finished EasyGPU texture through the window component. Vulkan builds use the GLFW swapchain path for direct texture presentation and optional ImGui overlay; CPU staging remains available through `PresentMode::CopyToCPU`.
 
 ---
 

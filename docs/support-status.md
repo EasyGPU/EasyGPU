@@ -11,6 +11,8 @@ EasyGPU keeps its C++ kernel DSL backend-independent, but backend and platform c
 | OpenGL compute backend | Stable | OpenGL 4.3+ on Windows and Linux |
 | Vulkan SPIR-V optimization inspection | Stable | Vulkan-only; OpenGL accepts related APIs silently and returns empty inspection strings |
 | Vulkan graphics pipeline | Preview | Vulkan-only; API may still evolve |
+| GLFW window component | Stable | Optional `EasyGPU::Window` target; X11 backend on Linux |
+| Dear ImGui overlay | Stable | Available through `UIContext` with Vulkan and Windows/Linux OpenGL window builds |
 | Automatic differentiation | Preview | Broad code-generation coverage; qualify numerical behavior per model |
 | Neural-network helpers | Preview | Intended for small models and research workflows |
 | UniformBuffer | Stable | Implemented as a read-only std430 storage buffer for cross-backend consistency |
@@ -20,9 +22,9 @@ EasyGPU keeps its C++ kernel DSL backend-independent, but backend and platform c
 
 | Platform | Supported backend paths | Notes |
 |:--|:--|:--|
-| Windows | OpenGL, Vulkan | OpenGL is continuously built in CI |
-| Linux | OpenGL, Vulkan | OpenGL GCC and Clang builds are continuously checked |
-| macOS | Vulkan via MoltenVK | GPU timestamp profiling uses a synchronized CPU fallback |
+| Windows | OpenGL, Vulkan | Window + ImGui supported |
+| Linux | OpenGL, Vulkan | Window + ImGui uses GLFW X11 backend |
+| macOS | Vulkan via MoltenVK | Window + ImGui supported through Vulkan; OpenGL backend is intentionally disabled |
 
 ## Verification Policy
 

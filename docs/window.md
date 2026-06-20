@@ -1,6 +1,6 @@
 # EasyGPU Window Component
 
-The EasyGPU Window component provides a lightweight, cross-platform windowing system for interactive GPU compute visualization. It is designed to be simple, modern, and seamlessly integrated with EasyGPU's compute capabilities.
+The EasyGPU Window component provides a cross-platform windowing and UI layer for interactive GPU compute visualization. It is designed to be simple, modern, and tightly integrated with EasyGPU textures: compute into a `Texture2D`, present it with `TexturePresenter`, and optionally draw Dear ImGui controls over the same frame.
 
 ## Overview
 
@@ -44,11 +44,12 @@ int main() {
 
 ## Features
 
-- **Cross-platform**: Windows (Win32), Linux (X11), and macOS (Cocoa/CoreGraphics) support
+- **Cross-platform**: GLFW-backed windows on Windows, Linux, and macOS
 - **Simple API**: Modern C++20 design with minimal boilerplate
 - **Event-driven**: Keyboard, mouse, resize, and focus events
 - **CPU Rendering**: `PixelBuffer` for software-rendered graphics
 - **GPU Integration**: `TexturePresenter` for displaying GPU textures
+- **Dear ImGui Overlay**: `UIContext` for sliders, panels, color editors, stats, and debug controls
 - **Optional**: Can be disabled at build time if not needed
 
 ## API Reference
@@ -169,6 +170,26 @@ public:
 };
 ```
 
+### UIContext
+
+Dear ImGui integration for controls layered over EasyGPU output.
+
+```cpp
+class UIContext {
+public:
+    explicit UIContext(AppWindow& window);
+
+    void BeginFrame();
+    void EndFrame();
+    void Render(const std::function<void()>& uiFunc);
+
+    [[nodiscard]] bool WantCaptureKeyboard() const;
+    [[nodiscard]] bool WantCaptureMouse() const;
+};
+```
+
+`UIContext::Render()` records an ImGui frame and queues the overlay so the next `TexturePresenter::Present()` call composites it over the presented image. On Vulkan this renders into the swapchain image using dynamic rendering; on OpenGL it renders before the GLFW buffer swap.
+
 ### Input Enums
 
 ```cpp
@@ -286,10 +307,10 @@ int main() {
     
     Kernel2D plasma([&](Int x, Int y) {
         auto tex = texture.Bind();
-        float t = timeUniform.Get();
+        Float t = timeUniform.Load();
         
-        Float u = Float(x) / 1024.0f;
-        Float v = Float(y) / 768.0f;
+        Float u = ToFloat(x) / 1024.0f;
+        Float v = ToFloat(y) / 768.0f;
         
         Float r = 0.5f + 0.5f * Sin(u * 10.0f + t);
         Float g = 0.5f + 0.5f * Sin(v * 10.0f + t * 0.5f);
@@ -303,7 +324,7 @@ int main() {
         
         // Update and render
         time += 0.016f;
-        timeUniform.Set(time);
+        timeUniform = time;
         plasma.Dispatch(64, 48);
         
         // Display result
@@ -313,6 +334,46 @@ int main() {
     return 0;
 }
 ```
+
+### Dear ImGui Overlay
+
+```cpp
+#include <GPU.h>
+#include <Window/AppWindow.h>
+#include <Window/TexturePresenter.h>
+#include <Window/UIContext.h>
+#include <imgui.h>
+
+int main() {
+    using namespace GPU;
+    using namespace GPU::Window;
+
+    AppWindow window({.width = 1280, .height = 720, .title = "EasyGPU ImGui"});
+    Texture2D<PixelFormat::RGBA8> texture(1280, 720);
+    TexturePresenter presenter(window);
+    UIContext ui(window);
+
+    float speed = 1.0f;
+    bool paused = false;
+
+    while (window.IsOpen()) {
+        window.PollEvents();
+
+        // Dispatch EasyGPU kernels here...
+
+        ui.Render([&] {
+            ImGui::Begin("Controls");
+            ImGui::Checkbox("Paused", &paused);
+            ImGui::SliderFloat("Speed", &speed, 0.0f, 4.0f);
+            ImGui::End();
+        });
+
+        presenter.Present(texture);
+    }
+}
+```
+
+See [`window_imgui_lab`](../examples/window_imgui_lab/main.cpp) for a full interactive sample with mode selection, color editors, mouse-driven uniforms, iteration controls, and live FPS stats.
 
 ## Building
 
@@ -324,12 +385,12 @@ cmake -B build -DEASYGPU_BUILD_WINDOW=OFF
 
 Platform-specific requirements:
 
-- **Windows**: No additional dependencies (uses Win32 API)
-- **Linux**: Requires X11 development libraries
+- **Windows**: No additional system dependencies for the window layer
+- **Linux**: Requires X11 development libraries for GLFW's X11 backend
   ```bash
   sudo apt-get install libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
   ```
-- **macOS**: No additional dependencies. Uses Cocoa/CoreGraphics (built into macOS), no external frameworks required.
+- **macOS**: Uses GLFW's Cocoa backend. The EasyGPU backend must be Vulkan via MoltenVK; OpenGL backend builds are intentionally disabled on macOS.
 
 ## Design Philosophy
 
@@ -337,16 +398,15 @@ The Window component follows EasyGPU's core principles:
 
 1. **Simplicity**: Minimal API surface, easy to learn
 2. **Modern C++**: RAII, move semantics, no raw pointers
-3. **Cross-platform**: Works on Windows, Linux, and macOS without changes
+3. **Cross-platform**: Works on Windows, Linux, and macOS without application code changes
 4. **Non-intrusive**: Completely optional, doesn't affect core compute functionality
-5. **Performance**: Efficient event handling and presentation paths
+5. **Interactive**: Dear ImGui controls are available without changing the compute kernels
 
 ## Limitations
 
-- Not a full GUI framework (no widgets, buttons, etc.)
-- Designed for compute visualization, not complex UIs
+- Designed for visualization and tool panels, not full multi-document desktop applications
 - Single-window applications (multi-window support is limited)
-- No hardware-accelerated 3D rendering (pair with [GraphicsPipeline](graphics-pipeline.md) for that; the older `FragmentKernel2D` is deprecated)
+- Hardware-accelerated 3D rendering should use [GraphicsPipeline](graphics-pipeline.md); the window layer presents finished textures
 
 ## See Also
 

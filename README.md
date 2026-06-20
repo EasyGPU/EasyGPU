@@ -10,6 +10,7 @@ C++20 Embedded DSL for GPU Compute, Rasterization, Autograd & Neural Networks
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-orange.svg)](https://en.cppreference.com/w/cpp/20)
 [![OpenGL](https://img.shields.io/badge/OpenGL-4.3+-green.svg)](https://www.opengl.org/)
 [![Vulkan](https://img.shields.io/badge/Vulkan-1.1+-red.svg)](https://www.vulkan.org/)
+[![Dear ImGui](https://img.shields.io/badge/Dear%20ImGui-Integrated-blueviolet.svg)](https://github.com/ocornut/imgui)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![Autograd](https://img.shields.io/badge/Autograd-Reverse--Mode-blue.svg)](docs/autodiff.md)
 
@@ -90,7 +91,7 @@ int main() {
 - CMake 3.21+
 - **Windows:** No additional dependencies
 - **Linux:** X11 development libraries (`libx11-dev` on Ubuntu/Debian)
-- **macOS:** No additional dependencies — uses Cocoa/CoreGraphics (built-in)
+- **macOS:** Vulkan backend via MoltenVK; OpenGL backend is intentionally disabled
 - **Vulkan builds:** Vulkan SDK with `glslang` / `SPIRV-Tools` libraries available to CMake
 
 ---
@@ -517,18 +518,22 @@ KernelProfiler::PrintReport(kernel);
 
 ### Built-in Cross-Platform Window
 
-EasyGPU includes a lightweight, cross-platform window component for interactive GPU compute visualization. Built on top of [minifb](https://github.com/emoon/minifb), it provides a minimal footprint alternative to heavyweight frameworks like GLFW or SDL — the entire windowing layer adds less than 100KB to your binary.
+EasyGPU includes a cross-platform window component for interactive GPU compute visualization. Built on top of [GLFW](https://www.glfw.org/) and [Dear ImGui](https://github.com/ocornut/imgui), it gives compute demos a real application shell: native windows, keyboard/mouse input, GPU texture presentation, and immediate-mode controls in the same render loop.
 
-**Zero external dependencies.** The window component is self-contained and compiles out-of-the-box on Windows, Linux, and macOS. No need to hunt for system libraries or deal with complex linker flags.
+**Dear ImGui is first-class.** A `UIContext` can be layered over `TexturePresenter`, so sliders, color editors, checkboxes, stats panels, and debug controls can sit directly on top of live EasyGPU output.
 
-| Windows | Ubuntu | macOS |
-|:-------:|:------:|:-----:|
-| <img src="docs/image/appwindow_windows.png" width="260"> | <img src="docs/image/appwindow_ubuntu.png" width="260"> | *(Cocoa/CoreGraphics)* |
+<p align="center">
+  <img src="docs/image/imgui.png" alt="EasyGPU ImGui Lab" width="720">
+</p>
 
 ```cpp
 #include <GPU.h>
+#include <imgui.h>
 
 int main() {
+    using namespace GPU;
+    using namespace GPU::Window;
+
     // Create a lightweight window
     AppWindow window({
         .width = 1024,
@@ -539,6 +544,7 @@ int main() {
     // Create GPU texture and presenter
     Texture2D<PixelFormat::RGBA8> texture(1024, 768);
     TexturePresenter presenter(window);
+    UIContext ui(window);
     
     // Render kernel
     Kernel2D render([&](Int x, Int y) {
@@ -550,17 +556,23 @@ int main() {
     while (window.IsOpen()) {
         window.PollEvents();
         render.Dispatch(64, 48);
+        ui.Render([&] {
+            ImGui::Begin("Controls");
+            ImGui::Text("Live EasyGPU texture");
+            ImGui::End();
+        });
         presenter.Present(texture);  // Display GPU result
     }
 }
 ```
 
 **Key Features:**
-- **Ultra-lightweight** — Based on minifb, minimal overhead (~100KB added)
-- **Truly cross-platform** — Identical API on Windows (Win32), Linux (X11), and macOS (Cocoa/CoreGraphics)
-- **Zero external dependencies** — Self-contained, header-friendly implementation
+- **GLFW platform layer** — Native windows and input on Windows, Linux, and macOS
+- **Dear ImGui overlay** — Immediate-mode debug panels and interactive controls
 - **Event-driven input** — Keyboard, mouse, and resize events
-- **Dual rendering paths** — CPU `PixelBuffer` for software rendering, `TexturePresenter` for direct GPU display
+- **Dual presentation paths** — CPU `PixelBuffer` for software rendering, `TexturePresenter` for EasyGPU textures
+- **Vulkan swapchain path** — Direct texture presentation with ImGui overlay on Vulkan
+- **OpenGL window path** — Fullscreen RGBA texture upload and ImGui overlay on Windows/Linux OpenGL
 - **Optional at build time** — Control via `EASYGPU_BUILD_WINDOW` CMake option
 
 [Learn more about Window API →](docs/window.md)
@@ -966,6 +978,7 @@ g++ -std=c++20 hello_gpu.cpp -lEasyGPU -lGL -o hello_gpu
 | Beginner | [window_hello](examples/window_hello/main.cpp) | Window creation, event handling |
 | Beginner | [window_pixels](examples/window_pixels/main.cpp) | CPU pixel buffer, animation |
 | Intermediate | [window_compute](examples/window_compute/main.cpp) | Real-time GPU compute visualization |
+| Intermediate | [window_imgui_lab](examples/window_imgui_lab/main.cpp) | EasyGPU texture + Window + Dear ImGui controls |
 
 ### Mandelbrot Set
 
@@ -1141,6 +1154,7 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 - [API Reference](docs/api-reference.md#neural-network) — Neural Network API: Tensor, Optimizer (Adam/SGD/RMSprop), Layers, Loss, Checkpoint
 - [Texture3D Guide](docs/texture3d.md) — Volumetric textures and 3D compute
 - [Window Component](docs/window.md) — Cross-platform window for interactive visualization
+- [Window + ImGui](docs/window.md#dear-imgui-overlay) — Interactive controls over live EasyGPU textures
 - [Graphics Pipeline](docs/graphics-pipeline.md) — Vertex + Fragment shader DSL, Varying\<T\>, depth testing, OBJ rendering
 - [Shader Cache](docs/shader-cache.md) — Automatic kernel compilation caching
 - [Support Status](docs/support-status.md) — Capability maturity, platform notes, and verification policy
@@ -1158,8 +1172,10 @@ ExprBase::NotUse(B(MakeFloat(5.0f), z));
 |:-----------|:---------|:-----|:--------|
 | OpenGL 4.3+ | OpenGL builds | System | OpenGL compute backend |
 | Vulkan 1.1+ SDK | Vulkan builds | System | Vulkan compute backend (MoltenVK on macOS) |
-| X11 (Linux) | Linux only | System | Windowing system |
 | GLAD | OpenGL builds | ~500KB (bundled) | OpenGL loader |
+| GLFW | Window builds | Bundled | Cross-platform windows and input |
+| Dear ImGui | Window builds | Bundled | Immediate-mode UI overlay |
+| X11 (Linux) | Linux window builds | System | GLFW windowing backend |
 | stb_image | No | ~50KB (examples only) | Image I/O |
 
 ### Build Commands
@@ -1243,7 +1259,8 @@ MIT License. See [LICENSE](LICENSE).
 - [Taichi](https://github.com/taichi-dev/taichi) — Algorithms
 - [GLAD](https://glad.dav1d.de/) — OpenGL loader
 - [stb](https://github.com/nothings/stb) — Image utilities
-- [minifb](https://github.com/emoon/minifb) — Lightweight cross-platform windowing
+- [GLFW](https://www.glfw.org/) — Cross-platform windows and input
+- [Dear ImGui](https://github.com/ocornut/imgui) — Immediate-mode GUI
 
 ---
 
