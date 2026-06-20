@@ -411,7 +411,7 @@ int main() {
 			Float3 mapped	= avg / (avg + MakeFloat3(1.0f));
 			mapped			= Pow(Clamp(mapped, 0.0f, 1.0f), MakeFloat3(1.0f / 2.2f));
 
-			img.Write(px, HEIGHT - py, MakeFloat4(mapped.zyx(), 1.0f));
+			img.Write(px, HEIGHT - 1 - py, MakeFloat4(mapped, 1.0f));
 
 			state[idx] = rng;
 		});
