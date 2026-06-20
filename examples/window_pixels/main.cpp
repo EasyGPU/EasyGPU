@@ -32,7 +32,7 @@ int main() {
 	std::cout << "Press R to clear to red, G for green, B for blue" << std::endl;
 
 	float	 time		= 0.0f;
-	uint32_t clearColor = 0xFF101020; // Dark blue-gray
+	uint32_t clearColor = PackRGBA(16, 16, 32); // Dark blue-gray
 
 	// Main loop
 	while (window.IsOpen()) {
@@ -48,13 +48,13 @@ int main() {
 					window.Close();
 				}
 				if (key.key == Key::R && key.pressed) {
-					clearColor = 0xFFFF0000; // Red
+					clearColor = PackRGBA(255, 0, 0); // Red
 				}
 				if (key.key == Key::G && key.pressed) {
-					clearColor = 0xFF00FF00; // Green
+					clearColor = PackRGBA(0, 255, 0); // Green
 				}
 				if (key.key == Key::B && key.pressed) {
-					clearColor = 0xFF0000FF; // Blue
+					clearColor = PackRGBA(0, 0, 255); // Blue
 				}
 			}
 		}
@@ -104,7 +104,7 @@ int main() {
 		for (uint32_t y = 0; y < 100; ++y) {
 			for (uint32_t x = 0; x < 100; ++x) {
 				bool	 check = ((x / 10) ^ (y / 10)) & 1;
-				uint32_t color = check ? 0xFFFFFFFF : 0xFF000000;
+				uint32_t color = check ? PackRGBA(255, 255, 255) : PackRGBA(0, 0, 0);
 				pixels.SetPixelUnchecked(x, y, color);
 			}
 		}

@@ -1134,9 +1134,9 @@ Kernel2D box_filter([&](Int x, Int y) {
             Int sy = Clamp(y + dy, 0, HEIGHT - 1);
             Int p  = in[sy * WIDTH + sx];
 
-            sum_b = sum_b + (p & 0xFF);
+            sum_r = sum_r + (p & 0xFF);
             sum_g = sum_g + ((p >> 8) & 0xFF);
-            sum_r = sum_r + ((p >> 16) & 0xFF);
+            sum_b = sum_b + ((p >> 16) & 0xFF);
         });
     });
 
@@ -1144,7 +1144,7 @@ Kernel2D box_filter([&](Int x, Int y) {
     Int avg_g = sum_g / 9;
     Int avg_r = sum_r / 9;
 
-    out[idx] = (0xFF000000) | (avg_r << 16) | (avg_g << 8) | avg_b;
+    out[idx] = (0xFF000000) | (avg_b << 16) | (avg_g << 8) | avg_r;
 });
 ```
 

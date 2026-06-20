@@ -10,6 +10,12 @@
 
 using namespace GPU;
 
+namespace {
+constexpr int PackRGBA(int r, int g, int b, int a = 255) {
+	return r | (g << 8) | (b << 16) | (a << 24);
+}
+} // namespace
+
 int main() {
 	// ========================================================================
 	// Configuration
@@ -29,7 +35,7 @@ int main() {
 		for (int x = 0; x < WIDTH; ++x) {
 			bool black				  = ((x + y) % 2) == 0;
 			int	 c					  = black ? 0 : 255;
-			host_input[y * WIDTH + x] = static_cast<int>(0xFF000000 | (c << 16) | (c << 8) | c);
+			host_input[y * WIDTH + x] = PackRGBA(c, c, c);
 		}
 	}
 
@@ -67,9 +73,9 @@ int main() {
 
 						Int p  = in[sy * WIDTH + sx];
 
-						sum_b  = sum_b + (p & 0xFF);
+						sum_r  = sum_r + (p & 0xFF);
 						sum_g  = sum_g + ((p >> 8) & 0xFF);
-						sum_r  = sum_r + ((p >> 16) & 0xFF);
+						sum_b  = sum_b + ((p >> 16) & 0xFF);
 						sum_a  = sum_a + ((p >> 24) & 0xFF);
 					});
 				});
@@ -81,7 +87,7 @@ int main() {
 				Int avg_a  = sum_a / KERNEL_AREA;
 
 				// Repack
-				Int result = (avg_a << 24) | (avg_r << 16) | (avg_g << 8) | avg_b;
+				Int result = (avg_a << 24) | (avg_b << 16) | (avg_g << 8) | avg_r;
 				out[idx]   = result;
 			});
 		},
@@ -111,14 +117,14 @@ int main() {
 					int sx	= std::clamp(x + dx, 0, WIDTH - 1);
 					int sy	= std::clamp(y + dy, 0, HEIGHT - 1);
 					int p	= host_input[sy * WIDTH + sx];
-					sum_b  += p & 0xFF;
+					sum_r  += p & 0xFF;
 					sum_g  += (p >> 8) & 0xFF;
-					sum_r  += (p >> 16) & 0xFF;
+					sum_b  += (p >> 16) & 0xFF;
 					sum_a  += (p >> 24) & 0xFF;
 				}
 			}
-			int expected = ((sum_a / KERNEL_AREA) << 24) | ((sum_r / KERNEL_AREA) << 16) |
-						   ((sum_g / KERNEL_AREA) << 8) | (sum_b / KERNEL_AREA);
+			int expected = ((sum_a / KERNEL_AREA) << 24) | ((sum_b / KERNEL_AREA) << 16) |
+						   ((sum_g / KERNEL_AREA) << 8) | (sum_r / KERNEL_AREA);
 
 			if (host_output[idx] != expected) {
 				all_correct = false;

@@ -10,6 +10,12 @@
 
 using namespace GPU;
 
+namespace {
+constexpr int PackRGBA(int r, int g, int b, int a = 255) {
+	return r | (g << 8) | (b << 16) | (a << 24);
+}
+} // namespace
+
 int main() {
 	// ========================================================================
 	// Configuration
@@ -21,14 +27,13 @@ int main() {
 	// ========================================================================
 	// Host Data Preparation
 	// ========================================================================
-	// Packed RGBA pixels: 0xAARRGGBB
+	// Packed RGBA pixels in byte order: R | G << 8 | B << 16 | A << 24
 	std::vector<int> host_input	 = {
-		static_cast<int>(0xFFFF0000), static_cast<int>(0xFF00FF00), static_cast<int>(0xFF0000FF),
-		static_cast<int>(0xFFFFFFFF), static_cast<int>(0xFF7F7F7F), static_cast<int>(0xFF123456),
-		static_cast<int>(0xFFABCDEF), static_cast<int>(0xFF000000), static_cast<int>(0xFFFF00FF),
-		static_cast<int>(0xFFFFFF00), static_cast<int>(0xFF00FFFF), static_cast<int>(0xFF112233),
-		static_cast<int>(0xFF445566), static_cast<int>(0xFF778899), static_cast<int>(0xFFAABBCC),
-		static_cast<int>(0xFFDDEEFF),
+		PackRGBA(255, 0, 0),	  PackRGBA(0, 255, 0),	  PackRGBA(0, 0, 255),	PackRGBA(255, 255, 255),
+		PackRGBA(127, 127, 127), PackRGBA(0x12, 0x34, 0x56), PackRGBA(0xAB, 0xCD, 0xEF),
+		PackRGBA(0, 0, 0),		  PackRGBA(255, 0, 255),	  PackRGBA(255, 255, 0), PackRGBA(0, 255, 255),
+		PackRGBA(0x11, 0x22, 0x33), PackRGBA(0x44, 0x55, 0x66), PackRGBA(0x77, 0x88, 0x99),
+		PackRGBA(0xAA, 0xBB, 0xCC), PackRGBA(0xDD, 0xEE, 0xFF),
 	};
 
 	std::vector<int> host_output(PIXEL_COUNT);
@@ -54,9 +59,9 @@ int main() {
 				Int	 pixel = in[idx];
 
 				// Extract channels using bitwise ops
-				Int	 b	   = pixel & 0xFF;
+				Int	 r	   = pixel & 0xFF;
 				Int	 g	   = (pixel >> 8) & 0xFF;
-				Int	 r	   = (pixel >> 16) & 0xFF;
+				Int	 b	   = (pixel >> 16) & 0xFF;
 				Int	 a	   = (pixel >> 24) & 0xFF;
 
 				// Boost red channel (clamp to 255)
@@ -64,7 +69,7 @@ int main() {
 				If(new_r > 255, [&]() { new_r = 255; });
 
 				// Repack channels
-				Int result = (a << 24) | (new_r << 16) | (g << 8) | b;
+				Int result = (a << 24) | (b << 16) | (g << 8) | new_r;
 
 				out[idx]   = result;
 			});
@@ -88,15 +93,15 @@ int main() {
 		int in_pixel   = host_input[i];
 		int out_pixel  = host_output[i];
 
-		int b		   = in_pixel & 0xFF;
+		int r		   = in_pixel & 0xFF;
 		int g		   = (in_pixel >> 8) & 0xFF;
-		int r		   = (in_pixel >> 16) & 0xFF;
+		int b		   = (in_pixel >> 16) & 0xFF;
 		int a		   = (in_pixel >> 24) & 0xFF;
 
 		int expected_r = r + (r >> 1);
 		if (expected_r > 255)
 			expected_r = 255;
-		int expected = (a << 24) | (expected_r << 16) | (g << 8) | b;
+		int expected = (a << 24) | (b << 16) | (g << 8) | expected_r;
 
 		if (out_pixel != expected) {
 			all_correct = false;

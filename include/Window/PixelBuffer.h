@@ -23,8 +23,8 @@ namespace GPU::Window {
  *
  * Usage:
  *   PixelBuffer pixels(800, 600);
- *   pixels.Clear(0xFF202030);  // Dark blue background
- *   pixels.SetPixel(10, 20, 0xFFFF0000);  // Red pixel at (10, 20)
+ *   pixels.Clear(PackRGBA(32, 32, 48));  // Dark blue background
+ *   pixels.SetPixel(10, 20, PackRGBA(255, 0, 0));  // Red pixel at (10, 20)
  *   window.Present(pixels);
  */
 class PixelBuffer {
@@ -103,7 +103,7 @@ public:
 
 	/**
 	 * @brief Clear entire buffer with a color
-	 * @param rgba Color in RGBA8 format (e.g., 0xFF0000FF for red)
+	 * @param rgba Color packed with PackRGBA.
 	 */
 	void				   Clear(uint32_t rgba);
 
@@ -149,18 +149,18 @@ private:
  * @brief Helper to pack RGBA components into a single uint32_t
  */
 [[nodiscard]] inline uint32_t PackRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
-	return (static_cast<uint32_t>(a) << 24) | (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) |
-		   (static_cast<uint32_t>(b));
+	return static_cast<uint32_t>(r) | (static_cast<uint32_t>(g) << 8) | (static_cast<uint32_t>(b) << 16) |
+		   (static_cast<uint32_t>(a) << 24);
 }
 
 /**
  * @brief Helper to unpack RGBA components from a uint32_t
  */
 inline void UnpackRGBA(uint32_t rgba, uint8_t &r, uint8_t &g, uint8_t &b, uint8_t &a) {
-	a = static_cast<uint8_t>((rgba >> 24) & 0xFF);
-	r = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+	r = static_cast<uint8_t>(rgba & 0xFF);
 	g = static_cast<uint8_t>((rgba >> 8) & 0xFF);
-	b = static_cast<uint8_t>(rgba & 0xFF);
+	b = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+	a = static_cast<uint8_t>((rgba >> 24) & 0xFF);
 }
 
 } // namespace GPU::Window

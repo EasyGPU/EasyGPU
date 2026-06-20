@@ -257,7 +257,7 @@ int main() {
         for (uint32_t y = 0; y < pixels.Height(); ++y) {
             for (uint32_t x = 0; x < pixels.Width(); ++x) {
                 bool checker = ((x / 16) ^ (y / 16)) & 1;
-                pixels.SetPixelUnchecked(x, y, checker ? 0xFFFFFFFF : 0xFF000000);
+                pixels.SetPixelUnchecked(x, y, checker ? PackRGBA(255, 255, 255) : PackRGBA(0, 0, 0));
             }
         }
         
