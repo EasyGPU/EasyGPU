@@ -43,6 +43,13 @@ void GraphicsBuildContext::SetVertexLayout(const std::vector<Backend::VertexLayo
 	_vertexLayout = layout;
 }
 
+void GraphicsBuildContext::SetColorOutputCount(uint32_t count) {
+	if (count == 0 || count > Backend::MAX_COLOR_ATTACHMENTS) {
+		throw std::runtime_error("GraphicsBuildContext color output count must be between 1 and MAX_COLOR_ATTACHMENTS");
+	}
+	_colorOutputCount = count;
+}
+
 void GraphicsBuildContext::PushTranslatedCode(std::string Code) {
 	if (_stage != ShaderStage::VS && _stage != ShaderStage::FS) {
 		throw std::runtime_error("GraphicsBuildContext: translated code emitted outside a shader stage");
@@ -204,8 +211,14 @@ std::string GraphicsBuildContext::GenerateFragmentShaderMain() {
 	std::ostringstream oss;
 	oss << "void main() {\n";
 
-	// Declare fragColor as output
-	oss << "\tvec4 fragColor;\n\n";
+	if (_colorOutputCount == 1) {
+		oss << "\tvec4 fragColor;\n\n";
+	} else {
+		for (uint32_t i = 0; i < _colorOutputCount; ++i) {
+			oss << "\tvec4 fragColor" << i << ";\n";
+		}
+		oss << "\n";
+	}
 
 	if (!_fsBodyCode.empty()) {
 		std::istringstream codeStream(_fsBodyCode);
@@ -217,8 +230,14 @@ std::string GraphicsBuildContext::GenerateFragmentShaderMain() {
 		}
 	}
 
-	// Output the fragment color
-	oss << "\n\toutColor = fragColor;\n";
+	if (_colorOutputCount == 1) {
+		oss << "\n\toutColor = fragColor;\n";
+	} else {
+		oss << "\n";
+		for (uint32_t i = 0; i < _colorOutputCount; ++i) {
+			oss << "\toutColor" << i << " = fragColor" << i << ";\n";
+		}
+	}
 	oss << "}\n";
 	return oss.str();
 }
@@ -251,8 +270,14 @@ std::string GraphicsBuildContext::GetFragmentShaderCode() {
 
 	oss << GenerateCommonHeaders();
 
-	// Fragment shader output declaration
-	oss << "layout(location=0) out vec4 outColor;\n\n";
+	for (uint32_t i = 0; i < _colorOutputCount; ++i) {
+		if (_colorOutputCount == 1) {
+			oss << "layout(location=0) out vec4 outColor;\n";
+		} else {
+			oss << "layout(location=" << i << ") out vec4 outColor" << i << ";\n";
+		}
+	}
+	oss << "\n";
 
 	oss << GenerateVaryingInputs();
 

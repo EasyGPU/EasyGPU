@@ -58,6 +58,34 @@ int main() {
 			std::cout << "[Test 0 StructVertexLayoutSource] PASS" << std::endl;
 		}
 
+		// Test 0b: DSL graphics pipeline can emit multiple color outputs.
+		{
+			GPU::Kernel::GraphicsPipeline pipe(
+				[](GPU::IR::Value::Var<GPU::Math::Vec4> &gl_Position) {
+					auto vid = GPU::Kernel::VertexIndex();
+					auto x	 = ToFloat((vid & 1) << 2) - 1.0f;
+					auto y	 = ToFloat((vid & 2) << 1) - 1.0f;
+					gl_Position = MakeFloat4(x, y, 0.0f, 1.0f);
+				},
+				[](std::vector<GPU::IR::Value::Var<GPU::Math::Vec4>> &fragColors) {
+					fragColors[0] = MakeFloat4(1.0f, 0.0f, 0.0f, 1.0f);
+					fragColors[1] = MakeFloat4(0.0f, 1.0f, 0.0f, 1.0f);
+				},
+				2);
+
+			std::string src = pipe.GetShaderSource();
+			if (src.find("layout(location=0) out vec4 outColor0;") == std::string::npos ||
+				src.find("layout(location=1) out vec4 outColor1;") == std::string::npos ||
+				src.find("outColor0 = fragColor0;") == std::string::npos ||
+				src.find("outColor1 = fragColor1;") == std::string::npos) {
+				std::cout << "[Test 0b] FAIL: MRT fragment outputs not reflected in shader source" << std::endl;
+				return 1;
+			}
+			total++;
+			passed++;
+			std::cout << "[Test 0b MRTShaderSource] PASS" << std::endl;
+		}
+
 		GPU::Runtime::AutoInitContext();
 		auto *backend = GPU::Runtime::Context::GetBackend();
 		if (!backend || !backend->IsInitialized()) {
@@ -242,6 +270,78 @@ int main() {
 			total++;
 			passed++;
 			std::cout << "[Test 4 DrawOutsideRenderPass] PASS" << std::endl;
+		}
+
+		// Test 4b: Render to multiple color attachments and verify both outputs.
+		{
+			const uint32_t W = 128, H = 128;
+
+			const char *mrtFsSrc =
+				"#version 450\n"
+				"layout(location = 0) out vec4 outColor0;\n"
+				"layout(location = 1) out vec4 outColor1;\n"
+				"void main() {\n"
+				"\toutColor0 = vec4(1.0, 0.0, 0.0, 1.0);\n"
+				"\toutColor1 = vec4(0.0, 1.0, 0.0, 1.0);\n"
+				"}\n";
+
+			GPU::Backend::ShaderDesc vsDesc{GPU::Backend::ShaderType::Vertex, vsSrc, "main"};
+			auto					 vs = backend->CreateShader(vsDesc);
+			GPU::Backend::ShaderDesc fsDesc{GPU::Backend::ShaderType::Fragment, mrtFsSrc, "main"};
+			auto					 fs = backend->CreateShader(fsDesc);
+
+			GPU::Backend::GraphicsPipelineDesc pipeDesc;
+			pipeDesc.vertexShader			  = vs;
+			pipeDesc.fragmentShader			  = fs;
+			pipeDesc.topology				  = GPU::Backend::PrimitiveTopology::TriangleList;
+			pipeDesc.colorAttachmentFormats	  = {GPU::Backend::PixelFormat::RGBA8, GPU::Backend::PixelFormat::RGBA8};
+			auto pipeline					  = backend->CreateGraphicsPipeline(pipeDesc);
+
+			GPU::Backend::TextureDesc texDesc;
+			texDesc.width						  = W;
+			texDesc.height						  = H;
+			texDesc.format						  = GPU::Backend::PixelFormat::RGBA8;
+			auto							  rt0 = backend->CreateTexture(texDesc);
+			auto							  rt1 = backend->CreateTexture(texDesc);
+
+			GPU::Backend::RenderPassBeginDesc rpDesc;
+			rpDesc.colorAttachments = {rt0, rt1};
+			rpDesc.clearColorFlag	  = true;
+
+			backend->BeginRendering(rpDesc);
+			backend->SetViewport(0, 0, W, H);
+			backend->SetScissor(0, 0, W, H);
+			backend->BindPipeline(pipeline);
+			backend->Draw(3, 1, 0, 0);
+			backend->EndRendering();
+			backend->Finish();
+
+			std::vector<uint8_t> pixels0(W * H * 4);
+			std::vector<uint8_t> pixels1(W * H * 4);
+			backend->DownloadTexture(rt0, 0, 0, W, H, pixels0.data());
+			backend->DownloadTexture(rt1, 0, 0, W, H, pixels1.data());
+
+			size_t idx = (64 * W + 64) * 4;
+			bool   ok0 = pixels0[idx + 0] > 240 && pixels0[idx + 1] < 16 && pixels0[idx + 2] < 16;
+			bool   ok1 = pixels1[idx + 0] < 16 && pixels1[idx + 1] > 240 && pixels1[idx + 2] < 16;
+
+			backend->DestroyTexture(rt0);
+			backend->DestroyTexture(rt1);
+			backend->DestroyPipeline(pipeline);
+			backend->DestroyShader(vs);
+			backend->DestroyShader(fs);
+
+			if (!ok0 || !ok1) {
+				std::cout << "[Test 4b] FAIL: MRT pixels rt0=(" << (int)pixels0[idx + 0] << ", "
+						  << (int)pixels0[idx + 1] << ", " << (int)pixels0[idx + 2] << ") rt1=("
+						  << (int)pixels1[idx + 0] << ", " << (int)pixels1[idx + 1] << ", "
+						  << (int)pixels1[idx + 2] << ")" << std::endl;
+				backend->MakeNoneCurrent();
+				return 1;
+			}
+			total++;
+			passed++;
+			std::cout << "[Test 4b MRTRenderAndVerify] PASS" << std::endl;
 		}
 
 		// Test 5: Double BeginRendering must throw

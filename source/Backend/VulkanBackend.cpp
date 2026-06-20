@@ -2841,6 +2841,14 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 		throw std::runtime_error("Pipeline push constant size exceeds device limit");
 	}
 
+	std::vector<PixelFormat> colorAttachmentFormats = desc.colorAttachmentFormats;
+	if (colorAttachmentFormats.empty()) {
+		colorAttachmentFormats.push_back(desc.colorAttachmentFormat);
+	}
+	if (colorAttachmentFormats.empty() || colorAttachmentFormats.size() > MAX_COLOR_ATTACHMENTS) {
+		throw std::runtime_error("Graphics pipeline color attachment count must be between 1 and MAX_COLOR_ATTACHMENTS");
+	}
+
 	// Create descriptor set layout for resources
 	std::vector<ResourceLayoutEntry> sortedResources = desc.resources;
 	std::sort(sortedResources.begin(), sortedResources.end());
@@ -3032,16 +3040,18 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 	depthStencil.stencilTestEnable					   = VK_FALSE;
 
 	// Color blend
-	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-	colorBlendAttachment.blendEnable						 = VK_FALSE;
-	colorBlendAttachment.colorWriteMask =
-		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	VkPipelineColorBlendAttachmentState			  colorBlendAttachment = {};
+	colorBlendAttachment.blendEnable			  = VK_FALSE;
+	colorBlendAttachment.colorWriteMask			  = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+													VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(colorAttachmentFormats.size(),
+																		  colorBlendAttachment);
 
 	VkPipelineColorBlendStateCreateInfo colorBlending = {};
 	colorBlending.sType								  = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.logicOpEnable						  = VK_FALSE;
-	colorBlending.attachmentCount					  = 1;
-	colorBlending.pAttachments						  = &colorBlendAttachment;
+	colorBlending.attachmentCount					  = static_cast<uint32_t>(colorBlendAttachments.size());
+	colorBlending.pAttachments						  = colorBlendAttachments.data();
 
 	// Dynamic state
 	VkDynamicState					 dynamicStates[]  = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
@@ -3051,11 +3061,15 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 	dynamicState.pDynamicStates						  = dynamicStates;
 
 	// Dynamic rendering
-	VkFormat						 colorFormat	  = GetVkFormat(desc.colorAttachmentFormat);
+	std::vector<VkFormat>			 colorFormats;
+	colorFormats.reserve(colorAttachmentFormats.size());
+	for (PixelFormat format : colorAttachmentFormats) {
+		colorFormats.push_back(GetVkFormat(format));
+	}
 	VkPipelineRenderingCreateInfoKHR renderingInfo	  = {};
 	renderingInfo.sType								  = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-	renderingInfo.colorAttachmentCount				  = 1;
-	renderingInfo.pColorAttachmentFormats			  = &colorFormat;
+	renderingInfo.colorAttachmentCount				  = static_cast<uint32_t>(colorFormats.size());
+	renderingInfo.pColorAttachmentFormats			  = colorFormats.data();
 	if (desc.depthTestEnable) {
 		renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 	}
@@ -3096,7 +3110,8 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 	info.vertexShader		 = desc.vertexShader;
 	info.fragmentShader		 = desc.fragmentShader;
 	info.topology			 = desc.topology;
-	info.colorFormat		 = desc.colorAttachmentFormat;
+	info.colorFormat		 = colorAttachmentFormats.front();
+	info.colorFormats		 = std::move(colorAttachmentFormats);
 	info.depthEnable		 = desc.depthTestEnable;
 	info.vertexLayout		 = desc.vertexLayout;
 
@@ -3119,26 +3134,50 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 
 	EnsureCommandBuffer();
 
-	// Transition color attachment
-	auto colorIt = _textures.find(desc.colorAttachment);
-	if (colorIt == _textures.end()) {
-		throw std::runtime_error("Invalid color attachment texture handle");
+	std::vector<TextureHandle> colorHandles = desc.colorAttachments;
+	if (colorHandles.empty() && desc.colorAttachment != INVALID_TEXTURE_HANDLE) {
+		colorHandles.push_back(desc.colorAttachment);
+	}
+	if (colorHandles.empty() || colorHandles.size() > MAX_COLOR_ATTACHMENTS) {
+		throw std::runtime_error("BeginRendering color attachment count must be between 1 and MAX_COLOR_ATTACHMENTS");
 	}
 
-	VkRenderingAttachmentInfoKHR colorAttachment = {};
-	colorAttachment.sType						 = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-	colorAttachment.imageView					 = colorIt->second.view;
-	colorAttachment.imageLayout					 = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	colorAttachment.loadOp	= desc.clearColorFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
-	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachment.clearValue.color.float32[0] = desc.clearColor[0];
-	colorAttachment.clearValue.color.float32[1] = desc.clearColor[1];
-	colorAttachment.clearValue.color.float32[2] = desc.clearColor[2];
-	colorAttachment.clearValue.color.float32[3] = desc.clearColor[3];
+	std::vector<std::unordered_map<TextureHandle, TextureInfo>::iterator> colorTextureIters;
+	colorTextureIters.reserve(colorHandles.size());
+	for (TextureHandle handle : colorHandles) {
+		auto colorIt = _textures.find(handle);
+		if (colorIt == _textures.end()) {
+			throw std::runtime_error("Invalid color attachment texture handle");
+		}
+		colorTextureIters.push_back(colorIt);
+	}
 
-	// Transition to color attachment layout
-	TransitionTexture(colorIt->second, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-					  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+	const uint32_t renderWidth	= colorTextureIters.front()->second.width;
+	const uint32_t renderHeight = colorTextureIters.front()->second.height;
+	for (const auto &colorIt : colorTextureIters) {
+		if (colorIt->second.width != renderWidth || colorIt->second.height != renderHeight) {
+			throw std::runtime_error("BeginRendering MRT color attachments must have identical dimensions");
+		}
+	}
+
+	std::vector<VkRenderingAttachmentInfoKHR> colorAttachments;
+	colorAttachments.reserve(colorTextureIters.size());
+	for (auto &colorIt : colorTextureIters) {
+		VkRenderingAttachmentInfoKHR colorAttachment = {};
+		colorAttachment.sType						= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+		colorAttachment.imageView					= colorIt->second.view;
+		colorAttachment.imageLayout					= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorAttachment.loadOp	= desc.clearColorFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachment.clearValue.color.float32[0] = desc.clearColor[0];
+		colorAttachment.clearValue.color.float32[1] = desc.clearColor[1];
+		colorAttachment.clearValue.color.float32[2] = desc.clearColor[2];
+		colorAttachment.clearValue.color.float32[3] = desc.clearColor[3];
+		colorAttachments.push_back(colorAttachment);
+
+		TransitionTexture(colorIt->second, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+	}
 
 	VkRenderingAttachmentInfoKHR depthAttachment = {};
 	bool						 hasDepth		 = false;
@@ -3162,11 +3201,11 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 
 	VkRenderingInfoKHR renderingInfo	   = {};
 	renderingInfo.sType					   = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-	renderingInfo.renderArea.extent.width  = colorIt->second.width;
-	renderingInfo.renderArea.extent.height = colorIt->second.height;
+	renderingInfo.renderArea.extent.width  = renderWidth;
+	renderingInfo.renderArea.extent.height = renderHeight;
 	renderingInfo.layerCount			   = 1;
-	renderingInfo.colorAttachmentCount	   = 1;
-	renderingInfo.pColorAttachments		   = &colorAttachment;
+	renderingInfo.colorAttachmentCount	   = static_cast<uint32_t>(colorAttachments.size());
+	renderingInfo.pColorAttachments		   = colorAttachments.data();
 	if (hasDepth) {
 		renderingInfo.pDepthAttachment = &depthAttachment;
 	}

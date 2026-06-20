@@ -107,6 +107,9 @@ std::function<void(Float4 &gl_Position)>  // read from Bound buffer via VertexIn
 
 ```cpp
 std::function<void(Float4 &fragColor)>
+
+// Multiple render targets
+std::function<void(std::vector<Float4> &fragColors)>
 ```
 
 **Rendering**
@@ -117,6 +120,12 @@ pipeline.Draw(RenderTarget, vertexCount, sync);
 
 // With depth buffer
 pipeline.Draw(RenderTarget, depthBuffer, vertexCount, sync);
+
+// Multiple render targets
+pipeline.Draw({
+    GraphicsPipeline::RenderTarget(albedoTarget),
+    GraphicsPipeline::RenderTarget(normalTarget)
+}, depthBuffer, vertexCount, sync);
 ```
 
 **Debugging**
@@ -124,6 +133,29 @@ pipeline.Draw(RenderTarget, depthBuffer, vertexCount, sync);
 ```cpp
 std::string glsl = pipeline.GetShaderSource();  // Full VS + FS source
 ```
+
+### Multiple Render Targets
+
+`GraphicsPipeline` supports MRT on the Vulkan graphics path. Construct the pipeline with a fragment lambda that receives a `std::vector<Float4>&`, then pass the same number of render targets to `Draw()` or `DrawIndexed()`.
+
+```cpp
+GraphicsPipeline gbuffer(
+    [&](Float4 &gl_Position) {
+        // Write vertex position...
+    },
+    [&](std::vector<Float4> &out) {
+        out[0] = MakeFloat4(albedo, 1.0f);
+        out[1] = MakeFloat4(normal * 0.5f + 0.5f, 1.0f);
+    },
+    2);
+
+gbuffer.Draw({
+    GraphicsPipeline::RenderTarget(albedoTarget),
+    GraphicsPipeline::RenderTarget(normalTarget)
+}, depthBuffer, vertexCount, true);
+```
+
+All MRT attachments must have identical dimensions, and the attachment count passed to `Draw()` must match the fragment output count used at construction.
 
 ### FragmentShader (Fullscreen Pass)
 

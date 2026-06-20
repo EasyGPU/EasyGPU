@@ -23,6 +23,7 @@ namespace GPU::Backend {
 
 constexpr uint32_t MAX_BUFFER_BINDINGS			 = 32;
 constexpr uint32_t MAX_TEXTURE_BINDINGS			 = 32;
+constexpr uint32_t MAX_COLOR_ATTACHMENTS		 = 8;
 
 // ============================================================================
 // Handle Types
@@ -262,6 +263,7 @@ struct GraphicsPipelineDesc {
 	ShaderHandle					 fragmentShader		   = INVALID_SHADER_HANDLE;
 	PrimitiveTopology				 topology			   = PrimitiveTopology::TriangleList;
 	PixelFormat						 colorAttachmentFormat = PixelFormat::RGBA8;
+	std::vector<PixelFormat>		 colorAttachmentFormats;
 	bool							 depthTestEnable	   = false;
 	bool							 depthWriteEnable	   = true;
 	std::vector<VertexLayoutEntry>	 vertexLayout;
@@ -272,6 +274,7 @@ struct GraphicsPipelineDesc {
 /** @brief Descriptor for beginning a render pass. */
 struct RenderPassBeginDesc {
 	TextureHandle colorAttachment = INVALID_TEXTURE_HANDLE;
+	std::vector<TextureHandle> colorAttachments;
 	TextureHandle depthAttachment = INVALID_TEXTURE_HANDLE;
 	float		  clearColor[4]	  = {0.0f, 0.0f, 0.0f, 1.0f};
 	float		  clearDepth	  = 1.0f;

@@ -723,6 +723,10 @@ GraphicsPipeline pipeline(
 
 pipeline.Draw(renderTarget, 3, true);                    // no depth
 pipeline.Draw(renderTarget, depthBuffer, 3, true);       // with depth
+pipeline.Draw({
+    GraphicsPipeline::RenderTarget(gbuffer0),
+    GraphicsPipeline::RenderTarget(gbuffer1)
+}, depthBuffer, 3, true);                                // MRT
 ```
 
 **Methods**
@@ -731,6 +735,8 @@ pipeline.Draw(renderTarget, depthBuffer, 3, true);       // with depth
 |:-------|:------------|
 | `Draw(Texture2D&, uint32_t vertexCount, bool sync)` | Non-indexed draw without depth |
 | `Draw(Texture2D&, DepthBuffer&, uint32_t vertexCount, bool sync)` | Non-indexed draw with depth |
+| `Draw({RenderTarget(...)...}, uint32_t vertexCount, bool sync)` | Non-indexed draw to multiple render targets |
+| `Draw({RenderTarget(...)...}, DepthBuffer&, uint32_t vertexCount, bool sync)` | MRT draw with depth |
 | `SetVertexBuffer(BufferHandle, uint32_t stride)` | Bind a vertex buffer |
 | `SetIndexBuffer(BufferHandle)` | Bind an index buffer |
 | `SetIndexCount(uint32_t count)` | Set index count for indexed draws |
@@ -820,6 +826,7 @@ struct GraphicsPipelineDesc {
     ShaderHandle      fragmentShader         = INVALID_SHADER_HANDLE;
     PrimitiveTopology topology               = PrimitiveTopology::TriangleList;
     PixelFormat       colorAttachmentFormat  = PixelFormat::RGBA8;
+    std::vector<PixelFormat> colorAttachmentFormats;
     bool              depthTestEnable        = false;
     bool              depthWriteEnable       = true;
     std::vector<VertexLayoutEntry> vertexLayout;
@@ -833,6 +840,7 @@ struct GraphicsPipelineDesc {
 ```cpp
 struct RenderPassBeginDesc {
     TextureHandle colorAttachment  = INVALID_TEXTURE_HANDLE;
+    std::vector<TextureHandle> colorAttachments;
     TextureHandle depthAttachment  = INVALID_TEXTURE_HANDLE;
     float         clearColor[4]    = {0.0f, 0.0f, 0.0f, 1.0f};
     float         clearDepth       = 1.0f;

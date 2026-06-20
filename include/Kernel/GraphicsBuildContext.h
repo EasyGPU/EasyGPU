@@ -95,6 +95,15 @@ public:
 		return _vertexLayout;
 	}
 
+	/**
+	 * @brief Set how many vec4 color outputs the fragment shader should emit.
+	 */
+	void SetColorOutputCount(uint32_t count);
+
+	[[nodiscard]] uint32_t GetColorOutputCount() const {
+		return _colorOutputCount;
+	}
+
 public:
 	// ===================================================================
 	// Code Generation
@@ -196,6 +205,7 @@ protected:
 	std::string								_vsBodyCode;
 	std::string								_fsBodyCode;
 	std::string								_vertexInputSetupCode;
+	uint32_t								_colorOutputCount = 1;
 	ShaderStage							_stage = ShaderStage::Idle;
 };
 

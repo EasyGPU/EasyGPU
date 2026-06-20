@@ -257,6 +257,7 @@ private:
 		ShaderHandle					 fragmentShader = INVALID_SHADER_HANDLE;
 		PrimitiveTopology				 topology		= PrimitiveTopology::TriangleList;
 		PixelFormat						 colorFormat	= PixelFormat::RGBA8;
+		std::vector<PixelFormat>		 colorFormats;
 		bool							 depthEnable	= false;
 		std::vector<VertexLayoutEntry>	 vertexLayout;
 	};

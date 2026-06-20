@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include <stdexcept>
+#include <utility>
 
 namespace GPU::Kernel {
 
@@ -59,7 +60,12 @@ void GraphicsPipeline::EnsureCompiled() {
 	pipeDesc.vertexShader		   = _vsHandle;
 	pipeDesc.fragmentShader		   = _fsHandle;
 	pipeDesc.topology			   = Backend::PrimitiveTopology::TriangleList;
-	pipeDesc.colorAttachmentFormat = Backend::PixelFormat::RGBA8;
+	pipeDesc.colorAttachmentFormat =
+		_colorAttachmentFormats.empty() ? Backend::PixelFormat::RGBA8 : _colorAttachmentFormats.front();
+	pipeDesc.colorAttachmentFormats = _colorAttachmentFormats;
+	if (pipeDesc.colorAttachmentFormats.empty()) {
+		pipeDesc.colorAttachmentFormats.assign(_colorOutputCount, Backend::PixelFormat::RGBA8);
+	}
 	pipeDesc.depthTestEnable	   = true;
 	pipeDesc.depthWriteEnable	   = true;
 
@@ -89,13 +95,68 @@ void GraphicsPipeline::EnsureCompiled() {
 	_compiled				  = true;
 }
 
-void GraphicsPipeline::DrawImpl(Backend::TextureHandle colorHandle, Backend::TextureHandle depthHandle, uint32_t width,
-								uint32_t height, uint32_t vertexCount, uint32_t indexCount, bool indexed, bool sync) {
-	EnsureCompiled();
+std::pair<uint32_t, uint32_t>
+GraphicsPipeline::ValidateRenderTargets(const std::vector<RenderTargetAttachment> &renderTargets) {
+	if (renderTargets.empty()) {
+		throw std::runtime_error("GraphicsPipeline::Draw requires at least one render target");
+	}
+	if (renderTargets.size() > Backend::MAX_COLOR_ATTACHMENTS) {
+		throw std::runtime_error("GraphicsPipeline::Draw render target count exceeds MAX_COLOR_ATTACHMENTS");
+	}
 
+	const uint32_t width  = renderTargets.front().width;
+	const uint32_t height = renderTargets.front().height;
+	if (width == 0 || height == 0) {
+		throw std::runtime_error("GraphicsPipeline::Draw requires non-zero render target dimensions");
+	}
+
+	for (const auto &target : renderTargets) {
+		if (target.handle == Backend::INVALID_TEXTURE_HANDLE) {
+			throw std::runtime_error("GraphicsPipeline::Draw received an invalid render target");
+		}
+		if (target.width != width || target.height != height) {
+			throw std::runtime_error("GraphicsPipeline::Draw MRT render targets must have identical dimensions");
+		}
+	}
+
+	return {width, height};
+}
+
+std::vector<IR::Value::Var<GPU::Math::Vec4>> GraphicsPipeline::MakeFragmentColorOutputs(uint32_t colorOutputCount) {
+	if (colorOutputCount == 0 || colorOutputCount > Backend::MAX_COLOR_ATTACHMENTS) {
+		throw std::runtime_error("GraphicsPipeline MRT color output count must be between 1 and MAX_COLOR_ATTACHMENTS");
+	}
+
+	std::vector<IR::Value::Var<GPU::Math::Vec4>> outputs;
+	outputs.reserve(colorOutputCount);
+	for (uint32_t i = 0; i < colorOutputCount; ++i) {
+		outputs.emplace_back(std::format("fragColor{}", i), true);
+	}
+	return outputs;
+}
+
+void GraphicsPipeline::DrawImpl(const std::vector<RenderTargetAttachment> &renderTargets,
+								Backend::TextureHandle depthHandle, uint32_t width, uint32_t height,
+								uint32_t vertexCount, uint32_t indexCount, bool indexed, bool sync) {
 	auto *backend = Runtime::Context::GetBackend();
 	if (!backend)
 		throw std::runtime_error("Backend not available");
+	if (renderTargets.size() != _colorOutputCount) {
+		throw std::runtime_error("GraphicsPipeline::Draw render target count must match fragment output count");
+	}
+	std::vector<Backend::PixelFormat> drawFormats;
+	drawFormats.reserve(renderTargets.size());
+	for (const auto &target : renderTargets) {
+		drawFormats.push_back(target.format);
+	}
+	if (_compiled) {
+		if (drawFormats != _colorAttachmentFormats) {
+			throw std::runtime_error("GraphicsPipeline::Draw render target formats differ from compiled pipeline");
+		}
+	} else {
+		_colorAttachmentFormats = std::move(drawFormats);
+	}
+	EnsureCompiled();
 	if (!_simpleVertexInput && vertexCount > 0 && !_hasVertexBuffer) {
 		throw std::runtime_error("GraphicsPipeline::Draw requires a vertex buffer for this pipeline");
 	}
@@ -104,7 +165,11 @@ void GraphicsPipeline::DrawImpl(Backend::TextureHandle colorHandle, Backend::Tex
 	}
 
 	Backend::RenderPassBeginDesc rpDesc;
-	rpDesc.colorAttachment = colorHandle;
+	rpDesc.colorAttachment = renderTargets.front().handle;
+	rpDesc.colorAttachments.reserve(renderTargets.size());
+	for (const auto &target : renderTargets) {
+		rpDesc.colorAttachments.push_back(target.handle);
+	}
 	rpDesc.clearColorFlag  = true;
 	rpDesc.clearColor[0]   = 0.0f; // blue for debug
 	rpDesc.clearColor[1]   = 0.0f;
