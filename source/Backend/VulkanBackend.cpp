@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cstring>
 #include <iostream>
+#include <set>
 #include <unordered_set>
 
 // glslang includes for GLSL to SPIR-V compilation
@@ -27,6 +28,23 @@
 #endif
 
 namespace GPU::Backend {
+
+namespace {
+
+VulkanBackend::InstanceExtensionProvider &GetInstanceExtensionProvider() {
+	static VulkanBackend::InstanceExtensionProvider provider;
+	return provider;
+}
+
+bool HasInstanceExtensionProvider() {
+	return static_cast<bool>(GetInstanceExtensionProvider());
+}
+
+} // namespace
+
+void VulkanBackend::RegisterInstanceExtensionProvider(InstanceExtensionProvider provider) {
+	GetInstanceExtensionProvider() = std::move(provider);
+}
 
 // =============================================================================
 // Helper Functions
@@ -129,7 +147,7 @@ struct ScopedVulkanBuffer {
 	VkBuffer	   buffer = nullptr;
 	VkDeviceMemory memory = nullptr;
 
-	ScopedVulkanBuffer() = default;
+	ScopedVulkanBuffer()  = default;
 	ScopedVulkanBuffer(VkDevice device_) : device(device_) {
 	}
 	~ScopedVulkanBuffer() {
@@ -141,7 +159,7 @@ struct ScopedVulkanBuffer {
 		}
 	}
 
-	ScopedVulkanBuffer(const ScopedVulkanBuffer &)			 = delete;
+	ScopedVulkanBuffer(const ScopedVulkanBuffer &)			  = delete;
 	ScopedVulkanBuffer &operator=(const ScopedVulkanBuffer &) = delete;
 };
 
@@ -359,10 +377,24 @@ void VulkanBackend::CreateInstance() {
 	}
 #endif
 
-	// No instance extensions required for headless compute
-	createInfo.enabledExtensionCount = 0;
+	std::vector<const char *> instanceExtensions;
+	if (auto &provider = GetInstanceExtensionProvider()) {
+		for (const char *extension : provider()) {
+			if (extension) {
+				instanceExtensions.push_back(extension);
+			}
+		}
+	}
 
-	VkResult result					 = vkCreateInstance(&createInfo, nullptr, &_instance);
+#ifdef __APPLE__
+	instanceExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+	createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
+
+	createInfo.enabledExtensionCount   = static_cast<uint32_t>(instanceExtensions.size());
+	createInfo.ppEnabledExtensionNames = instanceExtensions.empty() ? nullptr : instanceExtensions.data();
+
+	VkResult result					   = vkCreateInstance(&createInfo, nullptr, &_instance);
 	CheckVkResult(result, "vkCreateInstance");
 }
 
@@ -476,21 +508,49 @@ void VulkanBackend::CreateDevice() {
 	dynamicRenderingFeatures.sType			  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
 	dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
 
-	// Device extensions
-	const char		  *deviceExtensions[]	  = {VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
-	bool			   hasDynamicRendering	  = true; // Assume supported; if not, graphics won't work
+	uint32_t extensionCount					  = 0;
+	vkEnumerateDeviceExtensionProperties(_physicalDevice, nullptr, &extensionCount, nullptr);
+	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+	if (extensionCount != 0) {
+		vkEnumerateDeviceExtensionProperties(_physicalDevice, nullptr, &extensionCount, availableExtensions.data());
+	}
 
-	VkDeviceCreateInfo createInfo			  = {};
-	createInfo.sType						  = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	createInfo.pNext						  = &dynamicRenderingFeatures;
-	createInfo.queueCreateInfoCount			  = 1;
-	createInfo.pQueueCreateInfos			  = &queueCreateInfo;
-	createInfo.pEnabledFeatures				  = &deviceFeatures;
-	createInfo.enabledExtensionCount		  = _caps.supportsGraphics ? 1u : 0u;
-	createInfo.ppEnabledExtensionNames		  = _caps.supportsGraphics ? deviceExtensions : nullptr;
-	createInfo.enabledLayerCount			  = 0;
+	std::set<std::string> availableExtensionNames;
+	for (const auto &extension : availableExtensions) {
+		availableExtensionNames.insert(extension.extensionName);
+	}
 
-	VkResult result							  = vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device);
+	std::vector<const char *> deviceExtensions;
+	if (_caps.supportsGraphics) {
+		if (availableExtensionNames.count(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) == 0) {
+			_caps.supportsGraphics = false;
+		} else {
+			deviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+		}
+	}
+	if (HasInstanceExtensionProvider()) {
+		if (availableExtensionNames.count(VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
+			throw std::runtime_error("Vulkan device does not support VK_KHR_swapchain");
+		}
+		deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+#ifdef __APPLE__
+		if (availableExtensionNames.count("VK_KHR_portability_subset") != 0) {
+			deviceExtensions.push_back("VK_KHR_portability_subset");
+		}
+#endif
+	}
+
+	VkDeviceCreateInfo createInfo	   = {};
+	createInfo.sType				   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pNext				   = _caps.supportsGraphics ? &dynamicRenderingFeatures : nullptr;
+	createInfo.queueCreateInfoCount	   = 1;
+	createInfo.pQueueCreateInfos	   = &queueCreateInfo;
+	createInfo.pEnabledFeatures		   = &deviceFeatures;
+	createInfo.enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size());
+	createInfo.ppEnabledExtensionNames = deviceExtensions.empty() ? nullptr : deviceExtensions.data();
+	createInfo.enabledLayerCount	   = 0;
+
+	VkResult result					   = vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device);
 	CheckVkResult(result, "vkCreateDevice");
 
 	// Get the queue (works for both graphics and compute)
@@ -1266,6 +1326,36 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	return handle;
 }
 
+VulkanBackend::NativeTextureInfo VulkanBackend::GetNativeTextureInfo(TextureHandle texture) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto						it = _textures.find(texture);
+	if (it == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+
+	const auto &info = it->second;
+	return NativeTextureInfo{.image	 = info.image,
+							 .format = info.vkFormat,
+							 .layout = info.currentLayout,
+							 .width	 = info.width,
+							 .height = info.height,
+							 .depth	 = info.depth};
+}
+
+void VulkanBackend::SetNativeTextureLayout(TextureHandle texture, VkImageLayout layout, VkPipelineStageFlags stage,
+										   VkAccessFlags access) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto						it = _textures.find(texture);
+	if (it == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	it->second.currentLayout = layout;
+	it->second.lastStage	 = stage;
+	it->second.lastAccess	 = access;
+}
+
 void VulkanBackend::DestroyTexture(TextureHandle texture) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
@@ -1305,7 +1395,7 @@ void VulkanBackend::UploadTextureFromBuffer(TextureHandle texture, uint32_t x, u
 											uint32_t height, BufferHandle source, size_t sourceOffset) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	auto texIt = _textures.find(texture);
+	auto						texIt = _textures.find(texture);
 	if (texIt == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
 	}
@@ -1403,12 +1493,12 @@ void VulkanBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t 
 	UploadTextureInternal(it->second, x, y, z, width, height, depth, data);
 }
 
-void VulkanBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
-											 uint32_t width, uint32_t height, uint32_t depth, BufferHandle source,
-											 size_t sourceOffset) {
+void VulkanBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+											  uint32_t height, uint32_t depth, BufferHandle source,
+											  size_t sourceOffset) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	auto texIt = _textures.find(texture);
+	auto						texIt = _textures.find(texture);
 	if (texIt == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
 	}
@@ -1446,7 +1536,7 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 	stagingInfo.sharingMode		   = VK_SHARING_MODE_EXCLUSIVE;
 
 	ScopedVulkanBuffer staging(_device);
-	VkResult result				   = vkCreateBuffer(_device, &stagingInfo, nullptr, &staging.buffer);
+	VkResult		   result = vkCreateBuffer(_device, &stagingInfo, nullptr, &staging.buffer);
 	CheckVkResult(result, "vkCreateBuffer (staging)");
 
 	AllocateBufferMemory(staging.buffer, staging.memory,
@@ -1515,7 +1605,7 @@ void VulkanBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, u
 											uint32_t height, BufferHandle destination, size_t destinationOffset) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	auto texIt = _textures.find(texture);
+	auto						texIt = _textures.find(texture);
 	if (texIt == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
 	}
@@ -1543,12 +1633,12 @@ void VulkanBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_
 	DownloadTextureInternal(it->second, x, y, z, width, height, depth, outData);
 }
 
-void VulkanBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
-											 uint32_t width, uint32_t height, uint32_t depth,
-											 BufferHandle destination, size_t destinationOffset) {
+void VulkanBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+											  uint32_t height, uint32_t depth, BufferHandle destination,
+											  size_t destinationOffset) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
-	auto texIt = _textures.find(texture);
+	auto						texIt = _textures.find(texture);
 	if (texIt == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
 	}
@@ -1586,7 +1676,7 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 	stagingInfo.sharingMode		   = VK_SHARING_MODE_EXCLUSIVE;
 
 	ScopedVulkanBuffer staging(_device);
-	VkResult result				   = vkCreateBuffer(_device, &stagingInfo, nullptr, &staging.buffer);
+	VkResult		   result = vkCreateBuffer(_device, &stagingInfo, nullptr, &staging.buffer);
 	CheckVkResult(result, "vkCreateBuffer (staging)");
 
 	AllocateBufferMemory(staging.buffer, staging.memory,
@@ -1632,7 +1722,8 @@ void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationB
 	region.imageOffset = {static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
 	region.imageExtent = {width, height, depth};
 
-	vkCmdCopyImageToBuffer(_commandBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationBuffer, 1, &region);
+	vkCmdCopyImageToBuffer(_commandBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationBuffer, 1,
+						   &region);
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
@@ -1726,7 +1817,7 @@ VkShaderStageFlags VulkanBackend::GetVkShaderStage(ShaderType type) {
 // =============================================================================
 
 std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &spirv,
-												   ShaderOptimizationLevel optimizationLevel) {
+												   ShaderOptimizationLevel		optimizationLevel) {
 	if (optimizationLevel == ShaderOptimizationLevel::None) {
 		return spirv;
 	}
@@ -1762,10 +1853,10 @@ std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &
 
 std::string VulkanBackend::DecompileSPIRVToGLSL(const std::vector<uint32_t> &spirv, ShaderType type) {
 #ifdef EASYGPU_SPIRV_CROSS_GLSL_ENABLED
-	spirv_cross::CompilerGLSL compiler(spirv);
+	spirv_cross::CompilerGLSL		   compiler(spirv);
 	spirv_cross::CompilerGLSL::Options options;
-	options.version		= type == ShaderType::Compute ? 430 : 450;
-	options.es			= false;
+	options.version			 = type == ShaderType::Compute ? 430 : 450;
+	options.es				 = false;
 	options.vulkan_semantics = true;
 	compiler.set_common_options(options);
 	return compiler.compile();

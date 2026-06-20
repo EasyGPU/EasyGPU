@@ -67,11 +67,21 @@ if(EASYGPU_BACKEND STREQUAL "OpenGL")
     )
 endif()
 
+if(EASYGPU_BACKEND STREQUAL "Vulkan")
+    find_package(Vulkan REQUIRED)
+endif()
+
 # Platform-specific libraries
 if(WIN32)
     set(EASYGPU_PLATFORM_LIBS crypt32)
     if(EASYGPU_BACKEND STREQUAL "OpenGL")
         list(APPEND EASYGPU_PLATFORM_LIBS opengl32)
+    endif()
+elseif(APPLE)
+    find_package(OpenSSL REQUIRED)
+    set(EASYGPU_PLATFORM_LIBS OpenSSL::Crypto)
+    if(EASYGPU_BACKEND STREQUAL "OpenGL")
+        message(FATAL_ERROR "OpenGL backend is not supported on macOS. Use -DEASYGPU_BACKEND=Vulkan on macOS.")
     endif()
 elseif(UNIX AND NOT APPLE)
     if(EASYGPU_BACKEND STREQUAL "OpenGL")
@@ -86,84 +96,42 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 # =============================================================================
-# Window Component (minifb)
+# Window Component (GLFW + ImGui)
 # =============================================================================
 if(EASYGPU_BUILD_WINDOW)
-    # minifb platform-specific sources
-    set(MINIFB_SOURCES
-        third/minifb/src/MiniFB_common.c
-        third/minifb/src/MiniFB_internal.c
-        third/minifb/src/MiniFB_timer.c
-    )
-    
-    if(WIN32)
-        list(APPEND MINIFB_SOURCES
-            third/minifb/src/windows/WinMiniFB.c
-        )
-        set(MINIFB_LIBS winmm)
-    elseif(APPLE)
-        list(APPEND MINIFB_SOURCES
-            third/minifb/src/macos/MacMiniFB.m
-            third/minifb/src/macos/OSXWindow.m
-            third/minifb/src/macos/OSXView.m
-        )
-        find_library(COCOA_LIB Cocoa)
-        find_library(COREGRAPHICS_LIB CoreGraphics)
-        find_library(COREVIDEO_LIB CoreVideo)
-        set(MINIFB_LIBS ${COCOA_LIB} ${COREGRAPHICS_LIB} ${COREVIDEO_LIB})
-    elseif(UNIX AND NOT APPLE)
-        list(APPEND MINIFB_SOURCES
-            third/minifb/src/x11/X11MiniFB.c
-        )
-        # Core X11 is required
-        find_package(X11 REQUIRED)
-        set(MINIFB_LIBS ${X11_LIBRARIES} pthread)
-
-        # Optional X11 extensions - only link if available
-        find_library(XCURSOR_LIB Xcursor)
-        find_library(XRANDR_LIB Xrandr)
-        find_library(XINERAMA_LIB Xinerama)
-        find_library(XI_LIB Xi)
-
-        if(XCURSOR_LIB)
-            list(APPEND MINIFB_LIBS ${XCURSOR_LIB})
-        endif()
-        if(XRANDR_LIB)
-            list(APPEND MINIFB_LIBS ${XRANDR_LIB})
-        endif()
-        if(XINERAMA_LIB)
-            list(APPEND MINIFB_LIBS ${XINERAMA_LIB})
-        endif()
-        if(XI_LIB)
-            list(APPEND MINIFB_LIBS ${XI_LIB})
-        endif()
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+    if(EASYGPU_BACKEND STREQUAL "Vulkan")
+        set(GLFW_VULKAN_STATIC OFF CACHE BOOL "" FORCE)
     endif()
+    add_subdirectory(third/glfw)
 
-    # Create minifb as an object library (linked into EasyGPUWindow)
-    add_library(minifb STATIC ${MINIFB_SOURCES})
-    target_include_directories(minifb PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third/imgui)
+    add_library(imgui STATIC
+        ${IMGUI_DIR}/imgui.cpp
+        ${IMGUI_DIR}/imgui_draw.cpp
+        ${IMGUI_DIR}/imgui_tables.cpp
+        ${IMGUI_DIR}/imgui_widgets.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
     )
 
-    if(WIN32)
-        target_include_directories(minifb PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/windows
-        )
-    elseif(APPLE)
-        target_include_directories(minifb PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/macos
-        )
-    elseif(UNIX AND NOT APPLE)
-        target_include_directories(minifb PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/src/x11
-        )
+    if(EASYGPU_BACKEND STREQUAL "Vulkan")
+        target_sources(imgui PRIVATE ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+        target_link_libraries(imgui PUBLIC Vulkan::Vulkan)
+    elseif(EASYGPU_BACKEND STREQUAL "OpenGL")
+        target_sources(imgui PRIVATE ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
     endif()
-    
-    if(MINIFB_LIBS)
-        target_link_libraries(minifb PUBLIC ${MINIFB_LIBS})
-    endif()
+
+    target_include_directories(imgui PUBLIC
+        $<BUILD_INTERFACE:${IMGUI_DIR}>
+        $<BUILD_INTERFACE:${IMGUI_DIR}/backends>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/imgui>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/imgui/backends>
+    )
+    target_link_libraries(imgui PUBLIC glfw)
+    target_compile_features(imgui PUBLIC cxx_std_17)
     
     # Create EasyGPUWindow library
     add_library(EasyGPUWindow STATIC
@@ -172,21 +140,28 @@ if(EASYGPU_BUILD_WINDOW)
         include/Window/Input.h
         include/Window/PixelBuffer.h
         include/Window/AppWindow.h
+        include/Window/UIContext.h
         include/Window/TexturePresenter.h
         include/Window/TexturePresenter.inl
         source/Window/PixelBuffer.cpp
         source/Window/Window.cpp
         source/Window/TexturePresenter.cpp
+        source/Window/UIContext.cpp
+        source/Window/Swapchain.h
+        source/Window/Swapchain.cpp
+        source/Window/Platform/IWindowPlatform.h
         source/Window/Platform/MiniFBWindowPlatform.h
-        source/Window/Platform/MiniFBWindowPlatform.cpp
+        source/Window/Platform/GLFWWindowPlatform.h
+        source/Window/Platform/GLFWWindowPlatform.cpp
     )
     add_library(EasyGPU::Window ALIAS EasyGPUWindow)
     
     target_compile_features(EasyGPUWindow PUBLIC cxx_std_20)
-    target_link_libraries(EasyGPUWindow PUBLIC minifb)
+    target_compile_definitions(EasyGPUWindow PUBLIC EASYGPU_BUILD_WINDOW)
+    target_link_libraries(EasyGPUWindow PUBLIC glfw imgui)
     target_include_directories(EasyGPUWindow PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third/minifb/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third/glfw/include>
         $<INSTALL_INTERFACE:include>
     )
     
@@ -196,8 +171,6 @@ if(EASYGPU_BUILD_WINDOW)
 endif()
 
 if(EASYGPU_BACKEND STREQUAL "Vulkan")
-    find_package(Vulkan REQUIRED)
-
     set(EASYGPU_VULKAN_SDK_HINTS)
     set(EASYGPU_GLSLANG_CONFIG_HINTS)
     if(DEFINED ENV{VULKAN_SDK})
@@ -523,6 +496,13 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
     )
 else()
     target_compile_definitions(EasyGPU PUBLIC EASYGPU_BACKEND_OPENGL)
+    if(EASYGPU_BUILD_WINDOW)
+        target_compile_definitions(EasyGPU PUBLIC EASYGPU_BUILD_WINDOW)
+    endif()
+endif()
+
+if(TARGET EasyGPUWindow)
+    target_link_libraries(EasyGPUWindow PUBLIC EasyGPU)
 endif()
 
 # Shader cache configuration
@@ -648,7 +628,7 @@ if(TARGET GLAD)
 endif()
 
 if(TARGET EasyGPUWindow)
-    install(TARGETS EasyGPUWindow minifb
+    install(TARGETS EasyGPUWindow glfw imgui
         EXPORT EasyGPUTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -660,7 +640,10 @@ endif()
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(DIRECTORY third/GLAD/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/GLAD FILES_MATCHING PATTERN "*.h")
 if(TARGET EasyGPUWindow)
-    install(DIRECTORY third/minifb/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(DIRECTORY third/glfw/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(DIRECTORY third/imgui/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/imgui
+        FILES_MATCHING PATTERN "*.h"
+    )
 endif()
 
 configure_package_config_file(
@@ -730,16 +713,19 @@ if(EASYGPU_BUILD_WINDOW AND EASYGPU_BUILD_WINDOW_EXAMPLES)
     # GPU compute + window example (requires EasyGPU)
     if(TARGET EasyGPU)
         add_executable(window_compute examples/window_compute/main.cpp)
-        target_link_libraries(window_compute PRIVATE EasyGPU EasyGPUWindow)
+        target_link_libraries(window_compute PRIVATE EasyGPUWindow)
+        add_executable(window_imgui_lab examples/window_imgui_lab/main.cpp)
+        target_link_libraries(window_imgui_lab PRIVATE EasyGPUWindow)
         if(MSVC)
             target_compile_options(window_compute PRIVATE /Zc:preprocessor)
+            target_compile_options(window_imgui_lab PRIVATE /Zc:preprocessor)
         endif()
     endif()
     
     # Real-time Cornell Box GI (requires EasyGPU + EasyGPUWindow)
     if(TARGET EasyGPU AND TARGET EasyGPUWindow)
         add_executable(cornell_box_gi examples/cornell_box_gi/main.cpp)
-        target_link_libraries(cornell_box_gi PRIVATE EasyGPU EasyGPUWindow)
+        target_link_libraries(cornell_box_gi PRIVATE EasyGPUWindow)
         if(MSVC)
             target_compile_options(cornell_box_gi PRIVATE /Zc:preprocessor)
         endif()
@@ -748,7 +734,7 @@ if(EASYGPU_BUILD_WINDOW AND EASYGPU_BUILD_WINDOW_EXAMPLES)
     # OBJ Model Viewer — rasterization pipeline demo (requires EasyGPU + EasyGPUWindow)
     if(TARGET EasyGPU AND TARGET EasyGPUWindow)
         add_executable(obj_renderer examples/obj_renderer/main.cpp)
-        target_link_libraries(obj_renderer PRIVATE EasyGPU EasyGPUWindow)
+        target_link_libraries(obj_renderer PRIVATE EasyGPUWindow)
         if(MSVC)
             target_compile_options(obj_renderer PRIVATE /Zc:preprocessor)
         endif()
@@ -757,7 +743,7 @@ if(EASYGPU_BUILD_WINDOW AND EASYGPU_BUILD_WINDOW_EXAMPLES)
     # Sponza Atrium — textured 3D model (requires EasyGPU + EasyGPUWindow)
     if(TARGET EasyGPU AND TARGET EasyGPUWindow)
         add_executable(sponza_renderer examples/sponza_renderer/main.cpp)
-        target_link_libraries(sponza_renderer PRIVATE EasyGPU EasyGPUWindow)
+        target_link_libraries(sponza_renderer PRIVATE EasyGPUWindow)
         if(MSVC)
             target_compile_options(sponza_renderer PRIVATE /Zc:preprocessor)
         endif()

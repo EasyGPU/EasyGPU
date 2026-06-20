@@ -49,6 +49,14 @@ public:
 	 */
 	static Backend::Backend			  *GetBackend();
 
+	template <typename T> static T &GetBackend() {
+		auto *backend = dynamic_cast<T *>(GetBackend());
+		if (!backend) {
+			throw std::runtime_error("Requested backend type does not match the active backend");
+		}
+		return *backend;
+	}
+
 	/**
 	 * Explicitly initialize the context (optional, called automatically)
 	 * @throw std::runtime_error if initialization fails

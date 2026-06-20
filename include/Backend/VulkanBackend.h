@@ -11,6 +11,7 @@
 #include <Backend/Backend.h>
 
 #include <array>
+#include <functional>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -31,6 +32,10 @@ constexpr uint32_t MAX_QUERIES		   = 256;
  */
 class VulkanBackend : public Backend {
 public:
+	using InstanceExtensionProvider = std::function<std::vector<const char *>()>;
+
+	static void RegisterInstanceExtensionProvider(InstanceExtensionProvider provider);
+
 	VulkanBackend();
 	~VulkanBackend() override;
 
@@ -166,6 +171,34 @@ public:
 	BackendType	  GetType() const override {
 		return BackendType::Vulkan;
 	}
+
+	struct NativeTextureInfo {
+		VkImage		  image	 = VK_NULL_HANDLE;
+		VkFormat	  format = VK_FORMAT_UNDEFINED;
+		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		uint32_t	  width	 = 0;
+		uint32_t	  height = 0;
+		uint32_t	  depth	 = 1;
+	};
+
+	[[nodiscard]] VkInstance Instance() const {
+		return _instance;
+	}
+	[[nodiscard]] VkPhysicalDevice PhysicalDevice() const {
+		return _physicalDevice;
+	}
+	[[nodiscard]] VkDevice Device() const {
+		return _device;
+	}
+	[[nodiscard]] VkQueue Queue() const {
+		return _computeQueue;
+	}
+	[[nodiscard]] uint32_t QueueFamilyIndex() const {
+		return _computeQueueFamilyIndex;
+	}
+	[[nodiscard]] NativeTextureInfo GetNativeTextureInfo(TextureHandle texture);
+	void SetNativeTextureLayout(TextureHandle texture, VkImageLayout layout, VkPipelineStageFlags stage,
+								VkAccessFlags access);
 
 private:
 	/** @brief Internal Vulkan buffer resource information. */

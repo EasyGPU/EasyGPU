@@ -95,6 +95,7 @@ generated/
 # Debug artifacts (screenshots, temporary output)
 *.png
 *.jpg
+imgui.ini
 .cache/
 
 BUILD.md

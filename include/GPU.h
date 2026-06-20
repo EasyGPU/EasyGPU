@@ -109,6 +109,7 @@
 #include <Window/Input.h>
 #include <Window/PixelBuffer.h>
 #include <Window/TexturePresenter.h>
+#include <Window/UIContext.h>
 #include <Window/WindowConfig.h>
 #include <Window/WindowEvents.h>
 

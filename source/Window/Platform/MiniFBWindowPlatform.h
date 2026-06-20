@@ -8,59 +8,15 @@
 #ifndef EASYGPU_MINIFB_WINDOW_PLATFORM_H
 #define EASYGPU_MINIFB_WINDOW_PLATFORM_H
 
-#include <Window/WindowConfig.h>
-#include <Window/WindowEvents.h>
+#include "IWindowPlatform.h"
 
-#include <cstdint>
-#include <functional>
 #include <queue>
-#include <string>
 
 // Forward declare minifb types
 struct mfb_window;
 struct mfb_timer;
 
 namespace GPU::Window {
-
-/**
- * @brief Internal platform abstraction interface
- *
- * This is the bridge between the public Window API and minifb.
- * It is intentionally kept internal to allow future backend changes.
- */
-class IWindowPlatform {
-public:
-	virtual ~IWindowPlatform()																		= default;
-
-	// Window state
-	[[nodiscard]] virtual bool	   IsOpen() const													= 0;
-	virtual void				   Close()															= 0;
-
-	// Window properties
-	[[nodiscard]] virtual uint32_t Width() const													= 0;
-	[[nodiscard]] virtual uint32_t Height() const													= 0;
-	virtual void				   SetTitle(const std::string &title)								= 0;
-
-	// Presentation
-	virtual void				   Present(const uint32_t *pixels, uint32_t width, uint32_t height) = 0;
-	virtual void				   WaitSync()														= 0;
-
-	// Events
-	virtual void				   PollEvents()														= 0;
-	virtual void				   WaitEvents()														= 0;
-	virtual bool				   PollEvent(WindowEvent &event)									= 0;
-
-	// Input state
-	[[nodiscard]] virtual bool	   IsKeyDown(int keyCode) const										= 0;
-	[[nodiscard]] virtual bool	   IsMouseDown(int button) const									= 0;
-	[[nodiscard]] virtual std::pair<int32_t, int32_t> MousePosition() const							= 0;
-	[[nodiscard]] virtual std::pair<float, float>	  MouseScroll() const							= 0;
-
-	// Callbacks (used by Window class to inject events)
-	std::function<void(uint32_t, uint32_t)>			  resizeCallback;
-	std::function<bool()>							  closeCallback;
-	std::function<void(bool)>						  focusCallback;
-};
 
 /**
  * @brief minifb-based platform implementation

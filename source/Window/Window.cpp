@@ -4,14 +4,14 @@
  */
 
 // Include Window headers only - avoid GPU core headers to prevent template instantiation issues
-#include "Platform/MiniFBWindowPlatform.h"
+#include "Platform/GLFWWindowPlatform.h"
 #include <Window/AppWindow.h>
 
 namespace GPU::Window {
 
 // Constructor
 AppWindow::AppWindow(const WindowConfig &config) : _config(config) {
-	_platform = std::make_unique<MiniFBWindowPlatform>(config, _eventQueue);
+	_platform = std::make_unique<GLFWWindowPlatform>(config, _eventQueue);
 	_isOpen	  = _platform->IsOpen();
 	_width	  = _platform->Width();
 	_height	  = _platform->Height();
@@ -84,14 +84,10 @@ void AppWindow::SetTitle(const std::string &title) {
 }
 
 void AppWindow::SetVSync(bool enabled) {
-	// minifb doesn't expose vsync control directly
-	// This would need platform-specific implementation
-	// For now, we use mfb_wait_sync in Present
 	_config.vsync = enabled;
 }
 
 void AppWindow::SetResizable(bool enabled) {
-	// minifb doesn't support changing resizable state after creation
 	_config.resizable = enabled;
 }
 

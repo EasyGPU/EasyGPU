@@ -72,9 +72,9 @@ public:
 	/** @copydoc Backend::UploadTexture */
 	void		   UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 								 const void *data) override;
-	void		   UploadTextureFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
-										   uint32_t height, BufferHandle source, size_t sourceOffset) override;
-	void		   GenerateMipmaps(TextureHandle texture) override;
+	void UploadTextureFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+								 BufferHandle source, size_t sourceOffset) override;
+	void GenerateMipmaps(TextureHandle texture) override;
 	/** @copydoc Backend::UploadTexture3D */
 	void UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 						 uint32_t depth, const void *data) override;
@@ -296,21 +296,21 @@ private:
 	void	*_glxContext = nullptr;
 #endif
 
-	bool											 _initialized = false;
+	bool											   _initialized = false;
 
-	std::unordered_map<BufferHandle, BufferInfo>	 _buffers;
-	std::unordered_map<TextureHandle, TextureInfo>	 _textures;
-	std::unordered_map<ShaderHandle, ShaderInfo>	 _shaders;
-	std::unordered_map<PipelineHandle, PipelineInfo> _pipelines;
-	std::vector<QueryInfo>							 _queries;
+	std::unordered_map<BufferHandle, BufferInfo>	   _buffers;
+	std::unordered_map<TextureHandle, TextureInfo>	   _textures;
+	std::unordered_map<ShaderHandle, ShaderInfo>	   _shaders;
+	std::unordered_map<PipelineHandle, PipelineInfo>   _pipelines;
+	std::vector<QueryInfo>							   _queries;
 
-	BufferHandle									 _nextBufferHandle	 = 1;
-	TextureHandle									 _nextTextureHandle	 = 1;
-	ShaderHandle									 _nextShaderHandle	 = 1;
-	PipelineHandle									 _nextPipelineHandle = 1;
+	BufferHandle									   _nextBufferHandle   = 1;
+	TextureHandle									   _nextTextureHandle  = 1;
+	ShaderHandle									   _nextShaderHandle   = 1;
+	PipelineHandle									   _nextPipelineHandle = 1;
 
-	uint32_t										 _currentProgram	 = 0;
-	std::array<uint32_t, MAX_BUFFER_BINDINGS>		 _boundBuffers{};
+	uint32_t										   _currentProgram	   = 0;
+	std::array<uint32_t, MAX_BUFFER_BINDINGS>		   _boundBuffers{};
 	std::array<ImageBindingInfo, MAX_TEXTURE_BINDINGS> _boundImages{};
 };
 

@@ -21,13 +21,7 @@
 #endif
 #include <windows.h>
 #elif defined(__APPLE__)
-// macOS: OpenGL backend is not supported — use Vulkan on macOS
-#ifdef __OBJC__
-#include <OpenGL/CGLTypes.h>
-#include <OpenGL/OpenGL.h>
-#else
-#error "OpenGL backend on macOS requires Objective-C (compile as .mm) — prefer using Vulkan backend instead"
-#endif
+#error "OpenGL backend is not supported on macOS; use the Vulkan backend on macOS"
 #else
 // Linux: Use system X11/GLX headers directly
 #include <GL/glx.h>
@@ -47,8 +41,8 @@ struct FramebufferGuard {
 		}
 	}
 
-	FramebufferGuard() = default;
-	FramebufferGuard(const FramebufferGuard &) = delete;
+	FramebufferGuard()									  = default;
+	FramebufferGuard(const FramebufferGuard &)			  = delete;
 	FramebufferGuard &operator=(const FramebufferGuard &) = delete;
 };
 } // namespace
@@ -416,9 +410,9 @@ void OpenGLBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t 
 	glBindTexture(GL_TEXTURE_3D, 0);
 }
 
-void OpenGLBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
-											 uint32_t width, uint32_t height, uint32_t depth, BufferHandle source,
-											 size_t sourceOffset) {
+void OpenGLBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+											  uint32_t height, uint32_t depth, BufferHandle source,
+											  size_t sourceOffset) {
 	auto texIt = _textures.find(texture);
 	if (texIt == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");
@@ -537,9 +531,9 @@ void OpenGLBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_
 	glBindTexture(GL_TEXTURE_3D, 0);
 }
 
-void OpenGLBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z,
-											 uint32_t width, uint32_t height, uint32_t depth,
-											 BufferHandle destination, size_t destinationOffset) {
+void OpenGLBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
+											  uint32_t height, uint32_t depth, BufferHandle destination,
+											  size_t destinationOffset) {
 	auto texIt = _textures.find(texture);
 	if (texIt == _textures.end()) {
 		throw std::runtime_error("Invalid texture handle");

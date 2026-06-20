@@ -18,13 +18,17 @@
 #include <queue>
 #include <string>
 
-// Forward declare minifb window to avoid exposing in public API
-struct mfb_window;
+#ifdef EASYGPU_BACKEND_VULKAN
+struct VkCommandBuffer_T;
+using VkCommandBuffer = VkCommandBuffer_T *;
+#endif
 
 namespace GPU::Window {
 
 // Forward declaration for platform implementation
 class IWindowPlatform;
+class TexturePresenter;
+class UIContext;
 
 /**
  * @brief Cross-platform window for displaying compute results
@@ -192,22 +196,38 @@ public:
 	 * @brief Set callback for window resize events
 	 * @param callback Function to call when window is resized
 	 */
-	void SetResizeCallback(std::function<void(uint32_t, uint32_t)> callback);
+	void						   SetResizeCallback(std::function<void(uint32_t, uint32_t)> callback);
 
 	/**
 	 * @brief Set callback for window close events
 	 * @param callback Function to call when window close is requested
 	 *                 Return false to prevent closing
 	 */
-	void SetCloseCallback(std::function<bool()> callback);
+	void						   SetCloseCallback(std::function<bool()> callback);
 
 	/**
 	 * @brief Set callback for focus events
 	 * @param callback Function to call when window gains/loses focus
 	 */
-	void SetFocusCallback(std::function<void(bool)> callback);
+	void						   SetFocusCallback(std::function<void(bool)> callback);
 
+#ifdef EASYGPU_BACKEND_VULKAN
+	using VulkanOverlayCallback = std::function<void(VkCommandBuffer, uint32_t)>;
+	void SetNextVulkanOverlay(VulkanOverlayCallback callback) {
+		_nextVulkanOverlay = std::move(callback);
+	}
+	VulkanOverlayCallback TakeNextVulkanOverlay() {
+		return std::move(_nextVulkanOverlay);
+	}
+#endif
 private:
+	[[nodiscard]] IWindowPlatform *Platform() noexcept {
+		return _platform.get();
+	}
+	[[nodiscard]] const IWindowPlatform *Platform() const noexcept {
+		return _platform.get();
+	}
+
 	// Platform-specific implementation
 	std::unique_ptr<IWindowPlatform>		_platform;
 
@@ -227,8 +247,14 @@ private:
 	uint32_t								_width	= 0;
 	uint32_t								_height = 0;
 
-	// Friend the platform implementation for event injection
+#ifdef EASYGPU_BACKEND_VULKAN
+	VulkanOverlayCallback _nextVulkanOverlay;
+#endif
+	// Friend platform implementations for event injection
 	friend class MiniFBWindowPlatform;
+	friend class GLFWWindowPlatform;
+	friend class TexturePresenter;
+	friend class UIContext;
 };
 
 } // namespace GPU::Window

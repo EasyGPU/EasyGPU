@@ -6,6 +6,9 @@
 #include <GPU.h>
 #include <Window/AppWindow.h>
 #include <Window/TexturePresenter.h>
+#include <Window/UIContext.h>
+
+#include <imgui.h>
 
 #include <chrono>
 #include <format>
@@ -88,9 +91,11 @@ int main() {
 
 	// Create the presenter for displaying GPU texture
 	TexturePresenter			  presenter(window);
+	UIContext					  ui(window);
 
 	// Animation state
 	float						  time		  = 0.0f;
+	float						  speed		  = 1.0f;
 	bool						  paused	  = false;
 	int							  frameCount  = 0;
 	auto						  lastFpsTime = std::chrono::steady_clock::now();
@@ -109,7 +114,7 @@ int main() {
 				if (key.key == Key::Escape && key.pressed) {
 					window.Close();
 				}
-				if (key.key == Key::Space && key.pressed) {
+				if (key.key == Key::Space && key.pressed && !ui.WantCaptureKeyboard()) {
 					paused = !paused;
 					std::cout << (paused ? "Paused" : "Resumed") << std::endl;
 				}
@@ -124,12 +129,20 @@ int main() {
 
 		// Update time
 		if (!paused) {
-			time += 0.016f; // ~60fps animation speed
+			time += 0.016f * speed; // ~60fps animation speed
 		}
 		timeUniform = (time);
 
 		// Dispatch kernel to generate frame (GPU computation)
 		plasmaKernel.Dispatch((WIDTH + 15) / 16, (HEIGHT + 15) / 16);
+
+		ui.Render([&]() {
+			ImGui::Begin("Controls");
+			ImGui::Checkbox("Paused", &paused);
+			ImGui::SliderFloat("Speed", &speed, 0.0f, 5.0f);
+			ImGui::Text("FPS: %.1f", currentFps);
+			ImGui::End();
+		});
 
 		// Present GPU texture to window
 		presenter.Present(renderTarget);
