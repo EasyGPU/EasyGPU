@@ -250,6 +250,15 @@ enum class PrimitiveTopology {
 	TriangleFan
 };
 
+/** @brief Multisample count for graphics pipelines. */
+enum class SampleCount : uint32_t {
+	X1  = 1,
+	X2  = 2,
+	X4  = 4,
+	X8  = 8,
+	X16 = 16
+};
+
 /** @brief Vertex attribute layout entry for vertex buffer binding. */
 struct VertexLayoutEntry {
 	uint32_t	location = 0;
@@ -264,6 +273,7 @@ struct GraphicsPipelineDesc {
 	PrimitiveTopology				 topology			   = PrimitiveTopology::TriangleList;
 	PixelFormat						 colorAttachmentFormat = PixelFormat::RGBA8;
 	std::vector<PixelFormat>		 colorAttachmentFormats;
+	SampleCount						 sampleCount		   = SampleCount::X1;
 	bool							 depthTestEnable	   = false;
 	bool							 depthWriteEnable	   = true;
 	std::vector<VertexLayoutEntry>	 vertexLayout;
@@ -276,6 +286,7 @@ struct RenderPassBeginDesc {
 	TextureHandle colorAttachment = INVALID_TEXTURE_HANDLE;
 	std::vector<TextureHandle> colorAttachments;
 	TextureHandle depthAttachment = INVALID_TEXTURE_HANDLE;
+	SampleCount	  sampleCount	  = SampleCount::X1;
 	float		  clearColor[4]	  = {0.0f, 0.0f, 0.0f, 1.0f};
 	float		  clearDepth	  = 1.0f;
 	bool		  clearColorFlag  = true;

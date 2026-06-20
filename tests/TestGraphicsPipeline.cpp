@@ -344,6 +344,109 @@ int main() {
 			std::cout << "[Test 4b MRTRenderAndVerify] PASS" << std::endl;
 		}
 
+		// Test 4c: Render with Vulkan MSAA and resolve into a normal Texture2D.
+		{
+			const uint32_t W = 128, H = 128;
+
+			GPU::Backend::ShaderDesc		   vsDesc{GPU::Backend::ShaderType::Vertex, vsSrc, "main"};
+			auto							   vs = backend->CreateShader(vsDesc);
+			GPU::Backend::ShaderDesc		   fsDesc{GPU::Backend::ShaderType::Fragment, fsSrc, "main"};
+			auto							   fs = backend->CreateShader(fsDesc);
+
+			GPU::Backend::GraphicsPipelineDesc pipeDesc;
+			pipeDesc.vertexShader		   = vs;
+			pipeDesc.fragmentShader		   = fs;
+			pipeDesc.topology			   = GPU::Backend::PrimitiveTopology::TriangleList;
+			pipeDesc.colorAttachmentFormat = GPU::Backend::PixelFormat::RGBA8;
+			pipeDesc.sampleCount		   = GPU::Backend::SampleCount::X4;
+			auto pipeline				   = backend->CreateGraphicsPipeline(pipeDesc);
+
+			GPU::Backend::TextureDesc texDesc;
+			texDesc.width						  = W;
+			texDesc.height						  = H;
+			texDesc.format						  = GPU::Backend::PixelFormat::RGBA8;
+			auto							  rt = backend->CreateTexture(texDesc);
+
+			GPU::Backend::RenderPassBeginDesc rpDesc;
+			rpDesc.colorAttachment = rt;
+			rpDesc.sampleCount	   = GPU::Backend::SampleCount::X4;
+			rpDesc.clearColorFlag  = true;
+
+			backend->BeginRendering(rpDesc);
+			backend->SetViewport(0, 0, W, H);
+			backend->SetScissor(0, 0, W, H);
+			backend->BindPipeline(pipeline);
+			backend->Draw(3, 1, 0, 0);
+			backend->EndRendering();
+			backend->Finish();
+
+			std::vector<uint8_t> pixels(W * H * 4);
+			backend->DownloadTexture(rt, 0, 0, W, H, pixels.data());
+
+			size_t idx = (64 * W + 64) * 4;
+			bool   ok	= pixels[idx + 0] >= 120 && pixels[idx + 0] <= 135 && pixels[idx + 1] >= 70 &&
+					  pixels[idx + 1] <= 85 && pixels[idx + 2] >= 20 && pixels[idx + 2] <= 35;
+
+			backend->DestroyTexture(rt);
+			backend->DestroyPipeline(pipeline);
+			backend->DestroyShader(vs);
+			backend->DestroyShader(fs);
+
+			if (!ok) {
+				std::cout << "[Test 4c] FAIL: MSAA resolved pixel=(" << (int)pixels[idx + 0] << ", "
+						  << (int)pixels[idx + 1] << ", " << (int)pixels[idx + 2] << ")" << std::endl;
+				backend->MakeNoneCurrent();
+				return 1;
+			}
+			total++;
+			passed++;
+			std::cout << "[Test 4c MSAARenderAndResolve] PASS" << std::endl;
+		}
+
+		// Test 4d: DSL GraphicsPipeline exposes MSAA sample count.
+		{
+			const uint32_t W = 64, H = 64;
+
+			Texture2D<PixelFormat::RGBA8> rt(W, H);
+			GPU::Kernel::GraphicsPipeline pipeline(
+				[](GPU::IR::Value::Var<GPU::Math::Vec4> &gl_Position) {
+					auto vid = GPU::Kernel::VertexIndex();
+					auto x	 = ToFloat((vid & 1) << 2) - 1.0f;
+					auto y	 = ToFloat((vid & 2) << 1) - 1.0f;
+					gl_Position = MakeFloat4(x, y, 0.0f, 1.0f);
+				},
+				[](GPU::IR::Value::Var<GPU::Math::Vec4> &fragColor) {
+					fragColor = MakeFloat4(0.0f, 0.25f, 1.0f, 1.0f);
+				});
+			pipeline.SetSampleCount(GPU::Backend::SampleCount::X4);
+			pipeline.Draw(rt, 3, true);
+
+			std::vector<uint8_t> pixels(W * H * 4);
+			rt.Download(pixels);
+			size_t idx = (32 * W + 32) * 4;
+			if (pixels[idx + 1] < 55 || pixels[idx + 1] > 75 || pixels[idx + 2] < 240) {
+				std::cout << "[Test 4d] FAIL: DSL MSAA resolved pixel=(" << (int)pixels[idx + 0] << ", "
+						  << (int)pixels[idx + 1] << ", " << (int)pixels[idx + 2] << ")" << std::endl;
+				backend->MakeNoneCurrent();
+				return 1;
+			}
+
+			bool caught = false;
+			try {
+				pipeline.SetSampleCount(GPU::Backend::SampleCount::X1);
+			} catch (const std::runtime_error &) {
+				caught = true;
+			}
+			if (!caught) {
+				std::cout << "[Test 4d] FAIL: SetSampleCount after first Draw should throw" << std::endl;
+				backend->MakeNoneCurrent();
+				return 1;
+			}
+			total++;
+			passed++;
+			std::cout << "[Test 4d DSLMSAA] PASS" << std::endl;
+		}
+
 		// Test 5: Double BeginRendering must throw
 		{
 			GPU::Backend::TextureDesc texDesc;

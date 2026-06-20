@@ -121,6 +121,10 @@ pipeline.Draw(RenderTarget, vertexCount, sync);
 // With depth buffer
 pipeline.Draw(RenderTarget, depthBuffer, vertexCount, sync);
 
+// Vulkan MSAA resolve into the target texture
+pipeline.SetSampleCount(Backend::SampleCount::X4);
+pipeline.Draw(RenderTarget, depthBuffer, vertexCount, sync);
+
 // Multiple render targets
 pipeline.Draw({
     GraphicsPipeline::RenderTarget(albedoTarget),
@@ -156,6 +160,18 @@ gbuffer.Draw({
 ```
 
 All MRT attachments must have identical dimensions, and the attachment count passed to `Draw()` must match the fragment output count used at construction.
+
+### MSAA
+
+`GraphicsPipeline` can use Vulkan multisampling for geometry edge antialiasing. Set the sample count before the first draw; EasyGPU renders into internal multisampled attachments and resolves back into the normal `Texture2D` targets passed to `Draw()` or `DrawIndexed()`.
+
+```cpp
+GraphicsPipeline pipeline(vertexFunc, fragmentFunc);
+pipeline.SetSampleCount(Backend::SampleCount::X4);
+pipeline.Draw(renderTarget, depthBuffer, vertexCount, true);
+```
+
+Supported values are `SampleCount::X1`, `X2`, `X4`, `X8`, and `X16`, subject to device support. MRT works with MSAA as well: each color attachment gets its own internal multisampled image and resolves into its corresponding target texture.
 
 ### FragmentShader (Fullscreen Pass)
 
@@ -407,6 +423,7 @@ The low-level backend API is documented in [`api-reference.md`](api-reference.md
 | `RenderPassBeginDesc` | Render pass descriptor (color + depth attachments, clear values) |
 | `VertexLayoutEntry` | Per-attribute vertex format (location, format, offset) |
 | `PrimitiveTopology` | `TriangleList`, `LineList`, `PointList`, etc. |
+| `SampleCount` | MSAA sample count: `X1`, `X2`, `X4`, `X8`, `X16` |
 
 **Backend Methods**
 

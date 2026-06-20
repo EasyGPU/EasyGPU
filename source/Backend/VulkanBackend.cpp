@@ -263,6 +263,16 @@ void VulkanBackend::CleanupVulkan() {
 		_descriptorSets.clear();
 		_inFlightDescriptorSets.clear();
 
+		for (auto &attachment : _msaaAttachments) {
+			if (attachment.view)
+				vkDestroyImageView(_device, attachment.view, nullptr);
+			if (attachment.image)
+				vkDestroyImage(_device, attachment.image, nullptr);
+			if (attachment.memory)
+				vkFreeMemory(_device, attachment.memory, nullptr);
+		}
+		_msaaAttachments.clear();
+
 		// Destroy pipelines
 		for (auto &[handle, info] : _pipelines) {
 			if (info.pipeline)
@@ -1314,6 +1324,7 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	info.mipLevels	   = mipLevels;
 	info.format		   = desc.format;
 	info.vkFormat	   = format;
+	info.samples	   = VK_SAMPLE_COUNT_1_BIT;
 	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	_textures[handle]  = info;
@@ -1779,6 +1790,23 @@ VkFormat VulkanBackend::GetVkFormat(PixelFormat format) {
 	}
 }
 
+VkSampleCountFlagBits VulkanBackend::GetVkSampleCount(SampleCount sampleCount) {
+	switch (sampleCount) {
+	case SampleCount::X1:
+		return VK_SAMPLE_COUNT_1_BIT;
+	case SampleCount::X2:
+		return VK_SAMPLE_COUNT_2_BIT;
+	case SampleCount::X4:
+		return VK_SAMPLE_COUNT_4_BIT;
+	case SampleCount::X8:
+		return VK_SAMPLE_COUNT_8_BIT;
+	case SampleCount::X16:
+		return VK_SAMPLE_COUNT_16_BIT;
+	default:
+		return VK_SAMPLE_COUNT_1_BIT;
+	}
+}
+
 VkDescriptorType VulkanBackend::GetVkDescriptorType(BindingType type) {
 	switch (type) {
 	case BindingType::Buffer:
@@ -2171,6 +2199,100 @@ void VulkanBackend::TransitionTexture(TextureInfo &info, VkImageLayout newLayout
 	info.currentLayout = newLayout;
 	info.lastStage	   = dstStage;
 	info.lastAccess	   = dstAccess;
+}
+
+void VulkanBackend::TransitionMsaaAttachment(MsaaAttachment &info, VkImageLayout newLayout,
+											 VkPipelineStageFlags dstStage, VkAccessFlags dstAccess) {
+	if (info.currentLayout == newLayout && info.lastStage == dstStage && info.lastAccess == dstAccess) {
+		return;
+	}
+
+	VkImageMemoryBarrier barrier			= {};
+	barrier.sType							= VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout						= info.currentLayout;
+	barrier.newLayout						= newLayout;
+	barrier.srcQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex				= VK_QUEUE_FAMILY_IGNORED;
+	barrier.image							= info.image;
+	barrier.subresourceRange.aspectMask		= info.aspectMask;
+	barrier.subresourceRange.baseMipLevel	= 0;
+	barrier.subresourceRange.levelCount		= 1;
+	barrier.subresourceRange.baseArrayLayer	= 0;
+	barrier.subresourceRange.layerCount		= 1;
+	barrier.srcAccessMask					= info.lastAccess;
+	barrier.dstAccessMask					= dstAccess;
+
+	vkCmdPipelineBarrier(_commandBuffer, info.lastStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+	info.currentLayout = newLayout;
+	info.lastStage	   = dstStage;
+	info.lastAccess	   = dstAccess;
+}
+
+VulkanBackend::MsaaAttachment &VulkanBackend::GetOrCreateMsaaAttachment(uint32_t width, uint32_t height, uint32_t slot,
+																		VkFormat format,
+																		VkSampleCountFlagBits samples,
+																		VkImageUsageFlags usage,
+																		VkImageAspectFlags aspectMask) {
+	for (auto &attachment : _msaaAttachments) {
+		if (attachment.width == width && attachment.height == height && attachment.format == format &&
+			attachment.samples == samples && attachment.aspectMask == aspectMask && attachment.slot == slot) {
+			return attachment;
+		}
+	}
+
+	VkImageCreateInfo imageInfo = {};
+	imageInfo.sType				= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType			= VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width		= width;
+	imageInfo.extent.height		= height;
+	imageInfo.extent.depth		= 1;
+	imageInfo.mipLevels			= 1;
+	imageInfo.arrayLayers		= 1;
+	imageInfo.format			= format;
+	imageInfo.tiling			= VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.initialLayout		= VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage				= usage;
+	imageInfo.sharingMode		= VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.samples			= samples;
+
+	VkImage image				= nullptr;
+	VkResult result				= vkCreateImage(_device, &imageInfo, nullptr, &image);
+	CheckVkResult(result, "vkCreateImage (MSAA attachment)");
+
+	VkDeviceMemory memory		= nullptr;
+	AllocateImageMemory(image, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	result = vkBindImageMemory(_device, image, memory, 0);
+	CheckVkResult(result, "vkBindImageMemory (MSAA attachment)");
+
+	VkImageViewCreateInfo viewInfo			 = {};
+	viewInfo.sType							 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image							 = image;
+	viewInfo.viewType						 = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format							 = format;
+	viewInfo.subresourceRange.aspectMask	 = aspectMask;
+	viewInfo.subresourceRange.baseMipLevel	 = 0;
+	viewInfo.subresourceRange.levelCount	 = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount	 = 1;
+
+	VkImageView view						 = nullptr;
+	result									 = vkCreateImageView(_device, &viewInfo, nullptr, &view);
+	CheckVkResult(result, "vkCreateImageView (MSAA attachment)");
+
+	MsaaAttachment attachment;
+	attachment.image		 = image;
+	attachment.memory		 = memory;
+	attachment.view			 = view;
+	attachment.width		 = width;
+	attachment.height		 = height;
+	attachment.slot			 = slot;
+	attachment.format		 = format;
+	attachment.samples		 = samples;
+	attachment.aspectMask	 = aspectMask;
+	_msaaAttachments.push_back(attachment);
+	return _msaaAttachments.back();
 }
 
 void VulkanBackend::BindPipeline(PipelineHandle pipeline) {
@@ -2849,6 +2971,19 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 		throw std::runtime_error("Graphics pipeline color attachment count must be between 1 and MAX_COLOR_ATTACHMENTS");
 	}
 
+	VkSampleCountFlagBits sampleCount = GetVkSampleCount(desc.sampleCount);
+	if (sampleCount != VK_SAMPLE_COUNT_1_BIT) {
+		VkPhysicalDeviceProperties props;
+		vkGetPhysicalDeviceProperties(_physicalDevice, &props);
+		VkSampleCountFlags supported = props.limits.framebufferColorSampleCounts;
+		if (desc.depthTestEnable) {
+			supported &= props.limits.framebufferDepthSampleCounts;
+		}
+		if ((supported & sampleCount) == 0) {
+			throw std::runtime_error("Requested graphics pipeline MSAA sample count is not supported by this device");
+		}
+	}
+
 	// Create descriptor set layout for resources
 	std::vector<ResourceLayoutEntry> sortedResources = desc.resources;
 	std::sort(sortedResources.begin(), sortedResources.end());
@@ -3027,7 +3162,7 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 	// Multisampling
 	VkPipelineMultisampleStateCreateInfo multisampling = {};
 	multisampling.sType								   = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.rasterizationSamples				   = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.rasterizationSamples				   = sampleCount;
 	multisampling.minSampleShading					   = 1.0f;
 
 	// Depth/stencil
@@ -3112,6 +3247,7 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 	info.topology			 = desc.topology;
 	info.colorFormat		 = colorAttachmentFormats.front();
 	info.colorFormats		 = std::move(colorAttachmentFormats);
+	info.samples			 = sampleCount;
 	info.depthEnable		 = desc.depthTestEnable;
 	info.vertexLayout		 = desc.vertexLayout;
 
@@ -3133,6 +3269,11 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 	}
 
 	EnsureCommandBuffer();
+
+	const VkSampleCountFlagBits sampleCount = GetVkSampleCount(desc.sampleCount);
+	if (sampleCount != VK_SAMPLE_COUNT_1_BIT && !desc.clearColorFlag) {
+		throw std::runtime_error("MSAA BeginRendering requires clearColorFlag=true");
+	}
 
 	std::vector<TextureHandle> colorHandles = desc.colorAttachments;
 	if (colorHandles.empty() && desc.colorAttachment != INVALID_TEXTURE_HANDLE) {
@@ -3162,10 +3303,14 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 
 	std::vector<VkRenderingAttachmentInfoKHR> colorAttachments;
 	colorAttachments.reserve(colorTextureIters.size());
-	for (auto &colorIt : colorTextureIters) {
+	for (size_t colorIndex = 0; colorIndex < colorTextureIters.size(); ++colorIndex) {
+		auto &colorIt = colorTextureIters[colorIndex];
+		TransitionTexture(colorIt->second, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+						  VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
 		VkRenderingAttachmentInfoKHR colorAttachment = {};
 		colorAttachment.sType						= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-		colorAttachment.imageView					= colorIt->second.view;
 		colorAttachment.imageLayout					= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		colorAttachment.loadOp	= desc.clearColorFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -3173,10 +3318,25 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 		colorAttachment.clearValue.color.float32[1] = desc.clearColor[1];
 		colorAttachment.clearValue.color.float32[2] = desc.clearColor[2];
 		colorAttachment.clearValue.color.float32[3] = desc.clearColor[3];
-		colorAttachments.push_back(colorAttachment);
 
-		TransitionTexture(colorIt->second, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-						  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+		if (sampleCount == VK_SAMPLE_COUNT_1_BIT) {
+			colorAttachment.imageView = colorIt->second.view;
+		} else {
+			auto &msaaColor = GetOrCreateMsaaAttachment(
+				renderWidth, renderHeight, static_cast<uint32_t>(colorIndex), colorIt->second.vkFormat, sampleCount,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+				VK_IMAGE_ASPECT_COLOR_BIT);
+			TransitionMsaaAttachment(msaaColor, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+									 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+									 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+			colorAttachment.imageView	   = msaaColor.view;
+			colorAttachment.storeOp		   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			colorAttachment.resolveMode	   = VK_RESOLVE_MODE_AVERAGE_BIT;
+			colorAttachment.resolveImageView = colorIt->second.view;
+			colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		}
+		colorAttachments.push_back(colorAttachment);
 	}
 
 	VkRenderingAttachmentInfoKHR depthAttachment = {};
@@ -3185,16 +3345,32 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 	if (desc.depthAttachment != INVALID_TEXTURE_HANDLE) {
 		auto depthIt = _textures.find(desc.depthAttachment);
 		if (depthIt != _textures.end()) {
+			if (sampleCount != VK_SAMPLE_COUNT_1_BIT && !desc.clearDepthFlag) {
+				throw std::runtime_error("MSAA BeginRendering with depth requires clearDepthFlag=true");
+			}
 			depthAttachment.sType		= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-			depthAttachment.imageView	= depthIt->second.view;
 			depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			depthAttachment.loadOp	= desc.clearDepthFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
 			depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			depthAttachment.clearValue.depthStencil.depth	= desc.clearDepth;
 			depthAttachment.clearValue.depthStencil.stencil = 0;
 
-			TransitionTexture(depthIt->second, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-							  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+			if (sampleCount == VK_SAMPLE_COUNT_1_BIT) {
+				depthAttachment.imageView = depthIt->second.view;
+				TransitionTexture(depthIt->second, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+								  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+								  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+			} else {
+				auto &msaaDepth = GetOrCreateMsaaAttachment(
+					renderWidth, renderHeight, MAX_COLOR_ATTACHMENTS, VK_FORMAT_D32_SFLOAT, sampleCount,
+					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+					VK_IMAGE_ASPECT_DEPTH_BIT);
+				TransitionMsaaAttachment(msaaDepth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+										 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+										 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+				depthAttachment.imageView = msaaDepth.view;
+				depthAttachment.storeOp	 = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			}
 			hasDepth = true;
 		}
 	}
@@ -3365,6 +3541,7 @@ TextureHandle VulkanBackend::CreateDepthBuffer(uint32_t width, uint32_t height) 
 	info.mipLevels	   = 1;
 	info.format		   = PixelFormat::R32F;
 	info.vkFormat	   = depthFormat;
+	info.samples	   = VK_SAMPLE_COUNT_1_BIT;
 	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	_textures[handle]  = std::move(info);

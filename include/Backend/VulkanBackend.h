@@ -229,6 +229,22 @@ private:
 		uint32_t			 mipLevels	   = 1;
 		PixelFormat			 format		   = PixelFormat::RGBA8;
 		VkFormat			 vkFormat	   = VK_FORMAT_UNDEFINED;
+		VkSampleCountFlagBits samples	   = VK_SAMPLE_COUNT_1_BIT;
+		VkImageLayout		 currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkPipelineStageFlags lastStage	   = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		VkAccessFlags		 lastAccess	   = 0;
+	};
+
+	struct MsaaAttachment {
+		VkImage				 image		   = nullptr;
+		VkDeviceMemory		 memory		   = nullptr;
+		VkImageView			 view		   = nullptr;
+		uint32_t			 width		   = 0;
+		uint32_t			 height		   = 0;
+		uint32_t			 slot		   = 0;
+		VkFormat			 format		   = VK_FORMAT_UNDEFINED;
+		VkSampleCountFlagBits samples	   = VK_SAMPLE_COUNT_1_BIT;
+		VkImageAspectFlags	 aspectMask	   = VK_IMAGE_ASPECT_COLOR_BIT;
 		VkImageLayout		 currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		VkPipelineStageFlags lastStage	   = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		VkAccessFlags		 lastAccess	   = 0;
@@ -258,6 +274,7 @@ private:
 		PrimitiveTopology				 topology		= PrimitiveTopology::TriangleList;
 		PixelFormat						 colorFormat	= PixelFormat::RGBA8;
 		std::vector<PixelFormat>		 colorFormats;
+		VkSampleCountFlagBits			 samples		= VK_SAMPLE_COUNT_1_BIT;
 		bool							 depthEnable	= false;
 		std::vector<VertexLayoutEntry>	 vertexLayout;
 	};
@@ -330,6 +347,11 @@ private:
 	 */
 	void TransitionTexture(TextureInfo &info, VkImageLayout newLayout, VkPipelineStageFlags dstStage,
 						   VkAccessFlags dstAccess);
+	void TransitionMsaaAttachment(MsaaAttachment &info, VkImageLayout newLayout, VkPipelineStageFlags dstStage,
+								  VkAccessFlags dstAccess);
+	MsaaAttachment &GetOrCreateMsaaAttachment(uint32_t width, uint32_t height, uint32_t slot, VkFormat format,
+											  VkSampleCountFlagBits samples, VkImageUsageFlags usage,
+											  VkImageAspectFlags aspectMask);
 	/** @brief Invalidate all cached descriptor sets. */
 	void InvalidateAllDescriptorCaches();
 	/**
@@ -409,6 +431,7 @@ private:
 	 * @return Corresponding VkFormat.
 	 */
 	static VkFormat			  GetVkFormat(PixelFormat format);
+	static VkSampleCountFlagBits GetVkSampleCount(SampleCount sampleCount);
 	/**
 	 * @brief Convert BindingType to Vulkan descriptor type.
 	 * @param type Binding type.
@@ -539,6 +562,7 @@ private:
 	// Resource maps
 	std::unordered_map<BufferHandle, BufferInfo>	 _buffers;
 	std::unordered_map<TextureHandle, TextureInfo>	 _textures;
+	std::vector<MsaaAttachment>						 _msaaAttachments;
 	std::unordered_map<ShaderHandle, ShaderInfo>	 _shaders;
 	std::unordered_map<PipelineHandle, PipelineInfo> _pipelines;
 	std::vector<QueryInfo>							 _queries;

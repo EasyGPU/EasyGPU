@@ -133,6 +133,17 @@ public:
 		return _name;
 	}
 
+	void SetSampleCount(Backend::SampleCount sampleCount) {
+		if (_compiled) {
+			throw std::runtime_error("GraphicsPipeline::SetSampleCount must be called before the first Draw");
+		}
+		_sampleCount = sampleCount;
+	}
+
+	[[nodiscard]] Backend::SampleCount GetSampleCount() const {
+		return _sampleCount;
+	}
+
 	/** Get generated shader source for debugging. */
 	std::string GetShaderSource() {
 		if (_context)
@@ -476,6 +487,7 @@ private:
 	Backend::PipelineHandle					_pipeline		   = Backend::INVALID_PIPELINE_HANDLE;
 	bool									_compiled		   = false;
 	uint32_t								_colorOutputCount = 1;
+	Backend::SampleCount					_sampleCount	   = Backend::SampleCount::X1;
 	std::vector<Backend::PixelFormat>		_colorAttachmentFormats;
 
 	bool									_hasVertexBuffer   = false;

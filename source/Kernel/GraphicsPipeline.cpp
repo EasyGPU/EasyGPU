@@ -66,6 +66,7 @@ void GraphicsPipeline::EnsureCompiled() {
 	if (pipeDesc.colorAttachmentFormats.empty()) {
 		pipeDesc.colorAttachmentFormats.assign(_colorOutputCount, Backend::PixelFormat::RGBA8);
 	}
+	pipeDesc.sampleCount	   = _sampleCount;
 	pipeDesc.depthTestEnable	   = true;
 	pipeDesc.depthWriteEnable	   = true;
 
@@ -176,6 +177,7 @@ void GraphicsPipeline::DrawImpl(const std::vector<RenderTargetAttachment> &rende
 	rpDesc.clearColor[2]   = 0.0f;
 	rpDesc.clearColor[3]   = 1.0f;
 	rpDesc.depthAttachment = depthHandle;
+	rpDesc.sampleCount	   = _sampleCount;
 	rpDesc.clearDepthFlag  = (depthHandle != Backend::INVALID_TEXTURE_HANDLE);
 	rpDesc.clearDepth	   = 1.0f;
 
