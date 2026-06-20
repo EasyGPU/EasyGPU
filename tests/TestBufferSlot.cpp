@@ -12,6 +12,8 @@ bool FloatEq(float a, float b, float epsilon = 0.001f) {
 	return std::abs(a - b) < epsilon;
 }
 
+EASYGPU_STRUCT(BufferSlotParticle, (GPU::Math::Vec4, position), (GPU::Math::Vec4, velocity), (float, mass));
+
 int main() {
 	try {
 		std::cout << "=== BufferSlot Tests ===" << std::endl;
@@ -308,6 +310,55 @@ int main() {
 
 			bool pass = FloatEq(result[0].x, 2.0f) && FloatEq(result[0].y, 4.0f) && FloatEq(result[0].z, 6.0f) &&
 						FloatEq(result[0].w, 8.0f) && FloatEq(result[1].x, 10.0f) && FloatEq(result[1].y, 12.0f);
+
+			if (pass) {
+				std::cout << " PASS" << std::endl;
+				testsPassed++;
+			} else {
+				std::cout << " FAIL" << std::endl;
+			}
+		}
+
+		// ==================================================================
+		// Test 8: EASYGPU_STRUCT BufferSlot
+		// ==================================================================
+		{
+			std::cout << "[Test 8] EASYGPU_STRUCT BufferSlot..." << std::flush;
+			testsTotal++;
+
+			BufferSlot<BufferSlotParticle> inputSlot;
+			BufferSlot<BufferSlotParticle> outputSlot;
+
+			Kernel1D kernel([&](Int i) {
+				auto in	 = inputSlot.Bind();
+				auto out = outputSlot.Bind();
+				auto p	 = in[i];
+				p.mass() = p.mass() + 1.0f;
+				out[i]	 = p;
+			});
+
+			std::vector<BufferSlotParticle> input(2);
+			input[0].position = Vec4(1.0f, 2.0f, 3.0f, 1.0f);
+			input[0].velocity = Vec4(0.5f, 0.0f, 0.0f, 0.0f);
+			input[0].mass	  = 2.0f;
+			input[1].position = Vec4(4.0f, 5.0f, 6.0f, 1.0f);
+			input[1].velocity = Vec4(0.0f, 0.5f, 0.0f, 0.0f);
+			input[1].mass	  = 3.0f;
+
+			std::vector<BufferSlotParticle> result(2);
+			Buffer<BufferSlotParticle>	  inputBuf(input);
+			Buffer<BufferSlotParticle>	  outputBuf(2);
+
+			inputSlot.Attach(inputBuf);
+			outputSlot.Attach(outputBuf);
+			kernel.Dispatch(1, true);
+			outputBuf.Download(result);
+
+			bool pass = FloatEq(result[0].mass, 3.0f) && FloatEq(result[1].mass, 4.0f) &&
+						FloatEq(result[0].position.x, 1.0f) && FloatEq(result[1].velocity.y, 0.5f);
+			if (std::string(inputSlot.GetTypeName()) != "BufferSlotParticle") {
+				pass = false;
+			}
 
 			if (pass) {
 				std::cout << " PASS" << std::endl;

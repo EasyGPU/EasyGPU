@@ -199,42 +199,8 @@ public:
 	 * @return The GLSL type name
 	 */
 	const char *GetTypeName() const override {
-		return GetGLSLTypeName<T>();
-	}
-
-protected:
-	/**
-	 * @brief Helper to deduce the GLSL type name for a given C++ type at compile time.
-	 * @tparam Type The C++ type to map.
-	 * @return The corresponding GLSL type name string literal.
-	 */
-	template <typename Type> static const char *GetGLSLTypeName() {
-		if constexpr (std::same_as<Type, float>)
-			return "float";
-		else if constexpr (std::same_as<Type, int>)
-			return "int";
-		else if constexpr (std::same_as<Type, bool>)
-			return "bool";
-		else if constexpr (std::same_as<Type, Math::Vec2>)
-			return "vec2";
-		else if constexpr (std::same_as<Type, Math::Vec3>)
-			return "vec3";
-		else if constexpr (std::same_as<Type, Math::Vec4>)
-			return "vec4";
-		else if constexpr (std::same_as<Type, Math::IVec2>)
-			return "ivec2";
-		else if constexpr (std::same_as<Type, Math::IVec3>)
-			return "ivec3";
-		else if constexpr (std::same_as<Type, Math::IVec4>)
-			return "ivec4";
-		else if constexpr (std::same_as<Type, Math::Mat2>)
-			return "mat2";
-		else if constexpr (std::same_as<Type, Math::Mat3>)
-			return "mat3";
-		else if constexpr (std::same_as<Type, Math::Mat4>)
-			return "mat4";
-		else
-			return "unknown";
+		static const std::string typeName = GetGLSLTypeNameForBuffer<T>();
+		return typeName.c_str();
 	}
 
 private:
