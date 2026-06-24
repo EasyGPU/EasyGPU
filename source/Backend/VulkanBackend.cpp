@@ -1859,6 +1859,221 @@ std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &
 	case ShaderOptimizationLevel::Size:
 		optimizer.RegisterSizePasses();
 		break;
+	case ShaderOptimizationLevel::Ultra: {
+		// ===================================================================
+		// Ultra: Full -O recipe augmented with GPU-specific passes.
+		//
+		// Strategy: replicate RegisterPerformancePasses() ordering and
+		// inject additional passes at points where they compound with
+		// surrounding optimizations:
+		//   - LICM / LoopUnswitch / LoopPeeling -> before LoopUnroll
+		//   - StrengthReduction + LocalRedundancyElimination -> before GVN
+		//   - CodeSinking + LoopFission -> after the main DCE cycles
+		//   - Final cleanup (UnifyConst, EliminateDeadConst, etc.)
+		//
+		// New passes vs -O are marked with [GPU].
+		// ===================================================================
+
+		// --- Phase 1: Setup ------------------------------------------------
+		optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+		optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+		optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+		optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
+
+		// --- Phase 2: First DCE + scalarization cycle ---------------------
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));
+		optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+
+		// --- Phase 3: Loop optimization (GPU-specific) --------------------
+		// [GPU] LICM: hoist uniform/buffer loads out of loops.
+		optimizer.RegisterPass(spvtools::CreateLoopInvariantCodeMotionPass());
+		// [GPU] LoopUnswitch: hoist invariant branch conditions outside
+		//       loops to reduce warp-divergent branching.
+		optimizer.RegisterPass(spvtools::CreateLoopUnswitchPass());
+		// [GPU] LoopPeeling: peel boundary iterations to expose constant
+		//       patterns, enabling more aggressive subsequent unrolling.
+		optimizer.RegisterPass(spvtools::CreateLoopPeelingPass());
+		optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+
+		// --- Phase 4: Value optimization ----------------------------------
+		optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateCCPPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		// [GPU] StrengthReduction: mul->shift, div->recip-mul.
+		optimizer.RegisterPass(spvtools::CreateStrengthReductionPass());
+		// [GPU] LocalRedundancyElimination: per-block CSE.
+		optimizer.RegisterPass(spvtools::CreateLocalRedundancyEliminationPass());
+		optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+		optimizer.RegisterPass(spvtools::CreateCombineAccessChainsPass());
+		optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+
+		// --- Phase 5: Second DCE + scalarization cycle --------------------
+		optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));
+		optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+
+		// --- Phase 6: SSA + vector cleanup --------------------------------
+		optimizer.RegisterPass(spvtools::CreateSSARewritePass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
+		optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+
+		// --- Phase 7: Branch -> select, array propagation -----------------
+		optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+		optimizer.RegisterPass(spvtools::CreateIfConversionPass());
+		optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());
+		optimizer.RegisterPass(spvtools::CreateReduceLoadSizePass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+		optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+		optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+		optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+
+		// --- Phase 8: Code layout for GPU register pressure --------------
+		// [GPU] CodeSinking: move computations closer to use points,
+		//       shortening live ranges -> fewer registers -> higher occupancy.
+		optimizer.RegisterPass(spvtools::CreateCodeSinkingPass());
+		// [GPU] LoopFission: split loops whose register pressure exceeds
+		//       64 registers, avoiding costly spills.
+		optimizer.RegisterPass(spvtools::CreateLoopFissionPass(64));
+
+		// --- Phase 9: Final cleanup ---------------------------------------
+		// [GPU] UnifyConstant + EliminateDeadConst.
+		optimizer.RegisterPass(spvtools::CreateUnifyConstantPass());
+		optimizer.RegisterPass(spvtools::CreateEliminateDeadConstantPass());
+		// [GPU] RemoveDuplicates: deduplicate types/decorations/capabilities.
+		optimizer.RegisterPass(spvtools::CreateRemoveDuplicatesPass());
+		// [GPU] DeadVariableElimination: remove unreferenced module-scope vars.
+		optimizer.RegisterPass(spvtools::CreateDeadVariableEliminationPass());
+		// [GPU] RemoveUnusedInterfaceVariables: clean up entry-point interface.
+		optimizer.RegisterPass(spvtools::CreateRemoveUnusedInterfaceVariablesPass());
+		// [GPU] TrimCapabilities: remove unused capabilities/extensions.
+		optimizer.RegisterPass(spvtools::CreateTrimCapabilitiesPass());
+		optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateCFGCleanupPass());
+		break;
+	}
+	case ShaderOptimizationLevel::Extreme: {
+		// ===================================================================
+		// Extreme: Ultra + speculative GPU optimizations.
+		//
+		// All Ultra passes plus:
+		//   - ConvertRelaxedToHalf  (2x ALU throughput: Pascal+/Vega+/M-series)
+		//   - LoopFusion            (merge adjacent same-bound loops)
+		//   - FlattenDecoration     (simplify grouped decorations)
+		//   - AmdExtToKhr           (replace vendor extensions with core)
+		//   - CanonicalizeIds       (cross-shader compression friendly)
+		// ===================================================================
+
+		// --- Phase 1: Setup ------------------------------------------------
+		optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+		optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+		optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+		optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
+
+		// --- Phase 2: First DCE + scalarization cycle ---------------------
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));
+		optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+
+		// --- Phase 3: Loop optimization -----------------------------------
+		optimizer.RegisterPass(spvtools::CreateLoopInvariantCodeMotionPass());
+		optimizer.RegisterPass(spvtools::CreateLoopUnswitchPass());
+		optimizer.RegisterPass(spvtools::CreateLoopPeelingPass());
+		optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+
+		// --- Phase 4: Value optimization ----------------------------------
+		optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateCCPPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateStrengthReductionPass());
+		optimizer.RegisterPass(spvtools::CreateLocalRedundancyEliminationPass());
+		optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+		optimizer.RegisterPass(spvtools::CreateCombineAccessChainsPass());
+		optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+
+		// --- Phase 5: Second DCE + scalarization cycle --------------------
+		optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));
+		optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+
+		// --- Phase 6: SSA + vector cleanup --------------------------------
+		optimizer.RegisterPass(spvtools::CreateSSARewritePass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
+		optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+
+		// --- Phase 7: Branch -> select, array propagation -----------------
+		optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+		optimizer.RegisterPass(spvtools::CreateIfConversionPass());
+		optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());
+		optimizer.RegisterPass(spvtools::CreateReduceLoadSizePass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+		optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+		optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+		optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+		optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+
+		// --- Phase 8: Code layout -----------------------------------------
+		optimizer.RegisterPass(spvtools::CreateCodeSinkingPass());
+		optimizer.RegisterPass(spvtools::CreateLoopFissionPass(64));
+
+		// --- Phase 9: Extreme-only passes ---------------------------------
+		// [Extreme] ConvertRelaxedToHalf: FP32->FP16 for RelaxedPrecision.
+		optimizer.RegisterPass(spvtools::CreateConvertRelaxedToHalfPass());
+		// [Extreme] LoopFusion: merge adjacent loops with same bounds.
+		optimizer.RegisterPass(spvtools::CreateLoopFusionPass(64));
+		// [Extreme] FlattenDecoration: simplify grouped decorations.
+		optimizer.RegisterPass(spvtools::CreateFlattenDecorationPass());
+		// [Extreme] AmdExtToKhr: replace AMD extensions with core insts.
+		optimizer.RegisterPass(spvtools::CreateAmdExtToKhrPass());
+		// [Extreme] CanonicalizeIds: renumber IDs for cross-shader compression.
+		optimizer.RegisterPass(spvtools::CreateCanonicalizeIdsPass());
+
+		// --- Phase 10: Final cleanup --------------------------------------
+		// NOTE: Extreme uses CanonicalizeIds (optimized for cross-shader
+		// compression) instead of CompactIds (minimize ID range). This
+		// is the primary structural difference vs Ultra in the GLSL output.
+		optimizer.RegisterPass(spvtools::CreateUnifyConstantPass());
+		optimizer.RegisterPass(spvtools::CreateEliminateDeadConstantPass());
+		optimizer.RegisterPass(spvtools::CreateRemoveDuplicatesPass());
+		optimizer.RegisterPass(spvtools::CreateDeadVariableEliminationPass());
+		optimizer.RegisterPass(spvtools::CreateRemoveUnusedInterfaceVariablesPass());
+		optimizer.RegisterPass(spvtools::CreateTrimCapabilitiesPass());
+		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+		optimizer.RegisterPass(spvtools::CreateCFGCleanupPass());
+		break;
+	}
 	case ShaderOptimizationLevel::None:
 		break;
 	}

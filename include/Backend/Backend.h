@@ -122,15 +122,19 @@ enum class ShaderOptimizationLevel {
 	None,				  ///< Skip backend optimization passes.
 	Size,				  ///< Optimize for compact shader binary size. Maps to SPIRV-Tools -Os on Vulkan.
 	Aggressive,			  ///< Default. Use SPIRV-Tools' strongest general performance preset (-O) on Vulkan.
+	Ultra,				  ///< -O + GPU-specific passes (LICM, LoopUnswitch, LoopPeeling, StrengthReduction,
+						  ///<   CodeSinking, LoopFission, LocalRedundancyElimination + extra cleanup).
+	Extreme,			  ///< Ultra + FP16 relaxed precision conversion, loop fusion, canonicalize IDs.
 	Performance = Aggressive ///< Compatibility alias for Aggressive.
 };
 
 /** @brief Descriptor for shader creation. */
 struct ShaderDesc {
-	ShaderType				type			  = ShaderType::Compute;
+	ShaderType				type			   = ShaderType::Compute;
 	std::string				sourceCode;
-	const char			   *entryPoint		  = "main";
-	ShaderOptimizationLevel optimizationLevel = ShaderOptimizationLevel::Aggressive;
+	const char			   *entryPoint		   = "main";
+	ShaderOptimizationLevel optimizationLevel  = ShaderOptimizationLevel::Aggressive;
+	bool					preserveInterface  = false; ///< Preserve non-IO interface variables during optimization.
 };
 
 // ============================================================================

@@ -298,6 +298,72 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 std::cout << "  ✓ Optimization levels selectable and observable!\n";
 END_TEST
 
+TEST(inspector_ultra_optimization)
+std::cout << "\n  Testing Ultra SPIR-V optimization level...\n";
+
+GPU::Kernel::InspectorKernel1D kernel([](Var<int> &id) {
+	Var<float> x    = Expr<float>(id) * 2.0f;
+	Var<float> dead = x * 0.0f;
+	If(MakeBool(false), [&] {
+		Var<float> y = dead + 1.0f;
+	}).Else([&] {
+		Var<float> z = x + 3.0f;
+	});
+	Var<float> dup   = Expr<float>(id) * 2.0f;
+	Float3    dummy  = MakeFloat3(x, Expr<float>(id) * 0.0f, 0.0f);
+	For(0, 4, 1, [&](Var<int> &i) {
+		Var<float> acc = Expr<float>(i) * 0.25f;
+	});
+});
+
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Ultra);
+ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Ultra);
+
+std::string ultra = kernel.GetOptimizedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(ultra.find("#version") != std::string::npos);
+	ASSERT(ultra.find("if (false)") == std::string::npos);
+} else {
+	ASSERT(ultra.empty());
+}
+
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::None);
+std::string none = kernel.GetOptimizedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(none.find("if (false)") != std::string::npos);
+	ASSERT(ultra != none);
+}
+
+std::cout << "  Ultra optimization level functional!\n";
+END_TEST
+
+TEST(inspector_extreme_optimization)
+std::cout << "\n  Testing Extreme SPIR-V optimization level...\n";
+
+GPU::Kernel::InspectorKernel1D kernel([](Var<int> &id) {
+	Var<float> x    = Expr<float>(id) * 2.0f;
+	Var<float> dead = x * 0.0f;
+	If(MakeBool(false), [&] {
+		Var<float> y = dead + 1.0f;
+	}).Else([&] {
+		Var<float> z = x + 3.0f;
+	});
+});
+
+kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Extreme);
+ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Extreme);
+
+std::string extreme = kernel.GetOptimizedGLSL();
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(extreme.find("#version") != std::string::npos);
+	ASSERT(extreme.find("if (false)") == std::string::npos);
+} else {
+	ASSERT(extreme.empty());
+}
+
+std::cout << "  Extreme optimization level functional!\n";
+END_TEST
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -323,6 +389,8 @@ int main() {
 		test_inspector_compile_simple_version();
 		test_inspector_optimized_glsl();
 		test_inspector_optimization_levels();
+		test_inspector_ultra_optimization();
+		test_inspector_extreme_optimization();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " tests passed\n";

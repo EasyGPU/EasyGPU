@@ -1177,7 +1177,93 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 } else {
 	ASSERT(noneCombined.empty());
 }
+
 END_TEST
+
+TEST(ad_ultra_optimization)
+	std::cout << "\n  Testing Ultra SPIR-V optimization level for AD kernels...\n";
+
+	GPU::Runtime::Buffer<float> xbuf(8);
+	GPU::Runtime::Buffer<float> wbuf(8);
+	GPU::AD::ADKernel1D kernel(
+		[&](GPU::IR::Value::Var<int> &id) {
+			auto		  xRef = xbuf.Bind();
+			auto		  wRef = wbuf.Bind();
+			Var<float> x	= xRef[id];
+			Var<float> w	= wRef[id];
+			Var<float> y	= x * w;
+			Var<float> dead = y * 0.0f;
+			If(MakeBool(false), [&] { Var<float> ignored = dead + 1.0f; }).Else([&] {
+				Var<float> loss = y * y;
+				GPU::AD::Loss(loss);
+			});
+			GPU::AD::Param(w);
+		},
+		8);
+
+	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Ultra);
+	ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Ultra);
+
+	std::string ultraCombined = kernel.GetOptimizedCombinedGLSL();
+	if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+		ASSERT(!ultraCombined.empty());
+	} else {
+		ASSERT(ultraCombined.empty());
+	}
+
+	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::None);
+	std::string noneCombined = kernel.GetOptimizedCombinedGLSL();
+	if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+		ASSERT(noneCombined.find("if (false)") != std::string::npos);
+	} else {
+		ASSERT(noneCombined.empty());
+	}
+
+	std::cout << "  Ultra optimization level functional!\n";
+	END_TEST
+
+	TEST(ad_extreme_optimization)
+	std::cout << "\n  Testing Extreme SPIR-V optimization level for AD kernels...\n";
+
+	GPU::Runtime::Buffer<float> xbuf(8);
+	GPU::Runtime::Buffer<float> wbuf(8);
+	GPU::AD::ADKernel1D kernel(
+		[&](GPU::IR::Value::Var<int> &id) {
+			auto		  xRef = xbuf.Bind();
+			auto		  wRef = wbuf.Bind();
+			Var<float> x	= xRef[id];
+			Var<float> w	= wRef[id];
+			Var<float> y	= x * w;
+			Var<float> dead = y * 0.0f;
+			If(MakeBool(false), [&] { Var<float> ignored = dead + 1.0f; }).Else([&] {
+				Var<float> loss = y * y;
+				GPU::AD::Loss(loss);
+			});
+			GPU::AD::Param(w);
+		},
+		8);
+
+	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Extreme);
+	ASSERT(kernel.GetOptimizationLevel() == Backend::ShaderOptimizationLevel::Extreme);
+
+	std::string extremeCombined = kernel.GetOptimizedCombinedGLSL();
+	if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+		ASSERT(!extremeCombined.empty());
+	} else {
+		ASSERT(extremeCombined.empty());
+	}
+
+	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::None);
+	std::string noneCombined = kernel.GetOptimizedCombinedGLSL();
+	if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+		ASSERT(noneCombined.find("if (false)") != std::string::npos);
+	} else {
+		ASSERT(noneCombined.empty());
+	}
+
+	std::cout << "  Extreme optimization level functional!\n";
+	END_TEST
+
 
 TEST(ad_expression_gradient_uses_temporaries_for_long_coefficients)
 auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
@@ -1451,6 +1537,8 @@ int main() {
 	test_ad_kernel_1d_sigmoid();
 	test_ad_kernel_1d_grad_bindings_follow_forward_bindings();
 	test_ad_kernel_optimization_levels();
+	test_ad_ultra_optimization();
+		test_ad_extreme_optimization();
 	test_ad_expression_gradient_uses_temporaries_for_long_coefficients();
 	test_ad_inspector_3d_basic();
 	test_ad_inspector_3d_vector();
