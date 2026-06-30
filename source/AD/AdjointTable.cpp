@@ -101,6 +101,16 @@ std::vector<std::pair<std::string, std::string>> AdjointTable::AllDeclarations()
 	return decls;
 }
 
+void AdjointTable::DeclareAdjoint(const std::string &adjName, const std::string &glslType) {
+	if (adjName.empty() || glslType.empty())
+		return;
+
+	if (!_types.count(adjName)) {
+		_types[adjName] = glslType;
+		_insertionOrder.push_back(adjName);
+	}
+}
+
 void AdjointTable::SetArraySize(const std::string &adjName, size_t arraySize) {
 	_arraySizes[adjName] = arraySize;
 }

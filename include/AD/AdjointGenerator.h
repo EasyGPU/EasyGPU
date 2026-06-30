@@ -38,6 +38,7 @@ struct AdjointBody {
 		std::string bufferName;
 		std::string adjName;
 		size_t		elementCount = 0;
+		std::string elementType;
 	};
 	std::vector<BufferWriteback> bufferWritebacks;
 	/** GLSL definitions of adjoint functions for Callable bodies. */
@@ -181,9 +182,6 @@ private:
 
 	// Reference to the main tape (for sub-tape access during Call processing)
 	const GradientTape								*_tape = nullptr;
-
-	// Pre-built map: entry id → call index (for O(1) sub-tape lookup)
-	std::unordered_map<int32_t, int>				 _callIndexMap;
 
 	// Counter for unique temp names in SaveAndZeroAdjoint
 	int												 _tmpCounter = 0;

@@ -364,7 +364,7 @@ private:
 			return;
 
 		// Mark that we're entering a callable body generation
-		context->PushCallableBody();
+		context->PushCallableBody(_mangledName);
 
 		// Execute the type-erased body generator
 		_bodyGenerator->Generate();
@@ -462,7 +462,7 @@ private:
 		if (!context)
 			return;
 
-		context->PushCallableBody();
+		context->PushCallableBody(_mangledName);
 
 		_bodyGenerator->Generate();
 

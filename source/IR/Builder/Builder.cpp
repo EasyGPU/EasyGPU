@@ -8,6 +8,7 @@
 #include <AD/GradientTape.h>
 #include <IR/Node/ArrayAccess.h>
 #include <IR/Node/AtomicOp.h>
+#include <IR/Node/Barrier.h>
 #include <IR/Node/Break.h>
 #include <IR/Node/Call.h>
 #include <IR/Node/CallInst.h>
@@ -29,6 +30,9 @@
 #include <IR/Node/SharedMemory.h>
 #include <IR/Node/Store.h>
 #include <IR/Node/Ternary.h>
+#include <IR/Node/TextureLoad.h>
+#include <IR/Node/TextureSample.h>
+#include <IR/Node/TextureStore.h>
 #include <IR/Node/While.h>
 
 #include <format>
@@ -40,11 +44,75 @@ bool IsLegitimateEmptyBuild(const Node::Node &node) {
 	if (node.Type() == Node::NodeType::SharedMemory) {
 		return true;
 	}
+	if (node.Type() == Node::NodeType::Barrier) {
+		return false;
+	}
 	if (node.Type() == Node::NodeType::LocalVariable) {
 		const auto &local = static_cast<const Node::LocalVariableNode &>(node);
 		return local.IsExternal();
 	}
 	return false;
+}
+
+bool NeedsStatementTerminator(const Node::Node &node) {
+	switch (node.Type()) {
+	case Node::NodeType::Store:
+	case Node::NodeType::CompoundAssignment:
+	case Node::NodeType::Increment:
+	case Node::NodeType::Break:
+	case Node::NodeType::Continue:
+	case Node::NodeType::Return:
+	case Node::NodeType::Call:
+	case Node::NodeType::CallInst:
+	case Node::NodeType::LocalVariable:
+	case Node::NodeType::LocalArray:
+	case Node::NodeType::AtomicOp:
+	case Node::NodeType::Barrier:
+	case Node::NodeType::TextureStore:
+	case Node::NodeType::RawCode:
+		return true;
+	default:
+		return false;
+	}
+}
+
+void AppendStatementCode(std::string &code, const Node::Node &node, Builder &builder) {
+	const auto statementCode = builder.BuildNode(node);
+	if (statementCode.empty()) {
+		if (IsLegitimateEmptyBuild(node)) {
+			return;
+		}
+		builder.ValidateGeneratedCode(statementCode, "statement");
+	}
+
+	code.append(statementCode);
+	if (NeedsStatementTerminator(node)) {
+		code.append(";");
+	}
+	code.append("\n");
+}
+
+std::string BuildForHeaderNodes(const std::vector<std::unique_ptr<Node::Node>> &nodes, Builder &builder) {
+	std::string code;
+	for (const auto &node : nodes) {
+		if (!node) {
+			continue;
+		}
+
+		const auto part = builder.BuildNode(*node);
+		if (part.empty()) {
+			if (IsLegitimateEmptyBuild(*node)) {
+				continue;
+			}
+			builder.ValidateGeneratedCode(part, "for header");
+		}
+
+		if (!code.empty()) {
+			code.append(", ");
+		}
+		code.append(part);
+	}
+	return code;
 }
 } // namespace
 
@@ -97,7 +165,11 @@ void Builder::Build(const Node::Node &Node, bool IsStatement) {
 		}
 		ValidateGeneratedCode(code, IsStatement ? "statement" : "expression");
 		if (IsStatement) {
-			_context->PushTranslatedCode(std::format("{};\n", code));
+			if (NeedsStatementTerminator(Node)) {
+				code.append(";");
+			}
+			code.append("\n");
+			_context->PushTranslatedCode(code);
 			if (_gradientTape) {
 				_gradientTape->Record(Node, IsStatement);
 			}
@@ -151,6 +223,15 @@ std::string Builder::BuildNode(const Node::Node &Node) {
 	case Node::NodeType::For: {
 		return BuildFor(static_cast<const Node::ForNode &>(Node));
 	}
+	case Node::NodeType::TextureLoad: {
+		return BuildTextureLoad(static_cast<const Node::TextureLoadNode &>(Node));
+	}
+	case Node::NodeType::TextureStore: {
+		return BuildTextureStore(static_cast<const Node::TextureStoreNode &>(Node));
+	}
+	case Node::NodeType::TextureSample: {
+		return BuildTextureSample(static_cast<const Node::TextureSampleNode &>(Node));
+	}
 	case Node::NodeType::Break: {
 		return BuildBreak(static_cast<const Node::BreakNode &>(Node));
 	}
@@ -174,6 +255,9 @@ std::string Builder::BuildNode(const Node::Node &Node) {
 	}
 	case Node::NodeType::AtomicOp: {
 		return BuildAtomicOp(static_cast<const Node::AtomicOpNode &>(Node));
+	}
+	case Node::NodeType::Barrier: {
+		return BuildBarrier(static_cast<const Node::BarrierNode &>(Node));
 	}
 	default: {
 		return "";
@@ -273,6 +357,9 @@ std::string Builder::BuildLocalVariable(const Node::LocalVariableNode &Node) {
 	if (Node.IsExternal()) {
 		return "";
 	}
+	if (Node.HasInitializer()) {
+		return std::format("{} {} = {}", Node.VarType(), Node.VarName(), BuildNode(*Node.Initializer()));
+	}
 	return std::format("{} {}", Node.VarType(), Node.VarName());
 }
 
@@ -359,8 +446,7 @@ std::string Builder::BuildMemberAccess(const Node::MemberAccessNode &Node) {
 std::string Builder::BuildIf(const Node::IfNode &Node) {
 	std::string code = std::format("if ({}) {{\n", BuildNode(*Node.Condition()));
 	for (auto &node : Node.Do()) {
-		code.append(BuildNode(*node));
-		code.append("\n");
+		AppendStatementCode(code, *node, *this);
 	}
 	code.append("}");
 
@@ -368,8 +454,7 @@ std::string Builder::BuildIf(const Node::IfNode &Node) {
 	for (const auto &[elifCond, elifBody] : Node.Elifs()) {
 		code.append(std::format(" else if ({}) {{\n", BuildNode(*elifCond)));
 		for (auto &node : elifBody) {
-			code.append(BuildNode(*node));
-			code.append("\n");
+			AppendStatementCode(code, *node, *this);
 		}
 		code.append("}");
 	}
@@ -378,8 +463,7 @@ std::string Builder::BuildIf(const Node::IfNode &Node) {
 	if (!Node.Else().empty()) {
 		code.append(" else {\n");
 		for (auto &node : Node.Else()) {
-			code.append(BuildNode(*node));
-			code.append("\n");
+			AppendStatementCode(code, *node, *this);
 		}
 		code.append("}");
 	}
@@ -390,8 +474,7 @@ std::string Builder::BuildIf(const Node::IfNode &Node) {
 std::string Builder::BuildWhile(const Node::WhileNode &Node) {
 	std::string code = std::format("while ({}) {{\n", BuildNode(*Node.Condition()));
 	for (auto &node : Node.Body()) {
-		code.append(BuildNode(*node));
-		code.append("\n");
+		AppendStatementCode(code, *node, *this);
 	}
 	code.append("}");
 	return code;
@@ -400,19 +483,30 @@ std::string Builder::BuildWhile(const Node::WhileNode &Node) {
 std::string Builder::BuildDoWhile(const Node::DoWhileNode &Node) {
 	std::string code = "do {\n";
 	for (auto &node : Node.Body()) {
-		code.append(BuildNode(*node));
-		code.append("\n");
+		AppendStatementCode(code, *node, *this);
 	}
 	code.append(std::format("}} while ({});", BuildNode(*Node.Condition())));
 	return code;
 }
 
 std::string Builder::BuildFor(const Node::ForNode &Node) {
+	if (Node.HasDynamicHeader()) {
+		const auto condition = Node.Condition() ? BuildNode(*Node.Condition()) : "true";
+		std::string code = std::format("for ({}; {}; {}) {{\n",
+									   BuildForHeaderNodes(Node.Init(), *this),
+									   condition,
+									   BuildForHeaderNodes(Node.StepNodes(), *this));
+		for (auto &node : Node.Body()) {
+			AppendStatementCode(code, *node, *this);
+		}
+		code.append("}");
+		return code;
+	}
+
 	std::string code = std::format("for (int {} = {}; {} < {}; {} += {}) {{\n", Node.VarName(), Node.Start(),
 								   Node.VarName(), Node.End(), Node.VarName(), Node.Step());
 	for (auto &node : Node.Body()) {
-		code.append(BuildNode(*node));
-		code.append("\n");
+		AppendStatementCode(code, *node, *this);
 	}
 	code.append("}");
 	return code;
@@ -456,9 +550,46 @@ std::string Builder::BuildTernary(const Node::TernaryNode &Node) {
 					   BuildNode(*Node.FalseExpr()));
 }
 
+std::string Builder::BuildTextureLoad(const Node::TextureLoadNode &Node) {
+	if (Node.X() == nullptr || Node.Y() == nullptr) {
+		return "";
+	}
+	if (Node.Z() != nullptr) {
+		return std::format("imageLoad({}, ivec3({}, {}, {}))", Node.TextureName(), BuildNode(*Node.X()),
+						   BuildNode(*Node.Y()), BuildNode(*Node.Z()));
+	}
+	return std::format("imageLoad({}, ivec2({}, {}))", Node.TextureName(), BuildNode(*Node.X()), BuildNode(*Node.Y()));
+}
+
+std::string Builder::BuildTextureStore(const Node::TextureStoreNode &Node) {
+	if (Node.X() == nullptr || Node.Y() == nullptr || Node.Value() == nullptr) {
+		return "";
+	}
+	if (Node.Z() != nullptr) {
+		return std::format("imageStore({}, ivec3({}, {}, {}), {})", Node.TextureName(), BuildNode(*Node.X()),
+						   BuildNode(*Node.Y()), BuildNode(*Node.Z()), BuildNode(*Node.Value()));
+	}
+	return std::format("imageStore({}, ivec2({}, {}), {})", Node.TextureName(), BuildNode(*Node.X()),
+					   BuildNode(*Node.Y()), BuildNode(*Node.Value()));
+}
+
+std::string Builder::BuildTextureSample(const Node::TextureSampleNode &Node) {
+	if (Node.Coordinate() == nullptr) {
+		return "";
+	}
+	if (Node.HasExplicitLevel()) {
+		if (Node.Level() == nullptr) {
+			return "";
+		}
+		return std::format("textureLod({}, {}, {})", Node.TextureName(), BuildNode(*Node.Coordinate()),
+						   BuildNode(*Node.Level()));
+	}
+	return std::format("texture({}, {})", Node.TextureName(), BuildNode(*Node.Coordinate()));
+}
+
 std::string Builder::BuildSharedMemory(const Node::SharedMemoryNode &Node) {
-	// Shared memory is declared at global scope, not inside main()
-	// So we return empty string here - the declaration is handled separately
+	ContextChecked()->PushSharedMemoryDeclaration(
+		std::format("shared {} {}[{}];", Node.VarType(), Node.VarName(), Node.Size()));
 	return "";
 }
 
@@ -469,8 +600,10 @@ std::string Builder::BuildAtomicOp(const Node::AtomicOpNode &Node) {
 		opName = "atomicAdd";
 		break;
 	case Node::AtomicOpCode::Sub:
-		opName = "atomicSub";
-		break;
+		if (Node.Value() == nullptr) {
+			return "";
+		}
+		return std::format("atomicAdd({}, -({}))", BuildNode(*Node.Target()), BuildNode(*Node.Value()));
 	case Node::AtomicOpCode::Min:
 		opName = "atomicMin";
 		break;
@@ -501,6 +634,19 @@ std::string Builder::BuildAtomicOp(const Node::AtomicOpNode &Node) {
 						   BuildNode(*Node.Value()));
 	}
 	return std::format("{}({}, {})", opName, BuildNode(*Node.Target()), BuildNode(*Node.Value()));
+}
+
+std::string Builder::BuildBarrier(const Node::BarrierNode &Node) {
+	switch (Node.Code()) {
+	case Node::BarrierCode::Workgroup:
+		return "barrier()";
+	case Node::BarrierCode::Memory:
+		return "memoryBarrier()";
+	case Node::BarrierCode::Full:
+		return "memoryBarrier();\nbarrier()";
+	default:
+		return "";
+	}
 }
 
 } // namespace GPU::IR::Builder

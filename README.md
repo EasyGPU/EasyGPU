@@ -1242,7 +1242,7 @@ cd build && ctest
 | `EASYGPU_BUILD_EXAMPLES` | Top-level only | Build examples |
 | `EASYGPU_BUILD_TESTS` | Top-level only | Build tests |
 | `EASYGPU_BUILD_FRAGMENT_TESTER` | `OFF` | Build the Windows FragmentKernel tester |
-| `EASYGPU_BUILD_WINDOW` | Top-level only | Build the window component |
+| `EASYGPU_BUILD_WINDOW` | `ON` | Build the window component |
 | `EASYGPU_BUILD_WINDOW_EXAMPLES` | Top-level only | Build window examples |
 
 ---

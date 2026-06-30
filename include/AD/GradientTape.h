@@ -46,6 +46,12 @@ struct BufferParam {
 	size_t		elementCount = 0;
 };
 
+struct BufferAdjointStorage {
+	std::string bufferName;
+	std::string elementType;
+	size_t		elementCount = 0;
+};
+
 /**
  * The gradient tape records every differentiable operation during the forward pass.
  *
@@ -89,6 +95,14 @@ public:
 	 */
 	void						  RegisterBufferParameter(const std::string &bufferName, const std::string &elementType,
 														  size_t elementCount);
+
+	/**
+	 * Register storage for a buffer whose values can appear in differentiable
+	 * expressions but whose gradients are not user-requested parameters.
+	 */
+	void						  RegisterBufferAdjointStorage(const std::string &bufferName,
+															   const std::string &elementType,
+															   size_t elementCount);
 
 	/** Check if a variable name corresponds to a registered parameter. */
 	bool						  IsParameter(const std::string &name) const;
@@ -134,7 +148,7 @@ public:
 
 	/** Push a new sub-tape onto the stack. All subsequent Record() calls
 	 *  go to this sub-tape until PopSubTape() is called. */
-	void		PushSubTape();
+	void		PushSubTape(const std::string &callableName = {});
 
 	/** Pop the current sub-tape and store it. Returns the index of the stored sub-tape. */
 	int			PopSubTape();
@@ -156,6 +170,9 @@ public:
 		}
 		return *_subTapes[index];
 	}
+
+	/** Find a callable body sub-tape by its emitted GLSL function name. */
+	const GradientTape *FindSubTapeByCallableName(const std::string &callableName, int *index = nullptr) const;
 
 	/** Get all sub-tapes. */
 	const auto &SubTapes() const {
@@ -195,6 +212,11 @@ public:
 		return _bufferParamList;
 	}
 
+	/** Get all non-parameter buffer adjoint storage declarations. */
+	const std::vector<BufferAdjointStorage> &BufferAdjointStorages() const {
+		return _bufferAdjointStorageList;
+	}
+
 	/** Get the number of registered parameters. */
 	size_t ParameterCount() const {
 		return _paramList.size() + _bufferParamList.size();
@@ -211,8 +233,18 @@ private:
 	void				   RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node, const TapeVar &output);
 	void				   RecordTernary(const GPU::IR::Node::TernaryNode &node, const TapeVar &output);
 	void				   RecordLocalVariable(const GPU::IR::Node::LocalVariableNode &node);
+	void				   RecordAssignmentRhs(const GPU::IR::Node::Node &rhs, const TapeVar &output);
 	void				   RecordCall(const GPU::IR::Node::CallNode &node, const TapeVar &output);
 	void				   RecordReturn(const GPU::IR::Node::ReturnNode &node);
+	void				   AddExpressionLeaf(const GPU::IR::Node::Node &node, const std::string &coeff,
+											 const std::string &coeffType, std::vector<TapeVar> &inputs,
+											 std::vector<std::string> &inputGradExprs,
+											 std::vector<std::string> &inputGradTypes) const;
+	void				   CollectExpressionLeaves(const GPU::IR::Node::Node &node, const std::string &upstream,
+												   const std::string &upstreamType, std::vector<TapeVar> &inputs,
+												   std::vector<std::string> &inputGradExprs,
+												   std::vector<std::string> &inputGradTypes) const;
+	std::string			   InferNodeType(const GPU::IR::Node::Node &node) const;
 
 	/** Extract a variable name from a Load node (returns Unwrap()). */
 	static std::string	   ExtractVarName(const GPU::IR::Node::Node &loadNode);
@@ -247,11 +279,17 @@ private:
 	std::unordered_map<std::string, BufferParam>	 _bufferParameters;
 	std::vector<BufferParam>						 _bufferParamList;
 
+	// Buffer-level adjoint storage for differentiable non-parameter inputs.
+	std::unordered_map<std::string, BufferAdjointStorage> _bufferAdjointStorages;
+	std::vector<BufferAdjointStorage>					 _bufferAdjointStorageList;
+
 	// The scalar loss variable
 	std::optional<TapeVar>							 _lossVar;
 
 	// Sub-tape support for recording Callable function bodies
 	std::vector<std::unique_ptr<GradientTape>>		 _subTapes;
+	std::vector<std::string>						 _subTapeCallableNames;
+	std::unordered_map<std::string, int>			 _subTapeCallableNameToIndex;
 	std::stack<GradientTape *>						 _subTapeParentStack;
 	std::stack<GradientTape *>						 _subTapeStack;
 	GradientTape									*_currentSubTape = nullptr;

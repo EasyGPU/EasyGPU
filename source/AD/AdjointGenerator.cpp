@@ -18,10 +18,23 @@
 #include <unordered_set>
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace GPU::AD {
 
 namespace {
+bool IsNumericLiteralName(const std::string &name) {
+	if (name.empty())
+		return false;
+	char *end = nullptr;
+	std::strtof(name.c_str(), &end);
+	if (end == name.c_str())
+		return false;
+	if (*end == '\0')
+		return true;
+	return (end[0] == 'f' || end[0] == 'F' || end[0] == 'u' || end[0] == 'U') && end[1] == '\0';
+}
+
 bool IsScalarAdjointType(const std::string &type) {
 	return type == "float";
 }
@@ -34,6 +47,8 @@ bool IsLiteralName(const std::string &name) {
 	if (name.empty())
 		return true;
 	if (name == "true" || name == "false")
+		return true;
+	if (IsNumericLiteralName(name))
 		return true;
 	static const char *glslTypes[] = {"float", "int",	"uint",	 "bool",  "vec2",  "vec3",	"vec4",	 "ivec2", "ivec3",
 									  "ivec4", "uvec2", "uvec3", "uvec4", "bvec2", "bvec3", "bvec4", "mat2",  "mat3",
@@ -506,6 +521,10 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 		std::string adjName = _adjTable.GetOrCreate(param.bufferName + "[0]", param.elementType);
 		_adjTable.SetArraySize(adjName, param.elementCount);
 	}
+	for (const auto &storage : tape.BufferAdjointStorages()) {
+		std::string adjName = _adjTable.GetOrCreate(storage.bufferName + "[0]", storage.elementType);
+		_adjTable.SetArraySize(adjName, storage.elementCount);
+	}
 
 	// Count how many registered parameters belong to each buffer base.
 	{
@@ -531,17 +550,8 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 		EmitLine(std::format("{} = {}(1.0);", adjLoss, lossVar.glslType));
 	}
 
-	// Step 2.5: Build call index map for O(1) sub-tape lookup
-	_callIndexMap.clear();
-	{
-		int callIdx = 0;
-		for (int32_t i = 0; i < static_cast<int32_t>(tape.Size()); i++) {
-			if (tape[i].kind == TapeOpKind::Call) {
-				_callIndexMap[tape[i].id] = callIdx++;
-			}
-		}
-	}
-	//}
+	// Step 2.5: Callable sub-tapes are keyed by callable identity. Older
+	// unnamed recordings can still fall back to occurrence order in ProcessCall.
 
 	// Step 3: Walk tape in reverse, generating adjoint statements
 	for (int32_t i = static_cast<int32_t>(tape.Size()) - 1; i >= 0; --i) {
@@ -570,7 +580,7 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 				adjName = adjName.substr(0, bpos);
 			if (!adjName.empty()) {
 				_bufferParamWritebacks.push_back(
-					{ResolveAliases(param.bufferName), ResolveAliases(adjName), param.elementCount});
+					{ResolveAliases(param.bufferName), ResolveAliases(adjName), param.elementCount, param.elementType});
 			}
 		}
 	}
@@ -666,16 +676,19 @@ void AdjointGenerator::ProcessExpressionGradient(const TapeEntry &entry) {
 	std::string	 adjSrc = SaveAndZeroAdjoint(dOut, entry.output.glslType);
 	const size_t count	= std::min(entry.inputs.size(), entry.inputGradExprs.size());
 	for (size_t i = 0; i < count; i++) {
-		const std::string gradType = i < entry.inputGradTypes.size() ? entry.inputGradTypes[i] : entry.output.glslType;
+		std::string gradType = i < entry.inputGradTypes.size() ? entry.inputGradTypes[i] : entry.output.glslType;
+		if (i < entry.inputs.size() && IsVectorAdjointType(entry.inputs[i].glslType)) {
+			gradType.clear();
+		}
 		std::string		  coeff	   = entry.inputGradExprs[i];
-		if (coeff.size() > 120) {
+		if (coeff.size() > 96) {
 			coeff = EmitTemp(gradType.empty() ? entry.output.glslType : gradType, coeff);
 		}
 		std::string gradExpr = std::format("({})*({})", adjSrc, coeff);
-		if (gradExpr.size() > 160) {
+		if (gradExpr.size() > 128) {
 			gradExpr = EmitTemp(gradType.empty() ? entry.output.glslType : gradType, gradExpr);
 		}
-		EmitAccumulate(entry.inputs[i].name, gradExpr, gradType);
+		EmitAccumulate(entry.inputs[i].name, gradExpr, IsVectorAdjointType(entry.inputs[i].glslType) ? std::string{} : gradType);
 	}
 }
 
@@ -721,10 +734,10 @@ void AdjointGenerator::ProcessTernary(const TapeEntry &entry) {
 	std::string adjSrc	 = SaveAndZeroAdjoint(dOut, entry.output.glslType);
 
 	if (!adjTrue.empty()) {
-		EmitLine(std::format("{} += ({})?({}):{}(0);", adjTrue, cond.name, adjSrc, ZeroOf(trueVal.glslType)));
+		EmitLine(std::format("{} += ({})?({}):{};", adjTrue, cond.name, adjSrc, ZeroOf(trueVal.glslType)));
 	}
 	if (!adjFalse.empty()) {
-		EmitLine(std::format("{} += ({})?{}(0):({});", adjFalse, cond.name, ZeroOf(falseVal.glslType), adjSrc));
+		EmitLine(std::format("{} += ({})?{}:({});", adjFalse, cond.name, ZeroOf(falseVal.glslType), adjSrc));
 	}
 }
 
@@ -783,7 +796,7 @@ void AdjointGenerator::EmitAccumulate(const std::string &inputName, const std::s
 	std::string resolvedAdj	 = ResolveAliases(adjName);
 	std::string resolvedGrad = ResolveAliases(gradExpr);
 	std::string adjType		 = _adjTable.GetTypeForAdjoint(adjName);
-	if (IsScalarAdjointType(adjType)) {
+	if (IsScalarAdjointType(adjType) && IsVectorAdjointType(gradTypeHint)) {
 		std::string gradType = gradTypeHint;
 		if (gradType.empty()) {
 			for (const auto &[tmpName, tmpType] : _tempTypes) {
@@ -889,12 +902,13 @@ void AdjointGenerator::PopControlFrameAndWrap(const TapeEntry &beginEntry) {
 		break;
 	}
 	case ControlFlowKind::ForLoop: {
-		// Reversed for loop: for (int var = end-1; var >= start; var -= step)
+		// Reversed canonical loop: for (int var = end-step; var >= start; var -= step)
 		std::string forHeader;
 		if (!beginEntry.forVarName.empty()) {
-			forHeader = std::format("for (int {} = ({}) - 1; {} >= ({}); {} -= ({})) {{\n", beginEntry.forVarName,
-									beginEntry.forEnd, beginEntry.forVarName, beginEntry.forStart,
-									beginEntry.forVarName, beginEntry.forStep);
+			forHeader = std::format("for (int {} = ({}) - ({}); {} >= ({}); {} -= ({})) {{\n",
+									beginEntry.forVarName, beginEntry.forEnd, beginEntry.forStep,
+									beginEntry.forVarName, beginEntry.forStart, beginEntry.forVarName,
+									beginEntry.forStep);
 		} else {
 			forHeader = "for (int _i = 0; _i < 1; _i++) {\n";
 		}
@@ -1067,36 +1081,136 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	if (!_tape)
 		return;
 
-	// O(1) sub-tape lookup via pre-built index map
-	auto mapIt = _callIndexMap.find(entry.id);
-	if (mapIt == _callIndexMap.end())
-		return;
-	int callIndex = mapIt->second;
-	if (callIndex >= static_cast<int>(_tape->SubTapeCount()))
-		return;
+	int callIndex = -1;
+	const GradientTape *subTapePtr = _tape->FindSubTapeByCallableName(entry.callableFuncName, &callIndex);
+	if (subTapePtr == nullptr) {
+		int sequenceIndex = 0;
+		for (const auto &candidate : _tape->Entries()) {
+			if (candidate.kind != TapeOpKind::Call) {
+				continue;
+			}
+			if (candidate.id == entry.id) {
+				callIndex = sequenceIndex;
+				break;
+			}
+			sequenceIndex++;
+		}
+		if (callIndex < 0)
+			return;
+		if (callIndex >= static_cast<int>(_tape->SubTapeCount()))
+			return;
 
-	const auto &subTape = _tape->SubTape(callIndex);
+		subTapePtr = &_tape->SubTape(callIndex);
+	}
+
+	const auto &subTape = *subTapePtr;
 	if (subTape.Size() == 0)
 		return;
 
 	// Build a name-remapped copy of the sub-tape for the adjoint generator.
 	// Parameter names (p0, p1, ...) are mapped to the caller's input names.
 	// Internal variable names are prefixed for uniqueness.
-	std::string									 prefix = "_ca" + std::to_string(callIndex) + "_";
-	std::unordered_map<std::string, std::string> nameMap;
-	// Map parameters: p0 -> inputs[0].name, p1 -> inputs[1].name, ...
-	for (size_t pi = 0; pi < entry.inputs.size(); pi++) {
-		nameMap["p" + std::to_string(pi)] = entry.inputs[pi].name;
-	}
+		std::string									 prefix =
+			"_ca" + std::to_string(callIndex) + "_e" + std::to_string(entry.id) + "_";
+		std::unordered_map<std::string, std::string> nameMap;
+		// Map parameters: p0 -> inputs[0].name, p1 -> inputs[1].name, ...
+		for (size_t pi = 0; pi < entry.inputs.size(); pi++) {
+			nameMap["p" + std::to_string(pi)] = entry.inputs[pi].name;
+		}
+
+		auto remapName = [&nameMap, &prefix](const std::string &name) {
+			if (name.empty() || IsLiteralName(name))
+				return name;
+			auto nit = nameMap.find(name);
+			return nit != nameMap.end() ? nit->second : prefix + name;
+		};
+
+		auto remapExpression = [&remapName](const std::string &expr, const std::vector<std::string> &names) {
+			std::string result = expr;
+			auto sortedNames = names;
+			std::sort(sortedNames.begin(), sortedNames.end(),
+					  [](const auto &a, const auto &b) { return a.size() > b.size(); });
+			sortedNames.erase(std::unique(sortedNames.begin(), sortedNames.end()), sortedNames.end());
+			for (const auto &name : sortedNames) {
+				if (name.empty() || IsLiteralName(name))
+					continue;
+				const auto mappedName = remapName(name);
+				size_t pos = 0;
+				while ((pos = result.find(name, pos)) != std::string::npos) {
+					const bool leftOk =
+						pos == 0 ||
+						!(std::isalnum(static_cast<unsigned char>(result[pos - 1])) || result[pos - 1] == '_');
+					const size_t endPos = pos + name.size();
+					const bool rightOk =
+						endPos >= result.size() ||
+						!(std::isalnum(static_cast<unsigned char>(result[endPos])) || result[endPos] == '_');
+					if (leftOk && rightOk) {
+						result.replace(pos, name.size(), mappedName);
+						pos += mappedName.size();
+					} else {
+						pos += name.size();
+					}
+				}
+			}
+			return result;
+		};
 
 	// Find the return variable from the sub-tape
 	std::string retVarName;
-	for (size_t i = 0; i < subTape.Size(); i++) {
-		if (subTape[i].kind == TapeOpKind::Return && !subTape[i].output.name.empty()) {
-			retVarName = subTape[i].output.name;
-			break;
+	std::string retVarType;
+		for (size_t i = 0; i < subTape.Size(); i++) {
+			if (subTape[i].kind == TapeOpKind::Return && !subTape[i].output.name.empty()) {
+				retVarName = subTape[i].output.name;
+				retVarType = subTape[i].output.glslType;
+				break;
+			}
 		}
-	}
+		if (retVarType.empty()) {
+			retVarType = entry.output.glslType.empty() ? "float" : entry.output.glslType;
+		}
+
+		// Modern typed-IR callables preserve source parameter names instead of
+		// synthetic p0/p1 names. Infer those parameter leaves from the sub-tape so
+		// inlined adjoints reference the caller's argument expressions in main().
+		std::vector<std::string> inferredParams;
+		std::unordered_set<std::string> producedNames;
+		for (size_t i = 0; i < subTape.Size(); i++) {
+			const auto &se = subTape[i];
+			if (!se.output.name.empty()) {
+				producedNames.insert(se.output.name);
+			}
+		}
+		for (size_t i = 0; i < subTape.Size(); i++) {
+			const auto &se = subTape[i];
+			for (const auto &in : se.inputs) {
+				if (in.name.empty() || IsLiteralName(in.name) || producedNames.count(in.name) > 0) {
+					continue;
+				}
+				if (std::find(inferredParams.begin(), inferredParams.end(), in.name) == inferredParams.end()) {
+					inferredParams.push_back(in.name);
+				}
+			}
+		}
+		for (size_t pi = 0; pi < entry.inputs.size() && pi < inferredParams.size(); pi++) {
+			nameMap[inferredParams[pi]] = entry.inputs[pi].name;
+		}
+
+		std::vector<std::string> allOriginalNames;
+		auto rememberOriginalName = [&allOriginalNames](const std::string &name) {
+			if (name.empty() || IsLiteralName(name))
+				return;
+			if (std::find(allOriginalNames.begin(), allOriginalNames.end(), name) == allOriginalNames.end()) {
+				allOriginalNames.push_back(name);
+			}
+		};
+		for (size_t i = 0; i < subTape.Size(); i++) {
+			const auto &se = subTape[i];
+			rememberOriginalName(se.output.name);
+			for (const auto &in : se.inputs) {
+				rememberOriginalName(in.name);
+			}
+			rememberOriginalName(se.forVarName);
+		}
 
 	// Create a remapped tape with renamed variables
 	GradientTape remappedTape;
@@ -1104,44 +1218,49 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		TapeEntry	se			= subTape[i];
 
 		// Remap output name
-		std::string origOutName = se.output.name;
-		if (!origOutName.empty()) {
-			auto nit = nameMap.find(origOutName);
-			if (nit != nameMap.end()) {
-				se.output.name = nit->second;
-			} else if (origOutName != retVarName || retVarName.empty()) {
-				se.output.name = prefix + origOutName;
-			}
-			// For the return variable, we handle it specially below
-		}
-
-		// Remap input names
-		for (auto &in : se.inputs) {
-			if (!in.name.empty()) {
-				auto nit = nameMap.find(in.name);
-				if (nit != nameMap.end()) {
-					in.name = nit->second;
-				} else {
-					in.name = prefix + in.name;
+			std::string origOutName = se.output.name;
+			if (!origOutName.empty()) {
+				se.output.name = remapName(origOutName);
+				if (!entry.output.glslType.empty() && origOutName == retVarName) {
+					se.output.glslType = entry.output.glslType;
 				}
 			}
-		}
 
-		// Skip Return entries — we handle them specially
-		if (se.kind == TapeOpKind::Return)
-			continue;
+			// Remap input names
+			std::vector<std::string> originalInputNames;
+			originalInputNames.reserve(se.inputs.size() + 1);
+			if (!origOutName.empty())
+				originalInputNames.push_back(origOutName);
+			for (auto &in : se.inputs) {
+				originalInputNames.push_back(in.name);
+				if (!in.name.empty()) {
+					in.name = remapName(in.name);
+				}
+			}
+
+			for (auto &gradExpr : se.inputGradExprs) {
+				gradExpr = remapExpression(gradExpr, allOriginalNames);
+			}
+
+			// Skip Return entries — we handle them specially
+			if (se.kind == TapeOpKind::Return) {
+				if (!entry.output.glslType.empty() && se.output.name == remapName(retVarName)) {
+					se.output.glslType = entry.output.glslType;
+				}
+				continue;
+			}
 
 		// For binary ops with literal operands, keep them as-is
 		// Check 'forVarName' etc. in control flow entries
-		if (se.kind == TapeOpKind::ControlFlowBegin) {
-			if (!se.conditionVarName.empty()) {
-				auto nit = nameMap.find(se.conditionVarName);
-				if (nit != nameMap.end())
-					se.conditionVarName = nit->second;
-				else
-					se.conditionVarName = prefix + se.conditionVarName;
+			if (se.kind == TapeOpKind::ControlFlowBegin) {
+				if (!se.conditionVarName.empty()) {
+					se.conditionVarName = remapExpression(se.conditionVarName, allOriginalNames);
+				}
+				se.forVarName = remapName(se.forVarName);
+				se.forStart = remapExpression(se.forStart, allOriginalNames);
+				se.forEnd = remapExpression(se.forEnd, allOriginalNames);
+				se.forStep = remapExpression(se.forStep, allOriginalNames);
 			}
-		}
 
 		remappedTape.RecordRemapped(se);
 	}
@@ -1156,7 +1275,7 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		auto		nit			  = nameMap.find(retVarName);
 		if (nit != nameMap.end())
 			mappedRetName = nit->second;
-		remappedTape.MarkLoss(mappedRetName, "float");
+		remappedTape.MarkLoss(mappedRetName, retVarType);
 		// Seed: the adjoint of the return variable = dOut
 		// We'll handle this manually after generation
 	}
@@ -1176,15 +1295,59 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	for (const auto &[adjName, glslType] : subBody.declarations) {
 		// Filter: only emit local ones (not parameter adjoints which are already
 		// in the main adjoint table)
-		if (adjName.find(prefix) == 0) {
-			// Add to main adjTable so EmitLine works
-			_adjTable.GetOrCreate(adjName, glslType);
+		if (adjName.find(prefix) == 0 || adjName.find("d_" + prefix) == 0 || adjName.find("grad_" + prefix) == 0) {
+			_adjTable.DeclareAdjoint(adjName, glslType);
 		} else {
 			// This is a parameter adjoint — already in the main adjTable
 		}
 	}
 
 	// Emit the sub-body lines, replacing the d_ret seed with dOut
+	auto prefixSubBodyTemps = [&prefix](const std::string &line) {
+		std::string result = line;
+		auto replacePrefixedTemp = [&result, &prefix](const std::string &needlePrefix, bool trailingUnderscore) {
+			size_t pos = 0;
+			while ((pos = result.find(needlePrefix, pos)) != std::string::npos) {
+				const bool leftOk =
+					pos == 0 ||
+					!(std::isalnum(static_cast<unsigned char>(result[pos - 1])) || result[pos - 1] == '_');
+				if (!leftOk) {
+					pos += needlePrefix.size();
+					continue;
+				}
+
+				size_t cursor = pos + needlePrefix.size();
+				while (cursor < result.size() && std::isdigit(static_cast<unsigned char>(result[cursor]))) {
+					cursor++;
+				}
+				if (cursor == pos + needlePrefix.size()) {
+					pos += needlePrefix.size();
+					continue;
+				}
+				if (trailingUnderscore) {
+					if (cursor >= result.size() || result[cursor] != '_') {
+						pos += needlePrefix.size();
+						continue;
+					}
+					cursor++;
+				}
+				const bool rightOk =
+					cursor >= result.size() ||
+					!(std::isalnum(static_cast<unsigned char>(result[cursor])) || result[cursor] == '_');
+				if (!rightOk) {
+					pos += needlePrefix.size();
+					continue;
+				}
+
+				result.insert(pos + 1, prefix);
+				pos = cursor + prefix.size();
+			}
+		};
+
+		replacePrefixedTemp("_adj", true);
+		replacePrefixedTemp("_ad_tmp", false);
+		return result;
+	};
 	for (const auto &line : subBody.lines) {
 		// Find the seed line (adj_of_loss = float(1.0)) and replace with dOut
 		std::string seedName = prefix + retVarName;
@@ -1195,11 +1358,13 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		std::string adjRetName =
 			subGen.GetAdjointTable().Get(nit != nameMap.end() ? nit->second : (prefix + retVarName));
 
-		std::string expectedSeed = adjRetName + " = float(1.0);";
-		if (line == expectedSeed) {
+		const bool isSeed =
+			line == adjRetName + " = " + retVarType + "(1.0);" ||
+			line == adjRetName + " = float(1.0);";
+		if (isSeed) {
 			EmitLine(adjRetName + " += " + dOut + ";");
 		} else {
-			EmitLine(line);
+			EmitLine(prefixSubBodyTemps(line));
 		}
 	}
 }

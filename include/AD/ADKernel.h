@@ -198,8 +198,18 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 		auto bpos = name.find('[');
 		return bpos == std::string::npos ? name : name.substr(0, bpos);
 	};
+	auto componentCount = [](const std::string &elementType) {
+		if (elementType == "vec2")
+			return 2;
+		if (elementType == "vec3")
+			return 3;
+		if (elementType == "vec4")
+			return 4;
+		return 1;
+	};
 
 	std::unordered_map<std::string, std::pair<std::string, int>> paramAdjArrays;
+	std::unordered_set<std::string> vectorParamAdjArrays;
 	for (const auto &[paramName, adjName] : body.writebacks) {
 		auto [baseName, index] = parseBufAccess(paramName);
 		auto it				   = groupMap.find(baseName);
@@ -210,7 +220,11 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 	for (const auto &wb : body.bufferWritebacks) {
 		auto it = groupMap.find(wb.bufferName);
 		if (it != groupMap.end()) {
-			paramAdjArrays[adjBaseName(wb.adjName)] = {wb.bufferName, it->second.second};
+			const auto adjBase = adjBaseName(wb.adjName);
+			paramAdjArrays[adjBase] = {wb.bufferName, it->second.second};
+			if (componentCount(wb.elementType) > 1) {
+				vectorParamAdjArrays.insert(adjBase);
+			}
 		}
 	}
 
@@ -224,7 +238,17 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 	for (const auto &[adjName, glslType] : body.declarations) {
 		auto bracketPos = glslType.find('[');
 		if (bracketPos != std::string::npos) {
-			if (!paramAdjArrays.count(adjName)) {
+			if (vectorParamAdjArrays.count(adjName)) {
+				const auto elementType = glslType.substr(0, bracketPos);
+				const auto cb = glslType.find(']', bracketPos);
+				const auto arrSize = cb == std::string::npos ? std::string{} : glslType.substr(bracketPos, cb - bracketPos + 1);
+				adjDecls += std::format("    {} {}{};\n", elementType, adjName, arrSize);
+				if (!arrSize.empty()) {
+					adjDecls += std::format(
+						"    for (uint _ad_init = 0u; _ad_init < {}u; ++_ad_init) {}[_ad_init] = {}(0.0);\n",
+						arrSize.substr(1, arrSize.size() - 2), adjName, elementType);
+				}
+			} else if (!paramAdjArrays.count(adjName)) {
 				adjArrayNames.push_back(adjName);
 			}
 		} else {
@@ -263,6 +287,9 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 	for (const auto &line : body.lines) {
 		std::string rewritten = line;
 		for (const auto &[adjBase, info] : paramAdjArrays) {
+			if (vectorParamAdjArrays.count(adjBase)) {
+				continue;
+			}
 			const auto &[bufBase, stride] = info;
 			std::string from			  = adjBase + "[";
 			std::string to = std::format("_ad_grad_{}_data[int(gl_GlobalInvocationID.x) * {} + ", bufBase, stride);
@@ -300,26 +327,66 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 		}
 	}
 	for (const auto &wb : body.bufferWritebacks) {
-		if (paramAdjArrays.count(adjBaseName(wb.adjName)))
+		if (paramAdjArrays.count(adjBaseName(wb.adjName)) && !vectorParamAdjArrays.count(adjBaseName(wb.adjName)))
 			continue;
 		auto it = groupMap.find(wb.bufferName);
 		if (it == groupMap.end())
 			continue;
 		int stride = it->second.second;
+		int components = componentCount(wb.elementType);
 		if (is1D) {
-			writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) "
-									  "_ad_grad_{}_data[int(gl_GlobalInvocationID.x) * {} + int(_ad_bp)] = {}[_ad_bp];\n",
-									  wb.elementCount, wb.bufferName, stride, wb.adjName);
+			if (components == 1) {
+				writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) "
+										  "_ad_grad_{}_data[int(gl_GlobalInvocationID.x) * {} + int(_ad_bp)] = {}[_ad_bp];\n",
+										  wb.elementCount, wb.bufferName, stride, wb.adjName);
+			} else {
+				writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) {{\n",
+										  wb.elementCount);
+				for (int c = 0; c < components; ++c) {
+					writebacks += std::format(
+						"        _ad_grad_{}_data[int(gl_GlobalInvocationID.x) * {} + int(_ad_bp) * {} + {}] = {}[_ad_bp][{}];\n",
+						wb.bufferName, stride, components, c, wb.adjName, c);
+				}
+				writebacks += "    }\n";
+			}
 		} else {
-			writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) "
-									  "_ad_grad_{}_data[(gl_GlobalInvocationID.y * gl_NumWorkGroups.x * "
-									  "gl_WorkGroupSize.x + gl_GlobalInvocationID.x) * {} + _ad_bp] = {}[_ad_bp];\n",
-									  wb.elementCount, wb.bufferName, stride, wb.adjName);
+			if (components == 1) {
+				writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) "
+										  "_ad_grad_{}_data[(gl_GlobalInvocationID.y * gl_NumWorkGroups.x * "
+										  "gl_WorkGroupSize.x + gl_GlobalInvocationID.x) * {} + _ad_bp] = {}[_ad_bp];\n",
+										  wb.elementCount, wb.bufferName, stride, wb.adjName);
+			} else {
+				writebacks += std::format("    for (uint _ad_bp = 0u; _ad_bp < {}u; ++_ad_bp) {{\n",
+										  wb.elementCount);
+				for (int c = 0; c < components; ++c) {
+					writebacks += std::format(
+						"        _ad_grad_{}_data[(gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x + gl_GlobalInvocationID.x) * {} + int(_ad_bp) * {} + {}] = {}[_ad_bp][{}];\n",
+						wb.bufferName, stride, components, c, wb.adjName, c);
+				}
+				writebacks += "    }\n";
+			}
 		}
 	}
 
-	// Find the closing brace of main() (last '}' in the code)
-	auto closePos = forwardCode.rfind('}');
+	// Find the closing brace of main(). Callable definitions can appear after
+	// main(), so using the last brace in the full shader would place backward
+	// code inside the final helper function.
+	size_t closePos = std::string::npos;
+	{
+		int depth = 0;
+		for (size_t pos = bracePos; pos < forwardCode.size(); ++pos) {
+			const char ch = forwardCode[pos];
+			if (ch == '{') {
+				depth++;
+			} else if (ch == '}') {
+				depth--;
+				if (depth == 0) {
+					closePos = pos;
+					break;
+				}
+			}
+		}
+	}
 	if (closePos == std::string::npos || closePos <= bracePos)
 		throw std::runtime_error("MergeForwardBackward: main() closing brace not found");
 
@@ -332,8 +399,28 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 	std::string strippedBody;
 	strippedBody.reserve(forwardBody.size());
 	hoistedDecls.reserve(forwardBody.size() / 4);
+	std::unordered_set<std::string> hoistedNames;
+	auto appendHoistedDecl = [&](const std::string &type, const std::string &name, std::string_view originalDecl) {
+		if (!hoistedNames.insert(name).second) {
+			return;
+		}
+		if (!originalDecl.empty()) {
+			hoistedDecls += originalDecl;
+			hoistedDecls += '\n';
+		} else {
+			hoistedDecls += type + " " + name + ";\n";
+		}
+	};
+	auto isGlslIdentChar = [](char ch) {
+		return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
+	};
+	auto isGlslIdentStart = [](char ch) {
+		return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
+	};
 
-	// Pass 1: hoist uninitialized declarations (int v10; without =)
+	// Pass 1: hoist local declarations into function scope. Initializers stay
+	// at their original program point as assignments so forward execution order
+	// is preserved while backward code can still reference the locals.
 	{
 		size_t lineStart = 0;
 		while (lineStart < forwardBody.size()) {
@@ -344,26 +431,32 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 			std::string_view line(forwardBody.data() + lineStart, lineLen);
 
 			bool			 isHoistable = false;
+			bool			 hasInitializer = false;
+			std::string		 matchedType;
+			std::string		 matchedName;
+			size_t			 suffixStart = 0;
 			size_t			 pos		 = 0;
 			while (pos < lineLen && (line[pos] == ' ' || line[pos] == '\t'))
 				pos++;
 			auto checkType = [&](const char *typeName, size_t len) {
-				if (pos + len < lineLen && line.compare(pos, len, typeName) == 0 && line[pos + len] == ' ') {
+				if (pos + len < lineLen && line.compare(pos, len, typeName) == 0 &&
+					(line[pos + len] == ' ' || line[pos + len] == '\t')) {
 					size_t nameStart = pos + len + 1;
-					if (nameStart < lineLen && line[nameStart] == 'v') {
+					while (nameStart < lineLen && (line[nameStart] == ' ' || line[nameStart] == '\t'))
+						nameStart++;
+					if (nameStart < lineLen && isGlslIdentStart(line[nameStart])) {
 						size_t j = nameStart + 1;
-						while (j < lineLen && line[j] >= '0' && line[j] <= '9')
+						while (j < lineLen && isGlslIdentChar(line[j]))
 							j++;
-						if (j < lineLen && line[j] == ';') {
-							bool hasEq = false;
-							for (size_t k = nameStart; k < j; k++) {
-								if (line[k] == '=') {
-									hasEq = true;
-									break;
-								}
-							}
-							if (!hasEq)
-								isHoistable = true;
+						suffixStart = j;
+						size_t tokenEnd = j;
+						while (tokenEnd < lineLen && (line[tokenEnd] == ' ' || line[tokenEnd] == '\t'))
+							tokenEnd++;
+						if (tokenEnd < lineLen && (line[tokenEnd] == ';' || line[tokenEnd] == '=')) {
+							isHoistable = true;
+							hasInitializer = line[tokenEnd] == '=';
+							matchedType = std::string(typeName, len);
+							matchedName = std::string(line.substr(nameStart, j - nameStart));
 						}
 					}
 				}
@@ -377,8 +470,13 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 			}
 
 			if (isHoistable) {
-				hoistedDecls += line;
-				hoistedDecls += '\n';
+				appendHoistedDecl(matchedType, matchedName, {});
+				if (hasInitializer) {
+					strippedBody += line.substr(0, pos);
+					strippedBody += matchedName;
+					strippedBody += line.substr(suffixStart);
+					strippedBody += '\n';
+				}
 			} else {
 				strippedBody += line;
 				strippedBody += '\n';
@@ -398,7 +496,7 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 				// Find the first variable name
 				size_t vStart = searchPos + pattern.size() - 1;
 				size_t vEnd	  = vStart + 1;
-				while (vEnd < strippedBody.size() && strippedBody[vEnd] >= '0' && strippedBody[vEnd] <= '9')
+				while (vEnd < strippedBody.size() && isGlslIdentChar(strippedBody[vEnd]))
 					vEnd++;
 				std::string				 varName = strippedBody.substr(vStart, vEnd - vStart);
 				// Collect ALL comma-separated variable names
@@ -413,8 +511,7 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 							cursor++;
 						if (cursor < strippedBody.size() && strippedBody[cursor] == 'v') {
 							size_t cvEnd = cursor + 1;
-							while (cvEnd < strippedBody.size() && strippedBody[cvEnd] >= '0' &&
-								   strippedBody[cvEnd] <= '9')
+							while (cvEnd < strippedBody.size() && isGlslIdentChar(strippedBody[cvEnd]))
 								cvEnd++;
 							allVars.push_back(strippedBody.substr(cursor, cvEnd - cursor));
 							cursor = cvEnd;
@@ -424,7 +521,7 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 				}
 				// Hoist all collected variables
 				for (const auto &v : allVars) {
-					hoistedDecls += std::string(ft) + " " + v + ";\n";
+					appendHoistedDecl(ft, v, {});
 				}
 				// Remove "type " from the for-init
 				size_t typeStart = searchPos + 5; // skip "for ("

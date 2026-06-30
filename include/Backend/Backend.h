@@ -78,7 +78,19 @@ enum class PixelFormat {
 	R32UI,
 	RG32UI,
 	RGB32UI,
-	RGBA32UI
+	RGBA32UI,
+	D32F,
+	D24S8
+};
+
+enum TextureUsageFlags : uint32_t {
+	TextureUsageNone					 = 0,
+	TextureUsageStorage				 = 1u << 0,
+	TextureUsageSampled				 = 1u << 1,
+	TextureUsageTransferSrc			 = 1u << 2,
+	TextureUsageTransferDst			 = 1u << 3,
+	TextureUsageColorAttachment		 = 1u << 4,
+	TextureUsageDepthStencilAttachment = 1u << 5
 };
 
 // ============================================================================
@@ -104,6 +116,7 @@ struct TextureDesc {
 	uint32_t	mipLevels	= 1;
 	PixelFormat format		= PixelFormat::RGBA8;
 	const void *initialData = nullptr;
+	uint32_t	usage		= TextureUsageNone;
 };
 
 // ============================================================================
@@ -148,16 +161,80 @@ enum class BindingType {
 	Sampler
 };
 
+enum class SamplerFilter : uint32_t {
+	Nearest,
+	Linear
+};
+
+enum class SamplerMipmapMode : uint32_t {
+	Nearest,
+	Linear
+};
+
+enum class SamplerAddressMode : uint32_t {
+	ClampToEdge,
+	Repeat,
+	MirroredRepeat,
+	ClampToBorder
+};
+
+enum class CompareOp : uint32_t {
+	Never,
+	Less,
+	Equal,
+	LessOrEqual,
+	Greater,
+	NotEqual,
+	GreaterOrEqual,
+	Always
+};
+
+enum class SamplerBorderColor : uint32_t {
+	FloatTransparentBlack,
+	IntTransparentBlack,
+	FloatOpaqueBlack,
+	IntOpaqueBlack,
+	FloatOpaqueWhite,
+	IntOpaqueWhite
+};
+
+struct SamplerDesc {
+	SamplerFilter	   minFilter	= SamplerFilter::Nearest;
+	SamplerFilter	   magFilter	= SamplerFilter::Nearest;
+	SamplerMipmapMode  mipmapMode	= SamplerMipmapMode::Nearest;
+	SamplerAddressMode addressU		= SamplerAddressMode::ClampToEdge;
+	SamplerAddressMode addressV		= SamplerAddressMode::ClampToEdge;
+	SamplerAddressMode addressW		= SamplerAddressMode::ClampToEdge;
+	float			   mipLodBias	= 0.0f;
+	float			   minLod		= 0.0f;
+	float			   maxLod		= 1000.0f;
+	bool			   anisotropyEnable = false;
+	float			   maxAnisotropy = 1.0f;
+	bool			   compareEnable = false;
+	CompareOp		   compareOp = CompareOp::Always;
+	SamplerBorderColor borderColor = SamplerBorderColor::FloatOpaqueBlack;
+};
+
+enum ResourceShaderStageFlags : uint32_t {
+	ResourceStageNone	 = 0,
+	ResourceStageCompute	 = 1u << 0,
+	ResourceStageVertex	 = 1u << 1,
+	ResourceStageFragment = 1u << 2,
+	ResourceStageAll		 = ResourceStageCompute | ResourceStageVertex | ResourceStageFragment
+};
+
 /** @brief Pipeline resource layout entry describing a single binding. */
 struct ResourceLayoutEntry {
 	uint32_t	binding	 = 0;
 	BindingType type	 = BindingType::Buffer;
 	PixelFormat format	 = PixelFormat::RGBA8;
 	bool		readOnly = false;
+	uint32_t	stageFlags = ResourceStageNone;
 };
 
 inline bool operator==(const ResourceLayoutEntry &a, const ResourceLayoutEntry &b) {
-	return a.binding == b.binding && a.type == b.type && a.format == b.format && a.readOnly == b.readOnly;
+	return a.binding == b.binding && a.type == b.type && a.format == b.format && a.readOnly == b.readOnly &&
+		   a.stageFlags == b.stageFlags;
 }
 
 inline bool operator<(const ResourceLayoutEntry &a, const ResourceLayoutEntry &b) {
@@ -167,7 +244,9 @@ inline bool operator<(const ResourceLayoutEntry &a, const ResourceLayoutEntry &b
 		return a.type < b.type;
 	if (a.format != b.format)
 		return a.format < b.format;
-	return a.readOnly < b.readOnly;
+	if (a.readOnly != b.readOnly)
+		return a.readOnly < b.readOnly;
+	return a.stageFlags < b.stageFlags;
 }
 
 // ============================================================================
@@ -194,6 +273,7 @@ struct ResourceBinding {
 	};
 	PixelFormat format	 = PixelFormat::RGBA8;
 	bool		readOnly = false;
+	SamplerDesc sampler;
 };
 
 // ============================================================================
@@ -238,6 +318,8 @@ struct BackendCaps {
 	bool		supportsAsyncTransfer	 = false;
 	bool		supportsMultiQueue		 = false;
 	bool		supportsTimestampQueries = false;
+	bool		supportsDepthClamp		 = false;
+	bool		supportsNonFillPolygonMode = false;
 };
 
 // ============================================================================
@@ -263,6 +345,83 @@ enum class SampleCount : uint32_t {
 	X16 = 16
 };
 
+enum class BlendFactor : uint32_t {
+	Zero,
+	One,
+	SrcColor,
+	OneMinusSrcColor,
+	DstColor,
+	OneMinusDstColor,
+	SrcAlpha,
+	OneMinusSrcAlpha,
+	DstAlpha,
+	OneMinusDstAlpha
+};
+
+enum class BlendOp : uint32_t {
+	Add,
+	Subtract,
+	ReverseSubtract,
+	Min,
+	Max
+};
+
+enum ColorWriteMask : uint32_t {
+	ColorWriteNone  = 0,
+	ColorWriteRed   = 1u << 0,
+	ColorWriteGreen = 1u << 1,
+	ColorWriteBlue  = 1u << 2,
+	ColorWriteAlpha = 1u << 3,
+	ColorWriteAll   = ColorWriteRed | ColorWriteGreen | ColorWriteBlue | ColorWriteAlpha
+};
+
+struct ColorAttachmentBlendState {
+	bool		blendEnable = false;
+	BlendFactor srcColorBlendFactor = BlendFactor::One;
+	BlendFactor dstColorBlendFactor = BlendFactor::Zero;
+	BlendOp		colorBlendOp = BlendOp::Add;
+	BlendFactor srcAlphaBlendFactor = BlendFactor::One;
+	BlendFactor dstAlphaBlendFactor = BlendFactor::Zero;
+	BlendOp		alphaBlendOp = BlendOp::Add;
+	uint32_t	colorWriteMask = ColorWriteAll;
+};
+
+enum class StencilOp : uint32_t {
+	Keep,
+	Zero,
+	Replace,
+	IncrementAndClamp,
+	DecrementAndClamp,
+	Invert,
+	IncrementAndWrap,
+	DecrementAndWrap
+};
+
+struct StencilFaceState {
+	StencilOp failOp		 = StencilOp::Keep;
+	StencilOp passOp		 = StencilOp::Keep;
+	StencilOp depthFailOp	 = StencilOp::Keep;
+	CompareOp compareOp		 = CompareOp::Always;
+};
+
+enum class CullMode : uint32_t {
+	None,
+	Front,
+	Back,
+	FrontAndBack
+};
+
+enum class FrontFace : uint32_t {
+	CounterClockwise,
+	Clockwise
+};
+
+enum class PolygonMode : uint32_t {
+	Fill,
+	Line,
+	Point
+};
+
 /** @brief Vertex attribute layout entry for vertex buffer binding. */
 struct VertexLayoutEntry {
 	uint32_t	location = 0;
@@ -277,9 +436,30 @@ struct GraphicsPipelineDesc {
 	PrimitiveTopology				 topology			   = PrimitiveTopology::TriangleList;
 	PixelFormat						 colorAttachmentFormat = PixelFormat::RGBA8;
 	std::vector<PixelFormat>		 colorAttachmentFormats;
+	PixelFormat						 depthAttachmentFormat = PixelFormat::D32F;
 	SampleCount						 sampleCount		   = SampleCount::X1;
 	bool							 depthTestEnable	   = false;
 	bool							 depthWriteEnable	   = true;
+	CompareOp						 depthCompareOp		   = CompareOp::Less;
+	bool							 stencilTestEnable	   = false;
+	StencilFaceState				 stencilFront;
+	StencilFaceState				 stencilBack;
+	uint32_t						 stencilReadMask	   = 0xFFFFFFFFu;
+	uint32_t						 stencilWriteMask	   = 0xFFFFFFFFu;
+	uint32_t						 stencilReference	   = 0;
+	bool							 blendEnable		   = false;
+	BlendFactor						 blendSrcColor		   = BlendFactor::One;
+	BlendFactor						 blendDstColor		   = BlendFactor::Zero;
+	BlendOp							 blendColorOp		   = BlendOp::Add;
+	BlendFactor						 blendSrcAlpha		   = BlendFactor::One;
+	BlendFactor						 blendDstAlpha		   = BlendFactor::Zero;
+	BlendOp							 blendAlphaOp		   = BlendOp::Add;
+	uint32_t						 colorWriteMask		   = ColorWriteAll;
+	std::vector<ColorAttachmentBlendState> colorBlendAttachments;
+	CullMode						 cullMode			   = CullMode::None;
+	FrontFace						 frontFace			   = FrontFace::CounterClockwise;
+	PolygonMode						 polygonMode		   = PolygonMode::Fill;
+	bool							 depthClampEnable	   = false;
 	std::vector<VertexLayoutEntry>	 vertexLayout;
 	std::vector<ResourceLayoutEntry> resources;
 	uint32_t						 pushConstantSize = 0;

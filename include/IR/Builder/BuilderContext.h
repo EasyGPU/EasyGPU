@@ -250,6 +250,15 @@ public:
 	virtual void					 PushCallableBody()										   = 0;
 
 	/**
+	 * Enter callable body generation mode for a known GLSL callable symbol.
+	 * Implementations may use the name to associate AD sub-tapes with callable identity.
+	 */
+	virtual void					 PushCallableBody(const std::string &callableName) {
+		(void)callableName;
+		PushCallableBody();
+	}
+
+	/**
 	 * Exit callable body generation mode
 	 * Pops the callable body code buffer and stores it for later output
 	 */

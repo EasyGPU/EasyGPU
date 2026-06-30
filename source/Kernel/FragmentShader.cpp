@@ -131,6 +131,8 @@ void FragmentShader::EnsureCompiled() {
 			Backend::ResourceLayoutEntry res;
 			res.binding = buf.binding;
 			res.type	= Backend::BindingType::Buffer;
+			res.readOnly = (buf.mode == Backend::BUFFER_MODE_READ_ONLY);
+			res.stageFlags = Backend::ResourceStageVertex | Backend::ResourceStageFragment;
 			pipeDesc.resources.push_back(res);
 		}
 		for (const auto &tex : _context->GetTextureInfos()) {
@@ -138,6 +140,8 @@ void FragmentShader::EnsureCompiled() {
 			res.binding = tex.binding;
 			res.type	= tex.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
 			res.format	= static_cast<Backend::PixelFormat>(tex.format);
+			res.readOnly = tex.sampled;
+			res.stageFlags = Backend::ResourceStageFragment;
 			pipeDesc.resources.push_back(res);
 		}
 		pipeDesc.pushConstantSize = _context->GetPushConstantSize();
@@ -160,11 +164,6 @@ void FragmentShader::RenderToTexture(Backend::TextureHandle handle, uint32_t w, 
 	rpDesc.clearColor[2]   = 0.0f;
 	rpDesc.clearColor[3]   = 1.0f;
 
-	backend->BeginRendering(rpDesc);
-	backend->SetViewport(0, 0, w, h);
-	backend->SetScissor(0, 0, w, h);
-	backend->BindPipeline(_pipelineHandle);
-
 	// Bind resources
 	std::vector<Backend::ResourceBinding> bindings;
 	if (_context) {
@@ -183,6 +182,9 @@ void FragmentShader::RenderToTexture(Backend::TextureHandle handle, uint32_t w, 
 			bindings.push_back(rb);
 		}
 	}
+
+	backend->BindPipeline(_pipelineHandle);
+
 	if (!bindings.empty()) {
 		backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
 	}
@@ -190,6 +192,13 @@ void FragmentShader::RenderToTexture(Backend::TextureHandle handle, uint32_t w, 
 	// Upload push constants
 	if (_context && _context->GetPushConstantSize() > 0) {
 		_context->UploadUniformValues(_pipelineHandle);
+	}
+
+	backend->BeginRendering(rpDesc);
+	backend->SetViewport(0, 0, w, h);
+	backend->SetScissor(0, 0, w, h);
+	if (!bindings.empty()) {
+		backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
 	}
 
 	backend->Draw(3, 1, 0, 0); // Fullscreen triangle = 3 vertices

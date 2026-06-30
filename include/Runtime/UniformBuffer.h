@@ -175,9 +175,13 @@ public:
 
 private:
 	void CreateUBO() {
+		Runtime::AutoInitContext();
+		Runtime::Context::GetInstance().MakeCurrent();
+
 		auto *backend = Context::GetBackend();
-		if (!backend)
-			return;
+		if (!backend) {
+			throw std::runtime_error("Backend not available");
+		}
 
 		GPU::Meta::Std430Converter<T> converter;
 		size_t						  gpuSize = converter.GetGPULayoutSize();
@@ -190,6 +194,9 @@ private:
 		desc.mode		 = Backend::BufferMode::Read;
 		desc.initialData = gpuData.data();
 		_uboHandle		 = backend->CreateBuffer(desc);
+		if (_uboHandle == Backend::INVALID_BUFFER_HANDLE) {
+			throw std::runtime_error("Failed to create uniform buffer");
+		}
 	}
 
 	void Upload() {

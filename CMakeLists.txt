@@ -18,7 +18,7 @@ include(CMakePackageConfigHelpers)
 option(EASYGPU_BUILD_EXAMPLES "Build example programs" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_BUILD_TESTS "Build test suite" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
-option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ${PROJECT_IS_TOP_LEVEL})
+option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ON)
 option(EASYGPU_ENABLE_SHADER_CACHE "Enable shader binary caching for faster startup" ON)
 option(EASYGPU_ENABLE_SPIRV_OPT "Optimize Vulkan SPIR-V with SPIRV-Tools opt passes" ON)
 option(EASYGPU_ENABLE_SPIRV_CROSS_GLSL "Expose optimized Vulkan SPIR-V as GLSL through SPIRV-Cross" ON)
@@ -293,6 +293,8 @@ add_library(EasyGPU STATIC
     include/IR/Builder/Builder.h
     source/IR/Builder/Builder.cpp
     include/IR/Builder/BuilderContext.h
+    include/IR/Module.h
+    source/IR/Module.cpp
     
     # IR Nodes
     include/IR/Node/Node.h
@@ -344,6 +346,14 @@ add_library(EasyGPU STATIC
     source/IR/Node/SharedMemory.cpp
     include/IR/Node/AtomicOp.h
     source/IR/Node/AtomicOp.cpp
+    include/IR/Node/Barrier.h
+    source/IR/Node/Barrier.cpp
+    include/IR/Node/TextureLoad.h
+    source/IR/Node/TextureLoad.cpp
+    include/IR/Node/TextureStore.h
+    source/IR/Node/TextureStore.cpp
+    include/IR/Node/TextureSample.h
+    source/IR/Node/TextureSample.cpp
     
     # IR Values
     include/IR/Value/Value.h

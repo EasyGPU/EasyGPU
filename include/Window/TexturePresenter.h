@@ -73,7 +73,7 @@ public:
 	 * @brief Present raw pixel data directly (always available)
 	 */
 	void Present(const uint32_t *pixels, uint32_t width, uint32_t height);
-	void PresentTextureHandle(Backend::TextureHandle texture);
+	[[nodiscard]] bool PresentTextureHandle(Backend::TextureHandle texture);
 
 	[[nodiscard]] PixelBuffer &StagingBuffer();
 	void					   Present(); // Present staging buffer

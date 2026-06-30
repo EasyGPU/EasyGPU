@@ -38,6 +38,10 @@ class RawCodeNode;
 class TernaryNode;
 class SharedMemoryNode;
 class AtomicOpNode;
+class BarrierNode;
+class TextureLoadNode;
+class TextureStoreNode;
+class TextureSampleNode;
 } // namespace GPU::IR::Node
 
 namespace GPU::AD {
@@ -335,6 +339,21 @@ public:
 	std::string BuildTernary(const Node::TernaryNode &Node);
 
 	/**
+	 * Building a texture load expression node.
+	 */
+	std::string BuildTextureLoad(const Node::TextureLoadNode &Node);
+
+	/**
+	 * Building a texture store statement node.
+	 */
+	std::string BuildTextureStore(const Node::TextureStoreNode &Node);
+
+	/**
+	 * Building a texture sample expression node.
+	 */
+	std::string BuildTextureSample(const Node::TextureSampleNode &Node);
+
+	/**
 	 * Building a shared memory node
 	 * @param Node The node to be built
 	 * @return The built string
@@ -347,6 +366,13 @@ public:
 	 * @return The built string
 	 */
 	std::string BuildAtomicOp(const Node::AtomicOpNode &Node);
+
+	/**
+	 * Building a shader synchronization barrier node
+	 * @param Node The node to be built
+	 * @return The built string
+	 */
+	std::string BuildBarrier(const Node::BarrierNode &Node);
 
 private:
 	Builder() = default;

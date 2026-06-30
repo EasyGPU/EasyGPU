@@ -10,6 +10,7 @@
 
 #include <IR/Node/Node.h>
 
+#include <memory>
 #include <string>
 
 namespace GPU::IR::Node {
@@ -19,6 +20,7 @@ namespace GPU::IR::Node {
 class LocalVariableNode : public Node {
 public:
 	LocalVariableNode(std::string Name, std::string Type);
+	LocalVariableNode(std::string Name, std::string Type, std::unique_ptr<Node> Initializer);
 
 	/**
 	 * Constructor for external variables (e.g., uniforms)
@@ -48,6 +50,8 @@ public:
 	 * @return True if this is an external variable
 	 */
 	[[nodiscard]] bool					IsExternal() const;
+	[[nodiscard]] bool					HasInitializer() const;
+	[[nodiscard]] const Node		   *Initializer() const;
 
 	[[nodiscard]] std::unique_ptr<Node> Clone() const override;
 
@@ -55,6 +59,7 @@ private:
 	std::string _name;
 	std::string _type;
 	bool		_isExternal = false;
+	std::unique_ptr<Node> _initializer;
 };
 } // namespace GPU::IR::Node
 

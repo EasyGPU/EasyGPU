@@ -103,12 +103,14 @@ std::string KernelBuildContext::GetCompleteCode() {
 		// Save current state
 		std::string				savedCallableBody	= std::move(_currentCallableBody);
 		bool					savedInCallableBody = _inCallableBody;
-		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
+		std::stack<CallableBodyFrame> savedBodyStack	= std::move(_callableBodyStack);
+		size_t					savedNextCallableBodyIndex = _nextCallableBodyIndex;
 		auto				   &builder				= IR::Builder::Builder::Get();
 
 		// Clear state for pre-execution
 		_currentCallableBody.clear();
 		_inCallableBody = false;
+		_nextCallableBodyIndex = 0;
 		IR::Builder::Builder::ScopedCallableBody callableBodyGuard(builder, false);
 		while (!_callableBodyStack.empty()) {
 			_callableBodyStack.pop();
@@ -130,6 +132,7 @@ std::string KernelBuildContext::GetCompleteCode() {
 		_currentCallableBody = std::move(savedCallableBody);
 		_inCallableBody		 = savedInCallableBody;
 		_callableBodyStack	 = std::move(savedBodyStack);
+		_nextCallableBodyIndex = savedNextCallableBodyIndex;
 	}
 
 	// ===================================================================
@@ -275,7 +278,7 @@ uint32_t KernelBuildContext::AllocateTextureBinding() {
 
 void KernelBuildContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat format, const std::string &textureName,
 										 uint32_t width, uint32_t height, bool sampled) {
-	_textures.push_back({binding, format, textureName, width, height, 1, sampled});
+	_textures.push_back({binding, format, textureName, width, height, 1, 2, sampled});
 	_textureBindings.push_back(binding);
 	InvalidateBindings();
 	InvalidateBarrierType();
@@ -284,7 +287,7 @@ void KernelBuildContext::RegisterTexture(uint32_t binding, Runtime::PixelFormat 
 void KernelBuildContext::RegisterTexture3D(uint32_t binding, Runtime::PixelFormat format,
 										   const std::string &textureName, uint32_t width, uint32_t height,
 										   uint32_t depth, bool sampled) {
-	_textures.push_back({binding, format, textureName, width, height, depth, sampled});
+	_textures.push_back({binding, format, textureName, width, height, depth, 3, sampled});
 	_textureBindings.push_back(binding);
 	InvalidateBindings();
 	InvalidateBarrierType();
@@ -317,9 +320,10 @@ static std::string GetGLSLImageTypeName(Runtime::PixelFormat format, bool is3D =
 std::string KernelBuildContext::GetTextureDeclarations() const {
 	std::ostringstream oss;
 	for (const auto &tex : _textures) {
+		const auto is3D = tex.dimension == 3;
 		if (tex.sampled) {
 			std::string samplerType = GetGLSLSamplerType(tex.format);
-			if (tex.depth > 1) {
+			if (is3D) {
 				// Replace 2D with 3D in sampler type (e.g. sampler2D -> sampler3D)
 				samplerType = samplerType.substr(0, samplerType.size() - 2) + "3D";
 			}
@@ -332,7 +336,7 @@ std::string KernelBuildContext::GetTextureDeclarations() const {
 		}
 
 		std::string formatQualifier = GetGLSLFormatQualifier(tex.format);
-		std::string imageType		= GetGLSLImageTypeName(tex.format, tex.depth > 1);
+		std::string imageType		= GetGLSLImageTypeName(tex.format, is3D);
 #if defined(EASYGPU_BACKEND_VULKAN)
 		oss << std::format("layout(set=0, {}, binding={}) uniform {} {};\n", formatQualifier, tex.binding, imageType,
 						   tex.textureName);
@@ -366,14 +370,33 @@ void KernelBuildContext::AddCallableBodyGenerator(std::function<void()> generato
 }
 
 void KernelBuildContext::PushCallableBody() {
-	_callableBodyStack.push(_currentCallableBody);
+	auto callableName = std::string{};
+	if (_nextCallableBodyIndex < _callableDeclarations.size()) {
+		const auto &declaration = _callableDeclarations[_nextCallableBodyIndex];
+		const auto paren = declaration.find('(');
+		if (paren != std::string::npos) {
+			const auto nameEnd = declaration.find_last_not_of(" \t\r\n", paren == 0 ? 0 : paren - 1);
+			if (nameEnd != std::string::npos) {
+				const auto nameStart = declaration.find_last_of(" \t\r\n", nameEnd);
+				callableName = declaration.substr(
+					nameStart == std::string::npos ? 0 : nameStart + 1,
+					nameEnd - (nameStart == std::string::npos ? 0 : nameStart + 1) + 1);
+			}
+		}
+	}
+	_nextCallableBodyIndex++;
+	PushCallableBody(callableName);
+}
+
+void KernelBuildContext::PushCallableBody(const std::string &callableName) {
+	_callableBodyStack.push(CallableBodyFrame{std::move(_currentCallableBody), _inCallableBody});
 	_currentCallableBody.clear();
 	_inCallableBody = true;
 	IR::Builder::Builder::Get().SetInCallableBody(true);
 	// If gradient tape is active, push a sub-tape for callable body recording
 	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
 	if (tape) {
-		tape->PushSubTape();
+		tape->PushSubTape(callableName);
 	}
 }
 
@@ -389,12 +412,13 @@ void KernelBuildContext::PopCallableBody() {
 	}
 
 	if (!_callableBodyStack.empty()) {
-		_currentCallableBody = _callableBodyStack.top();
+		auto frame = std::move(_callableBodyStack.top());
 		_callableBodyStack.pop();
-		_inCallableBody = true;
-		IR::Builder::Builder::Get().SetInCallableBody(true);
+		_currentCallableBody = std::move(frame.body);
+		_inCallableBody = frame.inCallableBody;
+		IR::Builder::Builder::Get().SetInCallableBody(_inCallableBody);
 		// Push new sub-tape for the restored callable body
-		if (tape) {
+		if (tape && _inCallableBody) {
 			tape->PushSubTape();
 		}
 	}
@@ -438,7 +462,7 @@ std::string KernelBuildContext::RegisterUniform(
 	std::function<void(uint32_t program, const std::string &name, void *ptr)> uploadFunc,
 	std::function<void(void *dst, void *ptr)>								  packFunc) {
 	for (const auto &entry : _uniforms) {
-		if (entry.uniformPtr == uniformPtr) {
+		if (uniformPtr != nullptr && entry.uniformPtr == uniformPtr) {
 			return entry.name;
 		}
 	}

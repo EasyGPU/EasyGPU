@@ -17,7 +17,7 @@ namespace GPU::IR::Node {
  */
 enum class AtomicOpCode {
 	Add,	  // atomicAdd
-	Sub,	  // atomicSub (GLSL 4.6+)
+	Sub,	  // atomicAdd with negated value; GLSL has no atomicSub intrinsic.
 	Min,	  // atomicMin
 	Max,	  // atomicMax
 	And,	  // atomicAnd

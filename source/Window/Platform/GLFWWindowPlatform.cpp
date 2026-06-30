@@ -45,25 +45,15 @@ void ReleaseGLFW() {
 void RegisterVulkanInstanceExtensionProvider() {
 #ifdef EASYGPU_BACKEND_VULKAN
 	GPU::Backend::VulkanBackend::RegisterInstanceExtensionProvider([]() {
-		EnsureGLFWInitialized();
-		uint32_t	 extensionCount = 0;
-		const char **extensions	   = glfwGetRequiredInstanceExtensions(&extensionCount);
-		if (!extensions || extensionCount == 0) {
-			ReleaseGLFW();
-			throw std::runtime_error("GLFW did not report required Vulkan instance extensions");
-		}
-		static std::vector<std::string> extensionStorage;
-		extensionStorage.clear();
-		extensionStorage.reserve(extensionCount);
-		for (uint32_t i = 0; i < extensionCount; ++i) {
-			extensionStorage.emplace_back(extensions[i]);
-		}
-		ReleaseGLFW();
 		std::vector<const char *> result;
-		result.reserve(extensionStorage.size());
-		for (const auto &extension : extensionStorage) {
-			result.push_back(extension.c_str());
-		}
+		result.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+#ifdef __APPLE__
+		result.push_back("VK_EXT_metal_surface");
+#elif defined(_WIN32)
+		result.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#elif defined(__linux__)
+		result.push_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+#endif
 		return result;
 	});
 #endif
@@ -88,9 +78,10 @@ void CheckVk(VkResult result, const char *operation) {
 
 } // namespace
 
-struct GLFWWindowPlatform::PixelPresenter {
+	struct GLFWWindowPlatform::PixelPresenter {
 	explicit PixelPresenter(GLFWWindowPlatform &platform) : owner(platform) {
 #ifdef EASYGPU_BACKEND_VULKAN
+		GPU::Runtime::AutoInitContext();
 		auto &backend = GPU::Runtime::Context::GetBackend<GPU::Backend::VulkanBackend>();
 		surface		  = owner.CreateVulkanSurface(backend.Instance());
 		swapchain.Create(SwapchainConfig{.instance		   = backend.Instance(),
@@ -112,6 +103,7 @@ struct GLFWWindowPlatform::PixelPresenter {
 #ifdef EASYGPU_BACKEND_VULKAN
 		swapchain.Destroy();
 		if (surface) {
+			GPU::Runtime::AutoInitContext();
 			auto &backend = GPU::Runtime::Context::GetBackend<GPU::Backend::VulkanBackend>();
 			vkDestroySurfaceKHR(backend.Instance(), surface, nullptr);
 		}

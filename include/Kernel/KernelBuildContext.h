@@ -55,6 +55,7 @@ public:
 		uint32_t			 width;
 		uint32_t			 height;
 		uint32_t			 depth	 = 1;
+		uint32_t			 dimension = 2;
 		bool				 sampled = false;
 	};
 
@@ -422,6 +423,12 @@ public:
 	void					 PushCallableBody() override;
 
 	/**
+	 * @brief Begin capturing a named callable function body.
+	 * @param callableName Emitted GLSL function name for AD sub-tape identity.
+	 */
+	void					 PushCallableBody(const std::string &callableName) override;
+
+	/**
 	 * @brief End capturing a callable function body.
 	 */
 	void					 PopCallableBody() override;
@@ -445,12 +452,18 @@ public:
 
 protected:
 	// Callable support
+	struct CallableBodyFrame {
+		std::string body;
+		bool		inCallableBody = false;
+	};
+
 	std::vector<std::string>								 _callableDeclarations;
 	std::vector<std::function<void()>>						 _callableBodyGenerators;
 	std::vector<std::string>								 _callableBodies;
-	std::stack<std::string>									 _callableBodyStack;
+	std::stack<CallableBodyFrame>							 _callableBodyStack;
 	std::string												 _currentCallableBody;
 	bool													 _inCallableBody = false;
+	size_t													 _nextCallableBodyIndex = 0;
 
 	uint32_t												 _nextBinding	 = 0;
 	std::vector<BufferInfo>									 _buffers;

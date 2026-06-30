@@ -80,6 +80,7 @@ void GraphicsPipeline::EnsureCompiled() {
 			res.binding	 = buf.binding;
 			res.type	 = Backend::BindingType::Buffer;
 			res.readOnly = (buf.mode == Backend::BUFFER_MODE_READ_ONLY);
+			res.stageFlags = Backend::ResourceStageVertex | Backend::ResourceStageFragment;
 			pipeDesc.resources.push_back(res);
 		}
 		for (const auto &tex : _context->GetTextureInfos()) {
@@ -87,6 +88,8 @@ void GraphicsPipeline::EnsureCompiled() {
 			res.binding = tex.binding;
 			res.type	= tex.sampled ? Backend::BindingType::Sampler : Backend::BindingType::Texture;
 			res.format	= static_cast<Backend::PixelFormat>(tex.format);
+			res.readOnly = tex.sampled;
+			res.stageFlags = Backend::ResourceStageFragment;
 			pipeDesc.resources.push_back(res);
 		}
 	}
@@ -181,17 +184,6 @@ void GraphicsPipeline::DrawImpl(const std::vector<RenderTargetAttachment> &rende
 	rpDesc.clearDepthFlag  = (depthHandle != Backend::INVALID_TEXTURE_HANDLE);
 	rpDesc.clearDepth	   = 1.0f;
 
-	backend->BeginRendering(rpDesc);
-	backend->SetViewport(0, 0, width, height);
-	backend->SetScissor(0, 0, width, height);
-	backend->BindPipeline(_pipeline);
-	if (_hasVertexBuffer) {
-		backend->BindVertexBuffer(_vertexBufferHandle, _vertexStride);
-	}
-	if (indexed) {
-		backend->BindIndexBuffer(_indexBufferHandle);
-	}
-
 	// Bind resources
 	std::vector<Backend::ResourceBinding> bindings;
 	if (_context) {
@@ -210,6 +202,15 @@ void GraphicsPipeline::DrawImpl(const std::vector<RenderTargetAttachment> &rende
 			bindings.push_back(rb);
 		}
 	}
+
+	backend->BindPipeline(_pipeline);
+	if (_hasVertexBuffer) {
+		backend->BindVertexBuffer(_vertexBufferHandle, _vertexStride);
+	}
+	if (indexed) {
+		backend->BindIndexBuffer(_indexBufferHandle);
+	}
+
 	if (!bindings.empty()) {
 		backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
 	}
@@ -217,6 +218,13 @@ void GraphicsPipeline::DrawImpl(const std::vector<RenderTargetAttachment> &rende
 	// Upload push constants
 	if (_context && _context->GetPushConstantSize() > 0) {
 		_context->UploadUniformValues(_pipeline);
+	}
+
+	backend->BeginRendering(rpDesc);
+	backend->SetViewport(0, 0, width, height);
+	backend->SetScissor(0, 0, width, height);
+	if (!bindings.empty()) {
+		backend->BindResources(bindings.data(), static_cast<uint32_t>(bindings.size()));
 	}
 
 	if (indexed) {

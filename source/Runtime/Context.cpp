@@ -17,10 +17,6 @@ namespace GPU::Runtime {
 
 Context					&Context::GetInstance() {
 	static Context instance;
-	// Auto-initialize on first access
-	if (!instance._initialized) {
-		instance.Initialize();
-	}
 	return instance;
 }
 
@@ -33,6 +29,7 @@ Context::~Context() {
 }
 
 void Context::Initialize() {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (_initialized) {
 		return;
 	}
@@ -47,10 +44,12 @@ void Context::Initialize() {
 }
 
 bool Context::IsInitialized() const {
+	std::lock_guard<std::mutex> lock(_mutex);
 	return _initialized;
 }
 
 void Context::MakeCurrent() {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (!_initialized || !_backend) {
 		throw std::runtime_error("Context not initialized");
 	}
@@ -58,12 +57,14 @@ void Context::MakeCurrent() {
 }
 
 void Context::MakeNoneCurrent() {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (_backend) {
 		_backend->MakeNoneCurrent();
 	}
 }
 
 std::string Context::GetVersionString() const {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (!_initialized || !_backend) {
 		return "Not initialized";
 	}
@@ -71,6 +72,7 @@ std::string Context::GetVersionString() const {
 }
 
 bool Context::HasComputeShadersSupport() const {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (!_initialized || !_backend) {
 		return false;
 	}
@@ -78,6 +80,7 @@ bool Context::HasComputeShadersSupport() const {
 }
 
 void Context::GetMaxWorkGroupSize(int &x, int &y, int &z) const {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (!_initialized || !_backend) {
 		x = y = z = 0;
 		return;
@@ -89,6 +92,7 @@ void Context::GetMaxWorkGroupSize(int &x, int &y, int &z) const {
 }
 
 void *Context::GetNativeGLContext() const {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (!_initialized || !_backend) {
 		return nullptr;
 	}
@@ -98,6 +102,7 @@ void *Context::GetNativeGLContext() const {
 }
 
 Backend::BackendType Context::GetBackendType() const {
+	std::lock_guard<std::mutex> lock(_mutex);
 	if (!_initialized || !_backend) {
 		return Backend::GetDefaultBackendType();
 	}

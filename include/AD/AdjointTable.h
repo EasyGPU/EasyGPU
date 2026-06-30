@@ -57,6 +57,13 @@ public:
 	std::vector<std::pair<std::string, std::string>> AllDeclarations() const;
 
 	/**
+	 * Add an already-named adjoint declaration. Used when inlining adjoint code
+	 * generated for callable sub-tapes into an outer adjoint body.
+	 */
+	void											 DeclareAdjoint(const std::string &adjName,
+																	const std::string &glslType);
+
+	/**
 	 * Clear all mappings (for reuse).
 	 */
 	void											 Clear();

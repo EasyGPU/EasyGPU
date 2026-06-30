@@ -39,6 +39,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace GPU::AD {
@@ -155,6 +156,24 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 	std::string strippedBody;
 	strippedBody.reserve(forwardBody.size());
 	hoistedDecls.reserve(forwardBody.size() / 4);
+	std::unordered_set<std::string> hoistedNames;
+	auto appendHoistedDecl = [&](const std::string &type, const std::string &name, std::string_view originalDecl) {
+		if (!hoistedNames.insert(name).second) {
+			return;
+		}
+		if (!originalDecl.empty()) {
+			hoistedDecls += originalDecl;
+			hoistedDecls += '\n';
+		} else {
+			hoistedDecls += type + " " + name + ";\n";
+		}
+	};
+	auto isGlslIdentChar = [](char ch) {
+		return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
+	};
+	auto isGlslIdentStart = [](char ch) {
+		return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
+	};
 
 	size_t lineStart = 0;
 	while (lineStart < forwardBody.size()) {
@@ -167,30 +186,34 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 		// Match "    float v123;" or "    int v456;" or "    bool v789;"
 		// The pattern: optional whitespace, type, space, 'v', digits, ';', optional whitespace
 		bool			 isHoistable = false;
+		bool			 hasInitializer = false;
+		std::string		 matchedType;
+		std::string		 matchedName;
+		size_t			 suffixStart = 0;
 		size_t			 pos		 = 0;
 		// skip leading whitespace
 		while (pos < lineLen && (line[pos] == ' ' || line[pos] == '\t'))
 			pos++;
 		// check for a GLSL scalar type followed by space
 		auto checkType = [&](const char *typeName, size_t len) {
-			if (pos + len < lineLen && line.compare(pos, len, typeName) == 0 && line[pos + len] == ' ') {
+			if (pos + len < lineLen && line.compare(pos, len, typeName) == 0 &&
+				(line[pos + len] == ' ' || line[pos + len] == '\t')) {
 				size_t nameStart = pos + len + 1;
-				if (nameStart < lineLen && line[nameStart] == 'v') {
-					// check that remaining chars are digits then ';'
+				while (nameStart < lineLen && (line[nameStart] == ' ' || line[nameStart] == '\t'))
+					nameStart++;
+				if (nameStart < lineLen && isGlslIdentStart(line[nameStart])) {
 					size_t j = nameStart + 1;
-					while (j < lineLen && line[j] >= '0' && line[j] <= '9')
+					while (j < lineLen && isGlslIdentChar(line[j]))
 						j++;
-					if (j < lineLen && line[j] == ';') {
-						// make sure no '=' before ';' (skip init lines)
-						bool hasEq = false;
-						for (size_t k = nameStart; k < j; k++) {
-							if (line[k] == '=') {
-								hasEq = true;
-								break;
-							}
-						}
-						if (!hasEq)
-							isHoistable = true;
+					suffixStart = j;
+					size_t tokenEnd = j;
+					while (tokenEnd < lineLen && (line[tokenEnd] == ' ' || line[tokenEnd] == '\t'))
+						tokenEnd++;
+					if (tokenEnd < lineLen && (line[tokenEnd] == ';' || line[tokenEnd] == '=')) {
+						isHoistable = true;
+						hasInitializer = line[tokenEnd] == '=';
+						matchedType = std::string(typeName, len);
+						matchedName = std::string(line.substr(nameStart, j - nameStart));
 					}
 				}
 			}
@@ -204,8 +227,13 @@ inline std::string MergeForwardBackward(const std::string &forwardCode, const Ad
 		}
 
 		if (isHoistable) {
-			hoistedDecls += line;
-			hoistedDecls += '\n';
+			appendHoistedDecl(matchedType, matchedName, {});
+			if (hasInitializer) {
+				strippedBody += line.substr(0, pos);
+				strippedBody += matchedName;
+				strippedBody += line.substr(suffixStart);
+				strippedBody += '\n';
+			}
 		} else {
 			strippedBody += line;
 			strippedBody += '\n';

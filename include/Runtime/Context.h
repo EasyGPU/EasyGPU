@@ -14,6 +14,7 @@
 #include <Backend/Backend.h>
 
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 
@@ -120,6 +121,7 @@ private:
 
 private:
 	bool							  _initialized = false;
+	mutable std::mutex				  _mutex;
 	std::unique_ptr<Backend::Backend> _backend;
 };
 

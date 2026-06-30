@@ -180,6 +180,9 @@ public:
 	/** @brief Enter callable body generation mode. */
 	void		PushCallableBody() override;
 
+	/** @brief Enter named callable body generation mode. */
+	void		PushCallableBody(const std::string &callableName) override;
+
 	/** @brief Exit callable body generation mode and emit the function body. */
 	void		PopCallableBody() override;
 

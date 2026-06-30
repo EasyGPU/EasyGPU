@@ -36,11 +36,11 @@ void TexturePresenter::Present(const uint32_t *pixels, uint32_t width, uint32_t 
 	_impl->_window.Present(pixels, width, height);
 }
 
-void TexturePresenter::PresentTextureHandle(Backend::TextureHandle texture) {
+bool TexturePresenter::PresentTextureHandle(Backend::TextureHandle texture) {
 #ifdef EASYGPU_BACKEND_VULKAN
 	auto *platform = dynamic_cast<GLFWWindowPlatform *>(_impl->_window.Platform());
 	if (!platform || !platform->GetSwapchain()) {
-		return;
+		return false;
 	}
 	auto &backend = GPU::Runtime::Context::GetBackend<GPU::Backend::VulkanBackend>();
 	backend.Finish();
@@ -55,8 +55,10 @@ void TexturePresenter::PresentTextureHandle(Backend::TextureHandle texture) {
 	} else {
 		platform->GetSwapchain()->PresentTexture(backend, texture);
 	}
+	return true;
 #else
 	(void)texture;
+	return false;
 #endif
 }
 

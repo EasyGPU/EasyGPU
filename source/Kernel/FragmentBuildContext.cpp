@@ -77,7 +77,7 @@ std::string FragmentBuildContext::GetCompleteCode() {
 	{
 		std::string				savedCallableBody	= std::move(_currentCallableBody);
 		bool					savedInCallableBody = _inCallableBody;
-		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
+		std::stack<CallableBodyFrame> savedBodyStack	= std::move(_callableBodyStack);
 
 		auto				   &builder				= IR::Builder::Builder::Get();
 		_currentCallableBody.clear();
@@ -140,7 +140,7 @@ std::string FragmentBuildContext::GetFragmentShaderSource() {
 	{
 		std::string				savedCallableBody	= std::move(_currentCallableBody);
 		bool					savedInCallableBody = _inCallableBody;
-		std::stack<std::string> savedBodyStack		= std::move(_callableBodyStack);
+		std::stack<CallableBodyFrame> savedBodyStack	= std::move(_callableBodyStack);
 
 		auto				   &builder				= IR::Builder::Builder::Get();
 		_currentCallableBody.clear();

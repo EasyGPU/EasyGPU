@@ -250,6 +250,33 @@ private:
 		VkAccessFlags		 lastAccess	   = 0;
 	};
 
+	struct SamplerKey {
+		SamplerFilter	   minFilter	= SamplerFilter::Nearest;
+		SamplerFilter	   magFilter	= SamplerFilter::Nearest;
+		SamplerMipmapMode  mipmapMode	= SamplerMipmapMode::Nearest;
+		SamplerAddressMode addressU		= SamplerAddressMode::ClampToEdge;
+		SamplerAddressMode addressV		= SamplerAddressMode::ClampToEdge;
+		SamplerAddressMode addressW		= SamplerAddressMode::ClampToEdge;
+		float			   mipLodBias	= 0.0f;
+		float			   minLod		= 0.0f;
+		float			   maxLod		= 1000.0f;
+		bool			   anisotropyEnable = false;
+		float			   maxAnisotropy = 1.0f;
+		bool			   compareEnable = false;
+		CompareOp		   compareOp = CompareOp::Always;
+		SamplerBorderColor borderColor = SamplerBorderColor::FloatOpaqueBlack;
+
+		bool operator==(const SamplerKey &other) const {
+			return minFilter == other.minFilter && magFilter == other.magFilter &&
+				   mipmapMode == other.mipmapMode &&
+				   addressU == other.addressU && addressV == other.addressV && addressW == other.addressW &&
+				   mipLodBias == other.mipLodBias && minLod == other.minLod && maxLod == other.maxLod &&
+				   anisotropyEnable == other.anisotropyEnable && maxAnisotropy == other.maxAnisotropy &&
+				   compareEnable == other.compareEnable && compareOp == other.compareOp &&
+				   borderColor == other.borderColor;
+		}
+	};
+
 	/** @brief Internal Vulkan shader resource information. */
 	struct ShaderInfo {
 		VkShaderModule		  module = nullptr;
@@ -295,6 +322,7 @@ private:
 		std::array<BindingType, MAX_TEXTURE_BINDINGS>	boundTextureTypes{};
 		std::array<PixelFormat, MAX_TEXTURE_BINDINGS>	boundFormats{};
 		std::array<bool, MAX_TEXTURE_BINDINGS>			boundReadOnly{};
+		std::array<SamplerKey, MAX_TEXTURE_BINDINGS>	boundSamplers{};
 		uint64_t										bufferMask	= 0;
 		uint64_t										textureMask = 0;
 	};
@@ -451,6 +479,7 @@ private:
 	 * @return Corresponding VkShaderStageFlags.
 	 */
 	static VkShaderStageFlags GetVkShaderStage(ShaderType type);
+	static VkShaderStageFlags GetVkResourceStages(uint32_t stageFlags, bool graphicsPipeline);
 
 	/**
 	 * @brief Compile GLSL source code to SPIR-V bytecode.
@@ -523,10 +552,13 @@ private:
 	 * @return Pointer to the matching descriptor set cache entry.
 	 */
 	DescriptorSetCache	   *FindOrCreateDescriptorSet(const ResourceBinding *bindings, uint32_t count);
+	VkSampler				GetOrCreateSampler(const SamplerKey &key);
+	SamplerKey				MakeSamplerKey(const SamplerDesc &desc, bool hasMipmaps) const;
 
 private:
 	// Vulkan handles
 	VkInstance										 _instance				  = nullptr;
+	VkDebugUtilsMessengerEXT						 _debugMessenger		  = nullptr;
 	VkPhysicalDevice								 _physicalDevice		  = nullptr;
 	VkDevice										 _device				  = nullptr;
 	VkQueue											 _computeQueue			  = nullptr;
@@ -552,6 +584,7 @@ private:
 	VkDescriptorPool								 _descriptorPool		  = nullptr;
 	VkSampler										 _defaultSampler		  = nullptr;
 	VkSampler										 _mipmapSampler			  = nullptr;
+	std::vector<std::pair<SamplerKey, VkSampler>>	 _samplerCache;
 	VkPipelineCache									 _pipelineCache			  = nullptr;
 	std::vector<VkDescriptorSet>					 _inFlightDescriptorSets;
 
@@ -582,6 +615,10 @@ private:
 	BackendCaps										 _caps;
 	float											 _timestampPeriod	  = 1.0f;
 	uint32_t										 _maxPushConstantSize = 0;
+	bool											 _samplerAnisotropySupported = false;
+	float											 _maxSamplerAnisotropy = 1.0f;
+	bool											 _depthClampSupported = false;
+	bool											 _fillModeNonSolidSupported = false;
 
 	// Thread safety
 	std::mutex										 _mutex;

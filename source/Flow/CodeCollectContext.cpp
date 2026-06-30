@@ -180,6 +180,12 @@ void CodeCollectContext::PushCallableBody() {
 	}
 }
 
+void CodeCollectContext::PushCallableBody(const std::string &callableName) {
+	if (_parentContext) {
+		_parentContext->PushCallableBody(callableName);
+	}
+}
+
 void CodeCollectContext::PopCallableBody() {
 	if (_parentContext) {
 		_parentContext->PopCallableBody();

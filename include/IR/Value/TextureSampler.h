@@ -88,7 +88,7 @@ public:
 		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height) {
 		static_assert(
 			Detail::TextureSamplerValueType<Format>::supported,
-			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+			"Unsigned integer sampled texture value types are not surfaced by TextureSampler yet");
 	}
 
 	/**
@@ -101,7 +101,7 @@ public:
 		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0) {
 		static_assert(
 			Detail::TextureSamplerValueType<Format>::supported,
-			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+			"Unsigned integer sampled texture value types are not surfaced by TextureSampler yet");
 	}
 
 	/// @brief Get the binding index of this sampler
@@ -289,7 +289,7 @@ public:
 		: _textureName(std::move(textureName)), _binding(binding), _width(width), _height(height), _depth(depth) {
 		static_assert(
 			Detail::TextureSamplerValueType<Format>::supported,
-			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+			"Unsigned integer sampled texture value types are not surfaced by TextureSampler yet");
 	}
 
 	/// @brief Construct a TextureSampler3D for function parameter references
@@ -297,7 +297,7 @@ public:
 		: _textureName(std::move(textureName)), _binding(0), _width(0), _height(0), _depth(0) {
 		static_assert(
 			Detail::TextureSamplerValueType<Format>::supported,
-			"Unsigned integer sampled textures require uint/uvec DSL support, which EasyGPU does not provide yet");
+			"Unsigned integer sampled texture value types are not surfaced by TextureSampler yet");
 	}
 
 	/// @brief Get the binding index of this sampler
