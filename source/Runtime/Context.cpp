@@ -16,8 +16,8 @@
 namespace GPU::Runtime {
 
 Context					&Context::GetInstance() {
-	static Context instance;
-	return instance;
+	static Context *instance = new Context();
+	return *instance;
 }
 
 Backend::Backend *Context::GetBackend() {
@@ -46,6 +46,12 @@ void Context::Initialize() {
 bool Context::IsInitialized() const {
 	std::lock_guard<std::mutex> lock(_mutex);
 	return _initialized;
+}
+
+void Context::AbandonBackendForProcessExit() noexcept {
+	std::lock_guard<std::mutex> lock(_mutex);
+	(void)_backend.release();
+	_initialized = false;
 }
 
 void Context::MakeCurrent() {

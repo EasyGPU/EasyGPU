@@ -71,6 +71,15 @@ public:
 	[[nodiscard]] bool				   IsInitialized() const;
 
 	/**
+	 * @brief Abandon the active backend without running driver teardown.
+	 *
+	 * This is intended only for process-exit paths where the OS is about to
+	 * reclaim resources and calling into graphics drivers or compiler globals
+	 * can be unsafe because static destruction is already in progress.
+	 */
+	void							   AbandonBackendForProcessExit() noexcept;
+
+	/**
 	 * Make the backend context current on this thread
 	 */
 	void							   MakeCurrent();
