@@ -198,13 +198,51 @@ if(EASYGPU_BACKEND STREQUAL "Vulkan")
 
     if(TARGET glslang::SPIRV AND TARGET glslang::glslang-default-resource-limits)
         set(EASYGPU_USE_GLSLANG_PACKAGE ON)
-        if(EASYGPU_ENABLE_SPIRV_OPT AND NOT TARGET SPIRV-Tools-opt)
-            message(FATAL_ERROR "EASYGPU_ENABLE_SPIRV_OPT requires the glslang package to expose SPIRV-Tools-opt")
+
+        find_package(SPIRV-Tools CONFIG QUIET)
+        if(TARGET SPIRV-Tools-static AND NOT TARGET SPIRV-Tools)
+            add_library(SPIRV-Tools INTERFACE IMPORTED)
+            set_property(TARGET SPIRV-Tools PROPERTY INTERFACE_LINK_LIBRARIES SPIRV-Tools-static)
         endif()
+        find_package(SPIRV-Tools-opt CONFIG QUIET)
+        find_package(SPIRV-Tools-link CONFIG QUIET)
+
+        set(EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS)
+        if(TARGET SPIRV-Tools-link)
+            list(APPEND EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS SPIRV-Tools-link)
+        else()
+            find_library(SPIRV_TOOLS_LINK_LIBRARY SPIRV-Tools-link HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+            if(SPIRV_TOOLS_LINK_LIBRARY)
+                list(APPEND EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS ${SPIRV_TOOLS_LINK_LIBRARY})
+            endif()
+        endif()
+        if(TARGET SPIRV-Tools-opt)
+            list(APPEND EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS SPIRV-Tools-opt)
+        else()
+            find_library(SPIRV_TOOLS_OPT_LIBRARY SPIRV-Tools-opt HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+            if(SPIRV_TOOLS_OPT_LIBRARY)
+                list(APPEND EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS ${SPIRV_TOOLS_OPT_LIBRARY})
+            elseif(EASYGPU_ENABLE_SPIRV_OPT)
+                message(FATAL_ERROR "EASYGPU_ENABLE_SPIRV_OPT requires SPIRV-Tools-opt")
+            endif()
+        endif()
+        if(TARGET SPIRV-Tools-static)
+            list(APPEND EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS SPIRV-Tools-static)
+        elseif(TARGET SPIRV-Tools)
+            list(APPEND EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS SPIRV-Tools)
+        else()
+            find_library(SPIRV_TOOLS_LIBRARY SPIRV-Tools HINTS ${EASYGPU_VULKAN_SDK_HINTS})
+            if(SPIRV_TOOLS_LIBRARY)
+                list(APPEND EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS ${SPIRV_TOOLS_LIBRARY})
+            endif()
+        endif()
+
         set(EASYGPU_VULKAN_LIBS
             Vulkan::Vulkan
+            glslang::glslang
             glslang::SPIRV
             glslang::glslang-default-resource-limits
+            ${EASYGPU_PACKAGE_SPIRV_TOOLS_LIBS}
         )
     else()
         set(EASYGPU_USE_GLSLANG_PACKAGE OFF)
