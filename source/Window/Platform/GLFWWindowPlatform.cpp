@@ -50,9 +50,9 @@ void RegisterVulkanInstanceExtensionProvider() {
 #ifdef __APPLE__
 		result.push_back("VK_EXT_metal_surface");
 #elif defined(_WIN32)
-		result.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+		result.push_back("VK_KHR_win32_surface");
 #elif defined(__linux__)
-		result.push_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+		result.push_back("VK_KHR_xlib_surface");
 #endif
 		return result;
 	});
