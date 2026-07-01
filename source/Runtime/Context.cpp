@@ -122,7 +122,15 @@ void Context::CreateBackend() {
 }
 
 void Context::DestroyBackend() {
+	if (_backend) {
+		try {
+			_backend->Shutdown();
+		} catch (...) {
+			// Context destruction can run during process teardown; keep it noexcept.
+		}
+	}
 	_backend.reset();
+	_initialized = false;
 }
 
 } // namespace GPU::Runtime

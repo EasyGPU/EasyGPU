@@ -1108,82 +1108,43 @@ void VulkanBackend::EnsureNoPendingGpuWork() {
 }
 
 void VulkanBackend::InvalidateAllDescriptorCaches() {
-	std::vector<VkDescriptorSet> setsToFree;
-	setsToFree.reserve(_descriptorSets.size());
-	for (const auto &cache : _descriptorSets) {
-		if (cache.set != nullptr) {
-			setsToFree.push_back(cache.set);
-		}
-	}
-	if (!setsToFree.empty()) {
-		CheckVkResult(
-			vkFreeDescriptorSets(_device, _descriptorPool, static_cast<uint32_t>(setsToFree.size()), setsToFree.data()),
-			"vkFreeDescriptorSets");
-	}
 	_descriptorSets.clear();
 }
 
 void VulkanBackend::InvalidateDescriptorCachesForPipeline(PipelineHandle pipeline) {
-	std::vector<VkDescriptorSet> setsToFree;
 	auto						 eraseBegin =
 		std::remove_if(_descriptorSets.begin(), _descriptorSets.end(), [&](const DescriptorSetCache &cache) {
 			if (cache.pipeline == pipeline) {
-				if (cache.set != nullptr) {
-					setsToFree.push_back(cache.set);
-				}
 				return true;
 			}
 			return false;
 		});
-	if (!setsToFree.empty()) {
-		CheckVkResult(
-			vkFreeDescriptorSets(_device, _descriptorPool, static_cast<uint32_t>(setsToFree.size()), setsToFree.data()),
-			"vkFreeDescriptorSets");
-	}
 	_descriptorSets.erase(eraseBegin, _descriptorSets.end());
 }
 
 void VulkanBackend::InvalidateDescriptorCachesForBuffer(BufferHandle buffer) {
-	std::vector<VkDescriptorSet> setsToFree;
 	auto						 eraseBegin =
 		std::remove_if(_descriptorSets.begin(), _descriptorSets.end(), [&](const DescriptorSetCache &cache) {
 			for (uint32_t i = 0; i < MAX_BUFFER_BINDINGS; ++i) {
 				if ((cache.bufferMask & (1ull << i)) != 0 && cache.boundBuffers[i] == buffer) {
-					if (cache.set != nullptr) {
-						setsToFree.push_back(cache.set);
-					}
 					return true;
 				}
 			}
 			return false;
 		});
-	if (!setsToFree.empty()) {
-		CheckVkResult(
-			vkFreeDescriptorSets(_device, _descriptorPool, static_cast<uint32_t>(setsToFree.size()), setsToFree.data()),
-			"vkFreeDescriptorSets");
-	}
 	_descriptorSets.erase(eraseBegin, _descriptorSets.end());
 }
 
 void VulkanBackend::InvalidateDescriptorCachesForTexture(TextureHandle texture) {
-	std::vector<VkDescriptorSet> setsToFree;
 	auto						 eraseBegin =
 		std::remove_if(_descriptorSets.begin(), _descriptorSets.end(), [&](const DescriptorSetCache &cache) {
 			for (uint32_t i = 0; i < MAX_TEXTURE_BINDINGS; ++i) {
 				if ((cache.textureMask & (1ull << i)) != 0 && cache.boundTextures[i] == texture) {
-					if (cache.set != nullptr) {
-						setsToFree.push_back(cache.set);
-					}
 					return true;
 				}
 			}
 			return false;
 		});
-	if (!setsToFree.empty()) {
-		CheckVkResult(
-			vkFreeDescriptorSets(_device, _descriptorPool, static_cast<uint32_t>(setsToFree.size()), setsToFree.data()),
-			"vkFreeDescriptorSets");
-	}
 	_descriptorSets.erase(eraseBegin, _descriptorSets.end());
 }
 
