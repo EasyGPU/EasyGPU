@@ -48,6 +48,11 @@ bool Context::IsInitialized() const {
 	return _initialized;
 }
 
+void Context::ShutdownBackend() {
+	std::lock_guard<std::mutex> lock(_mutex);
+	DestroyBackend();
+}
+
 void Context::AbandonBackendForProcessExit() noexcept {
 	std::lock_guard<std::mutex> lock(_mutex);
 	(void)_backend.release();

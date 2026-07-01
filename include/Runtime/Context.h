@@ -71,6 +71,11 @@ public:
 	[[nodiscard]] bool				   IsInitialized() const;
 
 	/**
+	 * @brief Shut down the active backend in normal runtime code.
+	 */
+	void							   ShutdownBackend();
+
+	/**
 	 * @brief Abandon the active backend without running driver teardown.
 	 *
 	 * This is intended only for process-exit paths where the OS is about to
