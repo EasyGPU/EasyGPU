@@ -183,6 +183,10 @@ public:
 	/** @brief Enter named callable body generation mode. */
 	void		PushCallableBody(const std::string &callableName) override;
 
+	/** @brief Enter named callable body generation mode with ordered parameter names. */
+	void		PushCallableBody(const std::string &callableName,
+								 const std::vector<std::string> &parameterNames) override;
+
 	/** @brief Exit callable body generation mode and emit the function body. */
 	void		PopCallableBody() override;
 

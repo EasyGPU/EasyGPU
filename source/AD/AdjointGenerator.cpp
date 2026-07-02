@@ -566,10 +566,10 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 			return false;
 		if (tape.IsParameter(name))
 			return true;
-		if (producedNames.count(name) > 0)
-			return true;
 		std::string base = BufferBaseName(name);
-		return !base.empty() && bufferAdjointStorageBases.count(base) > 0;
+		if (!base.empty())
+			return bufferAdjointStorageBases.count(base) > 0;
+		return producedNames.count(name) > 0;
 	};
 
 	// Build transitive alias map for resolving stale aliases in loops
@@ -1205,6 +1205,12 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	for (size_t pi = 0; pi < entry.inputs.size(); pi++) {
 		nameMap["p" + std::to_string(pi)] = entry.inputs[pi].name;
 	}
+	const auto &callableParameterNames = subTape.CallableParameterNames();
+	for (size_t pi = 0; pi < entry.inputs.size() && pi < callableParameterNames.size(); pi++) {
+		if (!callableParameterNames[pi].empty()) {
+			nameMap[callableParameterNames[pi]] = entry.inputs[pi].name;
+		}
+	}
 
 	// Find the return variable from the sub-tape
 	std::string retVarName;
@@ -1243,8 +1249,10 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 			}
 		}
 	}
-	for (size_t pi = 0; pi < entry.inputs.size() && pi < inferredParams.size(); pi++) {
-		nameMap[inferredParams[pi]] = entry.inputs[pi].name;
+	if (callableParameterNames.empty()) {
+		for (size_t pi = 0; pi < entry.inputs.size() && pi < inferredParams.size(); pi++) {
+			nameMap[inferredParams[pi]] = entry.inputs[pi].name;
+		}
 	}
 
 	std::vector<std::string> allOriginalNames;

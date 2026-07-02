@@ -149,7 +149,8 @@ public:
 
 	/** Push a new sub-tape onto the stack. All subsequent Record() calls
 	 *  go to this sub-tape until PopSubTape() is called. */
-	void		PushSubTape(const std::string &callableName = {});
+	void		PushSubTape(const std::string &callableName = {},
+							 const std::vector<std::string> &parameterNames = {});
 
 	/** Pop the current sub-tape and store it. Returns the index of the stored sub-tape. */
 	int			PopSubTape();
@@ -178,6 +179,11 @@ public:
 	/** Get all sub-tapes. */
 	const auto &SubTapes() const {
 		return _subTapes;
+	}
+
+	/** Ordered GLSL parameter names for a callable body sub-tape, when known. */
+	const std::vector<std::string> &CallableParameterNames() const {
+		return _callableParameterNames;
 	}
 
 	// ---- Access ----------------------------------------------------------
@@ -299,6 +305,7 @@ private:
 	std::stack<GradientTape *>						 _subTapeParentStack;
 	std::stack<GradientTape *>						 _subTapeStack;
 	GradientTape									*_currentSubTape = nullptr;
+	std::vector<std::string>						 _callableParameterNames;
 };
 
 } // namespace GPU::AD

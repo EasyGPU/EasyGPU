@@ -1211,11 +1211,13 @@ TEST(ad_kernel_readonly_buffer_leaf_is_not_gradient_target)
 GPU::Runtime::Buffer<float> target(8, GPU::Runtime::BufferMode::Read);
 GPU::Runtime::Buffer<float> pdf(8, GPU::Runtime::BufferMode::Read);
 GPU::Runtime::Buffer<float> weight(8);
+GPU::Runtime::Buffer<float> lossOut(8);
 GPU::AD::ADKernel1D kernel(
 	[&](GPU::IR::Value::Var<int> &id) {
 		auto targetRef = target.Bind();
 		auto pdfRef	   = pdf.Bind();
 		auto weightRef = weight.Bind();
+		auto lossRef	  = lossOut.Bind();
 
 		Var<float> targetValue = targetRef[id];
 		Var<float> pdfValue	  = pdfRef[id];
@@ -1226,6 +1228,7 @@ GPU::AD::ADKernel1D kernel(
 		Var<float> denom	  = Max(pdfValue + model, 0.001f);
 		Var<float> loss		  = error3 / denom;
 
+		lossRef[id] = loss;
 		GPU::AD::Param(model);
 		GPU::AD::Loss(loss);
 	},
@@ -1235,6 +1238,7 @@ std::string code = kernel.CombinedCode();
 CHECK_CONTAINS(code, "grad_buf2");
 CHECK_NOT_CONTAINS(code, "grad_buf0");
 CHECK_NOT_CONTAINS(code, "grad_buf1");
+CHECK_NOT_CONTAINS(code, "grad_buf3");
 END_TEST
 
 TEST(ad_kernel_optimization_levels)
@@ -1600,6 +1604,69 @@ CHECK_NOT_CONTAINS(r.backwardCode, "(a)");
 CHECK_NOT_CONTAINS(r.backwardCode, "(b)");
 END_TEST
 
+TEST(ad_callable_declared_parameter_order_remaps_all_locals)
+GPU::AD::GradientTape tape;
+tape.PushSubTape("misLike", {"brdfValue", "brdfPdf", "ltcValue", "ltcMagnitude"});
+
+GPU::AD::TapeEntry error;
+error.kind			 = GPU::AD::TapeOpKind::ExpressionGradient;
+error.output		 = {"error", "float"};
+error.inputs		 = {{"brdfValue", "float"}, {"ltcValue", "float"}};
+error.inputGradExprs = {"sign(brdfValue-ltcValue)", "-sign(brdfValue-ltcValue)"};
+error.inputGradTypes = {"float", "float"};
+error.forwardExpr	 = "abs(brdfValue-ltcValue)";
+tape.RecordRemapped(error);
+
+GPU::AD::TapeEntry denominator;
+denominator.kind	   = GPU::AD::TapeOpKind::BinaryOp;
+denominator.output	   = {"denominator", "float"};
+denominator.inputs	   = {{"brdfPdf", "float"}, {"ltcMagnitude", "float"}};
+denominator.binaryOp   = GPU::IR::Node::OperationCode::Add;
+denominator.forwardExpr = "(brdfPdf)+(ltcMagnitude)";
+tape.RecordRemapped(denominator);
+
+GPU::AD::TapeEntry result;
+result.kind		   = GPU::AD::TapeOpKind::BinaryOp;
+result.output	   = {"result", "float"};
+result.inputs	   = {{"error", "float"}, {"denominator", "float"}};
+result.binaryOp	   = GPU::IR::Node::OperationCode::Div;
+result.forwardExpr = "(error)/(denominator)";
+tape.RecordRemapped(result);
+
+GPU::AD::TapeEntry ret;
+ret.kind   = GPU::AD::TapeOpKind::Return;
+ret.output = {"result", "float"};
+tape.RecordRemapped(ret);
+tape.PopSubTape();
+
+GPU::AD::TapeEntry call;
+call.kind			  = GPU::AD::TapeOpKind::Call;
+call.output			  = {"loss", "float"};
+call.inputs			  = {{"0.7", "float"}, {"0.2", "float"}, {"p", "float"}, {"1.2", "float"}};
+call.callableFuncName = "misLike";
+tape.RecordRemapped(call);
+tape.RegisterParameter("p", "float");
+tape.MarkLoss("loss", "float");
+
+GPU::AD::AdjointGenerator gen;
+auto					  body = gen.GenerateBody(tape, true);
+std::string				  code;
+for (const auto &[name, type] : body.declarations) {
+	code += type + " " + name + ";\n";
+}
+for (const auto &line : body.lines) {
+	code += line + "\n";
+}
+
+CHECK_CONTAINS(code, "_ca0_e0_denominator");
+CHECK_CONTAINS(code, "1.2");
+CHECK_NOT_CONTAINS(code, "brdfValue");
+CHECK_NOT_CONTAINS(code, "brdfPdf");
+CHECK_NOT_CONTAINS(code, "ltcValue");
+CHECK_NOT_CONTAINS(code, "ltcMagnitude");
+CHECK_NOT_CONTAINS(code, "_ca0_e0(");
+END_TEST
+
 TEST(ad_callable_two_params_with_param_reg)
 Callable<float(float, float)> mulOp2([](Var<float> a, Var<float> b) {
 	Var<float> r = a * b;
@@ -1733,6 +1800,7 @@ int main() {
 	test_ad_nested_callable_expression_composes_subtapes();
 	test_ad_callable_local_primal_values_are_rematerialized();
 	test_ad_callable_absdiff_expression_remaps_parameters();
+	test_ad_callable_declared_parameter_order_remaps_all_locals();
 	test_ad_callable_two_params_with_param_reg();
 
 	std::cout << "\n=== Results: " << pass_count << "/" << test_count << " passed ===\n";

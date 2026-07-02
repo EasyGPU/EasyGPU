@@ -331,9 +331,15 @@ private:
 
 		bool ok = true;
 		const auto previousBlocks = _activeBlocks;
-		_activeBlocks = &_module.callables[callableId].blocks;
-		context.PushCallableBody();
-		for (const auto &statement : _module.callables[callableId].statements) {
+		const auto &callable = _module.callables[callableId];
+		_activeBlocks = &callable.blocks;
+		std::vector<std::string> parameterNames;
+		parameterNames.reserve(callable.parameters.size());
+		for (const auto &parameter : callable.parameters) {
+			parameterNames.push_back(parameter.first);
+		}
+		context.PushCallableBody(callable.name, parameterNames);
+		for (const auto &statement : callable.statements) {
 			if (!LowerStatement(statement)) {
 				ok = false;
 				break;

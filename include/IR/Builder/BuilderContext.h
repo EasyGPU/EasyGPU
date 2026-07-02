@@ -259,6 +259,17 @@ public:
 	}
 
 	/**
+	 * Enter callable body generation mode for a known GLSL callable symbol and
+	 * its ordered GLSL parameter names. AD uses the names to remap callable
+	 * sub-tapes at call sites without guessing from expression leaves.
+	 */
+	virtual void					 PushCallableBody(const std::string &callableName,
+													  const std::vector<std::string> &parameterNames) {
+		(void)parameterNames;
+		PushCallableBody(callableName);
+	}
+
+	/**
 	 * Exit callable body generation mode
 	 * Pops the callable body code buffer and stores it for later output
 	 */

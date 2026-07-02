@@ -247,9 +247,10 @@ void GradientTape::RecordDirect(const GPU::IR::Node::Node &node, bool isStatemen
 void GradientTape::RecordRemapped(const TapeEntry &entry) {
 	// Add a pre-remapped entry with an auto-assigned ID.
 	// Used by AdjointGenerator to clone and remap sub-tape entries.
+	auto *target = _currentSubTape != nullptr ? _currentSubTape : this;
 	TapeEntry e = entry;
-	e.id		= _nextId++;
-	_entries.push_back(std::move(e));
+	e.id		= target->_nextId++;
+	target->_entries.push_back(std::move(e));
 }
 
 void GradientTape::RegisterParameter(const std::string &name, const std::string &glslType) {
@@ -1191,9 +1192,10 @@ bool GradientTape::IsActive() {
 // Sub-tape support (Callable body recording)
 // =============================================================================
 
-void GradientTape::PushSubTape(const std::string &callableName) {
+void GradientTape::PushSubTape(const std::string &callableName, const std::vector<std::string> &parameterNames) {
 	auto sub			 = std::make_unique<GradientTape>();
 	_currentSubTape		 = sub.get();
+	_currentSubTape->_callableParameterNames = parameterNames;
 	// Push to the current active tape (this or a sub-tape) so the hierarchy
 	// forms a proper tree. Otherwise nested Flow::For / Flow::If bodies would
 	// all be flattened into the main tape's _subTapes and recursion in
@@ -1234,6 +1236,7 @@ void GradientTape::CloneSubTapesFrom(const GradientTape &src) {
 	for (size_t i = 0; i < src.SubTapeCount(); i++) {
 		const auto &ss	 = src.SubTape(i);
 		auto		copy = std::make_unique<GradientTape>();
+		copy->_callableParameterNames = ss._callableParameterNames;
 		for (size_t j = 0; j < ss.Size(); j++) {
 			copy->RecordRemapped(ss[j]);
 		}
