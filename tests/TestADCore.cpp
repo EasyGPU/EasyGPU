@@ -614,6 +614,40 @@ std::string				  backwardCode = gen.Generate(tape, false);
 CHECK_CONTAINS(backwardCode, "dot(");
 END_TEST
 
+TEST(ad_matrix_constructor_and_matvec_expression_gradient)
+GPU::AD::GradientTape tape;
+
+GPU::AD::TapeEntry matrix;
+matrix.kind = GPU::AD::TapeOpKind::ExpressionGradient;
+matrix.output = {"m", "mat3"};
+matrix.inputs = {{"p", "float"}};
+matrix.inputGradExprs = {"(__feather_ad_upstream__)[0][0]*(0.5)"};
+matrix.inputGradTypes = {"float"};
+matrix.forwardExpr = "mat3((1.0)+((0.5)*(p)),0,0,0,1,0,0,0,1)";
+tape.RecordRemapped(matrix);
+
+GPU::AD::TapeEntry y;
+y.kind = GPU::AD::TapeOpKind::ExpressionGradient;
+y.output = {"y", "vec3"};
+y.inputs = {{"m", "mat3"}, {"v", "vec3"}};
+y.inputGradExprs = {
+	"mat3((__feather_ad_upstream__)*(v).x, (__feather_ad_upstream__)*(v).y, (__feather_ad_upstream__)*(v).z)",
+	"(transpose(m))*(__feather_ad_upstream__)"};
+y.inputGradTypes = {"mat3", "vec3"};
+y.forwardExpr = "(m)*(v)";
+tape.RecordRemapped(y);
+
+tape.RegisterParameter("p", "float");
+tape.MarkLoss("y", "vec3");
+
+GPU::AD::AdjointGenerator gen;
+std::string backwardCode = gen.Generate(tape, true);
+CHECK_NOT_CONTAINS(backwardCode, "__feather_ad_upstream__");
+CHECK_CONTAINS(backwardCode, "d_m += mat3(");
+CHECK_CONTAINS(backwardCode, "d_p +=");
+CHECK_CONTAINS(backwardCode, "[0][0]");
+END_TEST
+
 TEST(ad_vec3_dot)
 auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
 	Var<Vec3>  a = MakeFloat3(1.0f, 0.0f, 0.0f);
@@ -1581,6 +1615,103 @@ CHECK_CONTAINS(r.backwardCode, "/");
 CHECK_NOT_CONTAINS(r.backwardCode, "_ca0_e0(");
 END_TEST
 
+TEST(ad_callable_rematerializes_transitive_local_dependencies)
+GPU::AD::GradientTape tape;
+tape.PushSubTape("evalLike", {"direction", "m", "invM", "scale"});
+
+GPU::AD::TapeEntry normalizedExpr;
+normalizedExpr.kind = GPU::AD::TapeOpKind::ExpressionGradient;
+normalizedExpr.output = {"_ad_expr0", "vec3"};
+normalizedExpr.inputs = {{"invM", "mat3"}, {"direction", "vec3"}};
+normalizedExpr.inputGradExprs = {"mat3(0.0)", "vec3(0.0)"};
+normalizedExpr.inputGradTypes = {"mat3", "vec3"};
+normalizedExpr.forwardExpr = "normalize((invM)*(direction))";
+tape.RecordRemapped(normalizedExpr);
+
+GPU::AD::TapeEntry original;
+original.kind = GPU::AD::TapeOpKind::BinaryOp;
+original.output = {"original", "vec3"};
+original.inputs = {{"_ad_expr0", "vec3"}, {"0", "float"}};
+original.binaryOp = GPU::IR::Node::OperationCode::Add;
+original.forwardExpr = "_ad_expr0";
+tape.RecordRemapped(original);
+
+GPU::AD::TapeEntry transformed;
+transformed.kind = GPU::AD::TapeOpKind::ExpressionGradient;
+transformed.output = {"transformed", "vec3"};
+transformed.inputs = {{"m", "mat3"}, {"original", "vec3"}};
+transformed.inputGradExprs = {"mat3(0.0)", "vec3(1.0)"};
+transformed.inputGradTypes = {"mat3", "vec3"};
+transformed.forwardExpr = "(m)*(original)";
+tape.RecordRemapped(transformed);
+
+GPU::AD::TapeEntry length;
+length.kind = GPU::AD::TapeOpKind::ExpressionGradient;
+length.output = {"lengthValue", "float"};
+length.inputs = {{"transformed", "vec3"}};
+length.inputGradExprs = {"(transformed)/length(transformed)"};
+length.inputGradTypes = {"vec3"};
+length.forwardExpr = "length(transformed)";
+tape.RecordRemapped(length);
+
+GPU::AD::TapeEntry d;
+d.kind = GPU::AD::TapeOpKind::ExpressionGradient;
+d.output = {"d", "float"};
+d.inputs = {{"original", "vec3"}};
+d.inputGradExprs = {"vec3(0.0, 0.0, 1.0)"};
+d.inputGradTypes = {"vec3"};
+d.forwardExpr = "max((original).z,0)";
+tape.RecordRemapped(d);
+
+GPU::AD::TapeEntry scaled;
+scaled.kind = GPU::AD::TapeOpKind::BinaryOp;
+scaled.output = {"scaled", "float"};
+scaled.inputs = {{"scale", "float"}, {"d", "float"}};
+scaled.binaryOp = GPU::IR::Node::OperationCode::Mul;
+scaled.forwardExpr = "(scale)*(d)";
+tape.RecordRemapped(scaled);
+
+GPU::AD::TapeEntry result;
+result.kind = GPU::AD::TapeOpKind::BinaryOp;
+result.output = {"result", "float"};
+result.inputs = {{"scaled", "float"}, {"lengthValue", "float"}};
+result.binaryOp = GPU::IR::Node::OperationCode::Div;
+result.forwardExpr = "(scaled)/(lengthValue)";
+tape.RecordRemapped(result);
+
+GPU::AD::TapeEntry ret;
+ret.kind = GPU::AD::TapeOpKind::Return;
+ret.output = {"result", "float"};
+tape.RecordRemapped(ret);
+tape.PopSubTape();
+
+GPU::AD::TapeEntry call;
+call.kind = GPU::AD::TapeOpKind::Call;
+call.output = {"loss", "float"};
+call.inputs = {{"direction_1", "vec3"}, {"m_1", "mat3"}, {"invM_1", "mat3"}, {"scale_1", "float"}};
+call.callableFuncName = "evalLike";
+tape.RecordRemapped(call);
+tape.RegisterParameter("scale_1", "float");
+tape.MarkLoss("loss", "float");
+
+GPU::AD::AdjointGenerator gen;
+auto body = gen.GenerateBody(tape, true);
+std::string code;
+for (const auto &line : body.lines) {
+	code += line + "\n";
+}
+
+const std::string exprDecl = "vec3 _ca0_e0__ad_expr0 = normalize((invM_1)*(direction_1));";
+const std::string originalDecl = "vec3 _ca0_e0_original = _ca0_e0__ad_expr0;";
+const std::string transformedDecl = "vec3 _ca0_e0_transformed = (m_1)*(_ca0_e0_original);";
+CHECK_CONTAINS(code, exprDecl);
+CHECK_CONTAINS(code, originalDecl);
+CHECK_CONTAINS(code, transformedDecl);
+ASSERT(code.find(exprDecl) < code.find(originalDecl));
+ASSERT(code.find(originalDecl) < code.find(transformedDecl));
+CHECK_NOT_CONTAINS(code, "_ca0_e0_lengthValue(");
+END_TEST
+
 TEST(ad_callable_absdiff_expression_remaps_parameters)
 Callable<float(float, float)> absDiff([](Var<float> a, Var<float> b) {
 	Var<float> e = Abs(a - b);
@@ -1736,6 +1867,7 @@ int main() {
 	test_ad_vec3_scalar_mul();
 	test_ad_vec3_scalar_mul_backward_types();
 	test_ad_vec3_scalar_expression_gradient_type_recording();
+	test_ad_matrix_constructor_and_matvec_expression_gradient();
 	test_ad_vec3_dot();
 	test_ad_vec3_cross();
 	test_ad_vec3_length();
@@ -1799,6 +1931,7 @@ int main() {
 	test_ad_callable_chain();
 	test_ad_nested_callable_expression_composes_subtapes();
 	test_ad_callable_local_primal_values_are_rematerialized();
+	test_ad_callable_rematerializes_transitive_local_dependencies();
 	test_ad_callable_absdiff_expression_remaps_parameters();
 	test_ad_callable_declared_parameter_order_remaps_all_locals();
 	test_ad_callable_two_params_with_param_reg();

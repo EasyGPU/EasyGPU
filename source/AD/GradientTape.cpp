@@ -97,6 +97,8 @@ std::string BuildNodeExpression(const GPU::IR::Node::Node &node) {
 	return GPU::IR::Builder::Builder::Get().BuildNode(node);
 }
 
+constexpr std::string_view kUpstreamAdjointPlaceholder = "__feather_ad_upstream__";
+
 int VectorSize(const std::string &type) {
 	if (type == "vec2" || type == "ivec2")
 		return 2;
@@ -107,8 +109,23 @@ int VectorSize(const std::string &type) {
 	return 0;
 }
 
+int MatrixSize(const std::string &type) {
+	if (type == "mat2")
+		return 2;
+	if (type == "mat3")
+		return 3;
+	if (type == "mat4")
+		return 4;
+	return 0;
+}
+
+bool IsScalarType(const std::string &type) {
+	return type == "float" || type == "int" || type == "uint" || type == "bool";
+}
+
 bool IsDifferentiableType(const std::string &type) {
-	return type == "float" || type == "vec2" || type == "vec3" || type == "vec4";
+	return type == "float" || type == "vec2" || type == "vec3" || type == "vec4" ||
+		   type == "mat2" || type == "mat3" || type == "mat4";
 }
 
 int SwizzleComponentIndex(char component) {
@@ -137,6 +154,10 @@ char VectorComponentName(size_t index) {
 
 bool IsVectorConstructorName(const std::string &name) {
 	return name == "vec2" || name == "vec3" || name == "vec4";
+}
+
+bool IsMatrixConstructorName(const std::string &name) {
+	return name == "mat2" || name == "mat3" || name == "mat4";
 }
 
 std::string SwizzleComponentExpr(const std::string &expr, size_t componentIndex) {
@@ -540,7 +561,7 @@ void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node,
 	size_t		nParams = params.size();
 	std::string intrinsicName(node.Name());
 
-	if (IsVectorConstructorName(intrinsicName)) {
+	if (IsVectorConstructorName(intrinsicName) || IsMatrixConstructorName(intrinsicName)) {
 		std::vector<TapeVar>	   inputs;
 		std::vector<std::string> inputGradExprs;
 		std::vector<std::string> inputGradTypes;
@@ -822,6 +843,63 @@ void GradientTape::CollectExpressionLeaves(const GPU::IR::Node::Node &node, cons
 		const auto &intrinsic = static_cast<const GPU::IR::Node::IntrinsicCallNode &>(node);
 		const auto &params	  = intrinsic.Parameter();
 		const auto intrinsicName = std::string(intrinsic.Name());
+		if (IsMatrixConstructorName(intrinsicName)) {
+			const int resultSize = MatrixSize(intrinsicName);
+			if (resultSize <= 0) {
+				return;
+			}
+
+			auto matrixUpstream = [&]() {
+				if (upstream == "1.0") {
+					return std::string(kUpstreamAdjointPlaceholder);
+				}
+				return upstream;
+			};
+
+			int componentOffset = 0;
+			for (const auto &param : params) {
+				if (!param || componentOffset >= resultSize * resultSize) {
+					continue;
+				}
+
+				const auto argType = InferNodeType(*param);
+				const int  argSize = std::max(1, VectorSize(argType));
+				const int  take = std::min(argSize, (resultSize * resultSize) - componentOffset);
+				if (take <= 0) {
+					continue;
+				}
+
+				if (argSize == 1) {
+					const int col = componentOffset / resultSize;
+					const int row = componentOffset % resultSize;
+					CollectExpressionLeaves(*param, std::format("({})[{}][{}]", matrixUpstream(), col, row),
+											"float", inputs, inputGradExprs, inputGradTypes);
+				} else {
+					const int col = componentOffset / resultSize;
+					if (componentOffset % resultSize == 0 && take == resultSize) {
+						CollectExpressionLeaves(*param, std::format("({})[{}]", matrixUpstream(), col),
+												argType, inputs, inputGradExprs, inputGradTypes);
+					} else {
+						for (int i = 0; i < take; i++) {
+							const int component = componentOffset + i;
+							const int c = component / resultSize;
+							const int r = component % resultSize;
+							CollectExpressionLeaves(
+								*param,
+								std::format("({})[{}][{}]", matrixUpstream(), c, r),
+								"float",
+								inputs,
+								inputGradExprs,
+								inputGradTypes);
+						}
+					}
+				}
+
+				componentOffset += take;
+			}
+			return;
+		}
+
 		if (IsVectorConstructorName(intrinsicName)) {
 			const int resultSize = VectorSize(intrinsicName);
 			if (resultSize <= 0) {
@@ -953,6 +1031,33 @@ void GradientTape::CollectExpressionLeaves(const GPU::IR::Node::Node &node, cons
 		if (rhs) {
 			std::string lhsExpr = nodeExpr(*lhs);
 			std::string rhsExpr = nodeExpr(*rhs);
+			const auto lhsType = InferNodeType(*lhs);
+			const auto rhsType = InferNodeType(*rhs);
+			const int lhsMatrixSize = MatrixSize(lhsType);
+			const int rhsVectorSize = VectorSize(rhsType);
+			if (lhsMatrixSize > 0 && rhsVectorSize == lhsMatrixSize) {
+				const std::string upstreamVec =
+					(upstream == "1.0" && VectorSize(upstreamType) == rhsVectorSize)
+						? std::string(kUpstreamAdjointPlaceholder)
+						: upstream;
+
+				std::ostringstream matrixCoeff;
+				matrixCoeff << lhsType << "(";
+				for (int i = 0; i < lhsMatrixSize; i++) {
+					if (i > 0) {
+						matrixCoeff << ", ";
+					}
+					matrixCoeff << "(" << upstreamVec << ")*(" << rhsExpr << ")."
+								<< VectorComponentName(static_cast<size_t>(i));
+				}
+				matrixCoeff << ")";
+
+				CollectExpressionLeaves(*lhs, matrixCoeff.str(), lhsType, inputs, inputGradExprs, inputGradTypes);
+				CollectExpressionLeaves(*rhs, std::format("(transpose({}))*({})", lhsExpr, upstreamVec),
+										rhsType, inputs, inputGradExprs, inputGradTypes);
+				return;
+			}
+
 			CollectExpressionLeaves(*lhs, std::format("({})*({})", upstream, rhsExpr), upstreamType, inputs,
 									inputGradExprs, inputGradTypes);
 			CollectExpressionLeaves(*rhs, std::format("({})*({})", upstream, lhsExpr), upstreamType, inputs,
@@ -1032,6 +1137,32 @@ std::string GradientTape::InferNodeType(const GPU::IR::Node::Node &node) const {
 	switch (node.Type()) {
 	case GPU::IR::Node::NodeType::Operation: {
 		const auto &operation = static_cast<const GPU::IR::Node::OperationNode &>(node);
+		if (operation.Code() == GPU::IR::Node::OperationCode::Mul &&
+			operation.LHS() != nullptr &&
+			operation.RHS() != nullptr) {
+			const auto lhsType = InferNodeType(*operation.LHS());
+			const auto rhsType = InferNodeType(*operation.RHS());
+			const int lhsMatrixSize = MatrixSize(lhsType);
+			const int rhsMatrixSize = MatrixSize(rhsType);
+			const int lhsVectorSize = VectorSize(lhsType);
+			const int rhsVectorSize = VectorSize(rhsType);
+
+			if (lhsMatrixSize > 0 && rhsVectorSize == lhsMatrixSize) {
+				return rhsType;
+			}
+			if (lhsVectorSize > 0 && rhsMatrixSize == lhsVectorSize) {
+				return lhsType;
+			}
+			if (lhsMatrixSize > 0 && rhsMatrixSize == lhsMatrixSize) {
+				return lhsType;
+			}
+			if (IsScalarType(lhsType) && (rhsVectorSize > 0 || rhsMatrixSize > 0)) {
+				return rhsType;
+			}
+			if (IsScalarType(rhsType) && (lhsVectorSize > 0 || lhsMatrixSize > 0)) {
+				return lhsType;
+			}
+		}
 		if (operation.LHS() != nullptr) {
 			return InferNodeType(*operation.LHS());
 		}

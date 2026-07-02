@@ -56,6 +56,31 @@ bool IsVectorAdjointType(const std::string &type) {
 	return type == "vec2" || type == "vec3" || type == "vec4";
 }
 
+int MatrixAdjointSize(const std::string &type) {
+	if (type == "mat2")
+		return 2;
+	if (type == "mat3")
+		return 3;
+	if (type == "mat4")
+		return 4;
+	return 0;
+}
+
+bool IsMatrixAdjointType(const std::string &type) {
+	return MatrixAdjointSize(type) > 0;
+}
+
+constexpr std::string_view kUpstreamAdjointPlaceholder = "__feather_ad_upstream__";
+
+std::string ReplaceAll(std::string value, const std::string_view needle, const std::string &replacement) {
+	size_t pos = 0;
+	while ((pos = value.find(needle, pos)) != std::string::npos) {
+		value.replace(pos, needle.size(), replacement);
+		pos += replacement.size();
+	}
+	return value;
+}
+
 bool IsLiteralName(const std::string &name) {
 	if (name.empty())
 		return true;
@@ -769,10 +794,14 @@ void AdjointGenerator::ProcessExpressionGradient(const TapeEntry &entry) {
 			gradType.clear();
 		}
 		std::string		  coeff	   = entry.inputGradExprs[i];
+		const bool		  coeffUsesExplicitUpstream = coeff.find(kUpstreamAdjointPlaceholder) != std::string::npos;
+		if (coeffUsesExplicitUpstream) {
+			coeff = ReplaceAll(std::move(coeff), kUpstreamAdjointPlaceholder, adjSrc);
+		}
 		if (coeff.size() > 96) {
 			coeff = EmitTemp(gradType.empty() ? entry.output.glslType : gradType, coeff);
 		}
-		std::string gradExpr = std::format("({})*({})", adjSrc, coeff);
+		std::string gradExpr = coeffUsesExplicitUpstream ? coeff : std::format("({})*({})", adjSrc, coeff);
 		if (gradExpr.size() > 128) {
 			gradExpr = EmitTemp(gradType.empty() ? entry.output.glslType : gradType, gradExpr);
 		}
@@ -904,6 +933,17 @@ void AdjointGenerator::EmitAccumulate(const std::string &inputName, const std::s
 		}
 		if (!gradType.empty()) {
 			resolvedGrad = std::format("dot({}, {}(1.0))", resolvedGrad, gradType);
+		}
+	}
+	if (IsScalarAdjointType(adjType) && IsMatrixAdjointType(gradTypeHint)) {
+		const int size = MatrixAdjointSize(gradTypeHint);
+		std::string sum;
+		for (int col = 0; col < size; col++) {
+			const std::string term = std::format("dot(({})[{}], vec{}(1.0))", resolvedGrad, col, size);
+			sum = sum.empty() ? term : std::format("({})+({})", sum, term);
+		}
+		if (!sum.empty()) {
+			resolvedGrad = sum;
 		}
 	}
 	if (resolvedGrad.size() > 120) {
@@ -1442,15 +1482,88 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	// The sub-tape adjoint coefficients may reference locals such as
 	// denominator/error/jacobian from the callable body; those names do not
 	// exist in main() unless we replay the callable's forward RHS expressions.
-	std::unordered_set<std::string> declaredForwardLocals;
+	//
+	// Replaying only the directly referenced locals is not sufficient. A local
+	// such as `jacobian` may depend on `lengthCubed`, which depends on `length`,
+	// which depends on `transformed`, which depends on an earlier `original`.
+	// Build the full transitive dependency closure and then emit it in the
+	// original tape order so every rematerialized RHS sees its prerequisites.
+	std::unordered_map<std::string, size_t> forwardLocalEntryByName;
+	for (size_t i = 0; i < remappedTape.Entries().size(); i++) {
+		const auto &se = remappedTape.Entries()[i];
+		if (se.kind == TapeOpKind::Return || se.output.name.empty() || se.forwardExpr.empty()) {
+			continue;
+		}
+		if (!IsDeclarableGLSLName(se.output.name) || !se.output.name.starts_with(prefix)) {
+			continue;
+		}
+		forwardLocalEntryByName[se.output.name] = i;
+	}
+
+	std::unordered_set<std::string> requiredForwardLocals;
+	std::unordered_set<std::string> visitingForwardLocals;
+	auto markForwardLocal = [&](auto &&self, const std::string &name) -> void {
+		auto entryIt = forwardLocalEntryByName.find(name);
+		if (entryIt == forwardLocalEntryByName.end()) {
+			return;
+		}
+		if (requiredForwardLocals.count(name) > 0) {
+			return;
+		}
+		if (!visitingForwardLocals.insert(name).second) {
+			return;
+		}
+
+		const auto &se = remappedTape.Entries()[entryIt->second];
+		for (const auto &in : se.inputs) {
+			self(self, in.name);
+		}
+
+		// Some expression-gradient entries intentionally carry a compact leaf
+		// list while their rematerialized RHS still names other callable locals.
+		// Scan the RHS as a conservative fallback so replay is closed over both
+		// structured inputs and textual dependencies.
+		std::string token;
+		for (size_t pos = 0; pos < se.forwardExpr.size();) {
+			const auto c = static_cast<unsigned char>(se.forwardExpr[pos]);
+			const bool isIdentStart = std::isalpha(c) || c == '_';
+			if (!isIdentStart) {
+				pos++;
+				continue;
+			}
+
+			const size_t start = pos++;
+			while (pos < se.forwardExpr.size()) {
+				const auto tc = static_cast<unsigned char>(se.forwardExpr[pos]);
+				if (!(std::isalnum(tc) || se.forwardExpr[pos] == '_')) {
+					break;
+				}
+				pos++;
+			}
+			token.assign(se.forwardExpr, start, pos - start);
+			self(self, token);
+		}
+
+		visitingForwardLocals.erase(name);
+		requiredForwardLocals.insert(name);
+	};
+
 	for (const auto &se : remappedTape.Entries()) {
 		if (se.kind == TapeOpKind::Return || se.output.name.empty() || se.forwardExpr.empty()) {
 			continue;
 		}
-		if (!IsDeclarableGLSLName(se.output.name)) {
+		if (!IsDeclarableGLSLName(se.output.name) || !se.output.name.starts_with(prefix)) {
 			continue;
 		}
 		if (se.output.name.find("_ad_expr") != std::string::npos) {
+			continue;
+		}
+		markForwardLocal(markForwardLocal, se.output.name);
+	}
+
+	std::unordered_set<std::string> declaredForwardLocals;
+	for (const auto &se : remappedTape.Entries()) {
+		if (requiredForwardLocals.count(se.output.name) == 0) {
 			continue;
 		}
 		const std::string type = se.output.glslType.empty() ? "float" : se.output.glslType;
@@ -1508,6 +1621,38 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		return result;
 	};
 	for (const auto &line : subBody.lines) {
+		auto declaredNameInLine = [](const std::string &candidate) -> std::string {
+			size_t first = candidate.find_first_not_of(" \t");
+			if (first == std::string::npos) {
+				return {};
+			}
+			size_t typeEnd = candidate.find_first_of(" \t", first);
+			if (typeEnd == std::string::npos) {
+				return {};
+			}
+			size_t nameStart = candidate.find_first_not_of(" \t", typeEnd);
+			if (nameStart == std::string::npos) {
+				return {};
+			}
+			size_t nameEnd = nameStart;
+			while (nameEnd < candidate.size()) {
+				const auto c = static_cast<unsigned char>(candidate[nameEnd]);
+				if (!(std::isalnum(c) || candidate[nameEnd] == '_')) {
+					break;
+				}
+				nameEnd++;
+			}
+			if (nameEnd == nameStart) {
+				return {};
+			}
+			std::string name = candidate.substr(nameStart, nameEnd - nameStart);
+			return IsDeclarableGLSLName(name) ? name : std::string{};
+		};
+		const std::string subBodyDeclaredName = declaredNameInLine(line);
+		if (!subBodyDeclaredName.empty() && declaredForwardLocals.count(subBodyDeclaredName) > 0) {
+			continue;
+		}
+
 		// Find the seed line (adj_of_loss = float(1.0)) and replace with dOut
 		std::string seedName = prefix + retVarName;
 		auto		nit		 = nameMap.find(retVarName);
