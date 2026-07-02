@@ -1271,6 +1271,10 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		}
 		rememberOriginalName(se.forVarName);
 	}
+	for (const auto &[originalName, mappedName] : nameMap) {
+		(void)mappedName;
+		rememberOriginalName(originalName);
+	}
 
 	auto remapSimpleName = [&nameMap, &prefix](const std::string &name) {
 		if (name.empty() || IsLiteralName(name))
