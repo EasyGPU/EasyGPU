@@ -76,6 +76,7 @@ struct TapeEntry {
 	int callableIndex = -1;					 // for Call: index into the sub-tape list (assigned during body recording)
 	std::vector<std::string> inputGradExprs; // for ExpressionGradient: coefficient per input
 	std::vector<std::string> inputGradTypes; // GLSL type for each coefficient expression
+	std::string forwardExpr;				 // rematerializable forward RHS expression, used when inlining callable AD
 
 	// Control flow metadata (only valid for ControlFlowBegin)
 	ControlFlowKind			 controlFlowKind = ControlFlowKind::IfBranch;

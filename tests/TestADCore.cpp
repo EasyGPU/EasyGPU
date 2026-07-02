@@ -62,6 +62,11 @@ static int pass_count = 0;
 		throw std::runtime_error("Expected '" + std::string(sub) + "' in:\n" + str);                                   \
 	}
 
+#define CHECK_NOT_CONTAINS(str, sub)                                                                                   \
+	if ((str).find(sub) != std::string::npos) {                                                                        \
+		throw std::runtime_error("Did not expect '" + std::string(sub) + "' in:\n" + str);                            \
+	}
+
 // =============================================================================
 // Helper: record a kernel and generate backward GLSL
 // =============================================================================
@@ -699,7 +704,8 @@ auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
 	Var<float> loss = z * z;
 	tape.MarkLoss(loss.VarName(), "float");
 });
-CHECK_CONTAINS(r.backwardCode, "length(vec3");
+CHECK_CONTAINS(r.backwardCode, "_ad_expr");
+CHECK_CONTAINS(r.backwardCode, "length(");
 CHECK_CONTAINS(r.backwardCode, "vec3(0.0, 0.0, 1.0)");
 CHECK_CONTAINS(r.backwardCode, "vec3(1.0, 0.0, 0.0)");
 CHECK_CONTAINS(r.backwardCode, "dot(");
@@ -1201,6 +1207,36 @@ CHECK_CONTAINS(code, "binding = 3");
 CHECK_CONTAINS(code, "_ad_grad_");
 END_TEST
 
+TEST(ad_kernel_readonly_buffer_leaf_is_not_gradient_target)
+GPU::Runtime::Buffer<float> target(8, GPU::Runtime::BufferMode::Read);
+GPU::Runtime::Buffer<float> pdf(8, GPU::Runtime::BufferMode::Read);
+GPU::Runtime::Buffer<float> weight(8);
+GPU::AD::ADKernel1D kernel(
+	[&](GPU::IR::Value::Var<int> &id) {
+		auto targetRef = target.Bind();
+		auto pdfRef	   = pdf.Bind();
+		auto weightRef = weight.Bind();
+
+		Var<float> targetValue = targetRef[id];
+		Var<float> pdfValue	  = pdfRef[id];
+		Var<float> model	  = weightRef[id];
+		Var<float> error	  = Abs(targetValue - model);
+		Var<float> error2	  = error * error;
+		Var<float> error3	  = error2 * error;
+		Var<float> denom	  = Max(pdfValue + model, 0.001f);
+		Var<float> loss		  = error3 / denom;
+
+		GPU::AD::Param(model);
+		GPU::AD::Loss(loss);
+	},
+	8);
+
+std::string code = kernel.CombinedCode();
+CHECK_CONTAINS(code, "grad_buf2");
+CHECK_NOT_CONTAINS(code, "grad_buf0");
+CHECK_NOT_CONTAINS(code, "grad_buf1");
+END_TEST
+
 TEST(ad_kernel_optimization_levels)
 GPU::Runtime::Buffer<float> xbuf(8);
 GPU::Runtime::Buffer<float> wbuf(8);
@@ -1517,6 +1553,53 @@ CHECK_CONTAINS(r.backwardCode, "+=");
 CHECK_CONTAINS(r.backwardCode, "*");
 END_TEST
 
+TEST(ad_callable_local_primal_values_are_rematerialized)
+Callable<float(float)> rational([](Var<float> x) {
+	Var<float> numerator	= x * x;
+	Var<float> denominator = x + Expr<float>(1.0f);
+	Var<float> y			= numerator / denominator;
+	Return(y);
+});
+
+auto				   r = RunADCallableTest([&](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<float> p;
+	p = 2.0f;
+	tape.RegisterParameter(p.VarName(), "float");
+	Var<float> y = rational(p);
+	tape.MarkLoss(y.VarName(), "float");
+});
+
+ASSERT(!r.forwardCode.empty());
+ASSERT(!r.backwardCode.empty());
+CHECK_CONTAINS(r.backwardCode, "float _ca");
+CHECK_CONTAINS(r.backwardCode, " = ");
+CHECK_CONTAINS(r.backwardCode, "/");
+CHECK_NOT_CONTAINS(r.backwardCode, "_ca0_e0(");
+END_TEST
+
+TEST(ad_callable_absdiff_expression_remaps_parameters)
+Callable<float(float, float)> absDiff([](Var<float> a, Var<float> b) {
+	Var<float> e = Abs(a - b);
+	Var<float> y = e * e;
+	Return(y);
+});
+
+auto						  r = RunADCallableTest([&](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<float> p;
+	p = 0.2f;
+	tape.RegisterParameter(p.VarName(), "float");
+	Var<float> y = absDiff(Expr<float>(0.7f), p);
+	tape.MarkLoss(y.VarName(), "float");
+});
+
+ASSERT(!r.forwardCode.empty());
+ASSERT(!r.backwardCode.empty());
+CHECK_CONTAINS(r.backwardCode, "sign");
+CHECK_NOT_CONTAINS(r.backwardCode, "_ca0_e0(");
+CHECK_NOT_CONTAINS(r.backwardCode, "(a)");
+CHECK_NOT_CONTAINS(r.backwardCode, "(b)");
+END_TEST
+
 TEST(ad_callable_two_params_with_param_reg)
 Callable<float(float, float)> mulOp2([](Var<float> a, Var<float> b) {
 	Var<float> r = a * b;
@@ -1634,6 +1717,7 @@ int main() {
 	test_ad_kernel_1d_api();
 	test_ad_kernel_1d_sigmoid();
 	test_ad_kernel_1d_grad_bindings_follow_forward_bindings();
+	test_ad_kernel_readonly_buffer_leaf_is_not_gradient_target();
 	test_ad_kernel_optimization_levels();
 	test_ad_ultra_optimization();
 		test_ad_extreme_optimization();
@@ -1647,6 +1731,8 @@ int main() {
 	test_ad_callable_add();
 	test_ad_callable_chain();
 	test_ad_nested_callable_expression_composes_subtapes();
+	test_ad_callable_local_primal_values_are_rematerialized();
+	test_ad_callable_absdiff_expression_remaps_parameters();
 	test_ad_callable_two_params_with_param_reg();
 
 	std::cout << "\n=== Results: " << pass_count << "/" << test_count << " passed ===\n";

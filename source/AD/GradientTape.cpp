@@ -93,6 +93,10 @@ bool IsLiteralName(const std::string &name) {
 	return false;
 }
 
+std::string BuildNodeExpression(const GPU::IR::Node::Node &node) {
+	return GPU::IR::Builder::Builder::Get().BuildNode(node);
+}
+
 int VectorSize(const std::string &type) {
 	if (type == "vec2" || type == "ivec2")
 		return 2;
@@ -385,6 +389,10 @@ void GradientTape::RecordAssignmentRhs(const GPU::IR::Node::Node &rhs, const Tap
 			auto entry	   = MakeEntry(_nextId++, TapeOpKind::BinaryOp, output,
 									   {TapeVar{inName, inType, IsParameter(inName)}, TapeVar{"0", "float", false}});
 			entry.binaryOp = GPU::IR::Node::OperationCode::Add;
+			entry.forwardExpr = BuildNodeExpression(node);
+			if (entry.forwardExpr.empty()) {
+				entry.forwardExpr = inName;
+			}
 			_entries.push_back(std::move(entry));
 
 			PropagateActive(output, {TapeVar{inName, inType, IsParameter(inName)}});
@@ -452,6 +460,7 @@ void GradientTape::RecordMemberAccess(const GPU::IR::Node::MemberAccessNode &nod
 	auto				 entry = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, output, inputs);
 	entry.inputGradExprs.push_back(BuildSwizzleScatterExpression(memberName, "1.0", baseType));
 	entry.inputGradTypes.push_back(baseType);
+	entry.forwardExpr = BuildNodeExpression(node);
 	_entries.push_back(std::move(entry));
 
 	PropagateActive(output, inputs);
@@ -485,6 +494,7 @@ void GradientTape::RecordCompoundAssignment(const GPU::IR::Node::CompoundAssignm
 
 	auto	entry	 = MakeEntry(_nextId++, TapeOpKind::CompoundAssign, output, {output, rhsVar});
 	entry.compoundOp = code;
+	entry.forwardExpr = BuildNodeExpression(*node.RHS());
 	_entries.push_back(std::move(entry));
 
 	if (IsActive(name)) {
@@ -518,6 +528,7 @@ void GradientTape::RecordOperation(const GPU::IR::Node::OperationNode &op, const
 	entry.binaryOp		 = code;
 	entry.inputGradExprs = std::move(inputGradExprs);
 	entry.inputGradTypes = std::move(inputGradTypes);
+	entry.forwardExpr	 = BuildNodeExpression(op);
 	_entries.push_back(std::move(entry));
 
 	PropagateActive(output, inputs);
@@ -548,10 +559,12 @@ void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node,
 			std::vector<std::string> inputGradTypes;
 			CollectExpressionLeaves(param, "1.0", paramType, inputs, inputGradExprs, inputGradTypes);
 			if (!inputs.empty()) {
-				TapeVar paramOutput{paramExpr, paramType, false};
+				const std::string paramTempName = std::format("_ad_expr{}", _nextId);
+				TapeVar			  paramOutput{paramTempName, paramType, false};
 				auto exprEntry = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, paramOutput, inputs);
 				exprEntry.inputGradExprs = std::move(inputGradExprs);
 				exprEntry.inputGradTypes = std::move(inputGradTypes);
+				exprEntry.forwardExpr = paramExpr;
 				_entries.push_back(std::move(exprEntry));
 				PropagateActive(paramOutput, inputs);
 
@@ -561,6 +574,7 @@ void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node,
 					output,
 					{paramOutput});
 				intrinsicEntry.intrinsicName = intrinsicName;
+				intrinsicEntry.forwardExpr = BuildNodeExpression(node);
 				_entries.push_back(std::move(intrinsicEntry));
 				PropagateActive(output, {paramOutput});
 				return;
@@ -587,6 +601,7 @@ void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node,
 			entry.intrinsicName = intrinsicName;
 			entry.inputGradExprs = std::move(inputGradExprs);
 			entry.inputGradTypes = std::move(inputGradTypes);
+			entry.forwardExpr	 = BuildNodeExpression(node);
 			_entries.push_back(std::move(entry));
 
 			PropagateActive(output, inputs);
@@ -620,6 +635,7 @@ void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node,
 
 	auto entry			= MakeEntry(_nextId++, kind, output, inputs);
 	entry.intrinsicName = intrinsicName;
+	entry.forwardExpr	= BuildNodeExpression(node);
 	_entries.push_back(std::move(entry));
 
 	PropagateActive(output, inputs);
@@ -642,6 +658,7 @@ void GradientTape::RecordTernary(const GPU::IR::Node::TernaryNode &node, const T
 	inputs.push_back(makeInput(*node.FalseExpr()));
 
 	auto entry = MakeEntry(_nextId++, TapeOpKind::Ternary, output, inputs);
+	entry.forwardExpr = BuildNodeExpression(node);
 	_entries.push_back(std::move(entry));
 
 	if (IsActive(output.name) || IsParameter(output.name)) {
@@ -703,6 +720,7 @@ void GradientTape::AddExpressionLeaf(const GPU::IR::Node::Node &node, const std:
 		TapeVar callOutput{callExpr, InferNodeType(call), false};
 		auto	callEntry = MakeEntry(_nextId++, TapeOpKind::Call, callOutput, callInputs);
 		callEntry.callableFuncName = call.FuncName();
+		callEntry.forwardExpr = callExpr;
 		_entries.push_back(std::move(callEntry));
 
 		inputs.push_back(callOutput);
@@ -1274,6 +1292,7 @@ void GradientTape::RecordCall(const GPU::IR::Node::CallNode &callNode, const Tap
 
 	auto entry			   = MakeEntry(_nextId++, TapeOpKind::Call, output, inputs);
 	entry.callableFuncName = callNode.FuncName();
+	entry.forwardExpr	   = BuildNodeExpression(callNode);
 	_entries.push_back(std::move(entry));
 
 	PropagateActive(output, inputs);
