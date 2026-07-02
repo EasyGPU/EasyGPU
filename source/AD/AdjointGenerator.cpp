@@ -35,6 +35,19 @@ bool IsNumericLiteralName(const std::string &name) {
 	return (end[0] == 'f' || end[0] == 'F' || end[0] == 'u' || end[0] == 'U') && end[1] == '\0';
 }
 
+bool IsConstantConstructorExpression(const std::string &name, size_t typeLength) {
+	if (name.size() <= typeLength + 2 || name[typeLength] != '(' || name.back() != ')') {
+		return false;
+	}
+	for (size_t i = typeLength + 1; i + 1 < name.size(); i++) {
+		const unsigned char c = static_cast<unsigned char>(name[i]);
+		if (std::isalpha(c) || c == '_' || c == '[' || c == ']') {
+			return false;
+		}
+	}
+	return true;
+}
+
 bool IsScalarAdjointType(const std::string &type) {
 	return type == "float";
 }
@@ -55,7 +68,7 @@ bool IsLiteralName(const std::string &name) {
 									  "mat4",  "dvec2", "dvec3", "dvec4", "dmat2", "dmat3", "dmat4"};
 	for (const char *t : glslTypes) {
 		size_t tlen = std::char_traits<char>::length(t);
-		if (name.compare(0, tlen, t) == 0 && name.size() > tlen && name[tlen] == '(') {
+		if (name.compare(0, tlen, t) == 0 && IsConstantConstructorExpression(name, tlen)) {
 			return true;
 		}
 	}
@@ -1265,8 +1278,10 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		remappedTape.RecordRemapped(se);
 	}
 
-	// Deep-copy sub-tapes so nested callable bodies work
-	remappedTape.CloneSubTapesFrom(subTape);
+	// Deep-copy the callable registry visible from the current tape. Typed IR
+	// records callable bodies as siblings under the owning shader tape, so an
+	// outer callable may call a sibling rather than a child sub-tape.
+	remappedTape.CloneSubTapesFrom(*_tape);
 
 	// Mark the return variable as the "loss" for the remapped tape
 	if (!retVarName.empty()) {
@@ -1283,6 +1298,9 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	// Register parameters in the remapped tape
 	for (size_t pi = 0; pi < entry.inputs.size(); pi++) {
 		std::string pName = entry.inputs[pi].name;
+		if (IsLiteralName(pName)) {
+			continue;
+		}
 		std::string pType = entry.inputs[pi].glslType;
 		remappedTape.RegisterParameter(pName, pType);
 	}
@@ -1293,12 +1311,10 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 
 	// Emit declarations for local adjoint variables (prefixed ones)
 	for (const auto &[adjName, glslType] : subBody.declarations) {
-		// Filter: only emit local ones (not parameter adjoints which are already
-		// in the main adjoint table)
-		if (adjName.find(prefix) == 0 || adjName.find("d_" + prefix) == 0 || adjName.find("grad_" + prefix) == 0) {
+		// Emit any local adjoint produced by the inlined sub-body. Parameter
+		// adjoints already exist in the parent table and are intentionally reused.
+		if (_adjTable.GetTypeForAdjoint(adjName).empty()) {
 			_adjTable.DeclareAdjoint(adjName, glslType);
-		} else {
-			// This is a parameter adjoint — already in the main adjTable
 		}
 	}
 

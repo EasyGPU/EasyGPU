@@ -9,6 +9,11 @@
 #include <Flow/IfFlow.h>
 #include <Flow/ReturnFlow.h>
 #include <IR/Builder/Builder.h>
+#include <IR/Node/CallInst.h>
+#include <IR/Node/LoadLocalVariable.h>
+#include <IR/Node/LoadUniform.h>
+#include <IR/Node/MemberAccess.h>
+#include <IR/Node/Store.h>
 #include <IR/Value/Var.h>
 #include <Kernel/Kernel.h>
 #include <Runtime/Buffer.h>
@@ -644,6 +649,62 @@ CHECK_CONTAINS(r.backwardCode, "length");
 CHECK_CONTAINS(r.backwardCode, "dot");
 END_TEST
 
+TEST(ad_member_access_alias_scatters_to_vector_adjoint)
+auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<Vec3> v = MakeFloat3(1.0f, 2.0f, 3.0f);
+	Var<float> z;
+
+	std::unique_ptr<GPU::IR::Node::Node> lhs = z.Load();
+	std::unique_ptr<GPU::IR::Node::Node> base = v.Load();
+	std::unique_ptr<GPU::IR::Node::Node> member = std::make_unique<GPU::IR::Node::LoadUniformNode>("z");
+	auto access = std::make_unique<GPU::IR::Node::MemberAccessNode>(base, member);
+	auto store = std::make_unique<GPU::IR::Node::StoreNode>(std::move(lhs), std::move(access));
+	GPU::IR::Builder::Builder::Get().Build(*store, true);
+
+	Var<float> l = z * z;
+	tape.MarkLoss(l.VarName(), "float");
+});
+CHECK_CONTAINS(r.backwardCode, "vec3(0.0, 0.0, 1.0)");
+if (r.backwardCode.find("d_(") != std::string::npos) {
+	throw std::runtime_error("Invalid adjoint identifier generated for member access:\n" + r.backwardCode);
+}
+END_TEST
+
+TEST(ad_vec3_constructor_expression_feeds_normalize_gradient)
+auto r = RunADTest([](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<float> p;
+	p = 0.25f;
+	tape.RegisterParameter(p.VarName(), "float");
+
+	std::vector<std::unique_ptr<GPU::IR::Node::Node>> ctorArgs;
+	ctorArgs.push_back(p.Load());
+	ctorArgs.push_back(std::make_unique<GPU::IR::Node::LoadUniformNode>("0.5"));
+	ctorArgs.push_back(std::make_unique<GPU::IR::Node::LoadUniformNode>("1.0"));
+	auto ctor = std::make_unique<GPU::IR::Node::IntrinsicCallNode>("vec3", std::move(ctorArgs));
+
+	std::vector<std::unique_ptr<GPU::IR::Node::Node>> normalizeArgs;
+	normalizeArgs.push_back(std::move(ctor));
+	auto normalize = std::make_unique<GPU::IR::Node::IntrinsicCallNode>("normalize", std::move(normalizeArgs));
+	GPU::IR::Builder::Builder::Get().Build(
+		GPU::IR::Node::LocalVariableNode("memberCtorProbe", "vec3", std::move(normalize)), true);
+
+	Var<float> z;
+	std::unique_ptr<GPU::IR::Node::Node> lhs = z.Load();
+	std::unique_ptr<GPU::IR::Node::Node> base = std::make_unique<GPU::IR::Node::LoadLocalVariableNode>("memberCtorProbe");
+	std::unique_ptr<GPU::IR::Node::Node> member = std::make_unique<GPU::IR::Node::LoadUniformNode>("z");
+	auto access = std::make_unique<GPU::IR::Node::MemberAccessNode>(base, member);
+	auto store = std::make_unique<GPU::IR::Node::StoreNode>(std::move(lhs), std::move(access));
+	GPU::IR::Builder::Builder::Get().Build(*store, true);
+
+	Var<float> loss = z * z;
+	tape.MarkLoss(loss.VarName(), "float");
+});
+CHECK_CONTAINS(r.backwardCode, "length(vec3");
+CHECK_CONTAINS(r.backwardCode, "vec3(0.0, 0.0, 1.0)");
+CHECK_CONTAINS(r.backwardCode, "vec3(1.0, 0.0, 0.0)");
+CHECK_CONTAINS(r.backwardCode, "dot(");
+END_TEST
+
 // =============================================================================
 // SECTION 7: Compound assignments
 // =============================================================================
@@ -751,6 +812,15 @@ ASSERT(table.Has("v0"));
 ASSERT(!table.Has("v9"));
 auto decls = table.AllDeclarations();
 ASSERT(decls.size() == 2);
+END_TEST
+
+TEST(ad_adjoint_table_sanitizes_expression_names)
+std::string adj = GPU::AD::AdjointTable::MakeAdjointName("(v12).z");
+ASSERT(adj.find('(') == std::string::npos);
+ASSERT(adj.find(')') == std::string::npos);
+ASSERT(adj.find('.') == std::string::npos);
+ASSERT(adj.rfind("d_", 0) == 0);
+ASSERT(GPU::AD::AdjointTable::MakeAdjointName("buf0[v1+1]") == "grad_buf0");
 END_TEST
 
 TEST(ad_adjoint_table_clear_resets_array_sizes)
@@ -1422,6 +1492,31 @@ CHECK_CONTAINS(r.backwardCode, "+=");
 CHECK_CONTAINS(r.backwardCode, "*");
 END_TEST
 
+TEST(ad_nested_callable_expression_composes_subtapes)
+Callable<float(float)> inner([](Var<float> x) {
+	Var<float> r = x * x;
+	Return(r);
+});
+
+Callable<float(float)> outer([&](Var<float> x) {
+	Return(inner(x) * Expr<float>(3.0f));
+});
+
+auto				   r = RunADCallableTest([&](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<float> p;
+	p = 2.0f;
+	tape.RegisterParameter(p.VarName(), "float");
+	Var<float> y = outer(p);
+	tape.MarkLoss(y.VarName(), "float");
+});
+
+ASSERT(!r.forwardCode.empty());
+ASSERT(!r.backwardCode.empty());
+CHECK_CONTAINS(r.tapeSummary, "call=");
+CHECK_CONTAINS(r.backwardCode, "+=");
+CHECK_CONTAINS(r.backwardCode, "*");
+END_TEST
+
 TEST(ad_callable_two_params_with_param_reg)
 Callable<float(float, float)> mulOp2([](Var<float> a, Var<float> b) {
 	Var<float> r = a * b;
@@ -1495,6 +1590,8 @@ int main() {
 	test_ad_vec3_cross();
 	test_ad_vec3_length();
 	test_ad_vec3_normalize();
+	test_ad_member_access_alias_scatters_to_vector_adjoint();
+	test_ad_vec3_constructor_expression_feeds_normalize_gradient();
 
 	// Section 7: Compound assignments
 	test_ad_compound_add_assign();
@@ -1507,6 +1604,7 @@ int main() {
 	// Section 9: Parameter and adjoint table
 	test_ad_params_multiple();
 	test_ad_adjoint_table();
+	test_ad_adjoint_table_sanitizes_expression_names();
 	test_ad_adjoint_table_clear_resets_array_sizes();
 	test_ad_active_propagation();
 
@@ -1548,6 +1646,7 @@ int main() {
 	test_ad_callable_mul();
 	test_ad_callable_add();
 	test_ad_callable_chain();
+	test_ad_nested_callable_expression_composes_subtapes();
 	test_ad_callable_two_params_with_param_reg();
 
 	std::cout << "\n=== Results: " << pass_count << "/" << test_count << " passed ===\n";

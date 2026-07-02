@@ -5,6 +5,7 @@
 
 #include <AD/AdjointTable.h>
 
+#include <cctype>
 #include <format>
 
 namespace GPU::AD {
@@ -129,22 +130,40 @@ void AdjointTable::Clear() {
 }
 
 std::string AdjointTable::MakeAdjointName(const std::string &varName) {
+	auto sanitizeIdentifierPart = [](const std::string &name) {
+		std::string sanitized;
+		sanitized.reserve(name.size());
+		for (unsigned char c : name) {
+			char next = '_';
+			if (std::isalnum(c) || c == '_') {
+				next = static_cast<char>(c);
+			}
+			if (next == '_' && (sanitized.empty() || sanitized.back() == '_')) {
+				continue;
+			}
+			sanitized += next;
+		}
+		while (!sanitized.empty() && sanitized.front() == '_') {
+			sanitized.erase(sanitized.begin());
+		}
+		if (sanitized.empty()) {
+			return std::string("v");
+		}
+		if (std::isdigit(static_cast<unsigned char>(sanitized.front()))) {
+			sanitized.insert(0, "v_");
+		}
+		return sanitized;
+	};
+
 	// Buffer element access "buf2[0]" or "buf2[expr]" -> "grad_buf2"
 	// All accesses to the same buffer share a single adjoint array.
 	// Index expressions are preserved in the generated GLSL code by
 	// reconstructing "grad_buf2[index]" from the base name and index.
 	if (auto bracketPos = varName.find('['); bracketPos != std::string::npos) {
-		return "grad_" + varName.substr(0, bracketPos);
+		return "grad_" + sanitizeIdentifierPart(varName.substr(0, bracketPos));
 	}
-	// Swizzle access "v3.xyz" -> "d_v3_xyz"
-	std::string sanitized;
-	for (char c : varName) {
-		if (c == '.')
-			sanitized += '_';
-		else
-			sanitized += c;
-	}
-	return std::format("d_{}", sanitized);
+
+	return std::format("d_{}", sanitizeIdentifierPart(varName));
 }
 
 } // namespace GPU::AD

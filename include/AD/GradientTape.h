@@ -35,6 +35,7 @@ class TernaryNode;
 class LocalVariableNode;
 class LoadNode;
 class CallNode;
+class MemberAccessNode;
 class ReturnNode;
 } // namespace GPU::IR::Node
 
@@ -234,17 +235,22 @@ private:
 	void				   RecordTernary(const GPU::IR::Node::TernaryNode &node, const TapeVar &output);
 	void				   RecordLocalVariable(const GPU::IR::Node::LocalVariableNode &node);
 	void				   RecordAssignmentRhs(const GPU::IR::Node::Node &rhs, const TapeVar &output);
+	void				   RecordMemberAccess(const GPU::IR::Node::MemberAccessNode &node, const TapeVar &output);
 	void				   RecordCall(const GPU::IR::Node::CallNode &node, const TapeVar &output);
 	void				   RecordReturn(const GPU::IR::Node::ReturnNode &node);
 	void				   AddExpressionLeaf(const GPU::IR::Node::Node &node, const std::string &coeff,
 											 const std::string &coeffType, std::vector<TapeVar> &inputs,
 											 std::vector<std::string> &inputGradExprs,
-											 std::vector<std::string> &inputGradTypes) const;
+											 std::vector<std::string> &inputGradTypes);
 	void				   CollectExpressionLeaves(const GPU::IR::Node::Node &node, const std::string &upstream,
 												   const std::string &upstreamType, std::vector<TapeVar> &inputs,
 												   std::vector<std::string> &inputGradExprs,
-												   std::vector<std::string> &inputGradTypes) const;
+												   std::vector<std::string> &inputGradTypes);
 	std::string			   InferNodeType(const GPU::IR::Node::Node &node) const;
+	static std::string	   ExtractMemberName(const GPU::IR::Node::Node &memberNode);
+	static std::string	   BuildSwizzleScatterExpression(const std::string &memberName,
+														  const std::string &upstream,
+														  const std::string &baseType);
 
 	/** Extract a variable name from a Load node (returns Unwrap()). */
 	static std::string	   ExtractVarName(const GPU::IR::Node::Node &loadNode);

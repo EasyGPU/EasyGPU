@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include <format>
 #include <functional>
+#include <sstream>
 
 namespace GPU::AD {
 
@@ -59,6 +60,19 @@ bool IsNumericLiteralName(const std::string &name) {
 	return (end[0] == 'f' || end[0] == 'F' || end[0] == 'u' || end[0] == 'U') && end[1] == '\0';
 }
 
+bool IsConstantConstructorExpression(const std::string &name, size_t typeLength) {
+	if (name.size() <= typeLength + 2 || name[typeLength] != '(' || name.back() != ')') {
+		return false;
+	}
+	for (size_t i = typeLength + 1; i + 1 < name.size(); i++) {
+		const unsigned char c = static_cast<unsigned char>(name[i]);
+		if (std::isalpha(c) || c == '_' || c == '[' || c == ']') {
+			return false;
+		}
+	}
+	return true;
+}
+
 bool IsLiteralName(const std::string &name) {
 	if (name.empty())
 		return true;
@@ -72,11 +86,70 @@ bool IsLiteralName(const std::string &name) {
 									  "dmat4"};
 	for (const char *t : glslTypes) {
 		size_t len = std::char_traits<char>::length(t);
-		if (name.compare(0, len, t) == 0 && name.size() > len && name[len] == '(') {
+		if (name.compare(0, len, t) == 0 && IsConstantConstructorExpression(name, len)) {
 			return true;
 		}
 	}
 	return false;
+}
+
+int VectorSize(const std::string &type) {
+	if (type == "vec2" || type == "ivec2")
+		return 2;
+	if (type == "vec3" || type == "ivec3")
+		return 3;
+	if (type == "vec4" || type == "ivec4")
+		return 4;
+	return 0;
+}
+
+bool IsDifferentiableType(const std::string &type) {
+	return type == "float" || type == "vec2" || type == "vec3" || type == "vec4";
+}
+
+int SwizzleComponentIndex(char component) {
+	switch (component) {
+	case 'x':
+	case 'r':
+		return 0;
+	case 'y':
+	case 'g':
+		return 1;
+	case 'z':
+	case 'b':
+		return 2;
+	case 'w':
+	case 'a':
+		return 3;
+	default:
+		return -1;
+	}
+}
+
+char VectorComponentName(size_t index) {
+	static constexpr char components[] = {'x', 'y', 'z', 'w'};
+	return index < (sizeof(components) / sizeof(components[0])) ? components[index] : 'x';
+}
+
+bool IsVectorConstructorName(const std::string &name) {
+	return name == "vec2" || name == "vec3" || name == "vec4";
+}
+
+std::string SwizzleComponentExpr(const std::string &expr, size_t componentIndex) {
+	return std::format("({}).{}", expr, VectorComponentName(componentIndex));
+}
+
+std::string SumSwizzleComponents(const std::string &expr, int componentCount) {
+	std::string sum;
+	for (int i = 0; i < componentCount; i++) {
+		auto component = SwizzleComponentExpr(expr, static_cast<size_t>(i));
+		if (sum.empty()) {
+			sum = std::move(component);
+		} else {
+			sum = std::format("({})+({})", sum, component);
+		}
+	}
+	return sum.empty() ? "0.0" : sum;
 }
 
 std::string SingleArgumentIntrinsicDerivative(const std::string &intrinsicName, const std::string &argExpr) {
@@ -345,6 +418,9 @@ void GradientTape::RecordAssignmentRhs(const GPU::IR::Node::Node &rhs, const Tap
 	}
 
 	case GPU::IR::Node::NodeType::MemberAccess:
+		RecordMemberAccess(static_cast<const GPU::IR::Node::MemberAccessNode &>(rhs), output);
+		break;
+
 	case GPU::IR::Node::NodeType::ArrayAccess:
 		recordAlias(rhs);
 		break;
@@ -352,6 +428,33 @@ void GradientTape::RecordAssignmentRhs(const GPU::IR::Node::Node &rhs, const Tap
 	default:
 		break;
 	}
+}
+
+void GradientTape::RecordMemberAccess(const GPU::IR::Node::MemberAccessNode &node, const TapeVar &output) {
+	if (node.LHS() == nullptr || node.RHS() == nullptr)
+		return;
+
+	std::string baseName = ExtractVarName(*node.LHS());
+	if (baseName.empty())
+		return;
+
+	std::string memberName = ExtractMemberName(*node.RHS());
+	if (memberName.empty())
+		return;
+
+	std::string baseType;
+	if (auto *t = GetVarType(baseName))
+		baseType = *t;
+	else
+		baseType = InferNodeType(*node.LHS());
+
+	std::vector<TapeVar> inputs{TapeVar{baseName, baseType, IsParameter(baseName)}};
+	auto				 entry = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, output, inputs);
+	entry.inputGradExprs.push_back(BuildSwizzleScatterExpression(memberName, "1.0", baseType));
+	entry.inputGradTypes.push_back(baseType);
+	_entries.push_back(std::move(entry));
+
+	PropagateActive(output, inputs);
 }
 
 void GradientTape::RecordCompoundAssignment(const GPU::IR::Node::CompoundAssignmentNode &node) {
@@ -432,22 +535,35 @@ void GradientTape::RecordIntrinsic(const GPU::IR::Node::IntrinsicCallNode &node,
 			paramName = ExtractVarName(param);
 		if (paramName.empty()) {
 			std::string paramExpr = GPU::IR::Builder::Builder::Get().BuildNode(param);
-			std::string derivative = SingleArgumentIntrinsicDerivative(intrinsicName, paramExpr);
-			if (!derivative.empty()) {
-				std::vector<TapeVar>	 inputs;
-				std::vector<std::string> inputGradExprs;
-				std::vector<std::string> inputGradTypes;
-				CollectExpressionLeaves(param, derivative, output.glslType, inputs, inputGradExprs, inputGradTypes);
-				if (!inputs.empty()) {
-					auto entry			 = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, output, inputs);
-					entry.intrinsicName = intrinsicName;
-					entry.inputGradExprs = std::move(inputGradExprs);
-					entry.inputGradTypes = std::move(inputGradTypes);
-					_entries.push_back(std::move(entry));
+			if (paramExpr.empty()) {
+				return;
+			}
+			std::string paramType = InferNodeType(param);
+			if (!IsDifferentiableType(paramType)) {
+				return;
+			}
 
-					PropagateActive(output, inputs);
-					return;
-				}
+			std::vector<TapeVar>	 inputs;
+			std::vector<std::string> inputGradExprs;
+			std::vector<std::string> inputGradTypes;
+			CollectExpressionLeaves(param, "1.0", paramType, inputs, inputGradExprs, inputGradTypes);
+			if (!inputs.empty()) {
+				TapeVar paramOutput{paramExpr, paramType, false};
+				auto exprEntry = MakeEntry(_nextId++, TapeOpKind::ExpressionGradient, paramOutput, inputs);
+				exprEntry.inputGradExprs = std::move(inputGradExprs);
+				exprEntry.inputGradTypes = std::move(inputGradTypes);
+				_entries.push_back(std::move(exprEntry));
+				PropagateActive(paramOutput, inputs);
+
+				auto intrinsicEntry = MakeEntry(
+					_nextId++,
+					nParams == 1 ? TapeOpKind::Intrinsic1 : (nParams == 2 ? TapeOpKind::Intrinsic2 : TapeOpKind::Intrinsic3),
+					output,
+					{paramOutput});
+				intrinsicEntry.intrinsicName = intrinsicName;
+				_entries.push_back(std::move(intrinsicEntry));
+				PropagateActive(output, {paramOutput});
+				return;
 			}
 		}
 	}
@@ -552,7 +668,69 @@ void GradientTape::RecordLocalVariable(const GPU::IR::Node::LocalVariableNode &n
 void GradientTape::AddExpressionLeaf(const GPU::IR::Node::Node &node, const std::string &coeff,
 									 const std::string &coeffType, std::vector<TapeVar> &inputs,
 									 std::vector<std::string> &inputGradExprs,
-									 std::vector<std::string> &inputGradTypes) const {
+									 std::vector<std::string> &inputGradTypes) {
+	if (node.Type() == GPU::IR::Node::NodeType::Call) {
+		const auto &call = static_cast<const GPU::IR::Node::CallNode &>(node);
+		std::string callExpr = GPU::IR::Builder::Builder::Get().BuildNode(call);
+		if (callExpr.empty() || IsLiteralName(callExpr)) {
+			return;
+		}
+
+		std::vector<TapeVar> callInputs;
+		callInputs.reserve(call.Arguments().size());
+		for (const auto &arg : call.Arguments()) {
+			if (!arg) {
+				continue;
+			}
+
+			std::string argName = TryExtractVarName(*arg);
+			if (argName.empty()) {
+				argName = ExtractVarName(*arg);
+			}
+			if (argName.empty()) {
+				argName = GPU::IR::Builder::Builder::Get().BuildNode(*arg);
+			}
+
+			std::string argType;
+			if (auto *tp = GetVarType(argName)) {
+				argType = *tp;
+			} else {
+				argType = InferNodeType(*arg);
+			}
+			callInputs.push_back(TapeVar{argName, argType, IsParameter(argName)});
+		}
+
+		TapeVar callOutput{callExpr, InferNodeType(call), false};
+		auto	callEntry = MakeEntry(_nextId++, TapeOpKind::Call, callOutput, callInputs);
+		callEntry.callableFuncName = call.FuncName();
+		_entries.push_back(std::move(callEntry));
+
+		inputs.push_back(callOutput);
+		inputGradExprs.push_back(coeff);
+		inputGradTypes.push_back(coeffType);
+		return;
+	}
+
+	if (node.Type() == GPU::IR::Node::NodeType::MemberAccess) {
+		const auto &member = static_cast<const GPU::IR::Node::MemberAccessNode &>(node);
+		if (member.LHS() != nullptr && member.RHS() != nullptr) {
+			std::string baseName = ExtractVarName(*member.LHS());
+			std::string memberName = ExtractMemberName(*member.RHS());
+			if (!baseName.empty() && !memberName.empty()) {
+				std::string baseType;
+				if (auto *tp = GetVarType(baseName))
+					baseType = *tp;
+				else
+					baseType = InferNodeType(*member.LHS());
+
+				inputs.push_back(TapeVar{baseName, baseType, IsParameter(baseName)});
+				inputGradExprs.push_back(BuildSwizzleScatterExpression(memberName, coeff, baseType));
+				inputGradTypes.push_back(baseType);
+				return;
+			}
+		}
+	}
+
 	std::string n = TryExtractVarName(node);
 	if (n.empty())
 		n = ExtractVarName(node);
@@ -565,6 +743,8 @@ void GradientTape::AddExpressionLeaf(const GPU::IR::Node::Node &node, const std:
 		t = *tp;
 	else
 		t = InferNodeType(node);
+	if (!IsDifferentiableType(t))
+		return;
 	inputs.push_back(TapeVar{n, t, IsParameter(n)});
 	inputGradExprs.push_back(coeff);
 	inputGradTypes.push_back(coeffType);
@@ -573,15 +753,95 @@ void GradientTape::AddExpressionLeaf(const GPU::IR::Node::Node &node, const std:
 void GradientTape::CollectExpressionLeaves(const GPU::IR::Node::Node &node, const std::string &upstream,
 										   const std::string &upstreamType, std::vector<TapeVar> &inputs,
 										   std::vector<std::string> &inputGradExprs,
-										   std::vector<std::string> &inputGradTypes) const {
+										   std::vector<std::string> &inputGradTypes) {
 	auto nodeExpr = [](const GPU::IR::Node::Node &n) { return GPU::IR::Builder::Builder::Get().BuildNode(n); };
 
 	if (node.Type() == GPU::IR::Node::NodeType::CallInst) {
 		const auto &intrinsic = static_cast<const GPU::IR::Node::IntrinsicCallNode &>(node);
 		const auto &params	  = intrinsic.Parameter();
+		const auto intrinsicName = std::string(intrinsic.Name());
+		if (IsVectorConstructorName(intrinsicName)) {
+			const int resultSize = VectorSize(intrinsicName);
+			if (resultSize <= 0) {
+				return;
+			}
+
+			if (params.size() == 1 && params[0]) {
+				const auto argType = InferNodeType(*params[0]);
+				if (VectorSize(argType) <= 0) {
+					if (upstream == "1.0" && VectorSize(upstreamType) == resultSize) {
+						CollectExpressionLeaves(*params[0], std::format("{}(1.0)", upstreamType), upstreamType, inputs,
+												inputGradExprs, inputGradTypes);
+					} else {
+						CollectExpressionLeaves(*params[0], SumSwizzleComponents(upstream, resultSize), "float", inputs,
+												inputGradExprs, inputGradTypes);
+					}
+					return;
+				}
+			}
+
+			int componentOffset = 0;
+			for (const auto &param : params) {
+				if (!param || componentOffset >= resultSize) {
+					continue;
+				}
+
+				const auto argType = InferNodeType(*param);
+				const int  argSize = std::max(1, VectorSize(argType));
+				const int  take = std::min(argSize, resultSize - componentOffset);
+				if (take <= 0) {
+					continue;
+				}
+
+				if (argSize == 1) {
+					if (upstream == "1.0" && VectorSize(upstreamType) == resultSize) {
+						const std::string memberName(1, VectorComponentName(static_cast<size_t>(componentOffset)));
+						CollectExpressionLeaves(
+							*param,
+							BuildSwizzleScatterExpression(memberName, "1.0", upstreamType),
+							upstreamType,
+							inputs,
+							inputGradExprs,
+							inputGradTypes);
+					} else {
+						CollectExpressionLeaves(*param, SwizzleComponentExpr(upstream, static_cast<size_t>(componentOffset)),
+												"float", inputs, inputGradExprs, inputGradTypes);
+					}
+				} else {
+					std::ostringstream coeff;
+					coeff << argType << "(";
+					for (int i = 0; i < take; i++) {
+						if (i > 0) {
+							coeff << ", ";
+						}
+						coeff << SwizzleComponentExpr(upstream, static_cast<size_t>(componentOffset + i));
+					}
+					coeff << ")";
+					CollectExpressionLeaves(*param, coeff.str(), argType, inputs, inputGradExprs, inputGradTypes);
+				}
+
+				componentOffset += take;
+			}
+			return;
+		}
+
 		if (params.size() == 1 && params[0]) {
 			std::string argExpr = nodeExpr(*params[0]);
-			std::string deriv	= SingleArgumentIntrinsicDerivative(std::string(intrinsic.Name()), argExpr);
+			if (intrinsicName == "normalize") {
+				std::string xn = std::format("({})/length({})", argExpr, argExpr);
+				std::string proj = std::format("({})*dot({},{})", xn, xn, upstream);
+				std::string tangent = std::format("({})-({})", upstream, proj);
+				CollectExpressionLeaves(*params[0], std::format("({})/length({})", tangent, argExpr),
+										InferNodeType(*params[0]), inputs, inputGradExprs, inputGradTypes);
+				return;
+			}
+			if (intrinsicName == "length") {
+				CollectExpressionLeaves(*params[0], std::format("({})*({})/length({})", upstream, argExpr, argExpr),
+										InferNodeType(*params[0]), inputs, inputGradExprs, inputGradTypes);
+				return;
+			}
+
+			std::string deriv	= SingleArgumentIntrinsicDerivative(intrinsicName, argExpr);
 			if (!deriv.empty()) {
 				CollectExpressionLeaves(*params[0], std::format("({})*({})", upstream, deriv), upstreamType, inputs,
 										inputGradExprs, inputGradTypes);
@@ -703,6 +963,26 @@ std::string GradientTape::InferNodeType(const GPU::IR::Node::Node &node) const {
 		}
 		break;
 	}
+	case GPU::IR::Node::NodeType::CallInst: {
+		const auto &intrinsic = static_cast<const GPU::IR::Node::IntrinsicCallNode &>(node);
+		const auto name = std::string(intrinsic.Name());
+		if (name == "vec2" || name == "ivec2") {
+			return name;
+		}
+		if (name == "vec3" || name == "ivec3") {
+			return name;
+		}
+		if (name == "vec4" || name == "ivec4") {
+			return name;
+		}
+		if (name == "normalize" && intrinsic.Parameter().size() == 1 && intrinsic.Parameter()[0] != nullptr) {
+			return InferNodeType(*intrinsic.Parameter()[0]);
+		}
+		if (name == "length" || name == "dot" || name == "distance") {
+			return "float";
+		}
+		break;
+	}
 	case GPU::IR::Node::NodeType::MemberAccess: {
 		const auto &member = static_cast<const GPU::IR::Node::MemberAccessNode &>(node);
 		if (member.RHS() != nullptr) {
@@ -735,6 +1015,60 @@ std::string GradientTape::InferNodeType(const GPU::IR::Node::Node &node) const {
 	}
 
 	return "float";
+}
+
+std::string GradientTape::ExtractMemberName(const GPU::IR::Node::Node &memberNode) {
+	std::string member = ExtractVarName(memberNode);
+	if (member.empty()) {
+		member = GPU::IR::Builder::Builder::Get().BuildNode(memberNode);
+	}
+	while (member.size() >= 2 && member.front() == '(' && member.back() == ')') {
+		member = member.substr(1, member.size() - 2);
+	}
+	return member;
+}
+
+std::string GradientTape::BuildSwizzleScatterExpression(
+	const std::string &memberName,
+	const std::string &upstream,
+	const std::string &baseType) {
+	const int size = VectorSize(baseType);
+	if (size <= 0) {
+		return upstream;
+	}
+
+	std::vector<std::string> components(static_cast<size_t>(size), "0.0");
+	for (size_t i = 0; i < memberName.size(); i++) {
+		const int componentIndex = SwizzleComponentIndex(memberName[i]);
+		if (componentIndex < 0 || componentIndex >= size) {
+			continue;
+		}
+
+		std::string contribution;
+		if (memberName.size() == 1) {
+			contribution = upstream;
+		} else {
+			contribution = std::format("({}).{}", upstream, VectorComponentName(i));
+		}
+
+		auto &slot = components[static_cast<size_t>(componentIndex)];
+		if (slot == "0.0") {
+			slot = contribution;
+		} else {
+			slot = std::format("({})+({})", slot, contribution);
+		}
+	}
+
+	std::ostringstream expr;
+	expr << baseType << "(";
+	for (size_t i = 0; i < components.size(); i++) {
+		if (i > 0) {
+			expr << ", ";
+		}
+		expr << components[i];
+	}
+	expr << ")";
+	return expr.str();
 }
 
 TapeOpKind GradientTape::ClassifyOp(GPU::IR::Node::OperationCode code) {
