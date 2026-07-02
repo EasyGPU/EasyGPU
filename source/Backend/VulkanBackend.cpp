@@ -4013,8 +4013,13 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 	EnsureCommandBuffer();
 
 	const VkSampleCountFlagBits sampleCount = GetVkSampleCount(desc.sampleCount);
-	if (sampleCount != VK_SAMPLE_COUNT_1_BIT && !desc.clearColorFlag) {
-		throw std::runtime_error("MSAA BeginRendering requires clearColorFlag=true");
+
+	AttachmentLoadOp effectiveColorLoadOp = desc.colorLoadOp;
+	if (effectiveColorLoadOp == AttachmentLoadOp::Default) {
+		effectiveColorLoadOp = desc.clearColorFlag ? AttachmentLoadOp::Clear : AttachmentLoadOp::Load;
+	}
+	if (sampleCount != VK_SAMPLE_COUNT_1_BIT && effectiveColorLoadOp != AttachmentLoadOp::Clear) {
+		throw std::runtime_error("MSAA BeginRendering requires color load op Clear");
 	}
 
 	std::vector<TextureHandle> colorHandles = desc.colorAttachments;
@@ -4054,7 +4059,21 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 		VkRenderingAttachmentInfoKHR colorAttachment = {};
 		colorAttachment.sType						= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
 		colorAttachment.imageLayout					= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		colorAttachment.loadOp	= desc.clearColorFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+		switch (effectiveColorLoadOp) {
+		case AttachmentLoadOp::Load:
+			colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			break;
+		case AttachmentLoadOp::Clear:
+			colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			break;
+		case AttachmentLoadOp::DontCare:
+			colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			break;
+		case AttachmentLoadOp::Default:
+		default:
+			colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			break;
+		}
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		colorAttachment.clearValue.color.float32[0] = desc.clearColor[0];
 		colorAttachment.clearValue.color.float32[1] = desc.clearColor[1];

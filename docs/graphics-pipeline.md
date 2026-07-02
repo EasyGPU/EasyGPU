@@ -173,6 +173,37 @@ pipeline.Draw(renderTarget, depthBuffer, vertexCount, true);
 
 Supported values are `SampleCount::X1`, `X2`, `X4`, `X8`, and `X16`, subject to device support. MRT works with MSAA as well: each color attachment gets its own internal multisampled image and resolves into its corresponding target texture.
 
+### Low-Level Color Attachment Load Ops
+
+The high-level `GraphicsPipeline` DSL chooses the render pass setup for its `Draw` calls. If you use the low-level backend API directly, `RenderPassBeginDesc::colorLoadOp` controls how Vulkan initializes each color attachment at `BeginRendering`.
+
+```cpp
+Backend::RenderPassBeginDesc pass;
+pass.colorAttachment = color;
+pass.colorLoadOp = Backend::AttachmentLoadOp::Clear;
+pass.clearColor[0] = 0.0f;
+pass.clearColor[1] = 0.0f;
+pass.clearColor[2] = 0.0f;
+pass.clearColor[3] = 1.0f;
+backend->BeginRendering(pass);
+// draw fullscreen floor
+backend->EndRendering();
+
+pass.colorLoadOp = Backend::AttachmentLoadOp::Load;
+backend->BeginRendering(pass);
+// draw light quad; pixels outside the quad keep the floor pass result
+backend->EndRendering();
+```
+
+| Value | Vulkan mapping | Use case |
+|:------|:---------------|:---------|
+| `AttachmentLoadOp::Default` | `clearColorFlag ? CLEAR : LOAD` | Compatibility with existing code that only sets `clearColorFlag`. |
+| `AttachmentLoadOp::Load` | `VK_ATTACHMENT_LOAD_OP_LOAD` | Multi-pass rendering into the same color texture. |
+| `AttachmentLoadOp::Clear` | `VK_ATTACHMENT_LOAD_OP_CLEAR` | First pass of a frame or any pass that should discard previous color. |
+| `AttachmentLoadOp::DontCare` | `VK_ATTACHMENT_LOAD_OP_DONT_CARE` | Full-target overwrite where previous contents are irrelevant. |
+
+MSAA rendering uses transient multisampled color images that are resolved into the target texture at the end of the pass. Loading previous multisampled color contents is therefore not supported; start MSAA passes with `AttachmentLoadOp::Clear`.
+
 ### FragmentShader (Fullscreen Pass)
 
 `FragmentShader` is a simplified wrapper around `GraphicsPipeline` with a hardcoded fullscreen-triangle vertex shader. It is the easiest way to write a fullscreen post-processing pass.
@@ -420,7 +451,8 @@ The low-level backend API is documented in [`api-reference.md`](api-reference.md
 | Type | Purpose |
 |:-----|:--------|
 | `GraphicsPipelineDesc` | Pipeline creation descriptor (VS + FS + topology + depth + vertex layout) |
-| `RenderPassBeginDesc` | Render pass descriptor (color + depth attachments, clear values) |
+| `RenderPassBeginDesc` | Render pass descriptor (color/depth attachments, clear values, color load op) |
+| `AttachmentLoadOp` | Color attachment load behavior for low-level dynamic rendering |
 | `VertexLayoutEntry` | Per-attribute vertex format (location, format, offset) |
 | `PrimitiveTopology` | `TriangleList`, `LineList`, `PointList`, etc. |
 | `SampleCount` | MSAA sample count: `X1`, `X2`, `X4`, `X8`, `X16` |

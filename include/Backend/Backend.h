@@ -465,6 +465,14 @@ struct GraphicsPipelineDesc {
 	uint32_t						 pushConstantSize = 0;
 };
 
+/** @brief Attachment load operation used when beginning a render pass. */
+enum class AttachmentLoadOp {
+	Default,
+	Load,
+	Clear,
+	DontCare
+};
+
 /** @brief Descriptor for beginning a render pass. */
 struct RenderPassBeginDesc {
 	TextureHandle colorAttachment = INVALID_TEXTURE_HANDLE;
@@ -475,6 +483,7 @@ struct RenderPassBeginDesc {
 	float		  clearDepth	  = 1.0f;
 	bool		  clearColorFlag  = true;
 	bool		  clearDepthFlag  = true;
+	AttachmentLoadOp colorLoadOp = AttachmentLoadOp::Default;
 };
 
 // ============================================================================

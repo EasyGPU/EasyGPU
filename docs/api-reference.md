@@ -841,6 +841,13 @@ struct GraphicsPipelineDesc {
 **RenderPassBeginDesc**
 
 ```cpp
+enum class AttachmentLoadOp {
+    Default,
+    Load,
+    Clear,
+    DontCare
+};
+
 struct RenderPassBeginDesc {
     TextureHandle colorAttachment  = INVALID_TEXTURE_HANDLE;
     std::vector<TextureHandle> colorAttachments;
@@ -850,8 +857,11 @@ struct RenderPassBeginDesc {
     float         clearDepth       = 1.0f;
     bool          clearColorFlag   = true;
     bool          clearDepthFlag   = true;
+    AttachmentLoadOp colorLoadOp   = AttachmentLoadOp::Default;
 };
 ```
+
+`colorLoadOp` maps to Vulkan dynamic-rendering attachment load operations. `Default` preserves the older `clearColorFlag` behavior: clear when `clearColorFlag` is true, otherwise load. Use `Load` for later passes that must preserve pixels not covered by the current draw, `Clear` for frame/pass initialization, and `DontCare` only when previous color contents are irrelevant. MSAA draws use transient multisampled color attachments, so begin them with `Clear` rather than `Load`.
 
 **PrimitiveTopology**
 
