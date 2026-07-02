@@ -3176,7 +3176,6 @@ VulkanBackend::DescriptorSetCache *VulkanBackend::FindOrCreateDescriptorSet(cons
 
 	VkResult result							 = vkAllocateDescriptorSets(_device, &allocInfo, &requested.set);
 	if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL) {
-		InvalidateAllDescriptorCaches();
 		CreateDescriptorPool();
 		allocInfo.descriptorPool = _descriptorPool;
 		result = vkAllocateDescriptorSets(_device, &allocInfo, &requested.set);
