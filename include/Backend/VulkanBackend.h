@@ -242,6 +242,7 @@ private:
 		uint32_t			 width		   = 0;
 		uint32_t			 height		   = 0;
 		uint32_t			 slot		   = 0;
+		TextureHandle		 resolveTarget = INVALID_TEXTURE_HANDLE;
 		VkFormat			 format		   = VK_FORMAT_UNDEFINED;
 		VkSampleCountFlagBits samples	   = VK_SAMPLE_COUNT_1_BIT;
 		VkImageAspectFlags	 aspectMask	   = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -378,8 +379,8 @@ private:
 	void TransitionMsaaAttachment(MsaaAttachment &info, VkImageLayout newLayout, VkPipelineStageFlags dstStage,
 								  VkAccessFlags dstAccess);
 	MsaaAttachment &GetOrCreateMsaaAttachment(uint32_t width, uint32_t height, uint32_t slot, VkFormat format,
-											  VkSampleCountFlagBits samples, VkImageUsageFlags usage,
-											  VkImageAspectFlags aspectMask);
+											  VkSampleCountFlagBits samples, TextureHandle resolveTarget,
+											  VkImageUsageFlags usage, VkImageAspectFlags aspectMask);
 	/** @brief Invalidate all cached descriptor sets. */
 	void InvalidateAllDescriptorCaches();
 	/**

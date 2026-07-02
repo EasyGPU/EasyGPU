@@ -1721,6 +1721,20 @@ void VulkanBackend::DestroyTexture(TextureHandle texture) {
 	EnsureNoPendingGpuWork();
 	InvalidateDescriptorCachesForTexture(texture);
 
+	for (auto attachmentIt = _msaaAttachments.begin(); attachmentIt != _msaaAttachments.end();) {
+		if (attachmentIt->resolveTarget == texture) {
+			if (attachmentIt->view)
+				vkDestroyImageView(_device, attachmentIt->view, nullptr);
+			if (attachmentIt->image)
+				vkDestroyImage(_device, attachmentIt->image, nullptr);
+			if (attachmentIt->memory)
+				vkFreeMemory(_device, attachmentIt->memory, nullptr);
+			attachmentIt = _msaaAttachments.erase(attachmentIt);
+		} else {
+			++attachmentIt;
+		}
+	}
+
 	if (it->second.sampledView)
 		vkDestroyImageView(_device, it->second.sampledView, nullptr);
 	if (it->second.view)
@@ -2873,11 +2887,13 @@ void VulkanBackend::TransitionMsaaAttachment(MsaaAttachment &info, VkImageLayout
 VulkanBackend::MsaaAttachment &VulkanBackend::GetOrCreateMsaaAttachment(uint32_t width, uint32_t height, uint32_t slot,
 																		VkFormat format,
 																		VkSampleCountFlagBits samples,
+																		TextureHandle resolveTarget,
 																		VkImageUsageFlags usage,
 																		VkImageAspectFlags aspectMask) {
 	for (auto &attachment : _msaaAttachments) {
 		if (attachment.width == width && attachment.height == height && attachment.format == format &&
-			attachment.samples == samples && attachment.aspectMask == aspectMask && attachment.slot == slot) {
+			attachment.samples == samples && attachment.aspectMask == aspectMask && attachment.slot == slot &&
+			attachment.resolveTarget == resolveTarget) {
 			return attachment;
 		}
 	}
@@ -2929,6 +2945,7 @@ VulkanBackend::MsaaAttachment &VulkanBackend::GetOrCreateMsaaAttachment(uint32_t
 	attachment.width		 = width;
 	attachment.height		 = height;
 	attachment.slot			 = slot;
+	attachment.resolveTarget = resolveTarget;
 	attachment.format		 = format;
 	attachment.samples		 = samples;
 	attachment.aspectMask	 = aspectMask;
@@ -4018,9 +4035,6 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 	if (effectiveColorLoadOp == AttachmentLoadOp::Default) {
 		effectiveColorLoadOp = desc.clearColorFlag ? AttachmentLoadOp::Clear : AttachmentLoadOp::Load;
 	}
-	if (sampleCount != VK_SAMPLE_COUNT_1_BIT && effectiveColorLoadOp != AttachmentLoadOp::Clear) {
-		throw std::runtime_error("MSAA BeginRendering requires color load op Clear");
-	}
 
 	std::vector<TextureHandle> colorHandles = desc.colorAttachments;
 	if (colorHandles.empty() && desc.colorAttachment != INVALID_TEXTURE_HANDLE) {
@@ -4085,14 +4099,17 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 		} else {
 			auto &msaaColor = GetOrCreateMsaaAttachment(
 				renderWidth, renderHeight, static_cast<uint32_t>(colorIndex), colorIt->second.vkFormat, sampleCount,
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+				colorHandles[colorIndex], VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 				VK_IMAGE_ASPECT_COLOR_BIT);
+			const VkAccessFlags msaaAccess = colorAttachment.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD
+												? (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+												   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+												: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			TransitionMsaaAttachment(msaaColor, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-									 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-									 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+									 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, msaaAccess);
 
 			colorAttachment.imageView	   = msaaColor.view;
-			colorAttachment.storeOp		   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			colorAttachment.storeOp		   = VK_ATTACHMENT_STORE_OP_STORE;
 			colorAttachment.resolveMode	   = VK_RESOLVE_MODE_AVERAGE_BIT;
 			colorAttachment.resolveImageView = colorIt->second.view;
 			colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -4133,6 +4150,7 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 			} else {
 				auto &msaaDepth = GetOrCreateMsaaAttachment(
 					renderWidth, renderHeight, MAX_COLOR_ATTACHMENTS, depthIt->second.vkFormat, sampleCount,
+					desc.depthAttachment,
 					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
 					hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) : VK_IMAGE_ASPECT_DEPTH_BIT);
 				TransitionMsaaAttachment(msaaDepth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
