@@ -741,7 +741,14 @@ void GradientTape::AddExpressionLeaf(const GPU::IR::Node::Node &node, const std:
 			}
 		}
 
-		TapeVar callOutput{callExpr, InferNodeType(call), false};
+		// A callable can appear as a leaf inside a larger expression, e.g.
+		// `loss = ShaderLib.Shape(x) * scale`. The callable invocation text is
+		// not a stable adjoint target: it may contain resource indexing syntax
+		// such as `targets[i]`, which makes later code treat it like a buffer
+		// access rather than a produced value. Materialize it as an AD temp so
+		// the outer expression can seed a real adjoint and ProcessCall can
+		// propagate that seed through the callable sub-tape.
+		TapeVar callOutput{std::format("_ad_expr{}", _nextId), InferNodeType(call), false};
 		auto	callEntry = MakeEntry(_nextId++, TapeOpKind::Call, callOutput, callInputs);
 		callEntry.callableFuncName = call.FuncName();
 		callEntry.forwardExpr = callExpr;

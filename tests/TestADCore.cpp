@@ -1566,6 +1566,29 @@ CHECK_CONTAINS(r.backwardCode, "+=");
 CHECK_CONTAINS(r.backwardCode, "*");
 END_TEST
 
+TEST(ad_callable_inline_return_in_outer_expression_uses_temp_adjoint)
+Callable<float(float)> shape([](Var<float> x) {
+	Var<float> shifted = x + Expr<float>(0.5f);
+	Var<float> y	   = shifted * shifted;
+	Return(y);
+});
+
+auto				   r = RunADCallableTest([&](Var<int> &id, GPU::AD::GradientTape &tape) {
+	Var<float> p;
+	p = 0.4f;
+	tape.RegisterParameter(p.VarName(), "float");
+	Var<float> y = shape(p) * Expr<float>(1.75f);
+	tape.MarkLoss(y.VarName(), "float");
+});
+
+ASSERT(!r.forwardCode.empty());
+ASSERT(!r.backwardCode.empty());
+CHECK_CONTAINS(r.tapeSummary, "kind=" + std::to_string((int)GPU::AD::TapeOpKind::Call) + " out=_ad_expr");
+CHECK_CONTAINS(r.backwardCode, "float _ad_expr");
+CHECK_CONTAINS(r.backwardCode, "d_ad_expr");
+CHECK_NOT_CONTAINS(r.backwardCode, "d_global__");
+END_TEST
+
 TEST(ad_nested_callable_expression_composes_subtapes)
 Callable<float(float)> inner([](Var<float> x) {
 	Var<float> r = x * x;
@@ -1929,6 +1952,7 @@ int main() {
 	test_ad_callable_mul();
 	test_ad_callable_add();
 	test_ad_callable_chain();
+	test_ad_callable_inline_return_in_outer_expression_uses_temp_adjoint();
 	test_ad_nested_callable_expression_composes_subtapes();
 	test_ad_callable_local_primal_values_are_rematerialized();
 	test_ad_callable_rematerializes_transitive_local_dependencies();
