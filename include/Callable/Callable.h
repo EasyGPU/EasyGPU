@@ -363,8 +363,15 @@ private:
 		if (!context)
 			return;
 
+		std::vector<std::string> parameterNames;
+		std::vector<std::string> parameterTypes = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
+		parameterNames.reserve(parameterTypes.size());
+		for (size_t i = 0; i < parameterTypes.size(); ++i) {
+			parameterNames.push_back("p" + std::to_string(i));
+		}
+
 		// Mark that we're entering a callable body generation
-		context->PushCallableBody(_mangledName);
+		context->PushCallableBody(_mangledName, parameterNames, parameterTypes);
 
 		// Execute the type-erased body generator
 		_bodyGenerator->Generate();
@@ -462,7 +469,14 @@ private:
 		if (!context)
 			return;
 
-		context->PushCallableBody(_mangledName);
+		std::vector<std::string> parameterNames;
+		std::vector<std::string> parameterTypes = {std::string(Detail::GetGLSLTypeName<ScalarArg<Args>>())...};
+		parameterNames.reserve(parameterTypes.size());
+		for (size_t i = 0; i < parameterTypes.size(); ++i) {
+			parameterNames.push_back("p" + std::to_string(i));
+		}
+
+		context->PushCallableBody(_mangledName, parameterNames, parameterTypes);
 
 		_bodyGenerator->Generate();
 

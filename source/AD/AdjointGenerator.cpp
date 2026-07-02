@@ -1284,30 +1284,58 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 	};
 
 	auto remapExpression = [&remapSimpleName](const std::string &expr, const std::vector<std::string> &names) {
-		std::string result = expr;
-		auto		sortedNames = names;
-		std::sort(sortedNames.begin(), sortedNames.end(),
-				  [](const auto &a, const auto &b) { return a.size() > b.size(); });
-		sortedNames.erase(std::unique(sortedNames.begin(), sortedNames.end()), sortedNames.end());
-		for (const auto &name : sortedNames) {
-			if (name.empty() || IsLiteralName(name) || HasExpressionSyntax(name))
-				continue;
-			const auto mappedName = remapSimpleName(name);
-			size_t	   pos		  = 0;
-			while ((pos = result.find(name, pos)) != std::string::npos) {
-				const bool leftOk =
-					pos == 0 ||
-					!(std::isalnum(static_cast<unsigned char>(result[pos - 1])) || result[pos - 1] == '_');
-				const size_t endPos = pos + name.size();
-				const bool	 rightOk =
-					endPos >= result.size() ||
-					!(std::isalnum(static_cast<unsigned char>(result[endPos])) || result[endPos] == '_');
-				if (leftOk && rightOk) {
-					result.replace(pos, name.size(), mappedName);
-					pos += mappedName.size();
-				} else {
-					pos += name.size();
+		std::unordered_set<std::string> remappableNames;
+		for (const auto &name : names) {
+			if (!name.empty() && !IsLiteralName(name) && !HasExpressionSyntax(name)) {
+				remappableNames.insert(name);
+			}
+		}
+
+		auto isIdentStart = [](unsigned char c) { return std::isalpha(c) || c == '_'; };
+		auto isIdentChar  = [](unsigned char c) { return std::isalnum(c) || c == '_'; };
+		auto previousNonSpace = [](const std::string &s, size_t pos) -> char {
+			while (pos > 0) {
+				const auto c = static_cast<unsigned char>(s[pos - 1]);
+				if (!std::isspace(c)) {
+					return static_cast<char>(c);
 				}
+				pos--;
+			}
+			return '\0';
+		};
+		auto nextNonSpace = [](const std::string &s, size_t pos) -> char {
+			while (pos < s.size()) {
+				const auto c = static_cast<unsigned char>(s[pos]);
+				if (!std::isspace(c)) {
+					return static_cast<char>(c);
+				}
+				pos++;
+			}
+			return '\0';
+		};
+
+		std::string result;
+		result.reserve(expr.size());
+		for (size_t pos = 0; pos < expr.size();) {
+			const auto c = static_cast<unsigned char>(expr[pos]);
+			if (!isIdentStart(c)) {
+				result.push_back(expr[pos++]);
+				continue;
+			}
+
+			const size_t start = pos;
+			pos++;
+			while (pos < expr.size() && isIdentChar(static_cast<unsigned char>(expr[pos]))) {
+				pos++;
+			}
+
+			const std::string token = expr.substr(start, pos - start);
+			const bool		  isMemberName = previousNonSpace(expr, start) == '.';
+			const bool		  isFunctionName = nextNonSpace(expr, pos) == '(';
+			if (!isMemberName && !isFunctionName && remappableNames.count(token) > 0) {
+				result += remapSimpleName(token);
+			} else {
+				result += token;
 			}
 		}
 		return result;

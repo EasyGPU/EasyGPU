@@ -394,6 +394,12 @@ void KernelBuildContext::PushCallableBody(const std::string &callableName) {
 
 void KernelBuildContext::PushCallableBody(const std::string &callableName,
 										  const std::vector<std::string> &parameterNames) {
+	PushCallableBody(callableName, parameterNames, {});
+}
+
+void KernelBuildContext::PushCallableBody(const std::string &callableName,
+										  const std::vector<std::string> &parameterNames,
+										  const std::vector<std::string> &parameterTypes) {
 	_callableBodyStack.push(CallableBodyFrame{std::move(_currentCallableBody), _inCallableBody});
 	_currentCallableBody.clear();
 	_inCallableBody = true;
@@ -401,7 +407,7 @@ void KernelBuildContext::PushCallableBody(const std::string &callableName,
 	// If gradient tape is active, push a sub-tape for callable body recording
 	auto *tape = IR::Builder::Builder::Get().GetGradientTape();
 	if (tape) {
-		tape->PushSubTape(callableName, parameterNames);
+		tape->PushSubTape(callableName, parameterNames, parameterTypes);
 	}
 }
 

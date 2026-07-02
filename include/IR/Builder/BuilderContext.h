@@ -270,6 +270,18 @@ public:
 	}
 
 	/**
+	 * Enter callable body generation mode with ordered parameter names and
+	 * GLSL parameter types. AD uses the types to scatter gradients through
+	 * callable parameter member/swizzle accesses.
+	 */
+	virtual void					 PushCallableBody(const std::string &callableName,
+													  const std::vector<std::string> &parameterNames,
+													  const std::vector<std::string> &parameterTypes) {
+		(void)parameterTypes;
+		PushCallableBody(callableName, parameterNames);
+	}
+
+	/**
 	 * Exit callable body generation mode
 	 * Pops the callable body code buffer and stores it for later output
 	 */

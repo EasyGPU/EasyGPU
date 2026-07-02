@@ -437,6 +437,16 @@ public:
 											  const std::vector<std::string> &parameterNames) override;
 
 	/**
+	 * @brief Begin capturing a named callable function body with ordered parameter names and types.
+	 * @param callableName Emitted GLSL function name for AD sub-tape identity.
+	 * @param parameterNames GLSL parameter names in declaration order.
+	 * @param parameterTypes GLSL parameter types in declaration order.
+	 */
+	void					 PushCallableBody(const std::string &callableName,
+											  const std::vector<std::string> &parameterNames,
+											  const std::vector<std::string> &parameterTypes) override;
+
+	/**
 	 * @brief End capturing a callable function body.
 	 */
 	void					 PopCallableBody() override;

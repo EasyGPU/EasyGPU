@@ -193,6 +193,14 @@ void CodeCollectContext::PushCallableBody(const std::string &callableName,
 	}
 }
 
+void CodeCollectContext::PushCallableBody(const std::string &callableName,
+										  const std::vector<std::string> &parameterNames,
+										  const std::vector<std::string> &parameterTypes) {
+	if (_parentContext) {
+		_parentContext->PushCallableBody(callableName, parameterNames, parameterTypes);
+	}
+}
+
 void CodeCollectContext::PopCallableBody() {
 	if (_parentContext) {
 		_parentContext->PopCallableBody();

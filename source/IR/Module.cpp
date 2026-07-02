@@ -334,11 +334,14 @@ private:
 		const auto &callable = _module.callables[callableId];
 		_activeBlocks = &callable.blocks;
 		std::vector<std::string> parameterNames;
+		std::vector<std::string> parameterTypes;
 		parameterNames.reserve(callable.parameters.size());
+		parameterTypes.reserve(callable.parameters.size());
 		for (const auto &parameter : callable.parameters) {
 			parameterNames.push_back(parameter.first);
+			parameterTypes.push_back(ToGlslType(parameter.second));
 		}
-		context.PushCallableBody(callable.name, parameterNames);
+		context.PushCallableBody(callable.name, parameterNames, parameterTypes);
 		for (const auto &statement : callable.statements) {
 			if (!LowerStatement(statement)) {
 				ok = false;

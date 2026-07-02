@@ -150,7 +150,8 @@ public:
 	/** Push a new sub-tape onto the stack. All subsequent Record() calls
 	 *  go to this sub-tape until PopSubTape() is called. */
 	void		PushSubTape(const std::string &callableName = {},
-							 const std::vector<std::string> &parameterNames = {});
+							 const std::vector<std::string> &parameterNames = {},
+							 const std::vector<std::string> &parameterTypes = {});
 
 	/** Pop the current sub-tape and store it. Returns the index of the stored sub-tape. */
 	int			PopSubTape();
@@ -184,6 +185,11 @@ public:
 	/** Ordered GLSL parameter names for a callable body sub-tape, when known. */
 	const std::vector<std::string> &CallableParameterNames() const {
 		return _callableParameterNames;
+	}
+
+	/** Ordered GLSL parameter types for a callable body sub-tape, when known. */
+	const std::vector<std::string> &CallableParameterTypes() const {
+		return _callableParameterTypes;
 	}
 
 	// ---- Access ----------------------------------------------------------
@@ -244,6 +250,7 @@ private:
 	void				   RecordMemberAccess(const GPU::IR::Node::MemberAccessNode &node, const TapeVar &output);
 	void				   RecordCall(const GPU::IR::Node::CallNode &node, const TapeVar &output);
 	void				   RecordReturn(const GPU::IR::Node::ReturnNode &node);
+	TapeVar				   MakeCallInput(const GPU::IR::Node::Node &arg);
 	void				   AddExpressionLeaf(const GPU::IR::Node::Node &node, const std::string &coeff,
 											 const std::string &coeffType, std::vector<TapeVar> &inputs,
 											 std::vector<std::string> &inputGradExprs,
@@ -306,6 +313,7 @@ private:
 	std::stack<GradientTape *>						 _subTapeStack;
 	GradientTape									*_currentSubTape = nullptr;
 	std::vector<std::string>						 _callableParameterNames;
+	std::vector<std::string>						 _callableParameterTypes;
 };
 
 } // namespace GPU::AD
