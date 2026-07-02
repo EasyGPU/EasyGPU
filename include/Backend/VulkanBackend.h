@@ -582,6 +582,7 @@ private:
 
 	// Descriptor resources
 	VkDescriptorPool								 _descriptorPool		  = nullptr;
+	std::vector<VkDescriptorPool>					 _descriptorPools;
 	VkSampler										 _defaultSampler		  = nullptr;
 	VkSampler										 _mipmapSampler			  = nullptr;
 	std::vector<std::pair<SamplerKey, VkSampler>>	 _samplerCache;

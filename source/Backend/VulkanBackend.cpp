@@ -580,8 +580,12 @@ void VulkanBackend::CleanupVulkan() {
 			vkDestroySampler(_device, _defaultSampler, nullptr);
 		if (_mipmapSampler)
 			vkDestroySampler(_device, _mipmapSampler, nullptr);
-		if (_descriptorPool)
-			vkDestroyDescriptorPool(_device, _descriptorPool, nullptr);
+		for (auto pool : _descriptorPools) {
+			if (pool)
+				vkDestroyDescriptorPool(_device, pool, nullptr);
+		}
+		_descriptorPools.clear();
+		_descriptorPool = nullptr;
 
 		// Destroy pipeline cache
 		if (_pipelineCache)
@@ -946,8 +950,11 @@ void VulkanBackend::CreateDescriptorPool() {
 	poolInfo.maxSets						   = MAX_DESCRIPTOR_SETS;
 	poolInfo.flags							   = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
-	VkResult result							   = vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_descriptorPool);
+	VkDescriptorPool pool					   = nullptr;
+	VkResult result							   = vkCreateDescriptorPool(_device, &poolInfo, nullptr, &pool);
 	CheckVkResult(result, "vkCreateDescriptorPool");
+	_descriptorPools.push_back(pool);
+	_descriptorPool = pool;
 }
 
 void VulkanBackend::CreateDefaultSampler() {
@@ -1001,9 +1008,9 @@ void VulkanBackend::CreateQueryPool() {
 void VulkanBackend::MakeCurrent() {
 	std::lock_guard<std::mutex> lock(_mutex);
 	_isCurrent = true;
-	// Vulkan doesn't require explicit context making like OpenGL
-	// But we ensure the command buffer is ready
-	EnsureCommandBuffer();
+	// Vulkan does not have an OpenGL-style current context. Command buffers are
+	// opened lazily by operations that actually record GPU work; doing it here
+	// can leak an empty recording scope across API calls.
 }
 
 void VulkanBackend::MakeNoneCurrent() {
@@ -3169,9 +3176,9 @@ VulkanBackend::DescriptorSetCache *VulkanBackend::FindOrCreateDescriptorSet(cons
 
 	VkResult result							 = vkAllocateDescriptorSets(_device, &allocInfo, &requested.set);
 	if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL) {
-		EnsureNoPendingGpuWork();
 		InvalidateAllDescriptorCaches();
-		CheckVkResult(vkResetDescriptorPool(_device, _descriptorPool, 0), "vkResetDescriptorPool");
+		CreateDescriptorPool();
+		allocInfo.descriptorPool = _descriptorPool;
 		result = vkAllocateDescriptorSets(_device, &allocInfo, &requested.set);
 	}
 	CheckVkResult(result, "vkAllocateDescriptorSets");
