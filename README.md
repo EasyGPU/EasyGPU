@@ -8,13 +8,16 @@ C++20 Embedded DSL for GPU Compute, Rasterization, Autograd & Neural Networks
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-orange.svg)](https://en.cppreference.com/w/cpp/20)
+[![Feather C# Frontend](https://img.shields.io/badge/C%23%20Frontend-Feather-512BD4.svg)](https://github.com/FeatherCompute/Feather)
 [![OpenGL](https://img.shields.io/badge/OpenGL-4.3+-green.svg)](https://www.opengl.org/)
 [![Vulkan](https://img.shields.io/badge/Vulkan-1.1+-red.svg)](https://www.vulkan.org/)
 [![Dear ImGui](https://img.shields.io/badge/Dear%20ImGui-Integrated-blueviolet.svg)](https://github.com/ocornut/imgui)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![Autograd](https://img.shields.io/badge/Autograd-Reverse--Mode-blue.svg)](docs/autodiff.md)
 
-[Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Graphics Pipeline](docs/graphics-pipeline.md) · [API Reference](docs/api-reference.md)
+[Getting Started](docs/getting-started.md) · [Tutorial](docs/tutorial.md) · [Feather C# Frontend](https://github.com/FeatherCompute/Feather) · [Graphics Pipeline](docs/graphics-pipeline.md) · [API Reference](docs/api-reference.md)
+
+**Feather** brings EasyGPU to C# and .NET developers.
 
 </div>
 
@@ -23,6 +26,7 @@ C++20 Embedded DSL for GPU Compute, Rasterization, Autograd & Neural Networks
 ## Table of Contents
 
 - [Overview](#overview)
+- [C# Frontend](#c-frontend--feather)
 - [Concept](#concept)
 - [Features](#features)
   - [Automatic Differentiation](#automatic-differentiation--gpu-gradients-zero-hand-written-math)
@@ -78,6 +82,11 @@ int main() {
 - 30+ differentiable intrinsics (sin, cos, exp, log, pow, sqrt...), vector ops, control flow
 - Train tiny models, fit curves, and compute gradients without leaving C++
 
+**For C# and .NET developers:**
+- Use [Feather](https://github.com/FeatherCompute/Feather), the C# frontend for EasyGPU
+- Keep the same GPU-first programming model while writing host-side code in C#
+- Target EasyGPU without maintaining hand-written shader strings
+
 **For experienced developers:**
 - Zero vendor lock-in (OpenGL 4.3+ or Vulkan 1.1+, cross-platform)
 - Explicit dependency model: bundled GLAD for OpenGL; Vulkan SDK, glslang, and SPIRV-Tools for Vulkan
@@ -93,6 +102,25 @@ int main() {
 - **Linux:** X11 development libraries (`libx11-dev` on Ubuntu/Debian)
 - **macOS:** Vulkan backend via MoltenVK; OpenGL backend is intentionally disabled
 - **Vulkan builds:** Vulkan SDK with `glslang` / `SPIRV-Tools` libraries available to CMake
+
+---
+
+## C# Frontend — Feather
+
+<p align="center">
+  <a href="https://github.com/FeatherCompute/Feather">
+    <img src="docs/image/feather.svg" alt="Feather C# Frontend" width="420">
+  </a>
+</p>
+
+**[Feather](https://github.com/FeatherCompute/Feather)** is the C# frontend for EasyGPU. It brings the same embedded GPU programming model to .NET developers: write compute code from C#, let the frontend generate GPU work, and keep shader plumbing out of application logic.
+
+| Frontend | Language | Use Case |
+|:---------|:---------|:---------|
+| **EasyGPU** | C++20 | Native C++ compute, graphics, autograd, and NN training |
+| **Feather** | C# / .NET | C# applications that want EasyGPU-style GPU compute without hand-written shader code |
+
+[Feather on GitHub →](https://github.com/FeatherCompute/Feather)
 
 ---
 
@@ -1029,6 +1057,14 @@ Signed distance field path tracer with support for complex lighting and material
 ---
 
 ## Ecosystem
+
+### Feather — C# Frontend for EasyGPU
+
+[![Feather](https://img.shields.io/badge/EasyGPU-Feather-512BD4.svg)](https://github.com/FeatherCompute/Feather)
+
+**[Feather](https://github.com/FeatherCompute/Feather)** is the C# / .NET frontend for EasyGPU. It gives C# developers a native-feeling entry point into the EasyGPU programming model while keeping the generated GPU execution path behind a clean frontend API.
+
+[Feather on GitHub →](https://github.com/FeatherCompute/Feather)
 
 ### HashEncoder — Instant-NGP Style Hash Grid Encoding
 
