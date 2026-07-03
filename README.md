@@ -113,12 +113,12 @@ int main() {
   </a>
 </p>
 
-**[Feather](https://github.com/FeatherCompute/Feather)** is the C# frontend for EasyGPU. It brings the same embedded GPU programming model to .NET developers: write compute code from C#, let the frontend generate GPU work, and keep shader plumbing out of application logic.
+**[Feather](https://github.com/FeatherCompute/Feather)** is the experimental C# / .NET frontend for EasyGPU. It lets .NET developers write GPU-safe C# kernels, lowers the supported shader subset through Feather IR, and sends the generated work to EasyGPU for GLSL/SPIR-V execution. The compute path is the most mature surface; graphics, windowing, AD, and NN helpers are preview APIs.
 
 | Frontend | Language | Use Case |
 |:---------|:---------|:---------|
 | **EasyGPU** | C++20 | Native C++ compute, graphics, autograd, and NN training |
-| **Feather** | C# / .NET | C# applications that want EasyGPU-style GPU compute without hand-written shader code |
+| **Feather** | C# / .NET | .NET applications that want EasyGPU-backed compute, textures, and preview graphics/AD/NN workflows |
 
 [Feather on GitHub →](https://github.com/FeatherCompute/Feather)
 
@@ -990,14 +990,13 @@ g++ -std=c++20 hello_gpu.cpp -lEasyGPU -lGL -o hello_gpu
 | Advanced | [ad_gpt_demo](examples/ad_gpt_demo/main.cpp) | GPT name generator: Tensor, Adam, CausalSelfAttention, CPU inference |
 | Advanced | [ad_gpt_poet_demo](examples/ad_gpt_poet_demo/main.cpp) | GPT poetry: embedded sonnets, checkpoint save/load |
 
-### Parallel Primitives Examples
+### Parallel Primitives
 
-| Level | Example | Topics |
-|:------|:--------|:-------|
-| Intermediate | [workgroup_reduce](examples/workgroup_reduce/main.cpp) | WorkgroupReduce, sum/max |
-| Intermediate | [prefix_sum](examples/prefix_sum/main.cpp) | WorkgroupScanInclusive, WorkgroupScanExclusive |
-| Advanced | [matrix_transpose](examples/matrix_transpose/main.cpp) | Shared memory tiling |
-| Advanced | [parallel_sort](examples/parallel_sort/main.cpp) | Bitonic sort with shared memory |
+| Level | Resource | Topics |
+|:------|:---------|:-------|
+| Advanced | [parallel_reduction](examples/parallel_reduction/main.cpp) | Shared memory and workgroup-style reduction |
+| Advanced | [histogram](examples/histogram/main.cpp) | Atomic operations, shared memory, histogram accumulation |
+| Guide | [Parallel Primitives Guide](docs/parallel-primitives.md) | WorkgroupReduce, scans, active compaction, and performance patterns |
 
 ### Window Examples
 
@@ -1062,7 +1061,7 @@ Signed distance field path tracer with support for complex lighting and material
 
 [![Feather](https://img.shields.io/badge/EasyGPU-Feather-512BD4.svg)](https://github.com/FeatherCompute/Feather)
 
-**[Feather](https://github.com/FeatherCompute/Feather)** is the C# / .NET frontend for EasyGPU. It gives C# developers a native-feeling entry point into the EasyGPU programming model while keeping the generated GPU execution path behind a clean frontend API.
+**[Feather](https://github.com/FeatherCompute/Feather)** is the C# / .NET frontend for EasyGPU. It gives C# developers a native-feeling entry point into the EasyGPU programming model through source-generated C# kernels, Feather IR, and a native EasyGPU bridge. Feather is currently experimental: compute is the most mature path, while graphics, windowing, automatic differentiation, and neural-network helpers are preview surfaces.
 
 [Feather on GitHub →](https://github.com/FeatherCompute/Feather)
 
