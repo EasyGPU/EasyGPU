@@ -1461,6 +1461,17 @@ void AdjointGenerator::ProcessCall(const TapeEntry &entry) {
 		if (IsLiteralName(pName)) {
 			continue;
 		}
+
+		// Callable arguments need an adjoint in the remapped sub-tape so their
+		// gradients can flow back into the caller. A bare buffer element is the
+		// exception: if it was not explicitly registered as an AD parameter, it
+		// is an external primal input and must stop-gradient here. Otherwise a
+		// ReadOnlyBuffer<T> argument such as samples[i] becomes a fake gradient
+		// target and the sub-body emits writes like grad_samples[i] += ...
+		if (!entry.inputs[pi].isParameter && !BufferBaseName(pName).empty()) {
+			continue;
+		}
+
 		std::string pType = entry.inputs[pi].glslType;
 		remappedTape.RegisterParameter(pName, pType);
 	}
