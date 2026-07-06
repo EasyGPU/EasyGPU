@@ -5,6 +5,8 @@
 
 #include <IR/Module.h>
 
+#include <AD/GradientTape.h>
+#include <Flow/CodeCollectContext.h>
 #include <IR/Builder/Builder.h>
 #include <IR/Node/ArrayAccess.h>
 #include <IR/Node/AtomicOp.h>
@@ -18,8 +20,8 @@
 #include <IR/Node/If.h>
 #include <IR/Node/LoadLocalVariable.h>
 #include <IR/Node/LoadUniform.h>
-#include <IR/Node/MemberAccess.h>
 #include <IR/Node/LocalVariable.h>
+#include <IR/Node/MemberAccess.h>
 #include <IR/Node/Node.h>
 #include <IR/Node/Operation.h>
 #include <IR/Node/RawCode.h>
@@ -30,8 +32,6 @@
 #include <IR/Node/TextureSample.h>
 #include <IR/Node/TextureStore.h>
 #include <IR/Node/While.h>
-#include <AD/GradientTape.h>
-#include <Flow/CodeCollectContext.h>
 #include <Kernel/KernelBuildContext.h>
 
 #include <cstring>
@@ -198,7 +198,8 @@ bool IsLocalValue(const ValueRecord &value, const std::string &name) {
 
 class ModuleLowerer {
 public:
-	explicit ModuleLowerer(const Module &module, GPU::AD::GradientTape* tape = nullptr) : _module(module), _gradientTape(tape) {
+	explicit ModuleLowerer(const Module &module, GPU::AD::GradientTape *tape = nullptr)
+		: _module(module), _gradientTape(tape) {
 	}
 
 	[[nodiscard]] std::unique_ptr<Kernel::KernelBuildContext> Build() {
@@ -206,22 +207,25 @@ public:
 			return nullptr;
 		}
 
-		const auto &function = _module.functions.front();
-		const auto dimension = function.dimension > 0 ? function.dimension : (function.workSizeZ > 1 ? 3 : function.workSizeY > 1 ? 2 : 1);
-		auto	   context	= std::make_unique<Kernel::KernelBuildContext>(dimension);
-		context->WorkSizeX = function.workSizeX;
-		context->WorkSizeY = function.workSizeY;
-		context->WorkSizeZ = function.workSizeZ;
+		const auto &function  = _module.functions.front();
+		const auto	dimension = function.dimension > 0 ? function.dimension
+													   : (function.workSizeZ > 1   ? 3
+														  : function.workSizeY > 1 ? 2
+																				   : 1);
+		auto		context	  = std::make_unique<Kernel::KernelBuildContext>(dimension);
+		context->WorkSizeX	  = function.workSizeX;
+		context->WorkSizeY	  = function.workSizeY;
+		context->WorkSizeZ	  = function.workSizeZ;
 		if (!RegisterResources(*context)) {
 			return nullptr;
 		}
 
-			auto &builder = Builder::Builder::Get();
-			Builder::Builder::ScopedBind bind(builder, *context);
-			Builder::Builder::ScopedGradientTape tapeScope(builder, _gradientTape);
-			if (!RegisterCallableFunctions(*context)) {
-				return nullptr;
-			}
+		auto								&builder = Builder::Builder::Get();
+		Builder::Builder::ScopedBind		 bind(builder, *context);
+		Builder::Builder::ScopedGradientTape tapeScope(builder, _gradientTape);
+		if (!RegisterCallableFunctions(*context)) {
+			return nullptr;
+		}
 		for (const auto &statement : function.statements) {
 			if (!LowerStatement(statement)) {
 				return nullptr;
@@ -310,18 +314,30 @@ private:
 
 		std::string declaration = returnType + " " + callable.name + "(";
 		for (size_t i = 0; i < callable.parameters.size(); ++i) {
-			const auto parameterType = ToGlslType(callable.parameters[i].second);
-			if (parameterType.empty() || callable.parameters[i].first.empty()) {
+			const auto parameterType = ToGlslType(callable.parameters[i].type);
+			if (parameterType.empty() || callable.parameters[i].name.empty()) {
 				return {};
 			}
 
 			if (i > 0) {
 				declaration += ", ";
 			}
-			declaration += parameterType + " " + callable.parameters[i].first;
+			declaration += CallableParameterQualifier(callable.parameters[i].direction) + parameterType + " " +
+						   callable.parameters[i].name;
 		}
 		declaration += ")";
 		return declaration;
+	}
+
+	[[nodiscard]] static std::string CallableParameterQualifier(CallableParameterDirection direction) {
+		switch (direction) {
+		case CallableParameterDirection::Out:
+			return "out ";
+		case CallableParameterDirection::InOut:
+			return "inout ";
+		default:
+			return {};
+		}
 	}
 
 	[[nodiscard]] bool EmitCallableBody(Kernel::KernelBuildContext &context, FunctionId callableId) {
@@ -329,17 +345,17 @@ private:
 			return false;
 		}
 
-		bool ok = true;
-		const auto previousBlocks = _activeBlocks;
-		const auto &callable = _module.callables[callableId];
-		_activeBlocks = &callable.blocks;
+		bool		ok			   = true;
+		const auto	previousBlocks = _activeBlocks;
+		const auto &callable	   = _module.callables[callableId];
+		_activeBlocks			   = &callable.blocks;
 		std::vector<std::string> parameterNames;
 		std::vector<std::string> parameterTypes;
 		parameterNames.reserve(callable.parameters.size());
 		parameterTypes.reserve(callable.parameters.size());
 		for (const auto &parameter : callable.parameters) {
-			parameterNames.push_back(parameter.first);
-			parameterTypes.push_back(ToGlslType(parameter.second));
+			parameterNames.push_back(parameter.name);
+			parameterTypes.push_back(ToGlslType(parameter.type));
 		}
 		context.PushCallableBody(callable.name, parameterNames, parameterTypes);
 		for (const auto &statement : callable.statements) {
@@ -375,7 +391,7 @@ private:
 		for (const auto &callable : _module.callables) {
 			RegisterStructDefinition(context, callable.returnType);
 			for (const auto &parameter : callable.parameters) {
-				RegisterStructDefinition(context, parameter.second);
+				RegisterStructDefinition(context, parameter.type);
 			}
 			for (const auto &statement : callable.statements) {
 				RegisterStructDefinition(context, statement.localType);
@@ -443,7 +459,8 @@ private:
 		case Statement::Kind::Return: {
 			if (statement.value != InvalidValueId) {
 				auto value = BuildNode(statement.value);
-				if (value == nullptr) return false;
+				if (value == nullptr)
+					return false;
 				const Node::ReturnNode returnNode(std::move(value));
 				Builder::Builder::Get().Build(returnNode, true);
 			} else {
@@ -486,17 +503,18 @@ private:
 			return false;
 		}
 
-		auto x = BuildNode(target.index);
-		auto y = BuildNode(target.y);
-		auto z = target.right == InvalidValueId ? nullptr : BuildNode(target.right);
+		auto x	   = BuildNode(target.index);
+		auto y	   = BuildNode(target.y);
+		auto z	   = target.right == InvalidValueId ? nullptr : BuildNode(target.right);
 		auto value = BuildNode(source);
 		if (x == nullptr || y == nullptr || (target.right != InvalidValueId && z == nullptr) || value == nullptr) {
 			return false;
 		}
 
-		const auto store = z == nullptr
-			? Node::TextureStoreNode(resource.name, std::move(x), std::move(y), std::move(value))
-			: Node::TextureStoreNode(resource.name, std::move(x), std::move(y), std::move(z), std::move(value));
+		const auto store =
+			z == nullptr
+				? Node::TextureStoreNode(resource.name, std::move(x), std::move(y), std::move(value))
+				: Node::TextureStoreNode(resource.name, std::move(x), std::move(y), std::move(z), std::move(value));
 		Builder::Builder::Get().Build(store, true);
 		return true;
 	}
@@ -528,7 +546,8 @@ private:
 			return false;
 		}
 
-		const Node::SharedMemoryNode sharedMemory(statement.sharedName, typeStr, static_cast<int>(statement.sharedCount));
+		const Node::SharedMemoryNode sharedMemory(statement.sharedName, typeStr,
+												  static_cast<int>(statement.sharedCount));
 		Builder::Builder::Get().Build(sharedMemory, true);
 		return true;
 	}
@@ -548,13 +567,14 @@ private:
 		}
 
 		auto declaration = initializer == nullptr
-			? Node::LocalVariableNode(statement.localName, type)
-			: Node::LocalVariableNode(statement.localName, type, std::move(initializer));
+							   ? Node::LocalVariableNode(statement.localName, type)
+							   : Node::LocalVariableNode(statement.localName, type, std::move(initializer));
 		Builder::Builder::Get().Build(declaration, true);
 		return true;
 	}
 
-	[[nodiscard]] bool LowerStatementToNodes(const Statement &statement, std::vector<std::unique_ptr<Node::Node>> &nodes) {
+	[[nodiscard]] bool LowerStatementToNodes(const Statement						  &statement,
+											 std::vector<std::unique_ptr<Node::Node>> &nodes) {
 		switch (statement.kind) {
 		case Statement::Kind::LocalDeclaration: {
 			const auto type = ToGlslType(statement.localType);
@@ -570,9 +590,10 @@ private:
 				}
 			}
 
-			nodes.push_back(initializer == nullptr
-				? std::make_unique<Node::LocalVariableNode>(statement.localName, type)
-				: std::make_unique<Node::LocalVariableNode>(statement.localName, type, std::move(initializer)));
+			nodes.push_back(
+				initializer == nullptr
+					? std::make_unique<Node::LocalVariableNode>(statement.localName, type)
+					: std::make_unique<Node::LocalVariableNode>(statement.localName, type, std::move(initializer)));
 			return true;
 		}
 		case Statement::Kind::Store: {
@@ -591,26 +612,27 @@ private:
 					return false;
 				}
 
-				auto x = BuildNode(target.index);
-				auto y = BuildNode(target.y);
-				auto z = target.right == InvalidValueId ? nullptr : BuildNode(target.right);
+				auto x	   = BuildNode(target.index);
+				auto y	   = BuildNode(target.y);
+				auto z	   = target.right == InvalidValueId ? nullptr : BuildNode(target.right);
 				auto value = BuildNode(statement.value);
-				if (x == nullptr || y == nullptr || (target.right != InvalidValueId && z == nullptr) || value == nullptr) {
+				if (x == nullptr || y == nullptr || (target.right != InvalidValueId && z == nullptr) ||
+					value == nullptr) {
 					return false;
 				}
 
 				if (z == nullptr) {
-					nodes.push_back(std::make_unique<Node::TextureStoreNode>(
-						resource.name, std::move(x), std::move(y), std::move(value)));
+					nodes.push_back(std::make_unique<Node::TextureStoreNode>(resource.name, std::move(x), std::move(y),
+																			 std::move(value)));
 				} else {
-					nodes.push_back(std::make_unique<Node::TextureStoreNode>(
-						resource.name, std::move(x), std::move(y), std::move(z), std::move(value)));
+					nodes.push_back(std::make_unique<Node::TextureStoreNode>(resource.name, std::move(x), std::move(y),
+																			 std::move(z), std::move(value)));
 				}
 				return true;
 			}
 
 			auto target = BuildNode(statement.target);
-			auto value = BuildNode(statement.value);
+			auto value	= BuildNode(statement.value);
 			if (target == nullptr || value == nullptr) {
 				return false;
 			}
@@ -670,8 +692,8 @@ private:
 				return false;
 			}
 
-			nodes.push_back(std::make_unique<Node::SharedMemoryNode>(
-				statement.sharedName, typeStr, static_cast<int>(statement.sharedCount)));
+			nodes.push_back(std::make_unique<Node::SharedMemoryNode>(statement.sharedName, typeStr,
+																	 static_cast<int>(statement.sharedCount)));
 			return true;
 		}
 		case Statement::Kind::RawGLSL:
@@ -684,7 +706,7 @@ private:
 
 	[[nodiscard]] std::optional<std::vector<std::unique_ptr<Node::Node>>> BuildStatementNodes(BlockId block) {
 		std::vector<std::unique_ptr<Node::Node>> nodes;
-		const auto &blocks = ActiveBlocks();
+		const auto								&blocks = ActiveBlocks();
 		if (block >= blocks.size()) {
 			return std::move(nodes);
 		}
@@ -723,24 +745,30 @@ private:
 		switch (statement.kind) {
 		case Statement::Kind::If: {
 			auto condition = BuildNode(statement.condition);
-			if (condition == nullptr) return false;
+			if (condition == nullptr)
+				return false;
 			const auto condStr = builder.BuildNode(*condition);
-			if (condStr.empty()) return false;
+			if (condStr.empty())
+				return false;
 
 			tape.BeginIfBranch(condStr);
-			if (!RecordBlockOnTape(statement.thenBlock)) return false;
+			if (!RecordBlockOnTape(statement.thenBlock))
+				return false;
 			if (statement.elseBlock != InvalidBlockId) {
 				tape.BeginElseBranch();
-				if (!RecordBlockOnTape(statement.elseBlock)) return false;
+				if (!RecordBlockOnTape(statement.elseBlock))
+					return false;
 			}
 			tape.EndIfChain();
 			return true;
 		}
 		case Statement::Kind::For: {
 			auto tapeInfo = TryExtractForTapeInfo(statement);
-			if (!tapeInfo.has_value()) return false;
+			if (!tapeInfo.has_value())
+				return false;
 			tape.BeginForLoop(tapeInfo->varName, tapeInfo->start, tapeInfo->end, tapeInfo->step);
-			if (!RecordBlockOnTape(statement.bodyBlock)) return false;
+			if (!RecordBlockOnTape(statement.bodyBlock))
+				return false;
 			tape.EndForLoop();
 			return true;
 		}
@@ -788,7 +816,7 @@ private:
 		}
 
 		auto &builder = Builder::Builder::Get();
-		auto *parent = builder.Context();
+		auto *parent  = builder.Context();
 		if (parent == nullptr) {
 			return std::nullopt;
 		}
@@ -813,7 +841,7 @@ private:
 			return std::string{};
 		}
 
-		auto &builder = Builder::Builder::Get();
+		auto	   &builder = Builder::Builder::Get();
 		std::string header;
 		for (const auto &statement : block->statements) {
 			std::vector<std::unique_ptr<Node::Node>> nodes;
@@ -866,17 +894,17 @@ private:
 		ForTapeInfo info;
 		info.varName = left.localName;
 
-		auto start = TryExtractForStart(statement.initBlock, info.varName);
-		auto step = TryExtractForStep(statement.stepBlock, info.varName);
+		auto start	 = TryExtractForStart(statement.initBlock, info.varName);
+		auto step	 = TryExtractForStep(statement.stepBlock, info.varName);
 		auto endNode = BuildNode(condition.right);
 		if (!start.has_value() || !step.has_value() || endNode == nullptr) {
 			return std::nullopt;
 		}
 
 		auto &builder = Builder::Builder::Get();
-		info.start = *start;
-		info.end = builder.BuildNode(*endNode);
-		info.step = *step;
+		info.start	  = *start;
+		info.end	  = builder.BuildNode(*endNode);
+		info.step	  = *step;
 		if (info.start.empty() || info.end.empty() || info.step.empty()) {
 			return std::nullopt;
 		}
@@ -964,43 +992,49 @@ private:
 		}
 
 		auto condition = BuildNode(statement.condition);
-		if (condition == nullptr) return false;
+		if (condition == nullptr)
+			return false;
 
 		auto thenNodes = BuildStatementNodes(statement.thenBlock);
-		if (!thenNodes.has_value()) return false;
+		if (!thenNodes.has_value())
+			return false;
 
 		std::vector<std::unique_ptr<Node::Node>> elseNodes;
 		if (statement.elseBlock != InvalidBlockId) {
 			auto builtElse = BuildStatementNodes(statement.elseBlock);
-			if (!builtElse.has_value()) return false;
+			if (!builtElse.has_value())
+				return false;
 			elseNodes = std::move(*builtElse);
 		}
 
 		std::vector<std::pair<std::unique_ptr<Node::Node>, std::vector<std::unique_ptr<Node::Node>>>> elifs;
-		const Node::IfNode ifNode(*thenNodes, condition, elifs, elseNodes);
+		const Node::IfNode					 ifNode(*thenNodes, condition, elifs, elseNodes);
 		Builder::Builder::ScopedGradientTape suppressTape(builder, nullptr);
 		Builder::Builder::Get().Build(ifNode, true);
 		return true;
 	}
 
-	[[nodiscard]] bool LowerIfStatementToNodes(const Statement &statement,
+	[[nodiscard]] bool LowerIfStatementToNodes(const Statement							&statement,
 											   std::vector<std::unique_ptr<Node::Node>> &nodes) {
 		auto condition = BuildNode(statement.condition);
-		if (condition == nullptr) return false;
+		if (condition == nullptr)
+			return false;
 
 		std::vector<std::unique_ptr<Node::Node>> thenNodes;
-		const auto &blocks = ActiveBlocks();
+		const auto								&blocks = ActiveBlocks();
 		if (statement.thenBlock < blocks.size()) {
 			auto builtThen = BuildStatementNodes(statement.thenBlock);
-			if (!builtThen.has_value()) return false;
+			if (!builtThen.has_value())
+				return false;
 			thenNodes = std::move(*builtThen);
 		}
 
 		std::vector<std::pair<std::unique_ptr<Node::Node>, std::vector<std::unique_ptr<Node::Node>>>> elifs;
-		std::vector<std::unique_ptr<Node::Node>> elseNodes;
+		std::vector<std::unique_ptr<Node::Node>>													  elseNodes;
 		if (statement.elseBlock < blocks.size()) {
 			auto builtElse = BuildStatementNodes(statement.elseBlock);
-			if (!builtElse.has_value()) return false;
+			if (!builtElse.has_value())
+				return false;
 			elseNodes = std::move(*builtElse);
 		}
 
@@ -1010,12 +1044,14 @@ private:
 
 	[[nodiscard]] bool LowerForStatement(const Statement &statement) {
 		auto &builder = Builder::Builder::Get();
-		auto cond = BuildNode(statement.condition);
-		if (cond == nullptr) return false;
+		auto  cond	  = BuildNode(statement.condition);
+		if (cond == nullptr)
+			return false;
 
 		auto initHeader = BuildForHeader(statement.initBlock);
 		auto stepHeader = BuildForHeader(statement.stepBlock);
-		if (!initHeader.has_value() || !stepHeader.has_value()) return false;
+		if (!initHeader.has_value() || !stepHeader.has_value())
+			return false;
 
 		if (auto *tape = builder.GetGradientTape()) {
 			if (!RecordStatementOnTape(statement, *tape)) {
@@ -1026,47 +1062,54 @@ private:
 		std::vector<std::unique_ptr<Node::Node>> initNodes;
 		if (statement.initBlock < ActiveBlocks().size()) {
 			auto builtInit = BuildStatementNodes(statement.initBlock);
-			if (!builtInit.has_value()) return false;
+			if (!builtInit.has_value())
+				return false;
 			initNodes = std::move(*builtInit);
 		}
 
 		std::vector<std::unique_ptr<Node::Node>> stepNodes;
 		if (statement.stepBlock < ActiveBlocks().size()) {
 			auto builtStep = BuildStatementNodes(statement.stepBlock);
-			if (!builtStep.has_value()) return false;
+			if (!builtStep.has_value())
+				return false;
 			stepNodes = std::move(*builtStep);
 		}
 
 		auto bodyNodes = BuildStatementNodes(statement.bodyBlock);
-		if (!bodyNodes.has_value()) return false;
+		if (!bodyNodes.has_value())
+			return false;
 
-		const Node::ForNode forNode(initNodes, cond, stepNodes, *bodyNodes);
+		const Node::ForNode					 forNode(initNodes, cond, stepNodes, *bodyNodes);
 		Builder::Builder::ScopedGradientTape suppressTape(builder, nullptr);
 		Builder::Builder::Get().Build(forNode, true);
 		return true;
 	}
 
-	[[nodiscard]] bool LowerForStatementToNodes(const Statement &statement,
+	[[nodiscard]] bool LowerForStatementToNodes(const Statement							 &statement,
 												std::vector<std::unique_ptr<Node::Node>> &nodes) {
 		auto cond = BuildNode(statement.condition);
-		if (cond == nullptr) return false;
+		if (cond == nullptr)
+			return false;
 
 		std::vector<std::unique_ptr<Node::Node>> initNodes;
 		if (statement.initBlock < ActiveBlocks().size()) {
 			auto builtInit = BuildStatementNodes(statement.initBlock);
-			if (!builtInit.has_value()) return false;
+			if (!builtInit.has_value())
+				return false;
 			initNodes = std::move(*builtInit);
 		}
 
 		std::vector<std::unique_ptr<Node::Node>> stepNodes;
 		if (statement.stepBlock < ActiveBlocks().size()) {
 			auto builtStep = BuildStatementNodes(statement.stepBlock);
-			if (!builtStep.has_value()) return false;
+			if (!builtStep.has_value())
+				return false;
 			stepNodes = std::move(*builtStep);
 		}
 
 		auto bodyNodes = BuildStatementNodes(statement.bodyBlock);
-		if (!bodyNodes.has_value()) return false;
+		if (!bodyNodes.has_value())
+			return false;
 
 		nodes.push_back(std::make_unique<Node::ForNode>(initNodes, cond, stepNodes, *bodyNodes));
 		return true;
@@ -1074,24 +1117,28 @@ private:
 
 	[[nodiscard]] bool LowerWhileStatement(const Statement &statement) {
 		auto condition = BuildNode(statement.condition);
-		if (condition == nullptr) return false;
+		if (condition == nullptr)
+			return false;
 
 		auto builtBody = BuildStatementNodes(statement.bodyBlock);
-		if (!builtBody.has_value()) return false;
-		auto bodyNodes = std::move(*builtBody);
+		if (!builtBody.has_value())
+			return false;
+		auto				  bodyNodes = std::move(*builtBody);
 
 		const Node::WhileNode whileNode(condition, bodyNodes);
 		Builder::Builder::Get().Build(whileNode, true);
 		return true;
 	}
 
-	[[nodiscard]] bool LowerWhileStatementToNodes(const Statement &statement,
+	[[nodiscard]] bool LowerWhileStatementToNodes(const Statement						   &statement,
 												  std::vector<std::unique_ptr<Node::Node>> &nodes) {
 		auto condition = BuildNode(statement.condition);
-		if (condition == nullptr) return false;
+		if (condition == nullptr)
+			return false;
 
 		auto bodyNodes = BuildStatementNodes(statement.bodyBlock);
-		if (!bodyNodes.has_value()) return false;
+		if (!bodyNodes.has_value())
+			return false;
 
 		nodes.push_back(std::make_unique<Node::WhileNode>(condition, *bodyNodes));
 		return true;
@@ -1099,48 +1146,66 @@ private:
 
 	[[nodiscard]] bool LowerDoWhileStatement(const Statement &statement) {
 		auto builtBody = BuildStatementNodes(statement.bodyBlock);
-		if (!builtBody.has_value()) return false;
+		if (!builtBody.has_value())
+			return false;
 		auto bodyNodes = std::move(*builtBody);
 
 		auto condition = BuildNode(statement.condition);
-		if (condition == nullptr) return false;
+		if (condition == nullptr)
+			return false;
 
 		const Node::DoWhileNode doWhileNode(bodyNodes, condition);
 		Builder::Builder::Get().Build(doWhileNode, true);
 		return true;
 	}
 
-	[[nodiscard]] bool LowerDoWhileStatementToNodes(const Statement &statement,
+	[[nodiscard]] bool LowerDoWhileStatementToNodes(const Statement							 &statement,
 													std::vector<std::unique_ptr<Node::Node>> &nodes) {
 		auto bodyNodes = BuildStatementNodes(statement.bodyBlock);
-		if (!bodyNodes.has_value()) return false;
+		if (!bodyNodes.has_value())
+			return false;
 
 		auto condition = BuildNode(statement.condition);
-		if (condition == nullptr) return false;
+		if (condition == nullptr)
+			return false;
 
 		nodes.push_back(std::make_unique<Node::DoWhileNode>(*bodyNodes, condition));
 		return true;
 	}
 
 	[[nodiscard]] std::unique_ptr<Node::Node> BuildCompare(const ValueRecord &value) {
-		if (value.left >= _module.values.size() || value.right >= _module.values.size()) return nullptr;
+		if (value.left >= _module.values.size() || value.right >= _module.values.size())
+			return nullptr;
 		auto left  = BuildNode(value.left);
 		auto right = BuildNode(value.right);
-		if (left == nullptr || right == nullptr) return nullptr;
+		if (left == nullptr || right == nullptr)
+			return nullptr;
 
 		Node::OperationCode code;
 		switch (value.compareOp) {
-		case CompareOp::Less:		code = Node::OperationCode::Less; break;
-		case CompareOp::LessEqual:	code = Node::OperationCode::LessEqual; break;
-		case CompareOp::Greater:	code = Node::OperationCode::Greater; break;
-		case CompareOp::GreaterEqual: code = Node::OperationCode::GreaterEqual; break;
-		case CompareOp::Equal:		code = Node::OperationCode::Equal; break;
-		case CompareOp::NotEqual:	code = Node::OperationCode::NotEqual; break;
-		default: return nullptr;
+		case CompareOp::Less:
+			code = Node::OperationCode::Less;
+			break;
+		case CompareOp::LessEqual:
+			code = Node::OperationCode::LessEqual;
+			break;
+		case CompareOp::Greater:
+			code = Node::OperationCode::Greater;
+			break;
+		case CompareOp::GreaterEqual:
+			code = Node::OperationCode::GreaterEqual;
+			break;
+		case CompareOp::Equal:
+			code = Node::OperationCode::Equal;
+			break;
+		case CompareOp::NotEqual:
+			code = Node::OperationCode::NotEqual;
+			break;
+		default:
+			return nullptr;
 		}
 		return std::make_unique<Node::OperationNode>(code, std::move(left), std::move(right));
 	}
-
 
 	[[nodiscard]] std::unique_ptr<Node::Node> BuildNode(ValueId id) {
 		if (id >= _module.values.size()) {
@@ -1191,9 +1256,10 @@ private:
 			return std::make_unique<Node::LoadLocalVariableNode>(value.localName);
 		case ValueRecord::Kind::Ternary: {
 			auto cond = BuildNode(value.left);
-			auto tv = BuildNode(value.right);
-			auto fv = BuildNode(value.arguments[0]);
-			if (cond == nullptr || tv == nullptr || fv == nullptr) return nullptr;
+			auto tv	  = BuildNode(value.right);
+			auto fv	  = BuildNode(value.arguments[0]);
+			if (cond == nullptr || tv == nullptr || fv == nullptr)
+				return nullptr;
 			return std::make_unique<Node::TernaryNode>(std::move(cond), std::move(tv), std::move(fv));
 		}
 		case ValueRecord::Kind::Binary:
@@ -1279,7 +1345,8 @@ private:
 			return nullptr;
 		}
 
-		return std::make_unique<Node::OperationNode>(ToNodeOperation(value.binaryOp), std::move(left), std::move(right));
+		return std::make_unique<Node::OperationNode>(ToNodeOperation(value.binaryOp), std::move(left),
+													 std::move(right));
 	}
 
 	[[nodiscard]] std::unique_ptr<Node::Node> BuildUnary(const ValueRecord &value) {
@@ -1353,14 +1420,13 @@ private:
 				return nullptr;
 			}
 
-			auto compare = std::move(operand);
+			auto compare	 = std::move(operand);
 			auto replacement = BuildNode(value.arguments[1]);
 			if (replacement == nullptr) {
 				return nullptr;
 			}
 
-			return std::make_unique<Node::AtomicOpNode>(
-				std::move(target), std::move(compare), std::move(replacement));
+			return std::make_unique<Node::AtomicOpNode>(std::move(target), std::move(compare), std::move(replacement));
 		}
 
 		Node::AtomicOpCode code{};
@@ -1412,9 +1478,8 @@ private:
 			arguments.push_back(std::move(node));
 		}
 
-		return value.intrinsic.empty()
-			? nullptr
-			: std::make_unique<Node::CallNode>(value.intrinsic, std::move(arguments));
+		return value.intrinsic.empty() ? nullptr
+									   : std::make_unique<Node::CallNode>(value.intrinsic, std::move(arguments));
 	}
 
 	[[nodiscard]] std::unique_ptr<Node::Node> BuildSwizzle(const ValueRecord &value) {
@@ -1457,10 +1522,10 @@ private:
 		return std::make_unique<Node::ArrayAccessNode>(std::move(target), std::move(index));
 	}
 
-	const Module &_module;
-	GPU::AD::GradientTape* _gradientTape = nullptr;
+	const Module							   &_module;
+	GPU::AD::GradientTape					   *_gradientTape = nullptr;
 	std::unordered_map<ResourceId, std::string> _uniformNames;
-	const std::vector<Block> *_activeBlocks = nullptr;
+	const std::vector<Block>				   *_activeBlocks = nullptr;
 };
 
 } // namespace
@@ -1468,13 +1533,13 @@ private:
 FunctionId ModuleBuilder::BeginComputeKernel(uint32_t workSizeX, uint32_t workSizeY, uint32_t workSizeZ,
 											 uint32_t dimension, std::string entryPoint) {
 	Function function;
-	function.id		   = static_cast<FunctionId>(_module.functions.size());
-	function.stage	   = ShaderStage::Compute;
+	function.id			= static_cast<FunctionId>(_module.functions.size());
+	function.stage		= ShaderStage::Compute;
 	function.entryPoint = std::move(entryPoint);
-	function.workSizeX  = workSizeX;
-	function.workSizeY  = workSizeY;
-	function.workSizeZ  = workSizeZ;
-	function.dimension  = dimension;
+	function.workSizeX	= workSizeX;
+	function.workSizeY	= workSizeY;
+	function.workSizeZ	= workSizeZ;
+	function.dimension	= dimension;
 	_module.functions.push_back(std::move(function));
 	_activeFunction = _module.functions.back().id;
 	return _activeFunction;
@@ -1482,7 +1547,7 @@ FunctionId ModuleBuilder::BeginComputeKernel(uint32_t workSizeX, uint32_t workSi
 
 ResourceId ModuleBuilder::AddBuffer(uint32_t binding, Type elementType, ResourceAccess access, std::string name) {
 	ResourceBinding resource;
-	resource.id			= static_cast<ResourceId>(_module.resources.size());
+	resource.id			 = static_cast<ResourceId>(_module.resources.size());
 	resource.binding	 = binding;
 	resource.kind		 = ResourceKind::Buffer;
 	resource.access		 = access;
@@ -1493,48 +1558,48 @@ ResourceId ModuleBuilder::AddBuffer(uint32_t binding, Type elementType, Resource
 }
 
 ResourceId ModuleBuilder::AddTexture2D(uint32_t binding, Type elementType, ResourceAccess access, std::string name,
-										Runtime::PixelFormat format, uint32_t width, uint32_t height, bool sampled) {
+									   Runtime::PixelFormat format, uint32_t width, uint32_t height, bool sampled) {
 	ResourceBinding resource;
-	resource.id			  = static_cast<ResourceId>(_module.resources.size());
-	resource.binding	  = binding;
-	resource.kind		  = ResourceKind::Texture;
-	resource.access		  = access;
-	resource.elementType  = elementType;
-	resource.name		  = std::move(name);
-	resource.textureFormat = format;
-	resource.width		  = width;
-	resource.height		  = height;
-	resource.depth		  = 1;
+	resource.id				  = static_cast<ResourceId>(_module.resources.size());
+	resource.binding		  = binding;
+	resource.kind			  = ResourceKind::Texture;
+	resource.access			  = access;
+	resource.elementType	  = elementType;
+	resource.name			  = std::move(name);
+	resource.textureFormat	  = format;
+	resource.width			  = width;
+	resource.height			  = height;
+	resource.depth			  = 1;
 	resource.textureDimension = 2;
-	resource.sampled	  = sampled;
+	resource.sampled		  = sampled;
 	_module.resources.push_back(std::move(resource));
 	return _module.resources.back().id;
 }
 
 ResourceId ModuleBuilder::AddTexture3D(uint32_t binding, Type elementType, ResourceAccess access, std::string name,
-										Runtime::PixelFormat format, uint32_t width, uint32_t height, uint32_t depth,
-										bool sampled) {
+									   Runtime::PixelFormat format, uint32_t width, uint32_t height, uint32_t depth,
+									   bool sampled) {
 	ResourceBinding resource;
-	resource.id			  = static_cast<ResourceId>(_module.resources.size());
-	resource.binding	  = binding;
-	resource.kind		  = ResourceKind::Texture;
-	resource.access		  = access;
-	resource.elementType  = elementType;
-	resource.name		  = std::move(name);
-	resource.textureFormat = format;
-	resource.width		  = width;
-	resource.height		  = height;
-	resource.depth		  = depth;
+	resource.id				  = static_cast<ResourceId>(_module.resources.size());
+	resource.binding		  = binding;
+	resource.kind			  = ResourceKind::Texture;
+	resource.access			  = access;
+	resource.elementType	  = elementType;
+	resource.name			  = std::move(name);
+	resource.textureFormat	  = format;
+	resource.width			  = width;
+	resource.height			  = height;
+	resource.depth			  = depth;
 	resource.textureDimension = 3;
-	resource.sampled	  = sampled;
+	resource.sampled		  = sampled;
 	_module.resources.push_back(std::move(resource));
 	return _module.resources.back().id;
 }
 
 ResourceId ModuleBuilder::AddPushConstant(uint32_t binding, Type elementType, std::string name, void *data, size_t size,
-										   size_t alignment) {
+										  size_t alignment) {
 	ResourceBinding resource;
-	resource.id			= static_cast<ResourceId>(_module.resources.size());
+	resource.id			 = static_cast<ResourceId>(_module.resources.size());
 	resource.binding	 = binding;
 	resource.kind		 = ResourceKind::PushConstant;
 	resource.access		 = ResourceAccess::Read;
@@ -1690,9 +1755,9 @@ ValueId ModuleBuilder::Ternary(ValueId condition, ValueId trueValue, ValueId fal
 	if (condition >= _module.values.size() || trueValue >= _module.values.size() || falseValue >= _module.values.size())
 		return InvalidValueId;
 	ValueRecord value;
-	value.kind = ValueRecord::Kind::Ternary;
-	value.type = _module.values[trueValue].type;
-	value.left = condition;
+	value.kind	= ValueRecord::Kind::Ternary;
+	value.type	= _module.values[trueValue].type;
+	value.left	= condition;
 	value.right = trueValue;
 	value.arguments.push_back(falseValue);
 	return AddValue(std::move(value));
@@ -1756,8 +1821,8 @@ ValueId ModuleBuilder::TextureSample(ResourceId resource, Type resultType, Value
 
 ValueId ModuleBuilder::TextureSampleLevel(ResourceId resource, Type resultType, ValueId uv, ValueId lod) {
 	if (resource >= _module.resources.size() || _module.resources[resource].kind != ResourceKind::Texture ||
-		!_module.resources[resource].sampled || !resultType.IsValid() ||
-		uv >= _module.values.size() || lod >= _module.values.size()) {
+		!_module.resources[resource].sampled || !resultType.IsValid() || uv >= _module.values.size() ||
+		lod >= _module.values.size()) {
 		return InvalidValueId;
 	}
 
@@ -1781,16 +1846,15 @@ ValueId ModuleBuilder::Call(std::string name, Type resultType, std::span<const V
 	}
 
 	ValueRecord value;
-	value.kind = ValueRecord::Kind::Call;
-	value.type = std::move(resultType);
+	value.kind		= ValueRecord::Kind::Call;
+	value.type		= std::move(resultType);
 	value.intrinsic = std::move(name);
 	value.arguments.assign(arguments.begin(), arguments.end());
 	return AddValue(std::move(value));
 }
 
 ValueId ModuleBuilder::Atomic(AtomicOp op, Type resultType, ValueId target, std::span<const ValueId> arguments) {
-	if (!resultType.IsValid() || target >= _module.values.size() ||
-		arguments.empty() || arguments.size() > 2) {
+	if (!resultType.IsValid() || target >= _module.values.size() || arguments.empty() || arguments.size() > 2) {
 		return InvalidValueId;
 	}
 
@@ -1806,10 +1870,10 @@ ValueId ModuleBuilder::Atomic(AtomicOp op, Type resultType, ValueId target, std:
 	}
 
 	ValueRecord value;
-	value.kind = ValueRecord::Kind::Atomic;
-	value.type = std::move(resultType);
+	value.kind	   = ValueRecord::Kind::Atomic;
+	value.type	   = std::move(resultType);
 	value.atomicOp = op;
-	value.left = target;
+	value.left	   = target;
 	value.arguments.assign(arguments.begin(), arguments.end());
 	return AddValue(std::move(value));
 }
@@ -1833,9 +1897,9 @@ ValueId ModuleBuilder::IndexAccess(ValueId instance, ValueId index, Type resultT
 	}
 
 	ValueRecord value;
-	value.kind  = ValueRecord::Kind::IndexAccess;
-	value.type  = std::move(resultType);
-	value.left  = instance;
+	value.kind	= ValueRecord::Kind::IndexAccess;
+	value.type	= std::move(resultType);
+	value.left	= instance;
 	value.index = index;
 	return AddValue(std::move(value));
 }
@@ -1867,43 +1931,56 @@ ValueId ModuleBuilder::SharedMemoryElement(Type elementType, std::string name, V
 }
 
 FunctionId ModuleBuilder::AddCallable(std::string name, Type returnType,
-									   std::vector<std::pair<std::string, Type>> parameters,
-									   std::vector<Statement> statements, std::vector<Block> blocks) {
+									  std::vector<std::pair<std::string, Type>> parameters,
+									  std::vector<Statement> statements, std::vector<Block> blocks) {
+	std::vector<CallableParameter> callableParameters;
+	callableParameters.reserve(parameters.size());
+	for (auto &parameter : parameters) {
+		callableParameters.push_back(
+			CallableParameter{std::move(parameter.first), std::move(parameter.second), CallableParameterDirection::In});
+	}
+
+	return AddCallable(std::move(name), std::move(returnType), std::move(callableParameters), std::move(statements),
+					   std::move(blocks));
+}
+
+FunctionId ModuleBuilder::AddCallable(std::string name, Type returnType, std::vector<CallableParameter> parameters,
+									  std::vector<Statement> statements, std::vector<Block> blocks) {
 	if (name.empty() || !returnType.IsValid()) {
 		return InvalidFunctionId;
 	}
 
 	for (const auto &parameter : parameters) {
-		if (parameter.first.empty() || !parameter.second.IsValid()) {
+		if (parameter.name.empty() || !parameter.type.IsValid()) {
 			return InvalidFunctionId;
 		}
 	}
 
 	CallableFunction callable;
-	callable.id = static_cast<FunctionId>(_module.callables.size());
-	callable.name = std::move(name);
+	callable.id			= static_cast<FunctionId>(_module.callables.size());
+	callable.name		= std::move(name);
 	callable.returnType = std::move(returnType);
 	callable.parameters = std::move(parameters);
 	callable.statements = std::move(statements);
-	callable.blocks = std::move(blocks);
+	callable.blocks		= std::move(blocks);
 	_module.callables.push_back(std::move(callable));
 	return _module.callables.back().id;
 }
 
 void ModuleBuilder::DeclareLocal(Type type, std::string name, ValueId initializer) {
 	Statement statement;
-	statement.kind = Statement::Kind::LocalDeclaration;
-	statement.localType = type;
-	statement.localName = std::move(name);
+	statement.kind		  = Statement::Kind::LocalDeclaration;
+	statement.localType	  = type;
+	statement.localName	  = std::move(name);
 	statement.initializer = initializer;
 	ActiveFunction().statements.push_back(statement);
 }
 
 void ModuleBuilder::Store(ValueId target, ValueId value) {
 	Statement statement;
-	statement.kind	= Statement::Kind::Store;
+	statement.kind	 = Statement::Kind::Store;
 	statement.target = target;
-	statement.value	= value;
+	statement.value	 = value;
 	ActiveFunction().statements.push_back(statement);
 }
 
@@ -1911,25 +1988,26 @@ void ModuleBuilder::RawGLSL(std::string code) {
 	// Legacy compatibility escape hatch. New normal DSL features should add
 	// typed values/statements and EasyGPU nodes instead of entering here.
 	Statement statement;
-	statement.kind = Statement::Kind::RawGLSL;
+	statement.kind	  = Statement::Kind::RawGLSL;
 	statement.rawGlsl = std::move(code);
 	ActiveFunction().statements.push_back(statement);
 }
 
 ValueId ModuleBuilder::Compare(CompareOp op, ValueId left, ValueId right) {
-	if (left >= _module.values.size() || right >= _module.values.size()) return InvalidValueId;
+	if (left >= _module.values.size() || right >= _module.values.size())
+		return InvalidValueId;
 	ValueRecord value;
-	value.kind	   = ValueRecord::Kind::Compare;
-	value.type	   = Type::Bool();
+	value.kind		= ValueRecord::Kind::Compare;
+	value.type		= Type::Bool();
 	value.compareOp = op;
-	value.left	   = left;
-	value.right	   = right;
+	value.left		= left;
+	value.right		= right;
 	return AddValue(std::move(value));
 }
 
 BlockId ModuleBuilder::AddBlock(std::vector<Statement> statements) {
 	Block block;
-	block.id = static_cast<BlockId>(ActiveFunction().blocks.size());
+	block.id		 = static_cast<BlockId>(ActiveFunction().blocks.size());
 	block.statements = std::move(statements);
 	ActiveFunction().blocks.push_back(std::move(block));
 	return ActiveFunction().blocks.back().id;
@@ -1937,7 +2015,7 @@ BlockId ModuleBuilder::AddBlock(std::vector<Statement> statements) {
 
 void ModuleBuilder::If(ValueId condition, BlockId thenBlock, BlockId elseBlock) {
 	Statement statement;
-	statement.kind	   = Statement::Kind::If;
+	statement.kind		= Statement::Kind::If;
 	statement.condition = condition;
 	statement.thenBlock = thenBlock;
 	statement.elseBlock = elseBlock;
@@ -1946,7 +2024,7 @@ void ModuleBuilder::If(ValueId condition, BlockId thenBlock, BlockId elseBlock) 
 
 void ModuleBuilder::For(BlockId init, ValueId condition, BlockId step, BlockId body) {
 	Statement statement;
-	statement.kind = Statement::Kind::For;
+	statement.kind		= Statement::Kind::For;
 	statement.initBlock = init;
 	statement.condition = condition;
 	statement.stepBlock = step;
@@ -1956,7 +2034,7 @@ void ModuleBuilder::For(BlockId init, ValueId condition, BlockId step, BlockId b
 
 void ModuleBuilder::While(ValueId condition, BlockId body) {
 	Statement statement;
-	statement.kind	    = Statement::Kind::While;
+	statement.kind		= Statement::Kind::While;
 	statement.condition = condition;
 	statement.bodyBlock = body;
 	ActiveFunction().statements.push_back(std::move(statement));
@@ -1964,7 +2042,7 @@ void ModuleBuilder::While(ValueId condition, BlockId body) {
 
 void ModuleBuilder::DoWhile(BlockId body, ValueId condition) {
 	Statement statement;
-	statement.kind	    = Statement::Kind::DoWhile;
+	statement.kind		= Statement::Kind::DoWhile;
 	statement.bodyBlock = body;
 	statement.condition = condition;
 	ActiveFunction().statements.push_back(std::move(statement));
@@ -1984,34 +2062,33 @@ void ModuleBuilder::Continue() {
 
 void ModuleBuilder::Return(ValueId value) {
 	Statement statement;
-	statement.kind  = Statement::Kind::Return;
+	statement.kind	= Statement::Kind::Return;
 	statement.value = value;
 	ActiveFunction().statements.push_back(std::move(statement));
 }
 
 void ModuleBuilder::Expression(ValueId value) {
 	Statement statement;
-	statement.kind = Statement::Kind::Expression;
+	statement.kind	= Statement::Kind::Expression;
 	statement.value = value;
 	ActiveFunction().statements.push_back(std::move(statement));
 }
 
 void ModuleBuilder::Barrier(BarrierKind kind) {
 	Statement statement;
-	statement.kind = Statement::Kind::Barrier;
+	statement.kind		  = Statement::Kind::Barrier;
 	statement.barrierKind = kind;
 	ActiveFunction().statements.push_back(statement);
 }
 
 void ModuleBuilder::SharedMemoryDecl(Type type, uint32_t count, std::string name) {
 	Statement statement;
-	statement.kind	   = Statement::Kind::SharedMemoryDecl;
-	statement.sharedType = type;
+	statement.kind		  = Statement::Kind::SharedMemoryDecl;
+	statement.sharedType  = type;
 	statement.sharedCount = count;
 	statement.sharedName  = std::move(name);
 	ActiveFunction().statements.push_back(statement);
 }
-
 
 ValueId ModuleBuilder::AddValue(ValueRecord value) {
 	value.id = static_cast<ValueId>(_module.values.size());
@@ -2027,13 +2104,13 @@ Function &ModuleBuilder::ActiveFunction() {
 	return _module.functions[_activeFunction];
 }
 
-std::unique_ptr<Kernel::KernelBuildContext> BuildKernelBuildContext(const Module &module, GPU::AD::GradientTape* tape) {
+std::unique_ptr<Kernel::KernelBuildContext> BuildKernelBuildContext(const Module &module, GPU::AD::GradientTape *tape) {
 	// Dispatch to the appropriate build context based on shader stage.
 	if (module.functions.empty()) {
 		return nullptr;
 	}
 
-	const auto& stage = module.functions.front().stage;
+	const auto &stage = module.functions.front().stage;
 	if (stage == ShaderStage::Compute) {
 		return ModuleLowerer(module, tape).Build();
 	}
@@ -2043,6 +2120,5 @@ std::unique_ptr<Kernel::KernelBuildContext> BuildKernelBuildContext(const Module
 	// For now, use compute context as a fallback.
 	return ModuleLowerer(module, tape).Build();
 }
-
 
 } // namespace GPU::IR

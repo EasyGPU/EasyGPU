@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <GPU.h>
+#include <IR/Module.h>
 
 using namespace GPU::IR::Value;
 using namespace GPU::Math;
@@ -709,6 +710,42 @@ std::cout << "(Integer sampler callable test - verifying GLSL generation) ";
 END_TEST
 
 // =============================================================================
+// Test 15: Module API inout callable parameter
+// =============================================================================
+TEST(callable_module_inout_parameter)
+GPU::IR::ModuleBuilder builder;
+builder.BeginComputeKernel(1, 1, 1, 1);
+
+auto			   x   = builder.LocalVariable(GPU::IR::Type::Int(), "x");
+auto			   one = builder.Literal(GPU::IR::Type::Int(), "1");
+auto			   sum = builder.Binary(GPU::IR::BinaryOp::Add, x, one);
+
+GPU::IR::Statement store;
+store.kind	 = GPU::IR::Statement::Kind::Store;
+store.target = x;
+store.value	 = sum;
+
+std::vector<GPU::IR::CallableParameter> parameters{
+	GPU::IR::CallableParameter{"x", GPU::IR::Type::Int(), GPU::IR::CallableParameterDirection::InOut}};
+builder.AddCallable("inc", GPU::IR::Type::Void(), std::move(parameters), {store}, {});
+
+auto zero  = builder.Literal(GPU::IR::Type::Int(), "0");
+auto value = builder.LocalVariable(GPU::IR::Type::Int(), "value");
+builder.DeclareLocal(GPU::IR::Type::Int(), "value", zero);
+std::vector<GPU::IR::ValueId> callArgs{value};
+auto						  call =
+	builder.Call("inc", GPU::IR::Type::Void(), std::span<const GPU::IR::ValueId>(callArgs.data(), callArgs.size()));
+builder.Expression(call);
+
+auto context = GPU::IR::BuildKernelBuildContext(builder.GetModule());
+ASSERT(context != nullptr);
+auto glsl = context->GetCompleteCode();
+ASSERT(glsl.find("void inc(inout int x)") != std::string::npos);
+ASSERT(glsl.find("inc(value)") != std::string::npos);
+std::cout << "(Module API inout callable parameter GLSL verified) ";
+END_TEST
+
+// =============================================================================
 // Main
 // =============================================================================
 int main() {
@@ -731,6 +768,7 @@ int main() {
 		test_callable_texture_dispatch();
 		test_callable_mixed_params();
 		test_callable_integer_sampler();
+		test_callable_module_inout_parameter();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " passed\n";
