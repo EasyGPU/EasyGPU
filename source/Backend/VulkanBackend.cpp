@@ -104,7 +104,7 @@ std::optional<std::vector<uint8_t>> GetPipelineCacheBytes(VkDevice device, VkPip
 
 constexpr uint32_t kSpirvMagicNumber = 0x07230203u;
 constexpr uintmax_t kMaximumCachedSpirvBytes = 64u * 1024u * 1024u;
-constexpr std::string_view kSpirvCacheSchema = "easygpu-spirv-cache-v1";
+constexpr std::string_view kSpirvCacheSchema = "easygpu-spirv-cache-v2";
 constexpr std::string_view kPipelineCacheSchema = "easygpu-vulkan-pipeline-cache-v1";
 
 static std::atomic<uint64_t> g_cacheTemporaryFileCounter{0};
@@ -147,7 +147,7 @@ std::optional<std::filesystem::path> GetShaderCacheRootDirectory() {
 
 std::optional<std::filesystem::path> GetSpirvCacheDirectory() {
 	if (const auto root = GetShaderCacheRootDirectory()) {
-		return *root / "spirv-v1";
+		return *root / "spirv-v2";
 	}
 	return std::nullopt;
 }
@@ -2756,6 +2756,7 @@ std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &
 			optimizer.RegisterPass(spvtools::CreateAmdExtToKhrPass());
 		}
 
+		optimizer.RegisterPass(spvtools::CreateCombineAccessChainsPass());
 		optimizer.RegisterPass(spvtools::CreateSimplificationPass());
 		optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
 		optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass(preserveInterface));
