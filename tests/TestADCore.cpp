@@ -1275,6 +1275,42 @@ CHECK_NOT_CONTAINS(code, "grad_buf1");
 CHECK_NOT_CONTAINS(code, "grad_buf3");
 END_TEST
 
+TEST(ad_kernel_writable_intermediate_preserves_gradient_path)
+GPU::Runtime::Buffer<float> input({2.0f, -3.0f}, GPU::Runtime::BufferMode::Read);
+GPU::Runtime::Buffer<float> intermediate(2, GPU::Runtime::BufferMode::ReadWrite);
+GPU::Runtime::Buffer<float> weight(std::vector<float>{4.0f}, GPU::Runtime::BufferMode::ReadWrite);
+GPU::AD::ADKernel1D			kernel(
+	[&](GPU::IR::Value::Var<int> &id) {
+		auto	   inputRef		   = input.Bind();
+		auto	   intermediateRef = intermediate.Bind();
+		auto	   weightRef	   = weight.Bind();
+
+		Var<float> w			   = weightRef[0];
+		GPU::AD::Param(w);
+		intermediateRef[id]	  = w * inputRef[id];
+		Var<float> prediction = intermediateRef[id];
+		Var<float> loss		  = prediction * prediction;
+		GPU::AD::Loss(loss);
+	},
+	2);
+
+CHECK_CONTAINS(kernel.CombinedCode(), "grad_buf1");
+CHECK_NOT_CONTAINS(kernel.CombinedCode(), "grad_buf0");
+
+kernel.Backward(1, true);
+auto first = kernel.Gradient(0);
+ASSERT(first.size() == 2);
+ASSERT(std::abs(first[0] - 32.0f) < 1e-4f);
+ASSERT(std::abs(first[1] - 72.0f) < 1e-4f);
+
+// Both parameter and intermediate adjoints must be cleared between dispatches.
+kernel.Backward(1, true);
+auto second = kernel.Gradient(0);
+ASSERT(second.size() == first.size());
+ASSERT(std::abs(second[0] - first[0]) < 1e-4f);
+ASSERT(std::abs(second[1] - first[1]) < 1e-4f);
+END_TEST
+
 TEST(ad_kernel_optimization_levels)
 GPU::Runtime::Buffer<float> xbuf(8);
 GPU::Runtime::Buffer<float> wbuf(8);
@@ -1940,6 +1976,7 @@ int main() {
 	test_ad_kernel_1d_sigmoid();
 	test_ad_kernel_1d_grad_bindings_follow_forward_bindings();
 	test_ad_kernel_readonly_buffer_leaf_is_not_gradient_target();
+	test_ad_kernel_writable_intermediate_preserves_gradient_path();
 	test_ad_kernel_optimization_levels();
 	test_ad_ultra_optimization();
 		test_ad_extreme_optimization();

@@ -711,8 +711,13 @@ TEST(nn_linear_buffer_params_codegen_is_compact) {
 
 	auto combined = kernel.CombinedCode();
 	CHECK_CONTAINS(combined, "_ad_grad_");
+	CHECK_CONTAINS(combined, "grad_buf1[");
+	CHECK_NOT_CONTAINS(combined, "grad_buf1 = float(1.0)");
 	CHECK_CONTAINS(combined, "int(gl_GlobalInvocationID.x) * 256");
 	ASSERT(combined.find("for (uint _ad_bp") == std::string::npos);
+	if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+		ASSERT(!kernel.GetOptimizedCombinedGLSL().empty());
+	}
 }
 END_TEST
 
@@ -987,8 +992,8 @@ TEST(nn_sequential_ping_pong_intermediate_buffers) {
 	CHECK_CONTAINS(fwd, "buf3_t");
 	CHECK_CONTAINS(fwd, "(buf2[");
 	CHECK_CONTAINS(fwd, "(buf3[");
-	CHECK_CONTAINS(fwd, "])=(buf5[");
-	CHECK_CONTAINS(fwd, "])=(buf7[");
+	CHECK_CONTAINS(fwd, "])*(buf2[");
+	CHECK_CONTAINS(fwd, "])*(buf3[");
 }
 END_TEST
 

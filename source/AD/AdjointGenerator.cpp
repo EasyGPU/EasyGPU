@@ -531,6 +531,9 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	std::unordered_set<std::string> activeSet;
 	if (tape.LossVar()) {
 		activeSet.insert(tape.LossVar()->name);
+		std::string lossBufferBase = BufferBaseName(tape.LossVar()->name);
+		if (!lossBufferBase.empty())
+			activeSet.insert(lossBufferBase);
 	}
 	for (const auto &[paramName, paramType] : tape.Parameters()) {
 		activeSet.insert(paramName);
@@ -624,6 +627,8 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 		_adjTable.SetArraySize(adjName, param.elementCount);
 	}
 	for (const auto &storage : tape.BufferAdjointStorages()) {
+		if (!isActive(storage.bufferName))
+			continue;
 		std::string adjName = _adjTable.GetOrCreate(storage.bufferName + "[0]", storage.elementType);
 		_adjTable.SetArraySize(adjName, storage.elementCount);
 	}
@@ -648,7 +653,8 @@ std::string AdjointGenerator::Generate(const GradientTape &tape, bool writeBackP
 	// Step 2: Seed the backward pass: adjoint of loss = 1.0
 	if (tape.LossVar()) {
 		const auto &lossVar = *tape.LossVar();
-		std::string adjLoss = _adjTable.GetOrCreate(lossVar.name, lossVar.glslType);
+		_adjTable.GetOrCreate(lossVar.name, lossVar.glslType);
+		std::string adjLoss = _adjTable.Get(lossVar.name);
 		EmitLine(std::format("{} = {}(1.0);", adjLoss, lossVar.glslType));
 	}
 

@@ -314,11 +314,23 @@ void GradientTape::RegisterBufferParameter(const std::string &bufferName, const 
 	if (!_varTypes.count(bufferName)) {
 		_varTypes[bufferName] = elementType;
 	}
+
+	// A buffer may have been seen as a writable intermediate before it was
+	// explicitly registered as a parameter. Parameter storage supersedes the
+	// temporary adjoint pool entry in that case.
+	if (_bufferAdjointStorages.erase(bufferName) > 0) {
+		_bufferAdjointStorageList.erase(
+			std::remove_if(_bufferAdjointStorageList.begin(), _bufferAdjointStorageList.end(),
+						   [&](const BufferAdjointStorage &storage) { return storage.bufferName == bufferName; }),
+			_bufferAdjointStorageList.end());
+	}
 }
 
 void GradientTape::RegisterBufferAdjointStorage(const std::string &bufferName, const std::string &elementType,
 												size_t elementCount) {
 	if (bufferName.empty() || elementCount == 0)
+		return;
+	if (_bufferParameters.count(bufferName) > 0)
 		return;
 
 	auto it = _bufferAdjointStorages.find(bufferName);
@@ -385,6 +397,15 @@ void GradientTape::RecordStore(const GPU::IR::Node::StoreNode &store) {
 		outType = "float";
 
 	TapeVar output{outName, outType, IsParameter(outName)};
+
+	// Buffer stores can bridge differentiable stages: a layer writes an
+	// activation buffer and a later loss reads it back. Keep a temporary
+	// adjoint array for such buffers. The exact dynamic-index extent is refined
+	// by ADKernel1D when it assembles the backward shader.
+	auto	bracketPos = outName.find('[');
+	if (bracketPos != std::string::npos && bracketPos > 0 && !output.isParameter) {
+		RegisterBufferAdjointStorage(outName.substr(0, bracketPos), outType, 1);
+	}
 
 	RecordAssignmentRhs(*rhs, output);
 }
