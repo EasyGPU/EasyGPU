@@ -59,7 +59,7 @@ Set a runtime directory for development, CI, or application-managed cleanup:
 export EASYGPU_SHADER_CACHE_DIR=/path/to/cache
 ```
 
-SPIR-V entries are stored under `<root>/spirv-v1`. Device pipeline data is stored under `<root>/vulkan-pipeline-v1`, with one hashed `.bin` name per compatible device and driver identity. A build-time root can also be configured:
+SPIR-V entries are stored under `<root>/spirv-v2`. Device pipeline data is stored under `<root>/vulkan-pipeline-v1`, with one hashed `.bin` name per compatible device and driver identity. A build-time root can also be configured:
 
 ```bash
 cmake -S . -B build -DEASYGPU_SHADER_CACHE_DIR=/path/to/cache
