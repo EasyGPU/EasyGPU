@@ -23,8 +23,18 @@
 
 #ifdef EASYGPU_SHADER_CACHE_ENABLED
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
 #include <process.h>
 #else
+#include <fcntl.h>
+#include <sys/file.h>
 #include <unistd.h>
 #endif
 #endif
@@ -50,11 +60,51 @@ namespace GPU::Backend {
 
 namespace {
 
+constexpr uintmax_t kMaximumCachedPipelineBytes = 256u * 1024u * 1024u;
+
+bool ValidatePipelineCacheData(const void *data, size_t byteCount, const VkPhysicalDeviceProperties &properties) {
+	if (data == nullptr || byteCount < sizeof(VkPipelineCacheHeaderVersionOne) ||
+		byteCount > kMaximumCachedPipelineBytes) {
+		return false;
+	}
+
+	VkPipelineCacheHeaderVersionOne header{};
+	std::memcpy(&header, data, sizeof(header));
+	return header.headerSize >= sizeof(VkPipelineCacheHeaderVersionOne) && header.headerSize <= byteCount &&
+		   header.headerVersion == VK_PIPELINE_CACHE_HEADER_VERSION_ONE && header.vendorID == properties.vendorID &&
+		   header.deviceID == properties.deviceID &&
+		   std::memcmp(header.pipelineCacheUUID, properties.pipelineCacheUUID, VK_UUID_SIZE) == 0;
+}
+
+std::optional<std::vector<uint8_t>> GetPipelineCacheBytes(VkDevice device, VkPipelineCache cache) {
+	for (int attempt = 0; attempt < 3; ++attempt) {
+		size_t byteCount = 0;
+		if (vkGetPipelineCacheData(device, cache, &byteCount, nullptr) != VK_SUCCESS ||
+			byteCount < sizeof(VkPipelineCacheHeaderVersionOne) || byteCount > kMaximumCachedPipelineBytes) {
+			return std::nullopt;
+		}
+
+		std::vector<uint8_t> data(byteCount);
+		const VkResult result = vkGetPipelineCacheData(device, cache, &byteCount, data.data());
+		if (result == VK_SUCCESS) {
+			data.resize(byteCount);
+			return data;
+		}
+		if (result != VK_INCOMPLETE) {
+			return std::nullopt;
+		}
+	}
+	return std::nullopt;
+}
+
 #ifdef EASYGPU_SHADER_CACHE_ENABLED
 
 constexpr uint32_t kSpirvMagicNumber = 0x07230203u;
 constexpr uintmax_t kMaximumCachedSpirvBytes = 64u * 1024u * 1024u;
 constexpr std::string_view kSpirvCacheSchema = "easygpu-spirv-cache-v1";
+constexpr std::string_view kPipelineCacheSchema = "easygpu-vulkan-pipeline-cache-v1";
+
+static std::atomic<uint64_t> g_cacheTemporaryFileCounter{0};
 
 uint64_t GetProcessIdForCacheFile() {
 #ifdef _WIN32
@@ -64,32 +114,189 @@ uint64_t GetProcessIdForCacheFile() {
 #endif
 }
 
-std::optional<std::filesystem::path> GetSpirvCacheDirectory() {
+std::optional<std::filesystem::path> GetShaderCacheRootDirectory() {
 	if (const char *runtimeDirectory = std::getenv("EASYGPU_SHADER_CACHE_DIR");
 		runtimeDirectory != nullptr && runtimeDirectory[0] != '\0') {
-		return std::filesystem::path(runtimeDirectory) / "spirv-v1";
+		return std::filesystem::path(runtimeDirectory);
 	}
 
 #ifdef EASYGPU_SHADER_CACHE_DIR
-	return std::filesystem::path(EASYGPU_SHADER_CACHE_DIR) / "spirv-v1";
+	return std::filesystem::path(EASYGPU_SHADER_CACHE_DIR);
 #elif defined(_WIN32)
 	if (const char *localAppData = std::getenv("LOCALAPPDATA"); localAppData != nullptr && localAppData[0] != '\0') {
-		return std::filesystem::path(localAppData) / "EasyGPU" / "shader-cache" / "spirv-v1";
+		return std::filesystem::path(localAppData) / "EasyGPU" / "shader-cache";
 	}
 #elif defined(__APPLE__)
 	if (const char *home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
-		return std::filesystem::path(home) / "Library" / "Caches" / "EasyGPU" / "spirv-v1";
+		return std::filesystem::path(home) / "Library" / "Caches" / "EasyGPU";
 	}
 #else
 	if (const char *xdgCache = std::getenv("XDG_CACHE_HOME"); xdgCache != nullptr && xdgCache[0] != '\0') {
-		return std::filesystem::path(xdgCache) / "easygpu" / "spirv-v1";
+		return std::filesystem::path(xdgCache) / "easygpu";
 	}
 	if (const char *home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
-		return std::filesystem::path(home) / ".cache" / "easygpu" / "spirv-v1";
+		return std::filesystem::path(home) / ".cache" / "easygpu";
 	}
 #endif
 
 	return std::nullopt;
+}
+
+std::optional<std::filesystem::path> GetSpirvCacheDirectory() {
+	if (const auto root = GetShaderCacheRootDirectory()) {
+		return *root / "spirv-v1";
+	}
+	return std::nullopt;
+}
+
+std::filesystem::path MakeCacheTemporaryPath(const std::filesystem::path &path) {
+	auto temporaryPath = path;
+	temporaryPath += ".tmp-" + std::to_string(GetProcessIdForCacheFile()) + "-" +
+					 std::to_string(g_cacheTemporaryFileCounter.fetch_add(1, std::memory_order_relaxed));
+	return temporaryPath;
+}
+
+bool ReplaceCacheFileAtomically(const std::filesystem::path &path, const void *data, size_t byteCount) {
+	std::error_code error;
+	std::filesystem::create_directories(path.parent_path(), error);
+	if (error) {
+		return false;
+	}
+
+	const auto temporaryPath = MakeCacheTemporaryPath(path);
+	std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
+	if (!stream) {
+		return false;
+	}
+	if (byteCount != 0) {
+		stream.write(static_cast<const char *>(data), static_cast<std::streamsize>(byteCount));
+	}
+	stream.close();
+	if (!stream) {
+		std::filesystem::remove(temporaryPath, error);
+		return false;
+	}
+
+#ifdef _WIN32
+	if (MoveFileExW(temporaryPath.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0) {
+		return true;
+	}
+#else
+	std::filesystem::rename(temporaryPath, path, error);
+	if (!error) {
+		return true;
+	}
+#endif
+
+	error.clear();
+	std::filesystem::remove(temporaryPath, error);
+	return false;
+}
+
+class CacheFileLock {
+public:
+	explicit CacheFileLock(const std::filesystem::path &path) {
+#ifdef _WIN32
+		_handle = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE,
+							  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS,
+							  FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (_handle != INVALID_HANDLE_VALUE &&
+			LockFileEx(_handle, LOCKFILE_EXCLUSIVE_LOCK, 0, MAXDWORD, MAXDWORD, &_overlapped) == 0) {
+			CloseHandle(_handle);
+			_handle = INVALID_HANDLE_VALUE;
+		}
+#else
+		_descriptor = open(path.c_str(), O_CREAT | O_RDWR, 0600);
+		if (_descriptor >= 0 && flock(_descriptor, LOCK_EX) != 0) {
+			close(_descriptor);
+			_descriptor = -1;
+		}
+#endif
+	}
+
+	~CacheFileLock() {
+#ifdef _WIN32
+		if (_handle != INVALID_HANDLE_VALUE) {
+			UnlockFileEx(_handle, 0, MAXDWORD, MAXDWORD, &_overlapped);
+			CloseHandle(_handle);
+		}
+#else
+		if (_descriptor >= 0) {
+			flock(_descriptor, LOCK_UN);
+			close(_descriptor);
+		}
+#endif
+	}
+
+	CacheFileLock(const CacheFileLock &) = delete;
+	CacheFileLock &operator=(const CacheFileLock &) = delete;
+
+	bool IsLocked() const {
+#ifdef _WIN32
+		return _handle != INVALID_HANDLE_VALUE;
+#else
+		return _descriptor >= 0;
+#endif
+	}
+
+private:
+#ifdef _WIN32
+	HANDLE		 _handle = INVALID_HANDLE_VALUE;
+	OVERLAPPED _overlapped{};
+#else
+	int _descriptor = -1;
+#endif
+};
+
+std::filesystem::path BuildPipelineCachePath(const std::filesystem::path &root,
+											 const VkPhysicalDeviceProperties &properties) {
+	std::ostringstream identity;
+	identity << kPipelineCacheSchema << '\n';
+	identity << "vendor=" << properties.vendorID << '\n';
+	identity << "device=" << properties.deviceID << '\n';
+	identity << "driver=" << properties.driverVersion << '\n';
+	identity << "api=" << properties.apiVersion << '\n';
+	identity.write(reinterpret_cast<const char *>(properties.pipelineCacheUUID), VK_UUID_SIZE);
+	return root / "vulkan-pipeline-v1" / (Utility::ComputeSHA256(identity.str()) + ".bin");
+}
+
+struct PipelineCacheLoadResult {
+	std::vector<uint8_t> data;
+	bool				 found = false;
+	bool				 invalid = false;
+};
+
+PipelineCacheLoadResult LoadPipelineCacheData(const std::filesystem::path &path,
+											  const VkPhysicalDeviceProperties &properties) {
+	PipelineCacheLoadResult result;
+	std::error_code		 error;
+	result.found = std::filesystem::exists(path, error) && !error;
+	if (!result.found) {
+		return result;
+	}
+
+	const auto byteCount = std::filesystem::file_size(path, error);
+	if (error || byteCount < sizeof(VkPipelineCacheHeaderVersionOne) || byteCount > kMaximumCachedPipelineBytes) {
+		result.invalid = true;
+	} else {
+		std::ifstream stream(path, std::ios::binary);
+		if (stream) {
+			result.data.resize(static_cast<size_t>(byteCount));
+			stream.read(reinterpret_cast<char *>(result.data.data()), static_cast<std::streamsize>(byteCount));
+			if (!stream || !ValidatePipelineCacheData(result.data.data(), result.data.size(), properties)) {
+				result.invalid = true;
+				result.data.clear();
+			}
+		} else {
+			result.invalid = true;
+		}
+	}
+
+	if (result.invalid) {
+		error.clear();
+		std::filesystem::remove(path, error);
+	}
+	return result;
 }
 
 std::string BuildSpirvCacheKey(const std::string &glslSource, ShaderType type,
@@ -164,34 +371,7 @@ bool StoreCachedSpirv(const std::filesystem::path &path, const std::vector<uint3
 		}
 	}
 
-	static std::atomic<uint64_t> temporaryFileCounter{0};
-	auto temporaryPath = path;
-	temporaryPath += ".tmp-" + std::to_string(GetProcessIdForCacheFile()) + "-" +
-					 std::to_string(temporaryFileCounter.fetch_add(1, std::memory_order_relaxed));
-
-	{
-		std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
-		if (!stream) {
-			return false;
-		}
-		stream.write(reinterpret_cast<const char *>(spirv.data()),
-					 static_cast<std::streamsize>(spirv.size() * sizeof(uint32_t)));
-		stream.flush();
-		if (!stream) {
-			stream.close();
-			std::filesystem::remove(temporaryPath, error);
-			return false;
-		}
-	}
-
-	std::filesystem::rename(temporaryPath, path, error);
-	if (error) {
-		const bool anotherWriterCompleted = LoadCachedSpirv(path).has_value();
-		error.clear();
-		std::filesystem::remove(temporaryPath, error);
-		return anotherWriterCompleted;
-	}
-	return true;
+	return ReplaceCacheFileAtomically(path, spirv.data(), spirv.size() * sizeof(uint32_t));
 }
 
 #endif
@@ -635,14 +815,7 @@ void VulkanBackend::Initialize() {
 		CreateDescriptorPool();
 		CreateDefaultSampler();
 		CreateQueryPool();
-
-		// Create persistent pipeline cache for binary caching
-		VkPipelineCacheCreateInfo cacheCreateInfo = {};
-		cacheCreateInfo.sType					  = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-		auto result = vkCreatePipelineCache(_device, &cacheCreateInfo, nullptr, &_pipelineCache);
-		if (result != VK_SUCCESS) {
-			_pipelineCache = nullptr; // Pipeline cache is optional
-		}
+		InitializePipelineCache();
 
 		_initialized = true;
 	} catch (const std::exception &e) {
@@ -672,6 +845,7 @@ bool VulkanBackend::IsInitialized() const {
 void VulkanBackend::CleanupVulkan() {
 	if (_device) {
 		vkDeviceWaitIdle(_device);
+		PersistPipelineCache();
 		_descriptorSets.clear();
 		_inFlightDescriptorSets.clear();
 		for (auto &[key, sampler] : _samplerCache) {
@@ -752,8 +926,10 @@ void VulkanBackend::CleanupVulkan() {
 		_descriptorPool = nullptr;
 
 		// Destroy pipeline cache
-		if (_pipelineCache)
+		if (_pipelineCache) {
 			vkDestroyPipelineCache(_device, _pipelineCache, nullptr);
+			_pipelineCache = nullptr;
+		}
 
 		// Destroy query pool
 		if (_queryPool)
@@ -784,6 +960,151 @@ void VulkanBackend::CleanupVulkan() {
 		vkDestroyInstance(_instance, nullptr);
 		_instance = nullptr;
 	}
+}
+
+void VulkanBackend::InitializePipelineCache() {
+	_pipelineCacheStats = {};
+	_pipelineCachePath.clear();
+	_pipelineCacheDirty = false;
+
+	std::vector<uint8_t> initialData;
+#ifdef EASYGPU_SHADER_CACHE_ENABLED
+	try {
+		if (const auto root = GetShaderCacheRootDirectory()) {
+			VkPhysicalDeviceProperties properties{};
+			vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
+			const auto path = BuildPipelineCachePath(*root, properties);
+			_pipelineCachePath = path;
+
+			std::error_code error;
+			std::filesystem::create_directories(path.parent_path(), error);
+			if (!error) {
+				auto lockPath = path;
+				lockPath += ".lock";
+				CacheFileLock cacheLock(lockPath);
+				if (cacheLock.IsLocked()) {
+					auto cached = LoadPipelineCacheData(path, properties);
+					if (!cached.data.empty()) {
+						initialData = std::move(cached.data);
+					} else {
+						++_pipelineCacheStats.diskCacheMisses;
+						if (cached.invalid) {
+							++_pipelineCacheStats.invalidDiskEntries;
+						}
+					}
+				}
+			}
+		}
+	} catch (...) {
+		_pipelineCachePath.clear();
+		initialData.clear();
+	}
+#endif
+
+	VkPipelineCacheCreateInfo cacheCreateInfo{};
+	cacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+	cacheCreateInfo.initialDataSize = initialData.size();
+	cacheCreateInfo.pInitialData = initialData.empty() ? nullptr : initialData.data();
+
+	VkResult result = vkCreatePipelineCache(_device, &cacheCreateInfo, nullptr, &_pipelineCache);
+	if (result == VK_SUCCESS && !initialData.empty()) {
+		++_pipelineCacheStats.diskCacheHits;
+		_pipelineCacheStats.loadedBytes = initialData.size();
+		_pipelineCacheStats.lastDiskCacheHit = true;
+		return;
+	}
+
+	if (!initialData.empty()) {
+		++_pipelineCacheStats.diskCacheMisses;
+		++_pipelineCacheStats.invalidDiskEntries;
+		std::error_code error;
+		std::filesystem::remove(_pipelineCachePath, error);
+	}
+
+	if (result != VK_SUCCESS) {
+		cacheCreateInfo.initialDataSize = 0;
+		cacheCreateInfo.pInitialData = nullptr;
+		result = vkCreatePipelineCache(_device, &cacheCreateInfo, nullptr, &_pipelineCache);
+	}
+	if (result != VK_SUCCESS) {
+		_pipelineCache = nullptr;
+	}
+}
+
+void VulkanBackend::PersistPipelineCache() {
+#ifdef EASYGPU_SHADER_CACHE_ENABLED
+	if (!_pipelineCacheDirty || _pipelineCache == nullptr || _pipelineCachePath.empty()) {
+		return;
+	}
+
+	try {
+		const std::filesystem::path path = _pipelineCachePath;
+		std::error_code error;
+		std::filesystem::create_directories(path.parent_path(), error);
+		if (error) {
+			++_pipelineCacheStats.diskCacheWriteFailures;
+			return;
+		}
+
+		auto lockPath = path;
+		lockPath += ".lock";
+		CacheFileLock cacheLock(lockPath);
+		if (!cacheLock.IsLocked()) {
+			++_pipelineCacheStats.diskCacheWriteFailures;
+			return;
+		}
+
+		VkPhysicalDeviceProperties properties{};
+		vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
+		auto latest = LoadPipelineCacheData(path, properties);
+		if (latest.invalid) {
+			++_pipelineCacheStats.invalidDiskEntries;
+		}
+		if (!latest.data.empty()) {
+			VkPipelineCacheCreateInfo mergeCreateInfo{};
+			mergeCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+			mergeCreateInfo.initialDataSize = latest.data.size();
+			mergeCreateInfo.pInitialData = latest.data.data();
+
+			VkPipelineCache mergeCache = nullptr;
+			if (vkCreatePipelineCache(_device, &mergeCreateInfo, nullptr, &mergeCache) == VK_SUCCESS) {
+				const VkResult mergeResult = vkMergePipelineCaches(_device, _pipelineCache, 1, &mergeCache);
+				vkDestroyPipelineCache(_device, mergeCache, nullptr);
+				if (mergeResult != VK_SUCCESS) {
+					++_pipelineCacheStats.diskCacheWriteFailures;
+					return;
+				}
+			} else {
+				++_pipelineCacheStats.invalidDiskEntries;
+				error.clear();
+				std::filesystem::remove(path, error);
+			}
+		}
+
+		auto data = GetPipelineCacheBytes(_device, _pipelineCache);
+		if (!data || data->size() <= sizeof(VkPipelineCacheHeaderVersionOne) ||
+			!ValidatePipelineCacheData(data->data(), data->size(), properties)) {
+			_pipelineCacheDirty = false;
+			return;
+		}
+		if (!latest.data.empty() && latest.data == *data) {
+			_pipelineCacheDirty = false;
+			return;
+		}
+
+		if (ReplaceCacheFileAtomically(path, data->data(), data->size())) {
+			++_pipelineCacheStats.diskCacheWrites;
+			_pipelineCacheStats.savedBytes = data->size();
+			_pipelineCacheDirty = false;
+		} else {
+			++_pipelineCacheStats.diskCacheWriteFailures;
+		}
+	} catch (...) {
+		++_pipelineCacheStats.diskCacheWriteFailures;
+	}
+#else
+	_pipelineCacheDirty = false;
+#endif
 }
 
 void VulkanBackend::CreateInstance() {
@@ -2779,6 +3100,8 @@ PipelineHandle VulkanBackend::CreatePipeline(const PipelineDesc &desc) {
 	info.resources			 = std::move(sortedResources);
 
 	_pipelines[handle]		 = std::move(info);
+	_pipelineCacheDirty	 = true;
+	PersistPipelineCache();
 
 	return handle;
 }
@@ -3516,12 +3839,18 @@ uint64_t VulkanBackend::EndQuery(uint32_t query) {
 
 PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc &desc, const void *binaryData,
 													   size_t binarySize, uint32_t format) {
-	(void)format; // Vulkan doesn't use format parameter
-
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	if (!_initialized) {
 		throw std::runtime_error("Vulkan backend not initialized");
+	}
+
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
+	uint32_t expectedFormat = 0;
+	std::memcpy(&expectedFormat, properties.pipelineCacheUUID, sizeof(expectedFormat));
+	if (format != expectedFormat || !ValidatePipelineCacheData(binaryData, binarySize, properties)) {
+		return INVALID_PIPELINE_HANDLE;
 	}
 
 	// Create a temporary pipeline cache from the binary data
@@ -3609,6 +3938,12 @@ PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc &desc,
 	VkPipeline pipeline							= nullptr;
 	result = vkCreateComputePipelines(_device, tempCache, 1, &pipelineInfo, nullptr, &pipeline);
 
+	if (result == VK_SUCCESS && _pipelineCache != nullptr &&
+		vkMergePipelineCaches(_device, _pipelineCache, 1, &tempCache) == VK_SUCCESS) {
+		_pipelineCacheDirty = true;
+		PersistPipelineCache();
+	}
+
 	// Destroy temporary cache
 	vkDestroyPipelineCache(_device, tempCache, nullptr);
 
@@ -3644,32 +3979,20 @@ std::vector<uint8_t> VulkanBackend::GetPipelineBinary(PipelineHandle pipeline, u
 		return {};
 	}
 
-	// Get pipeline cache data from our persistent cache
-	// Note: In Vulkan, pipeline binaries are obtained from the pipeline cache,
-	// not individual pipelines. We merge pipeline data into our persistent cache
-	// during creation.
-	size_t	 cacheSize = 0;
-	VkResult result	   = vkGetPipelineCacheData(_device, _pipelineCache, &cacheSize, nullptr);
-	if (result != VK_SUCCESS || cacheSize == 0) {
+	if (_pipelineCache == nullptr) {
 		return {};
 	}
 
-	std::vector<uint8_t> data(cacheSize);
-	result = vkGetPipelineCacheData(_device, _pipelineCache, &cacheSize, data.data());
-	if (result != VK_SUCCESS) {
+	auto data = GetPipelineCacheBytes(_device, _pipelineCache);
+	if (!data) {
 		return {};
 	}
 
-	data.resize(cacheSize);
+	VkPipelineCacheHeaderVersionOne header{};
+	std::memcpy(&header, data->data(), sizeof(header));
+	std::memcpy(&format, header.pipelineCacheUUID, sizeof(format));
 
-	// Use Vulkan pipeline cache header UUID as format identifier
-	if (cacheSize >= sizeof(VkPipelineCacheHeaderVersionOne)) {
-		auto *header = reinterpret_cast<const VkPipelineCacheHeaderVersionOne *>(data.data());
-		// Create a simple hash from the first few bytes of UUID
-		format		 = *reinterpret_cast<const uint32_t *>(header->pipelineCacheUUID);
-	}
-
-	return data;
+	return std::move(*data);
 }
 
 bool VulkanBackend::SupportsPipelineCache() const {
@@ -3682,9 +4005,16 @@ uint32_t VulkanBackend::GetPipelineCacheFormat() const {
 	}
 
 	// Use device properties pipelineCacheUUID as format identifier
-	VkPhysicalDeviceProperties props;
+	VkPhysicalDeviceProperties props{};
 	vkGetPhysicalDeviceProperties(_physicalDevice, &props);
-	return *reinterpret_cast<const uint32_t *>(props.pipelineCacheUUID);
+	uint32_t format = 0;
+	std::memcpy(&format, props.pipelineCacheUUID, sizeof(format));
+	return format;
+}
+
+PipelineCacheStats VulkanBackend::GetPipelineCacheStats() const {
+	std::lock_guard<std::mutex> lock(_mutex);
+	return _pipelineCacheStats;
 }
 
 // =============================================================================
@@ -4061,6 +4391,8 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 	info.vertexLayout		 = desc.vertexLayout;
 
 	_pipelines[handle]		 = std::move(info);
+	_pipelineCacheDirty	 = true;
+	PersistPipelineCache();
 	return handle;
 }
 

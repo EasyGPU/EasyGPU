@@ -161,6 +161,18 @@ struct ShaderCompilationStats {
 	bool	 lastDiskCacheHit			 = false;
 };
 
+/** @brief Runtime statistics for the persistent backend pipeline cache. */
+struct PipelineCacheStats {
+	uint64_t diskCacheHits			= 0;
+	uint64_t diskCacheMisses		= 0;
+	uint64_t invalidDiskEntries		= 0;
+	uint64_t diskCacheWrites		= 0;
+	uint64_t diskCacheWriteFailures = 0;
+	uint64_t loadedBytes			= 0;
+	uint64_t savedBytes				= 0;
+	bool	 lastDiskCacheHit		= false;
+};
+
 // ============================================================================
 // Resource Binding
 // ============================================================================
@@ -985,6 +997,14 @@ public:
 	 */
 	virtual uint32_t GetPipelineCacheFormat() const {
 		return 0;
+	}
+
+	/**
+	 * Get persistent pipeline-cache load and write statistics.
+	 * @return Statistics for this backend instance
+	 */
+	virtual PipelineCacheStats GetPipelineCacheStats() const {
+		return {};
 	}
 
 	// ========================================================================

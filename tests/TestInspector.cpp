@@ -11,9 +11,13 @@
 #include <Runtime/Buffer.h>
 #include <Utility/Helpers.h>
 #include <Utility/Vec.h>
+#ifdef EASYGPU_BACKEND_VULKAN
+#include <Backend/VulkanBackend.h>
+#endif
 
 #include <cassert>
 #include <chrono>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -504,6 +508,122 @@ std::cout << "  Persistent SPIR-V cache is disabled in this build.\n";
 #endif
 END_TEST
 
+TEST(vulkan_pipeline_disk_cache)
+std::cout << "\n  Testing persistent Vulkan pipeline cache...\n";
+
+#if defined(EASYGPU_SHADER_CACHE_ENABLED) && defined(EASYGPU_BACKEND_VULKAN)
+const auto cacheDirectory = std::filesystem::temp_directory_path() /
+	("easygpu-pipeline-cache-test-" +
+	 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+std::filesystem::remove_all(cacheDirectory);
+#ifdef _WIN32
+_putenv_s("EASYGPU_SHADER_CACHE_DIR", cacheDirectory.string().c_str());
+#else
+setenv("EASYGPU_SHADER_CACHE_DIR", cacheDirectory.string().c_str(), 1);
+#endif
+
+auto buildPipeline = [](Backend::VulkanBackend &backend, bool validateBinaryRoundTrip) {
+	Backend::ShaderDesc shaderDesc;
+	shaderDesc.type = Backend::ShaderType::Compute;
+	shaderDesc.optimizationLevel = Backend::ShaderOptimizationLevel::Ultra;
+	shaderDesc.sourceCode = R"glsl(#version 450
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+void main() {}
+)glsl";
+
+	const auto shader = backend.CreateShader(shaderDesc);
+	ASSERT(shader != Backend::INVALID_SHADER_HANDLE);
+
+	Backend::PipelineDesc pipelineDesc;
+	pipelineDesc.computeShader = shader;
+	pipelineDesc.workGroupSizeX = 1;
+	pipelineDesc.workGroupSizeY = 1;
+	pipelineDesc.workGroupSizeZ = 1;
+	const auto pipeline = backend.CreatePipeline(pipelineDesc);
+	ASSERT(pipeline != Backend::INVALID_PIPELINE_HANDLE);
+	if (validateBinaryRoundTrip) {
+		uint32_t format = 0;
+		const auto binary = backend.GetPipelineBinary(pipeline, format);
+		ASSERT(!binary.empty());
+		auto incompatibleBinary = binary;
+		incompatibleBinary[offsetof(VkPipelineCacheHeaderVersionOne, pipelineCacheUUID) + VK_UUID_SIZE - 1] ^= 1u;
+		ASSERT(backend.CreatePipelineFromBinary(pipelineDesc, incompatibleBinary.data(), incompatibleBinary.size(),
+												format) == Backend::INVALID_PIPELINE_HANDLE);
+		const auto cachedPipeline = backend.CreatePipelineFromBinary(pipelineDesc, binary.data(), binary.size(), format);
+		ASSERT(cachedPipeline != Backend::INVALID_PIPELINE_HANDLE);
+		backend.DestroyPipeline(cachedPipeline);
+	}
+	backend.DestroyPipeline(pipeline);
+	backend.DestroyShader(shader);
+};
+
+{
+	Backend::VulkanBackend backend;
+	backend.Initialize();
+	const auto initialStats = backend.GetPipelineCacheStats();
+	ASSERT(initialStats.diskCacheHits == 0);
+	ASSERT(initialStats.diskCacheMisses == 1);
+	buildPipeline(backend, true);
+	backend.Shutdown();
+	const auto savedStats = backend.GetPipelineCacheStats();
+	ASSERT(savedStats.diskCacheWrites >= 1);
+	ASSERT(savedStats.diskCacheWriteFailures == 0);
+	ASSERT(savedStats.savedBytes > 0);
+}
+
+std::vector<std::filesystem::path> pipelineCacheFiles;
+const auto pipelineDirectory = cacheDirectory / "vulkan-pipeline-v1";
+for (const auto &entry : std::filesystem::directory_iterator(pipelineDirectory)) {
+	if (entry.is_regular_file() && entry.path().extension() == ".bin") {
+		pipelineCacheFiles.push_back(entry.path());
+	}
+}
+ASSERT(pipelineCacheFiles.size() == 1);
+
+{
+	Backend::VulkanBackend backend;
+	backend.Initialize();
+	const auto loadedStats = backend.GetPipelineCacheStats();
+	ASSERT(loadedStats.diskCacheHits == 1);
+	ASSERT(loadedStats.diskCacheMisses == 0);
+	ASSERT(loadedStats.invalidDiskEntries == 0);
+	ASSERT(loadedStats.loadedBytes == std::filesystem::file_size(pipelineCacheFiles.front()));
+	ASSERT(loadedStats.lastDiskCacheHit);
+	backend.Shutdown();
+}
+
+{
+	std::ofstream corrupted(pipelineCacheFiles.front(), std::ios::binary | std::ios::trunc);
+	const uint32_t invalidWord = 0;
+	corrupted.write(reinterpret_cast<const char *>(&invalidWord), sizeof(invalidWord));
+}
+
+{
+	Backend::VulkanBackend backend;
+	backend.Initialize();
+	const auto recoveredStats = backend.GetPipelineCacheStats();
+	ASSERT(recoveredStats.diskCacheHits == 0);
+	ASSERT(recoveredStats.diskCacheMisses == 1);
+	ASSERT(recoveredStats.invalidDiskEntries == 1);
+	ASSERT(!recoveredStats.lastDiskCacheHit);
+	buildPipeline(backend, false);
+	backend.Shutdown();
+	ASSERT(backend.GetPipelineCacheStats().diskCacheWrites >= 1);
+}
+ASSERT(std::filesystem::file_size(pipelineCacheFiles.front()) > sizeof(VkPipelineCacheHeaderVersionOne));
+
+#ifdef _WIN32
+_putenv_s("EASYGPU_SHADER_CACHE_DIR", "");
+#else
+unsetenv("EASYGPU_SHADER_CACHE_DIR");
+#endif
+std::filesystem::remove_all(cacheDirectory);
+std::cout << "  Persistent Vulkan pipeline cache load and recovery verified!\n";
+#else
+std::cout << "  Persistent Vulkan pipeline cache is disabled in this build.\n";
+#endif
+END_TEST
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -533,6 +653,7 @@ int main() {
 		test_inspector_extreme_optimization();
 		test_shader_optimization_execution_equivalence();
 		test_shader_disk_cache();
+		test_vulkan_pipeline_disk_cache();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " tests passed\n";

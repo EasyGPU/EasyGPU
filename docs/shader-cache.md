@@ -7,12 +7,13 @@ EasyGPU uses separate cache layers for shader compilation and driver pipeline cr
 | Layer | Lifetime | Stored data | Purpose |
 |:--|:--|:--|:--|
 | Kernel context | Process | Live shader and pipeline handles | Reuse an already-created pipeline when the same kernel instance dispatches again |
-| Global pipeline cache | Process | Backend pipeline binary data | Feed reusable driver data back into pipeline creation |
+| Global binary map | Process | Backend pipeline binary snapshots | Reuse driver data between equivalent kernel contexts in one process |
 | Vulkan SPIR-V cache | Disk | Validated optimized SPIR-V modules | Skip glslang and SPIRV-Tools across processes |
+| Vulkan pipeline cache | Disk | Device- and driver-specific pipeline data | Feed prior driver compilation results into compute and graphics pipeline creation |
 
-The persistent Vulkan cache is enabled by `EASYGPU_ENABLE_SHADER_CACHE`. A lookup occurs before GLSL parsing. A hit therefore avoids both glslang code generation and the selected SPIRV-Tools optimization recipe. Vulkan pipeline creation still runs because pipelines are device- and driver-specific.
+Both persistent Vulkan layers are enabled by `EASYGPU_ENABLE_SHADER_CACHE`. The SPIR-V lookup occurs before GLSL parsing, so a hit avoids glslang and the selected SPIRV-Tools recipe. Pipeline creation still calls Vulkan, but a compatible driver cache can reduce the work performed inside `vkCreateComputePipelines` and `vkCreateGraphicsPipelines`.
 
-## Persistent Cache Key
+## SPIR-V Cache Key
 
 Each SPIR-V entry is content-addressed with SHA-256 over:
 
@@ -28,21 +29,29 @@ Each SPIR-V entry is content-addressed with SHA-256 over:
 
 Changing any input produces a different file name. Toolchain upgrades and optimizer recipe changes cannot silently reuse an incompatible module.
 
-## Validation And Writes
+## SPIR-V Validation And Writes
 
 Cached modules are bounded to 64 MiB and validated for Vulkan 1.1 before use. Truncated, malformed, or invalid files are deleted and treated as misses. Cache writes use a temporary file in the destination directory followed by an atomic rename. Concurrent processes compiling the same shader may duplicate compilation, but they cannot expose a partially written final cache entry.
 
 Cache I/O is an optimization. An unavailable or read-only cache directory does not make shader compilation fail.
 
+## Vulkan Pipeline Cache
+
+EasyGPU loads one device-level `VkPipelineCache` during Vulkan initialization and supplies it to both compute and graphics pipeline creation. A pipeline cache file is selected using a SHA-256 key containing the cache schema, Vulkan vendor and device IDs, driver version, API version, and the full `pipelineCacheUUID`.
+
+The standard `VkPipelineCacheHeaderVersionOne` is checked again before data reaches the driver. Its header size, version, vendor ID, device ID, and all `VK_UUID_SIZE` UUID bytes must match the selected physical device. Files are bounded to 256 MiB; truncated, oversized, or incompatible entries are deleted and treated as misses.
+
+After successful pipeline creation, EasyGPU persists newly available driver data; backend shutdown performs a final dirty-cache flush. Writers take a cross-process file lock, merge any newer compatible disk cache with `vkMergePipelineCaches`, and atomically replace the final file. This avoids partial files and prevents concurrent processes from silently discarding one another's pipeline data. Cache failures never make pipeline creation or shutdown fail.
+
 ## Cache Location
 
 The default persistent cache directories are:
 
-| Platform | Directory |
+| Platform | Cache root |
 |:--|:--|
-| Windows | `%LOCALAPPDATA%/EasyGPU/shader-cache/spirv-v1` |
-| macOS | `~/Library/Caches/EasyGPU/spirv-v1` |
-| Linux | `$XDG_CACHE_HOME/easygpu/spirv-v1`, or `~/.cache/easygpu/spirv-v1` |
+| Windows | `%LOCALAPPDATA%/EasyGPU/shader-cache` |
+| macOS | `~/Library/Caches/EasyGPU` |
+| Linux | `$XDG_CACHE_HOME/easygpu`, or `~/.cache/easygpu` |
 
 Set a runtime directory for development, CI, or application-managed cleanup:
 
@@ -50,7 +59,7 @@ Set a runtime directory for development, CI, or application-managed cleanup:
 export EASYGPU_SHADER_CACHE_DIR=/path/to/cache
 ```
 
-The cache then uses `/path/to/cache/spirv-v1`. A build-time default can also be configured:
+SPIR-V entries are stored under `<root>/spirv-v1`. Device pipeline data is stored under `<root>/vulkan-pipeline-v1`, with one hashed `.bin` name per compatible device and driver identity. A build-time root can also be configured:
 
 ```bash
 cmake -S . -B build -DEASYGPU_SHADER_CACHE_DIR=/path/to/cache
@@ -58,7 +67,7 @@ cmake -S . -B build -DEASYGPU_SHADER_CACHE_DIR=/path/to/cache
 
 The runtime environment variable takes precedence over the CMake default.
 
-## Compilation Statistics
+## Cache Statistics
 
 Backends expose cache and compilation counters:
 
@@ -74,9 +83,15 @@ std::cout << "SPIR-V cache misses: " << stats.diskCacheMisses << '\n';
 std::cout << "Frontend compilations: " << stats.frontendCompilations << '\n';
 std::cout << "Last frontend time: " << stats.lastFrontendMilliseconds << " ms\n";
 std::cout << "Last optimizer time: " << stats.lastOptimizationMilliseconds << " ms\n";
+
+const auto pipelineStats = backend->GetPipelineCacheStats();
+std::cout << "Pipeline cache hits: " << pipelineStats.diskCacheHits << '\n';
+std::cout << "Pipeline cache writes: " << pipelineStats.diskCacheWrites << '\n';
+std::cout << "Pipeline cache loaded bytes: " << pipelineStats.loadedBytes << '\n';
+std::cout << "Pipeline cache saved bytes: " << pipelineStats.savedBytes << '\n';
 ```
 
-On a valid disk-cache hit, `lastDiskCacheHit` is true, both last-phase durations are zero, and `frontendCompilations` does not increase.
+On a valid SPIR-V hit, `ShaderCompilationStats::lastDiskCacheHit` is true, both last-phase durations are zero, and `frontendCompilations` does not increase. Pipeline statistics are per backend lifetime; a valid initial driver blob increments `diskCacheHits`, while rejected headers increment `invalidDiskEntries` and `diskCacheMisses`.
 
 ## In-Memory Pipeline Cache
 
@@ -94,7 +109,7 @@ size_t bytes = 0;
 cache.GetStats(entries, bytes);
 ```
 
-`GlobalShaderCache::Clear()` does not delete persistent SPIR-V files. Remove the configured disk directory when explicit invalidation or size management is required.
+`GlobalShaderCache::Clear()` does not delete either persistent Vulkan layer. Remove the configured cache root when explicit invalidation or size management is required.
 
 ## CMake Options
 
@@ -104,11 +119,12 @@ Persistent shader caching is enabled by default:
 cmake -S . -B build -DEASYGPU_ENABLE_SHADER_CACHE=ON
 ```
 
-Set it to `OFF` to disable persistent SPIR-V reads and writes. Live per-kernel pipeline reuse remains active.
+Set it to `OFF` to disable persistent SPIR-V and Vulkan pipeline reads and writes. Live per-kernel pipeline reuse and Vulkan's process-local pipeline cache remain active.
 
 ## Limits
 
 - There is no automatic disk-size eviction yet. Applications can point the cache at a managed directory and remove old schema directories.
 - Persistent optimized SPIR-V currently applies to the Vulkan backend. OpenGL continues to use its process-local program and pipeline mechanisms.
-- Vulkan pipeline data is still process-local in EasyGPU. It has stricter device and driver compatibility requirements than SPIR-V and must be persisted separately.
+- Pipeline cache data is opaque driver output. A validated load can accelerate pipeline creation, but the Vulkan implementation decides whether a particular pipeline is a real cache hit.
+- Pipeline data is flushed after successful creation and again during normal backend shutdown when dirty. An abrupt termination during a write cannot expose a partial final cache file.
 - Cache-hit improvements affect startup and compilation latency, not GPU execution time after a pipeline has been created.

@@ -620,7 +620,7 @@ kernel.Dispatch(120, 68, true);  // GPU processes while CPU continues
 
 ### Shader Cache
 
-Automatic pipeline reuse plus a content-addressed Vulkan SPIR-V disk cache:
+Automatic pipeline reuse plus persistent Vulkan SPIR-V and driver pipeline caches:
 
 ```cpp
 Kernel1D kernel([](Int i) {
@@ -639,6 +639,8 @@ kernel.Dispatch(16, true);
 - **Warm process startup** — Vulkan disk hits skip glslang and SPIRV-Tools
 - **Versioned keys** — Source, stage, preset, interface mode, and toolchain versions are hashed
 - **Validated entries** — Corrupt SPIR-V falls back to compilation and is repaired
+- **Device-safe pipeline data** — Vulkan driver blobs require a matching vendor, device, and full pipeline-cache UUID
+- **Concurrent writers** — Pipeline caches merge under a cross-process lock and publish with an atomic replace
 - **Thread-safe** — Safe for multi-threaded applications
 
 [Learn more about Shader Cache →](docs/shader-cache.md)
