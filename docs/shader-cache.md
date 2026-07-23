@@ -41,7 +41,7 @@ EasyGPU loads one device-level `VkPipelineCache` during Vulkan initialization an
 
 The standard `VkPipelineCacheHeaderVersionOne` is checked again before data reaches the driver. Its header size, version, vendor ID, device ID, and all `VK_UUID_SIZE` UUID bytes must match the selected physical device. Files are bounded to 256 MiB; truncated, oversized, or incompatible entries are deleted and treated as misses.
 
-After successful pipeline creation, EasyGPU persists newly available driver data; backend shutdown performs a final dirty-cache flush. Writers take a cross-process file lock, merge any newer compatible disk cache with `vkMergePipelineCaches`, and atomically replace the final file. This avoids partial files and prevents concurrent processes from silently discarding one another's pipeline data. Cache failures never make pipeline creation or shutdown fail.
+`Backend::FlushPipelineCache()` persists newly available driver data without tearing down Vulkan, and backend shutdown performs a final dirty-cache flush. Writers take a cross-process file lock, merge any newer compatible disk cache with `vkMergePipelineCaches`, and atomically replace the final file. This avoids partial files and prevents concurrent processes from silently discarding one another's pipeline data. Cache failures never make a flush or shutdown fail.
 
 ## Cache Location
 
@@ -89,6 +89,9 @@ std::cout << "Pipeline cache hits: " << pipelineStats.diskCacheHits << '\n';
 std::cout << "Pipeline cache writes: " << pipelineStats.diskCacheWrites << '\n';
 std::cout << "Pipeline cache loaded bytes: " << pipelineStats.loadedBytes << '\n';
 std::cout << "Pipeline cache saved bytes: " << pipelineStats.savedBytes << '\n';
+
+// Flush once after a pipeline compilation batch or at an application lifecycle boundary.
+backend->FlushPipelineCache();
 ```
 
 On a valid SPIR-V hit, `ShaderCompilationStats::lastDiskCacheHit` is true, both last-phase durations are zero, and `frontendCompilations` does not increase. Pipeline statistics are per backend lifetime; a valid initial driver blob increments `diskCacheHits`, while rejected headers increment `invalidDiskEntries` and `diskCacheMisses`.
@@ -126,5 +129,6 @@ Set it to `OFF` to disable persistent SPIR-V and Vulkan pipeline reads and write
 - There is no automatic disk-size eviction yet. Applications can point the cache at a managed directory and remove old schema directories.
 - Persistent optimized SPIR-V currently applies to the Vulkan backend. OpenGL continues to use its process-local program and pipeline mechanisms.
 - Pipeline cache data is opaque driver output. A validated load can accelerate pipeline creation, but the Vulkan implementation decides whether a particular pipeline is a real cache hit.
-- Pipeline data is flushed after successful creation and again during normal backend shutdown when dirty. An abrupt termination during a write cannot expose a partial final cache file.
+- Pipeline data is flushed explicitly with `FlushPipelineCache()` or during normal backend shutdown. Applications built around EasyGPU's intentionally process-lifetime global context should call the flush API at a lifecycle boundary; repeated synchronous flushes after every pipeline are intentionally avoided.
+- An abrupt termination during a write cannot expose a partial final cache file.
 - Cache-hit improvements affect startup and compilation latency, not GPU execution time after a pipeline has been created.

@@ -146,6 +146,8 @@ public:
 	uint32_t			 GetPipelineCacheFormat() const override;
 	/** @copydoc Backend::GetPipelineCacheStats */
 	PipelineCacheStats GetPipelineCacheStats() const override;
+	/** @copydoc Backend::FlushPipelineCache */
+	void				 FlushPipelineCache() override;
 	/** @copydoc Backend::CreateGraphicsPipeline */
 	PipelineHandle		 CreateGraphicsPipeline(const GraphicsPipelineDesc &desc) override;
 	/** @copydoc Backend::BeginRendering */

@@ -30,6 +30,9 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#ifdef MemoryBarrier
+#undef MemoryBarrier
+#endif
 
 #include <process.h>
 #else
@@ -3101,7 +3104,6 @@ PipelineHandle VulkanBackend::CreatePipeline(const PipelineDesc &desc) {
 
 	_pipelines[handle]		 = std::move(info);
 	_pipelineCacheDirty	 = true;
-	PersistPipelineCache();
 
 	return handle;
 }
@@ -3941,7 +3943,6 @@ PipelineHandle VulkanBackend::CreatePipelineFromBinary(const PipelineDesc &desc,
 	if (result == VK_SUCCESS && _pipelineCache != nullptr &&
 		vkMergePipelineCaches(_device, _pipelineCache, 1, &tempCache) == VK_SUCCESS) {
 		_pipelineCacheDirty = true;
-		PersistPipelineCache();
 	}
 
 	// Destroy temporary cache
@@ -4015,6 +4016,13 @@ uint32_t VulkanBackend::GetPipelineCacheFormat() const {
 PipelineCacheStats VulkanBackend::GetPipelineCacheStats() const {
 	std::lock_guard<std::mutex> lock(_mutex);
 	return _pipelineCacheStats;
+}
+
+void VulkanBackend::FlushPipelineCache() {
+	std::lock_guard<std::mutex> lock(_mutex);
+	if (_initialized) {
+		PersistPipelineCache();
+	}
 }
 
 // =============================================================================
@@ -4392,7 +4400,6 @@ PipelineHandle VulkanBackend::CreateGraphicsPipeline(const GraphicsPipelineDesc 
 
 	_pipelines[handle]		 = std::move(info);
 	_pipelineCacheDirty	 = true;
-	PersistPipelineCache();
 	return handle;
 }
 

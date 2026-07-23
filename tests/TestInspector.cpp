@@ -564,6 +564,7 @@ void main() {}
 	ASSERT(initialStats.diskCacheHits == 0);
 	ASSERT(initialStats.diskCacheMisses == 1);
 	buildPipeline(backend, true);
+	backend.FlushPipelineCache();
 	backend.Shutdown();
 	const auto savedStats = backend.GetPipelineCacheStats();
 	ASSERT(savedStats.diskCacheWrites >= 1);
@@ -607,6 +608,7 @@ ASSERT(pipelineCacheFiles.size() == 1);
 	ASSERT(recoveredStats.invalidDiskEntries == 1);
 	ASSERT(!recoveredStats.lastDiskCacheHit);
 	buildPipeline(backend, false);
+	backend.FlushPipelineCache();
 	backend.Shutdown();
 	ASSERT(backend.GetPipelineCacheStats().diskCacheWrites >= 1);
 }

@@ -1007,6 +1007,10 @@ public:
 		return {};
 	}
 
+	/** Flush pending persistent pipeline-cache data without shutting down the backend. */
+	virtual void FlushPipelineCache() {
+	}
+
 	// ========================================================================
 	// Native Handle Access (optional, for platform-specific features)
 	// ========================================================================
