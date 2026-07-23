@@ -24,43 +24,44 @@ enum class ShaderOptimizationLevel {
 
 `Aggressive` is the default. SPIRV-Tools exposes two built-in general optimization recipes: `-O` and `-Os`. EasyGPU maps `Aggressive` to the strongest general performance recipe available from SPIRV-Tools, `RegisterPerformancePasses()` / `spirv-opt -O`. `Performance` is kept as a compatibility alias for `Aggressive`.
 
-`Ultra` builds on the complete `-O` 44-pass pipeline and augments it with 8 GPU-specific passes: loop invariant code motion (LICM), loop unswitching, loop peeling, strength reduction, local redundancy elimination, code sinking, loop fission, plus an extended cleanup phase (constant unification, dead constant elimination, duplicate removal, dead variable elimination, unused interface variable removal, and capability trimming).
+`Ultra` starts with SPIRV-Tools' maintained `RegisterPerformancePasses()` recipe instead of copying its current pass list. It then runs a conservative, target-independent tail: loop invariant code motion (LICM), strength reduction, local and global redundancy elimination, code sinking, simplification, preserve-aware dead-code elimination, CFG cleanup, and ID compaction. These passes preserve shader precision and keep risky loop restructuring out of the production-oriented preset.
 
-`Extreme` layers speculative optimizations on top of Ultra: FP16 relaxed precision conversion (2× ALU throughput on modern GPUs), loop fusion, decoration flattening, AMD extension-to-core replacement, and canonical ID assignment. Extreme uses `CanonicalizeIds` instead of `CompactIds` — individual shader binaries may be slightly larger, but ID ranges are structured to improve dictionary-based compression when multiple shader modules coexist in the same pipeline cache. Extreme is intended for benchmarking and production release builds on known hardware.
+`Extreme` is an explicitly experimental preset. It additionally enables loop unswitching, peeling, fission and fusion, relaxed-precision FP16 conversion, decoration flattening, and AMD extension-to-core replacement. These transformations can increase code size or register pressure, and FP16 conversion can change numerical results. Use it only with workload-specific correctness and performance measurements.
+
+All optimizing presets honor `ShaderDesc::preserveInterface`. EasyGPU also validates the final optimized module for Vulkan 1.1 before creating a shader module; an invalid result fails compilation with a diagnostic instead of reaching the driver.
 
 | Level | Vulkan behavior | OpenGL behavior |
 |:--|:--|:--|
 | `None` | Compile GLSL to SPIR-V and skip SPIRV-Tools opt passes | No-op |
-| `Aggressive` | Default; run SPIRV-Tools performance passes (`-O`, ~44 passes) | No-op |
-| `Ultra` | `-O` + GPU-specific passes (LICM, LoopUnswitch, LoopPeeling, StrengthReduction, CodeSinking, LoopFission + cleanup, ~55 passes) | No-op |
-| `Extreme` | Ultra + FP16 conversion, LoopFusion, FlattenDecoration, AmdExtToKhr, CanonicalizeIds (~60 passes) | No-op |
+| `Aggressive` | Default; run the SPIRV-Tools performance recipe (`-O`) | No-op |
+| `Ultra` | Maintained `-O` recipe plus conservative scalar/loop/code-motion passes and final cleanup | No-op |
+| `Extreme` | Ultra plus speculative loop restructuring and relaxed-precision conversion | No-op |
 | `Performance` | Alias for `Aggressive` | No-op |
 | `Size` | Run SPIRV-Tools size passes (`-Os`) | No-op |
 
-### Ultra GPU-Specific Passes
+### Ultra Additional Passes
 
-| New Pass | Why not in `-O` | GPU Compute Benefit |
-|:---|:---|:---|
-| **LICM** (`loop-invariant-code-motion`) | Compile-time cost | Hoists uniform/buffer loads out of inner loops — every compute shader benefits |
-| **LoopUnswitch** | Compile-time cost | Moves invariant branch conditions outside loops → eliminates warp-divergent branching |
-| **LoopPeeling** | Added complexity | Peels boundary iterations to expose constant patterns → enables better unrolling |
-| **StrengthReduction** | Minimal CPU gain | `* 1024` → `<< 10` — measurable at shader-wide scale |
-| **LocalRedundancyElimination** | GVN covers cross-block | Per-block CSE is O(1) cheap; catches intra-block duplicates GVN misses |
-| **CodeSinking** | Not in recipe | Moves computations closer to use → shorter live ranges → fewer registers → higher occupancy |
-| **LoopFission** (threshold=64) | Niche use case | Splits high-register-pressure loops to avoid costly spills to memory |
-| **UnifyConst + EliminateDeadConst** | Not in recipe | Deduplicates and removes dead constants left after aggressive optimization |
-| **RemoveDuplicates** | Not in recipe | Deduplicates types, decorations, and capabilities |
-| **TrimCapabilities** | Not in recipe | Removes unused capabilities/extensions → enables more aggressive driver optimization |
+| Pass | Purpose |
+|:---|:---|
+| **LICM** | Hoist loop-invariant instructions to a loop preheader |
+| **StrengthReduction** | Replace eligible integer operations with equivalent cheaper operations, such as power-of-two multiplication with a shift |
+| **LocalRedundancyElimination** | Remove repeated value computations within a basic block |
+| **RedundancyElimination** | Re-run global value numbering after the added transformations |
+| **CodeSinking** | Move instructions into more deeply nested constructs, closer to their uses |
+| **Simplification + DCE + CFG cleanup** | Remove artifacts exposed by the added passes while respecting `preserveInterface` |
+| **CompactIds** | Renumber result IDs to a compact range after all semantic transformations |
+
+These are SPIR-V-level, target-independent transformations. A smaller module or fewer SPIR-V instructions does not by itself prove lower GPU execution time; the Vulkan driver still performs target-specific lowering and scheduling.
 
 ### Extreme-Only Passes
 
 | Pass | Why only in Extreme | Benefit |
 |:---|:---|:---|
-| **ConvertRelaxedToHalf** | Not safe for all workloads | Converts RelaxedPrecision FP32→FP16 — 2× ALU throughput on NVIDIA Pascal+, AMD Vega+, Apple M-series |
-| **LoopFusion** | Can increase register pressure | Merges adjacent loops with same bounds → reduces dispatch overhead |
-| **FlattenDecoration** | Minor gain | Simplifies OpDecorationGroup → individual OpDecorate for cleaner subsequent passes |
-| **AmdExtToKhr** | AMD-specific | Replaces AMD vendor extensions with core SPIR-V instructions |
-| **CanonicalizeIds** | Cross-shader only | Renumbers IDs for better compression when multiple shader modules coexist |
+| **LoopUnswitch / LoopPeeling** | Can duplicate loop bodies and grow the module | Expose loop-invariant branches and boundary iterations to later passes |
+| **LoopFission / LoopFusion** | Can improve or worsen estimated live-value pressure | Restructure compatible loops using SPIRV-Tools' SSA-level estimate; the threshold is not a physical GPU register count |
+| **ConvertRelaxedToHalf** | Can change numerical results | Convert eligible `RelaxedPrecision` operations and values to 16-bit types |
+| **FlattenDecoration** | Primarily structural | Replace grouped decorations with equivalent direct decorations |
+| **AmdExtToKhr** | Only relevant when AMD extension instructions are present | Replace supported AMD extension instructions with equivalent core/KHR forms |
 
 ## Kernel API
 
@@ -98,4 +99,4 @@ cmake --build build --target spirv_opt_inspection --parallel
 ./build/spirv_opt_inspection
 ```
 
-Prints Mandelbrot kernel GLSL at all four optimization levels (Raw, Aggressive, Ultra, Extreme) with line/size stats.
+Prints Mandelbrot kernel GLSL at all four optimization levels (Raw, Aggressive, Ultra, Extreme), along with line count, byte size, and the median host compilation/inspection time from seven warmed runs. The timing includes glslang, SPIRV-Tools, and SPIRV-Cross; it is not a GPU execution benchmark.

@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @brief Show Mandelbrot kernel GLSL at Raw / Aggressive / Ultra optimization levels.
+ * @brief Inspect and time Mandelbrot GLSL at the available optimization levels.
  *
  * The Mandelbrot example has rich control flow:
  *   - Callable functions (Mandelbrot, GetColor)
@@ -8,8 +8,8 @@
  *   - If/Else branches
  *   - Vector math (Float3, Sin, Cos, Pow, Clamp)
  *
- * This is where Ultra's custom passes (LoopUnroll, IfConversion, SSA+GVN,
- * ScalarReplacement, VectorDCE) can show measurable impact beyond -O.
+ * The reported duration covers glslang, SPIRV-Tools, and SPIRV-Cross on the
+ * host. It is a compilation/inspection measurement, not a GPU runtime result.
  */
 
 #include <Callable/Callable.h>
@@ -20,8 +20,13 @@
 #include <GPU.h>
 #include <Utility/Math.h>
 
+#include <algorithm>
+#include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <vector>
 
 using namespace GPU;
 using namespace GPU::IR::Value;
@@ -42,6 +47,11 @@ static int countLines(const std::string &s) {
 	for (char c : s) if (c == '\n') n++;
 	return n;
 }
+
+struct InspectionResult {
+	std::string glsl;
+	double		medianCompileMilliseconds = 0.0;
+};
 
 int main() {
 	// Build the Mandelbrot kernel (same as the real example, but inspect only)
@@ -113,19 +123,33 @@ int main() {
 	});
 
 	// =========================================================================
-	// Collect GLSL at all four levels
+	// Collect GLSL and median host compilation/inspection time. Each level is
+	// warmed once before seven measured runs to exclude one-time initialization.
 	// =========================================================================
-	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::None);
-	std::string rawGLSL = kernel.GetOptimizedGLSL();
+	auto inspect = [&](Backend::ShaderOptimizationLevel level) {
+		constexpr int sampleCount = 7;
+		kernel.SetOptimizationLevel(level);
+		(void)kernel.GetOptimizedGLSL();
 
-	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Aggressive);
-	std::string aggressiveGLSL = kernel.GetOptimizedGLSL();
+		InspectionResult   result;
+		std::vector<double> samples;
+		samples.reserve(sampleCount);
+		for (int i = 0; i < sampleCount; ++i) {
+			const auto start = std::chrono::steady_clock::now();
+			auto	   glsl  = kernel.GetOptimizedGLSL();
+			const auto end   = std::chrono::steady_clock::now();
+			samples.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+			result.glsl = std::move(glsl);
+		}
+		std::sort(samples.begin(), samples.end());
+		result.medianCompileMilliseconds = samples[samples.size() / 2];
+		return result;
+	};
 
-	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Ultra);
-	std::string ultraGLSL = kernel.GetOptimizedGLSL();
-
-	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Extreme);
-	std::string extremeGLSL = kernel.GetOptimizedGLSL();
+	const auto raw		= inspect(Backend::ShaderOptimizationLevel::None);
+	const auto aggressive = inspect(Backend::ShaderOptimizationLevel::Aggressive);
+	const auto ultra		= inspect(Backend::ShaderOptimizationLevel::Ultra);
+	const auto extreme	= inspect(Backend::ShaderOptimizationLevel::Extreme);
 
 	// =========================================================================
 	// Print
@@ -133,38 +157,40 @@ int main() {
 	std::cout << "╔══════════════════════════════════════════════════════════════════╗\n";
 	std::cout << "║        RAW GLSL — No SPIR-V Optimization (Mandelbrot)            ║\n";
 	std::cout << "╚══════════════════════════════════════════════════════════════════╝\n\n";
-	std::cout << rawGLSL << "\n";
+	std::cout << raw.glsl << "\n";
 
 	std::cout << "╔══════════════════════════════════════════════════════════════════╗\n";
 	std::cout << "║   AGGRESSIVE GLSL — SPIRV-Tools RegisterPerformancePasses (-O)   ║\n";
 	std::cout << "╚══════════════════════════════════════════════════════════════════╝\n\n";
-	std::cout << aggressiveGLSL << "\n";
+	std::cout << aggressive.glsl << "\n";
 
 	std::cout << "╔══════════════════════════════════════════════════════════════════╗\n";
-	std::cout << "║     ULTRA GLSL — Custom 20-pass Pipeline (GPU compute tuned)     ║\n";
+	std::cout << "║     ULTRA GLSL — Maintained -O + conservative optimization tail ║\n";
 	std::cout << "╚══════════════════════════════════════════════════════════════════╝\n\n";
-	std::cout << ultraGLSL << "\n";
+	std::cout << ultra.glsl << "\n";
 
 	std::cout << "╔══════════════════════════════════════════════════════════════════╗\n";
-		std::cout << "║   EXTREME GLSL — Ultra + FP16 + LoopFusion + CanonicalizeIds      ║\n";
+	std::cout << "║   EXTREME GLSL — Ultra + speculative loop/precision transforms  ║\n";
 	std::cout << "╚══════════════════════════════════════════════════════════════════╝\n\n";
-	std::cout << extremeGLSL << "\n";
+	std::cout << extreme.glsl << "\n";
 
 	// =========================================================================
 	// Stats
 	// =========================================================================
-	std::cout << "┌────────────────────────────┬──────────┬───────────┐\n";
-	std::cout << "│ Level                      │ Lines    │ Size (B)  │\n";
-	std::cout << "├────────────────────────────┼──────────┼───────────┤\n";
-	std::cout << "│ Raw (None)                 │ " << countLines(rawGLSL) << "      │ "
-			  << rawGLSL.size() << "       │\n";
-	std::cout << "│ Aggressive (-O)            │ " << countLines(aggressiveGLSL) << "      │ "
-			  << aggressiveGLSL.size() << "       │\n";
-	std::cout << "│ Ultra (20 GPU passes)      │ " << countLines(ultraGLSL) << "      │ "
-			  << ultraGLSL.size() << "       │\n";
-	std::cout << "│ Extreme (Ultra + FP16 etc)  │ " << countLines(extremeGLSL) << "      │ "
-			  << extremeGLSL.size() << "       │\n";
-	std::cout << "└────────────────────────────┴──────────┴───────────┘\n";
+	auto printStats = [](const char *label, const InspectionResult &result) {
+		std::cout << std::left << std::setw(20) << label << std::right << std::setw(8) << countLines(result.glsl)
+				  << std::setw(12) << result.glsl.size() << std::setw(14) << std::fixed << std::setprecision(3)
+				  << result.medianCompileMilliseconds << '\n';
+	};
+
+	std::cout << "\nHost compilation/inspection statistics (median of 7 warmed runs)\n";
+	std::cout << std::left << std::setw(20) << "Level" << std::right << std::setw(8) << "Lines" << std::setw(12)
+			  << "Bytes" << std::setw(14) << "Time (ms)" << '\n';
+	printStats("Raw (None)", raw);
+	printStats("Aggressive (-O)", aggressive);
+	printStats("Ultra", ultra);
+	printStats("Extreme", extreme);
+	std::cout << "Timing includes glslang + SPIRV-Tools + SPIRV-Cross; it is not GPU execution time.\n";
 
 	return 0;
 }

@@ -224,6 +224,8 @@ std::string optimized = kernel.GetOptimizedGLSL();
 |:--|:--|:--|
 | `Backend::ShaderOptimizationLevel::None` | Skip SPIRV-Tools opt passes | No-op |
 | `Backend::ShaderOptimizationLevel::Aggressive` | Default; strongest general SPIRV-Tools performance recipe (`spirv-opt -O`) | No-op |
+| `Backend::ShaderOptimizationLevel::Ultra` | Maintained `-O` recipe plus conservative optimization and cleanup passes | No-op |
+| `Backend::ShaderOptimizationLevel::Extreme` | Ultra plus experimental loop restructuring and relaxed-precision conversion | No-op |
 | `Backend::ShaderOptimizationLevel::Performance` | Compatibility alias for `Aggressive` | No-op |
 | `Backend::ShaderOptimizationLevel::Size` | SPIRV-Tools size recipe (`spirv-opt -Os`) | No-op |
 

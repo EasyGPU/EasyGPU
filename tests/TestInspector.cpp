@@ -15,6 +15,7 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace GPU;
 using namespace GPU::IR::Value;
@@ -364,6 +365,50 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 std::cout << "  Extreme optimization level functional!\n";
 END_TEST
 
+TEST(shader_optimization_execution_equivalence)
+std::cout << "\n  Testing execution equivalence across production optimization levels...\n";
+
+constexpr int		 kElementCount = 64;
+std::vector<int> inputData(kElementCount);
+for (int i = 0; i < kElementCount; ++i) {
+	inputData[i] = (i * 17) % 97 - 48;
+}
+
+Buffer<int> inputBuffer(inputData, BufferMode::Read);
+Buffer<int> outputBuffer(kElementCount, BufferMode::Write);
+
+GPU::Kernel::Kernel1D kernel(
+	[&](Var<int> &id) {
+		auto input  = inputBuffer.Bind();
+		auto output = outputBuffer.Bind();
+
+		Var<int> value = input[id];
+		Var<int> sum(Expr<int>(0));
+		For(0, 12, 1, [&](Var<int> &i) {
+			Var<int> term = value * 8 + i * 2;
+			If((value + i) % 3 == 0, [&] { sum = sum + term - 3; }).Else([&] { sum = sum + term + 5; });
+		});
+		output[id] = sum;
+	},
+	64);
+
+auto run = [&](Backend::ShaderOptimizationLevel level) {
+	kernel.SetOptimizationLevel(level);
+	kernel.Dispatch(1, true);
+	std::vector<int> result;
+	outputBuffer.Download(result);
+	return result;
+};
+
+const auto none		 = run(Backend::ShaderOptimizationLevel::None);
+const auto aggressive = run(Backend::ShaderOptimizationLevel::Aggressive);
+const auto ultra	 = run(Backend::ShaderOptimizationLevel::Ultra);
+
+ASSERT(none == aggressive);
+ASSERT(none == ultra);
+std::cout << "  None, Aggressive, and Ultra produced identical results!\n";
+END_TEST
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -391,6 +436,7 @@ int main() {
 		test_inspector_optimization_levels();
 		test_inspector_ultra_optimization();
 		test_inspector_extreme_optimization();
+		test_shader_optimization_execution_equivalence();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " tests passed\n";

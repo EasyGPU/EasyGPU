@@ -135,9 +135,9 @@ enum class ShaderOptimizationLevel {
 	None,				  ///< Skip backend optimization passes.
 	Size,				  ///< Optimize for compact shader binary size. Maps to SPIRV-Tools -Os on Vulkan.
 	Aggressive,			  ///< Default. Use SPIRV-Tools' strongest general performance preset (-O) on Vulkan.
-	Ultra,				  ///< -O + GPU-specific passes (LICM, LoopUnswitch, LoopPeeling, StrengthReduction,
-						  ///<   CodeSinking, LoopFission, LocalRedundancyElimination + extra cleanup).
-	Extreme,			  ///< Ultra + FP16 relaxed precision conversion, loop fusion, canonicalize IDs.
+	Ultra,				  ///< -O plus conservative LICM, strength reduction, redundancy elimination,
+						  ///<   code sinking, and final cleanup. Suitable for production benchmarking.
+	Extreme,			  ///< Ultra plus speculative loop transforms and relaxed-precision FP16 conversion.
 	Performance = Aggressive ///< Compatibility alias for Aggressive.
 };
 

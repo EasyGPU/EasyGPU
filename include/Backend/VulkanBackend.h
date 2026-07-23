@@ -487,19 +487,21 @@ private:
 	 * @param glslSource GLSL source string.
 	 * @param type Shader type.
 	 * @param optimizationLevel SPIR-V optimization preset.
+	 * @param preserveInterface Preserve non-IO entry-point interface variables.
 	 * @return SPIR-V binary as uint32_t vector.
 	 */
 	std::vector<uint32_t>	  CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
-												 ShaderOptimizationLevel optimizationLevel);
+												 ShaderOptimizationLevel optimizationLevel, bool preserveInterface);
 
 	/**
 	 * @brief Optimize SPIR-V bytecode with SPIRV-Tools.
 	 * @param spirv Unoptimized SPIR-V binary.
 	 * @param optimizationLevel SPIR-V optimization preset.
+	 * @param preserveInterface Preserve non-IO entry-point interface variables.
 	 * @return Optimized SPIR-V binary.
 	 */
 	std::vector<uint32_t>	  OptimizeSPIRV(const std::vector<uint32_t> &spirv,
-											ShaderOptimizationLevel optimizationLevel);
+											ShaderOptimizationLevel optimizationLevel, bool preserveInterface);
 
 	/**
 	 * @brief Convert SPIR-V bytecode back to readable GLSL for inspection.
