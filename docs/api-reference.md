@@ -231,6 +231,8 @@ std::string optimized = kernel.GetOptimizedGLSL();
 
 The same methods are available on `Kernel1D/2D/3D` and `InspectorKernel1D/2D/3D`. For AD kernels, see [ADKernel1D](#adkernel1d) and [SPIR-V Optimization](spirv-optimization.md).
 
+With persistent shader caching enabled, Vulkan checks a validated, versioned SPIR-V disk cache before invoking glslang. Use `Backend::GetShaderCompilationStats()` and `Backend::ResetShaderCompilationStats()` to inspect cache hits, misses, frontend compilation count, and the most recent frontend/optimizer durations. See [Shader Caching](shader-cache.md).
+
 ### Kernel Barriers
 
 Synchronization within work groups:

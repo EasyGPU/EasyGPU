@@ -99,4 +99,6 @@ cmake --build build --target spirv_opt_inspection --parallel
 ./build/spirv_opt_inspection
 ```
 
-Prints Mandelbrot kernel GLSL at all four optimization levels (Raw, Aggressive, Ultra, Extreme), along with line count, byte size, and the median host compilation/inspection time from seven warmed runs. The timing includes glslang, SPIRV-Tools, and SPIRV-Cross; it is not a GPU execution benchmark.
+Prints Mandelbrot kernel GLSL at all four optimization levels (Raw, Aggressive, Ultra, Extreme), along with line count, byte size, and median cold/warm host timings. Each cold sample forces a persistent-cache miss; each warm sample reads validated optimized SPIR-V from disk. These timings cover compilation and inspection, not GPU execution.
+
+See [Shader Caching](shader-cache.md) for cache keys, storage locations, validation, and runtime statistics.

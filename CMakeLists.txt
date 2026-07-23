@@ -19,7 +19,7 @@ option(EASYGPU_BUILD_EXAMPLES "Build example programs" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_BUILD_TESTS "Build test suite" ${PROJECT_IS_TOP_LEVEL})
 option(EASYGPU_BUILD_FRAGMENT_TESTER "Build fragment kernel tester with EasyX" OFF)
 option(EASYGPU_BUILD_WINDOW "Build window component for interactive visualization" ON)
-option(EASYGPU_ENABLE_SHADER_CACHE "Enable shader binary caching for faster startup" ON)
+option(EASYGPU_ENABLE_SHADER_CACHE "Enable persistent backend shader caching for faster startup" ON)
 option(EASYGPU_ENABLE_SPIRV_OPT "Optimize Vulkan SPIR-V with SPIRV-Tools opt passes" ON)
 option(EASYGPU_ENABLE_SPIRV_CROSS_GLSL "Expose optimized Vulkan SPIR-V as GLSL through SPIRV-Cross" ON)
 set(EASYGPU_SHADER_CACHE_DIR "" CACHE STRING "Directory for shader cache (empty = use default)")
@@ -477,6 +477,8 @@ add_library(EasyGPU STATIC
     source/Utility/Matrix.cpp
     include/Utility/Math.h
     source/Utility/Math.cpp
+    include/Utility/SHA256.h
+    source/Utility/SHA256.cpp
     include/Utility/Helpers.h
     include/Utility/Unref.h
     include/Utility/Atomic.h
@@ -561,7 +563,7 @@ endif()
 if(EASYGPU_ENABLE_SHADER_CACHE)
     target_compile_definitions(EasyGPU PUBLIC EASYGPU_SHADER_CACHE_ENABLED)
     if(NOT EASYGPU_SHADER_CACHE_DIR STREQUAL "")
-        target_compile_definitions(EasyGPU PUBLIC EASYGPU_SHADER_CACHE_DIR="${EASYGPU_SHADER_CACHE_DIR}")
+        target_compile_definitions(EasyGPU PRIVATE EASYGPU_SHADER_CACHE_DIR="${EASYGPU_SHADER_CACHE_DIR}")
     endif()
 endif()
 

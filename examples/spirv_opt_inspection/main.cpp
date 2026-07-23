@@ -22,6 +22,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -50,10 +52,40 @@ static int countLines(const std::string &s) {
 
 struct InspectionResult {
 	std::string glsl;
-	double		medianCompileMilliseconds = 0.0;
+	double		coldMilliseconds = 0.0;
+	double		warmMilliseconds = 0.0;
+	uint64_t	cacheHits = 0;
+	uint64_t	cacheMisses = 0;
 };
 
+static void setCacheDirectory(const std::filesystem::path &directory) {
+#ifdef _WIN32
+	_putenv_s("EASYGPU_SHADER_CACHE_DIR", directory.string().c_str());
+#else
+	setenv("EASYGPU_SHADER_CACHE_DIR", directory.string().c_str(), 1);
+#endif
+}
+
+static void clearCacheDirectoryOverride() {
+#ifdef _WIN32
+	_putenv_s("EASYGPU_SHADER_CACHE_DIR", "");
+#else
+	unsetenv("EASYGPU_SHADER_CACHE_DIR");
+#endif
+}
+
+static double median(std::vector<double> samples) {
+	std::sort(samples.begin(), samples.end());
+	return samples[samples.size() / 2];
+}
+
 int main() {
+	const auto cacheDirectory = std::filesystem::temp_directory_path() /
+		("easygpu-spirv-inspection-" +
+		 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	std::filesystem::remove_all(cacheDirectory);
+	setCacheDirectory(cacheDirectory);
+
 	// Build the Mandelbrot kernel (same as the real example, but inspect only)
 
 	// Color mapping — Callable with If/Else, Sin/Cos/Pow vector math
@@ -123,26 +155,39 @@ int main() {
 	});
 
 	// =========================================================================
-	// Collect GLSL and median host compilation/inspection time. Each level is
-	// warmed once before seven measured runs to exclude one-time initialization.
+	// Measure seven forced cache misses and seven disk-cache hits per level.
 	// =========================================================================
 	auto inspect = [&](Backend::ShaderOptimizationLevel level) {
 		constexpr int sampleCount = 7;
 		kernel.SetOptimizationLevel(level);
-		(void)kernel.GetOptimizedGLSL();
+		auto *backend = Runtime::Context::GetBackend();
+		backend->ResetShaderCompilationStats();
 
 		InspectionResult   result;
-		std::vector<double> samples;
-		samples.reserve(sampleCount);
+		std::vector<double> coldSamples;
+		std::vector<double> warmSamples;
+		coldSamples.reserve(sampleCount);
+		warmSamples.reserve(sampleCount);
 		for (int i = 0; i < sampleCount; ++i) {
+			std::filesystem::remove_all(cacheDirectory);
 			const auto start = std::chrono::steady_clock::now();
 			auto	   glsl  = kernel.GetOptimizedGLSL();
 			const auto end   = std::chrono::steady_clock::now();
-			samples.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+			coldSamples.push_back(std::chrono::duration<double, std::milli>(end - start).count());
 			result.glsl = std::move(glsl);
 		}
-		std::sort(samples.begin(), samples.end());
-		result.medianCompileMilliseconds = samples[samples.size() / 2];
+		for (int i = 0; i < sampleCount; ++i) {
+			const auto start = std::chrono::steady_clock::now();
+			result.glsl = kernel.GetOptimizedGLSL();
+			const auto end = std::chrono::steady_clock::now();
+			warmSamples.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+		}
+
+		const auto stats = backend->GetShaderCompilationStats();
+		result.coldMilliseconds = median(std::move(coldSamples));
+		result.warmMilliseconds = median(std::move(warmSamples));
+		result.cacheHits = stats.diskCacheHits;
+		result.cacheMisses = stats.diskCacheMisses;
 		return result;
 	};
 
@@ -150,6 +195,8 @@ int main() {
 	const auto aggressive = inspect(Backend::ShaderOptimizationLevel::Aggressive);
 	const auto ultra		= inspect(Backend::ShaderOptimizationLevel::Ultra);
 	const auto extreme	= inspect(Backend::ShaderOptimizationLevel::Extreme);
+	clearCacheDirectoryOverride();
+	std::filesystem::remove_all(cacheDirectory);
 
 	// =========================================================================
 	// Print
@@ -178,19 +225,23 @@ int main() {
 	// Stats
 	// =========================================================================
 	auto printStats = [](const char *label, const InspectionResult &result) {
+		const auto cacheCounts = std::to_string(result.cacheHits) + "/" + std::to_string(result.cacheMisses);
 		std::cout << std::left << std::setw(20) << label << std::right << std::setw(8) << countLines(result.glsl)
 				  << std::setw(12) << result.glsl.size() << std::setw(14) << std::fixed << std::setprecision(3)
-				  << result.medianCompileMilliseconds << '\n';
+				  << result.coldMilliseconds << std::setw(14) << result.warmMilliseconds << std::setw(12) << cacheCounts
+				  << '\n';
 	};
 
-	std::cout << "\nHost compilation/inspection statistics (median of 7 warmed runs)\n";
+	std::cout << "\nHost compilation/inspection statistics (median of 7 runs)\n";
 	std::cout << std::left << std::setw(20) << "Level" << std::right << std::setw(8) << "Lines" << std::setw(12)
-			  << "Bytes" << std::setw(14) << "Time (ms)" << '\n';
+			  << "Bytes" << std::setw(14) << "Cold (ms)" << std::setw(14) << "Warm (ms)" << std::setw(12)
+			  << "Hit/Miss" << '\n';
 	printStats("Raw (None)", raw);
 	printStats("Aggressive (-O)", aggressive);
 	printStats("Ultra", ultra);
 	printStats("Extreme", extreme);
-	std::cout << "Timing includes glslang + SPIRV-Tools + SPIRV-Cross; it is not GPU execution time.\n";
+	std::cout << "Cold timing includes glslang, SPIRV-Tools, cache write, and SPIRV-Cross.\n";
+	std::cout << "Warm timing includes cache read/validation and SPIRV-Cross. Neither is GPU execution time.\n";
 
 	return 0;
 }

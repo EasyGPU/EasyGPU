@@ -1,149 +1,114 @@
-# Shader Binary Cache
+# Shader Caching
 
-Runtime caching of compiled GPU programs for faster kernel execution.
+EasyGPU uses separate cache layers for shader compilation and driver pipeline creation. They solve different startup costs and have different compatibility rules.
 
-## Overview
+## Cache Layers
 
-EasyGPU automatically caches compiled shader binaries in memory to avoid repeated GLSL compilation overhead within a single application session. This provides significant performance improvements when the same kernels are dispatched multiple times.
+| Layer | Lifetime | Stored data | Purpose |
+|:--|:--|:--|:--|
+| Kernel context | Process | Live shader and pipeline handles | Reuse an already-created pipeline when the same kernel instance dispatches again |
+| Global pipeline cache | Process | Backend pipeline binary data | Feed reusable driver data back into pipeline creation |
+| Vulkan SPIR-V cache | Disk | Validated optimized SPIR-V modules | Skip glslang and SPIRV-Tools across processes |
 
-## How It Works
+The persistent Vulkan cache is enabled by `EASYGPU_ENABLE_SHADER_CACHE`. A lookup occurs before GLSL parsing. A hit therefore avoids both glslang code generation and the selected SPIRV-Tools optimization recipe. Vulkan pipeline creation still runs because pipelines are device- and driver-specific.
 
+## Persistent Cache Key
+
+Each SPIR-V entry is content-addressed with SHA-256 over:
+
+- the complete GLSL source bytes;
+- shader stage;
+- optimization level;
+- `ShaderDesc::preserveInterface`;
+- whether SPIRV-Tools optimization was compiled in;
+- Vulkan and SPIR-V target versions;
+- glslang version;
+- SPIRV-Tools version and commit details;
+- EasyGPU cache schema version.
+
+Changing any input produces a different file name. Toolchain upgrades and optimizer recipe changes cannot silently reuse an incompatible module.
+
+## Validation And Writes
+
+Cached modules are bounded to 64 MiB and validated for Vulkan 1.1 before use. Truncated, malformed, or invalid files are deleted and treated as misses. Cache writes use a temporary file in the destination directory followed by an atomic rename. Concurrent processes compiling the same shader may duplicate compilation, but they cannot expose a partially written final cache entry.
+
+Cache I/O is an optimization. An unavailable or read-only cache directory does not make shader compilation fail.
+
+## Cache Location
+
+The default persistent cache directories are:
+
+| Platform | Directory |
+|:--|:--|
+| Windows | `%LOCALAPPDATA%/EasyGPU/shader-cache/spirv-v1` |
+| macOS | `~/Library/Caches/EasyGPU/spirv-v1` |
+| Linux | `$XDG_CACHE_HOME/easygpu/spirv-v1`, or `~/.cache/easygpu/spirv-v1` |
+
+Set a runtime directory for development, CI, or application-managed cleanup:
+
+```bash
+export EASYGPU_SHADER_CACHE_DIR=/path/to/cache
 ```
-First Dispatch          Subsequent Dispatches
-     │                         │
-     ▼                         ▼
-┌─────────┐              ┌──────────┐
-│ Compile │              │  Lookup  │
-│  GLSL   │              │   Cache  │
-└────┬────┘              └────┬─────┘
-     │                         │
-     ▼                         ▼
-┌─────────┐              ┌──────────┐
-│  Store  │              │ Reuse    │
-│  Cache  │              │ Binary   │
-└─────────┘              └──────────┘
+
+The cache then uses `/path/to/cache/spirv-v1`. A build-time default can also be configured:
+
+```bash
+cmake -S . -B build -DEASYGPU_SHADER_CACHE_DIR=/path/to/cache
 ```
 
-## Features
+The runtime environment variable takes precedence over the CMake default.
 
-- **Automatic caching** — No code changes required; kernels are cached automatically
-- **In-memory only** — No disk writes, cache exists only for the application lifetime
-- **Cross-backend** — Works with both OpenGL and Vulkan backends
-- **Thread-safe** — Safe to use from multiple threads
-- **Zero overhead** — Cache lookup is negligible compared to shader compilation
+## Compilation Statistics
 
-## Usage
-
-No explicit action is required. The cache operates transparently:
+Backends expose cache and compilation counters:
 
 ```cpp
-#include <GPU.h>
+auto *backend = Runtime::Context::GetBackend();
+backend->ResetShaderCompilationStats();
 
-int main() {
-    Buffer<float> data(1024);
-    
-    // First call: compiles GLSL, executes, caches binary
-    Kernel1D kernel([](Int i) {
-        auto buf = data.Bind();
-        buf[i] = buf[i] * 2.0f;
-    });
-    kernel.Dispatch(4, true);  // ~15ms (includes compilation)
-    
-    // Same kernel instance: uses cached binary
-    kernel.Dispatch(4, true);  // ~0.5ms (reuses cached program)
-    
-    return 0;
-}
+// Compile or inspect a shader here.
+
+const auto stats = backend->GetShaderCompilationStats();
+std::cout << "SPIR-V cache hits: " << stats.diskCacheHits << '\n';
+std::cout << "SPIR-V cache misses: " << stats.diskCacheMisses << '\n';
+std::cout << "Frontend compilations: " << stats.frontendCompilations << '\n';
+std::cout << "Last frontend time: " << stats.lastFrontendMilliseconds << " ms\n";
+std::cout << "Last optimizer time: " << stats.lastOptimizationMilliseconds << " ms\n";
 ```
 
-## Manual Cache Control
+On a valid disk-cache hit, `lastDiskCacheHit` is true, both last-phase durations are zero, and `frontendCompilations` does not increase.
 
-For advanced use cases, you can access the global cache directly:
+## In-Memory Pipeline Cache
+
+`GPU::Kernel::GlobalShaderCache` remains the process-local store for backend pipeline binary data:
 
 ```cpp
 #include <Kernel/ShaderCache.h>
 
 using namespace GPU::Kernel;
 
-// Clear all cached binaries
 GlobalShaderCache::Clear();
-
-// Check if cache is active
-if (GlobalShaderCache::IsEnabled()) {
-    // ...
-}
-
-// Get cache statistics
-ShaderCache& cache = GlobalShaderCache::Get();
-size_t entries, bytes;
+auto &cache = GlobalShaderCache::Get();
+size_t entries = 0;
+size_t bytes = 0;
 cache.GetStats(entries, bytes);
-std::cout << "Cached shaders: " << entries 
-          << " (" << bytes << " bytes)" << std::endl;
 ```
 
-## Backend Support
-
-| Backend | Cache Support | Cache Method |
-|:--------|:-------------:|:-------------|
-| **OpenGL** | ✅ Yes | `glGetProgramBinary` / `glProgramBinary` |
-| **Vulkan** | ✅ Yes | `VkPipelineCache` |
-
-On Vulkan, cached pipeline data accelerates `vkCreateComputePipelines`; it is not a serialized replacement for the compute shader module. EasyGPU keeps a valid shader module alive for the complete pipeline-creation call, including cache-assisted creation.
-
-### Checking Backend Capabilities
-
-```cpp
-auto* backend = Runtime::Context::GetBackend();
-if (backend->SupportsPipelineCache()) {
-    uint32_t format = backend->GetPipelineCacheFormat();
-    std::cout << "Cache format: 0x" << std::hex << format << std::endl;
-}
-```
-
-## Implementation Details
-
-### Cache Key
-
-Cache entries are keyed by:
-- **SHA256 hash** of the complete GLSL source code
-- **Backend type** (OpenGL/Vulkan)
-- **Driver-specific format identifier**
-
-### Cache Storage
-
-The cache stores:
-- Compiled GPU binary (driver-specific format)
-- Format identifier (for validation)
-- Timestamp (for potential LRU eviction)
-
-### Lifetime
-
-- **Created**: When a kernel is first compiled
-- **Reused**: On subsequent dispatches of the same kernel
-- **Destroyed**: When the application exits
-
-## Performance
-
-Typical performance improvements on warm cache:
-
-| Operation | Cold | Warm | Speedup |
-|:----------|:----:|:----:|:-------:|
-| Simple kernel | ~15ms | ~0.5ms | **30x** |
-| Complex kernel | ~50ms | ~1ms | **50x** |
-
-> **Note:** Performance varies by GPU driver and kernel complexity.
+`GlobalShaderCache::Clear()` does not delete persistent SPIR-V files. Remove the configured disk directory when explicit invalidation or size management is required.
 
 ## CMake Options
 
-Shader cache is enabled by default. To disable:
+Persistent shader caching is enabled by default:
 
-```cmake
-set(EASYGPU_ENABLE_SHADER_CACHE OFF CACHE BOOL "" FORCE)
+```bash
+cmake -S . -B build -DEASYGPU_ENABLE_SHADER_CACHE=ON
 ```
 
-## Limitations
+Set it to `OFF` to disable persistent SPIR-V reads and writes. Live per-kernel pipeline reuse remains active.
 
-- Cache is **not persisted** to disk — restarting the application clears the cache
-- Each kernel context maintains its own cache entry
-- Maximum cache size is limited only by available system memory
-- Vulkan cache compatibility remains driver-specific; invalid or unusable cache data falls back to source pipeline creation
+## Limits
+
+- There is no automatic disk-size eviction yet. Applications can point the cache at a managed directory and remove old schema directories.
+- Persistent optimized SPIR-V currently applies to the Vulkan backend. OpenGL continues to use its process-local program and pipeline mechanisms.
+- Vulkan pipeline data is still process-local in EasyGPU. It has stricter device and driver compatibility requirements than SPIR-V and must be persisted separately.
+- Cache-hit improvements affect startup and compilation latency, not GPU execution time after a pipeline has been created.

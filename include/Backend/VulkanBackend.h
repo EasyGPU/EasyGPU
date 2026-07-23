@@ -103,6 +103,10 @@ public:
 	void				 DestroyShader(ShaderHandle shader) override;
 	/** @copydoc Backend::GetOptimizedGLSL */
 	std::string			 GetOptimizedGLSL(const ShaderDesc &desc) override;
+	/** @copydoc Backend::GetShaderCompilationStats */
+	ShaderCompilationStats GetShaderCompilationStats() const override;
+	/** @copydoc Backend::ResetShaderCompilationStats */
+	void				 ResetShaderCompilationStats() override;
 
 	/** @copydoc Backend::CreatePipeline */
 	PipelineHandle		 CreatePipeline(const PipelineDesc &desc) override;
@@ -623,9 +627,10 @@ private:
 	float											 _maxSamplerAnisotropy = 1.0f;
 	bool											 _depthClampSupported = false;
 	bool											 _fillModeNonSolidSupported = false;
+	ShaderCompilationStats						 _shaderCompilationStats;
 
 	// Thread safety
-	std::mutex										 _mutex;
+	mutable std::mutex							 _mutex;
 	bool											 _isCurrent = false;
 };
 

@@ -13,6 +13,10 @@
 #include <Utility/Vec.h>
 
 #include <cassert>
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -409,6 +413,97 @@ ASSERT(none == ultra);
 std::cout << "  None, Aggressive, and Ultra produced identical results!\n";
 END_TEST
 
+TEST(shader_disk_cache)
+std::cout << "\n  Testing persistent optimized SPIR-V cache...\n";
+
+#ifdef EASYGPU_SHADER_CACHE_ENABLED
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	const auto cacheDirectory = std::filesystem::temp_directory_path() /
+		("easygpu-spirv-cache-test-" +
+		 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	std::filesystem::remove_all(cacheDirectory);
+#ifdef _WIN32
+	_putenv_s("EASYGPU_SHADER_CACHE_DIR", cacheDirectory.string().c_str());
+#else
+	setenv("EASYGPU_SHADER_CACHE_DIR", cacheDirectory.string().c_str(), 1);
+#endif
+
+	auto *backend = Runtime::Context::GetBackend();
+	ASSERT(backend != nullptr);
+	backend->ResetShaderCompilationStats();
+
+	GPU::Kernel::InspectorKernel1D kernel([](Var<int> &id) {
+		Var<int> value = id * 8 + 3;
+		If(value > 17, [&] { value = value - 2; });
+	});
+	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Ultra);
+
+	ASSERT(!kernel.GetOptimizedGLSL().empty());
+	auto stats = backend->GetShaderCompilationStats();
+	ASSERT(stats.diskCacheHits == 0);
+	ASSERT(stats.diskCacheMisses == 1);
+	ASSERT(stats.frontendCompilations == 1);
+	ASSERT(!stats.lastDiskCacheHit);
+
+	ASSERT(!kernel.GetOptimizedGLSL().empty());
+	stats = backend->GetShaderCompilationStats();
+	ASSERT(stats.diskCacheHits == 1);
+	ASSERT(stats.diskCacheMisses == 1);
+	ASSERT(stats.frontendCompilations == 1);
+	ASSERT(stats.lastDiskCacheHit);
+	ASSERT(stats.lastFrontendMilliseconds == 0.0);
+	ASSERT(stats.lastOptimizationMilliseconds == 0.0);
+
+	std::vector<std::filesystem::path> cacheFiles;
+	for (const auto &entry : std::filesystem::recursive_directory_iterator(cacheDirectory)) {
+		if (entry.is_regular_file() && entry.path().extension() == ".spv") {
+			cacheFiles.push_back(entry.path());
+		}
+	}
+	ASSERT(cacheFiles.size() == 1);
+	{
+		std::ofstream corrupted(cacheFiles.front(), std::ios::binary | std::ios::trunc);
+		const uint32_t invalidWord = 0;
+		corrupted.write(reinterpret_cast<const char *>(&invalidWord), sizeof(invalidWord));
+	}
+
+	ASSERT(!kernel.GetOptimizedGLSL().empty());
+	stats = backend->GetShaderCompilationStats();
+	ASSERT(stats.diskCacheHits == 1);
+	ASSERT(stats.diskCacheMisses == 2);
+	ASSERT(stats.frontendCompilations == 2);
+	ASSERT(!stats.lastDiskCacheHit);
+	ASSERT(std::filesystem::file_size(cacheFiles.front()) >= 5 * sizeof(uint32_t));
+
+	kernel.SetOptimizationLevel(Backend::ShaderOptimizationLevel::Aggressive);
+	ASSERT(!kernel.GetOptimizedGLSL().empty());
+	stats = backend->GetShaderCompilationStats();
+	ASSERT(stats.diskCacheMisses == 3);
+	ASSERT(stats.frontendCompilations == 3);
+
+	Backend::ShaderDesc preserveDesc;
+	preserveDesc.type = Backend::ShaderType::Compute;
+	preserveDesc.sourceCode = kernel.GetCode();
+	preserveDesc.optimizationLevel = Backend::ShaderOptimizationLevel::Ultra;
+	preserveDesc.preserveInterface = true;
+	ASSERT(!backend->GetOptimizedGLSL(preserveDesc).empty());
+	stats = backend->GetShaderCompilationStats();
+	ASSERT(stats.diskCacheMisses == 4);
+	ASSERT(stats.frontendCompilations == 4);
+
+#ifdef _WIN32
+	_putenv_s("EASYGPU_SHADER_CACHE_DIR", "");
+#else
+	unsetenv("EASYGPU_SHADER_CACHE_DIR");
+#endif
+	std::filesystem::remove_all(cacheDirectory);
+}
+std::cout << "  Persistent SPIR-V cache hit and corruption recovery verified!\n";
+#else
+std::cout << "  Persistent SPIR-V cache is disabled in this build.\n";
+#endif
+END_TEST
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -437,6 +532,7 @@ int main() {
 		test_inspector_ultra_optimization();
 		test_inspector_extreme_optimization();
 		test_shader_optimization_execution_equivalence();
+		test_shader_disk_cache();
 
 		std::cout << "\n========================================\n";
 		std::cout << "  Results: " << pass_count << "/" << test_count << " tests passed\n";

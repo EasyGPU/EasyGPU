@@ -618,26 +618,27 @@ video.UploadAsync(frameData.data());
 kernel.Dispatch(120, 68, true);  // GPU processes while CPU continues
 ```
 
-### Shader Binary Cache
+### Shader Cache
 
-Automatic in-memory caching of compiled GPU programs for faster kernel execution:
+Automatic pipeline reuse plus a content-addressed Vulkan SPIR-V disk cache:
 
 ```cpp
 Kernel1D kernel([](Int i) {
     data[i] = data[i] * 2.0f;
 });
 
-// First dispatch: compiles and caches (~15ms)
+// First dispatch: compiles and populates the caches
 kernel.Dispatch(16, true);
 
-// Subsequent dispatches: uses cached binary (~0.5ms)
+// Subsequent dispatches reuse the live pipeline
 kernel.Dispatch(16, true);
 ```
 
 **Key Features:**
 - **Zero configuration** — Works automatically, no code changes needed
-- **Cross-backend** — Supports both OpenGL and Vulkan
-- **In-memory only** — No disk I/O, cache cleared on exit
+- **Warm process startup** — Vulkan disk hits skip glslang and SPIRV-Tools
+- **Versioned keys** — Source, stage, preset, interface mode, and toolchain versions are hashed
+- **Validated entries** — Corrupt SPIR-V falls back to compilation and is repaired
 - **Thread-safe** — Safe for multi-threaded applications
 
 [Learn more about Shader Cache →](docs/shader-cache.md)

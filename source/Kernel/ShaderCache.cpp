@@ -4,86 +4,11 @@
  */
 
 #include <Kernel/ShaderCache.h>
+#include <Utility/SHA256.h>
 
 #include <chrono>
-#include <iomanip>
-#include <sstream>
-
-// For SHA256 hash computation - use standard library where possible
-#include <algorithm>
-
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-
-#include <wincrypt.h>
-#elif defined(__APPLE__)
-#include <CommonCrypto/CommonDigest.h>
-#else
-#include <openssl/evp.h>
-#endif
 
 namespace GPU::Kernel {
-
-// Simple SHA256 implementation wrapper
-class SHA256 {
-public:
-	static std::string Hash(const std::string &input) {
-		unsigned char hash[32]	   = {};
-		bool		  hashComputed = false;
-
-#ifdef _WIN32
-		// Windows Cryptography API
-		HCRYPTPROV hProv   = 0;
-		HCRYPTHASH hHash   = 0;
-		DWORD	   hashLen = 32;
-
-		if (CryptAcquireContext(&hProv, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
-			if (CryptCreateHash(hProv, CALG_SHA_256, 0, 0, &hHash)) {
-				CryptHashData(hHash, reinterpret_cast<const BYTE *>(input.c_str()), static_cast<DWORD>(input.size()),
-							  0);
-				CryptGetHashParam(hHash, HP_HASHVAL, hash, &hashLen, 0);
-				CryptDestroyHash(hHash);
-				hashComputed = true;
-			}
-			CryptReleaseContext(hProv, 0);
-		}
-#elif defined(__APPLE__)
-		// Apple CommonCrypto
-		CC_SHA256_CTX ctx;
-		CC_SHA256_Init(&ctx);
-		CC_SHA256_Update(&ctx, input.c_str(), input.size());
-		CC_SHA256_Final(hash, &ctx);
-		hashComputed = true;
-#else
-		// OpenSSL EVP API
-		EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-		if (ctx) {
-			EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
-			EVP_DigestUpdate(ctx, input.c_str(), input.size());
-			EVP_DigestFinal_ex(ctx, hash, nullptr);
-			hashComputed = true;
-			EVP_MD_CTX_free(ctx);
-		}
-#endif
-
-		if (!hashComputed) {
-			throw std::runtime_error("SHA256 hash computation failed");
-		}
-
-		// Convert to hex string
-		std::ostringstream oss;
-		for (int i = 0; i < 32; ++i) {
-			oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
-		}
-		return oss.str();
-	}
-};
 
 // =============================================================================
 // ShaderCache Implementation
@@ -137,7 +62,7 @@ void ShaderCache::Clear() {
 }
 
 std::string ShaderCache::ComputeShaderHash(const std::string &sourceCode) {
-	return SHA256::Hash(sourceCode);
+	return Utility::ComputeSHA256(sourceCode);
 }
 
 // =============================================================================

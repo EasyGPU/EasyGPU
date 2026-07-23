@@ -7,6 +7,9 @@ set(EasyGPU_WITH_WINDOW @EASYGPU_BUILD_WINDOW@)
 
 if(EasyGPU_BACKEND STREQUAL "Vulkan")
     find_dependency(Vulkan)
+    if(UNIX)
+        find_dependency(OpenSSL)
+    endif()
 
     get_filename_component(_easygpu_vulkan_library_dir "${Vulkan_LIBRARY}" DIRECTORY)
     set(_easygpu_vulkan_library_hints

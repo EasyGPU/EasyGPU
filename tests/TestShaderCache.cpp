@@ -80,6 +80,7 @@ bool TestShaderHash() {
 	std::string hash1	= ShaderCache::ComputeShaderHash(source1);
 	std::string hash2	= ShaderCache::ComputeShaderHash(source2);
 	std::string hash3	= ShaderCache::ComputeShaderHash(source3);
+	std::string knownHash = ShaderCache::ComputeShaderHash("abc");
 
 	// Same source should produce same hash
 	if (hash1 != hash2) {
@@ -96,6 +97,10 @@ bool TestShaderHash() {
 	// Hash should be 64 characters (SHA256 hex)
 	if (hash1.length() != 64) {
 		std::cerr << "Hash length should be 64, got " << hash1.length() << std::endl;
+		return false;
+	}
+	if (knownHash != "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") {
+		std::cerr << "SHA256 known-answer test failed" << std::endl;
 		return false;
 	}
 

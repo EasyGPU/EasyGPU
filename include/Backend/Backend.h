@@ -150,6 +150,17 @@ struct ShaderDesc {
 	bool					preserveInterface  = false; ///< Preserve non-IO interface variables during optimization.
 };
 
+/** @brief Runtime statistics for backend shader compilation and persistent cache use. */
+struct ShaderCompilationStats {
+	uint64_t diskCacheHits				 = 0;
+	uint64_t diskCacheMisses			 = 0;
+	uint64_t frontendCompilations		 = 0;
+	uint64_t diskCacheWriteFailures	 = 0;
+	double	 lastFrontendMilliseconds	 = 0.0;
+	double	 lastOptimizationMilliseconds = 0.0;
+	bool	 lastDiskCacheHit			 = false;
+};
+
 // ============================================================================
 // Resource Binding
 // ============================================================================
@@ -735,6 +746,13 @@ public:
 	virtual std::string GetOptimizedGLSL(const ShaderDesc &desc) {
 		(void)desc;
 		return {};
+	}
+	/** @brief Return shader compilation and persistent-cache statistics for this backend instance. */
+	virtual ShaderCompilationStats GetShaderCompilationStats() const {
+		return {};
+	}
+	/** @brief Reset shader compilation and persistent-cache statistics. */
+	virtual void ResetShaderCompilationStats() {
 	}
 
 	/**

@@ -41,6 +41,7 @@ EasyGPU keeps its C++ kernel DSL backend-independent, but backend and platform c
 - Shader handles are released through exception-safe lifetime management during pipeline creation.
 - Buffer and texture slots reject binding after the attached resource has been destroyed.
 - `UniformBuffer<T>::GetValue()` returns a synchronized value copy rather than exposing a reference after releasing its lock.
+- Persistent Vulkan SPIR-V entries are version-keyed and validated before use; invalid entries fall back to source compilation.
 - Vulkan pipeline-cache entries are used only as pipeline creation acceleration data; a valid shader module remains live throughout pipeline creation.
 - Native GPU timestamp queries are used only when the backend reports reliable support. MoltenVK uses synchronized CPU timing as a stability fallback.
 
