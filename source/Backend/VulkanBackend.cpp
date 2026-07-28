@@ -4522,9 +4522,6 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 		auto depthIt = _textures.find(desc.depthAttachment);
 		if (depthIt != _textures.end()) {
 			hasStencil = depthIt->second.vkFormat == VK_FORMAT_D24_UNORM_S8_UINT;
-			if (sampleCount != VK_SAMPLE_COUNT_1_BIT && !desc.clearDepthFlag) {
-				throw std::runtime_error("MSAA BeginRendering with depth requires clearDepthFlag=true");
-			}
 			depthAttachment.sType		= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
 			depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			depthAttachment.loadOp	= desc.clearDepthFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -4534,20 +4531,29 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 
 			if (sampleCount == VK_SAMPLE_COUNT_1_BIT) {
 				depthAttachment.imageView = depthIt->second.view;
+				const VkAccessFlags depthAccess = desc.clearDepthFlag
+											 ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+											 : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+												VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 				TransitionTexture(depthIt->second, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-								  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-								  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+								  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+									  VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+								  depthAccess);
 			} else {
 				auto &msaaDepth = GetOrCreateMsaaAttachment(
 					renderWidth, renderHeight, MAX_COLOR_ATTACHMENTS, depthIt->second.vkFormat, sampleCount,
 					desc.depthAttachment,
-					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 					hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) : VK_IMAGE_ASPECT_DEPTH_BIT);
+				const VkAccessFlags depthAccess = desc.clearDepthFlag
+											 ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+											 : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+												VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 				TransitionMsaaAttachment(msaaDepth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-										 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-										 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+										 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+											 VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+										 depthAccess);
 				depthAttachment.imageView = msaaDepth.view;
-				depthAttachment.storeOp	 = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			}
 			hasDepth = true;
 		}

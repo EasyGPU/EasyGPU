@@ -202,7 +202,7 @@ backend->EndRendering();
 | `AttachmentLoadOp::Clear` | `VK_ATTACHMENT_LOAD_OP_CLEAR` | First pass of a frame or any pass that should discard previous color. |
 | `AttachmentLoadOp::DontCare` | `VK_ATTACHMENT_LOAD_OP_DONT_CARE` | Full-target overwrite where previous contents are irrelevant. |
 
-For MSAA rendering, EasyGPU keeps one internal multisampled color attachment per resolved target texture, color slot, format, and sample count. A later pass with `AttachmentLoadOp::Load` and the same resolved target loads that multisampled attachment, continues drawing, and resolves again when the pass ends.
+For MSAA rendering, EasyGPU keeps one internal multisampled color attachment per resolved target texture, color slot, format, and sample count. A later pass with `AttachmentLoadOp::Load` and the same resolved target loads that multisampled attachment, continues drawing, and resolves again when the pass ends. It likewise keeps multisampled depth per logical depth target; set `clearDepthFlag = false` on later passes to preserve depth testing across draws.
 
 ### FragmentShader (Fullscreen Pass)
 

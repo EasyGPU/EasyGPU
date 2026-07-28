@@ -447,6 +447,100 @@ int main() {
 			std::cout << "[Test 4d DSLMSAA] PASS" << std::endl;
 		}
 
+		// Test 4e: MSAA depth survives across render passes for the same target.
+		{
+			const uint32_t W = 64, H = 64;
+			const char *nearVsSrc =
+				"#version 450\nvoid main() {\n\tvec2 pos;\n\tpos.x = float((gl_VertexIndex & 1) << 2) - 1.0;\n"
+				"\tpos.y = float((gl_VertexIndex & 2) << 1) - 1.0;\n\tgl_Position = vec4(pos, 0.25, 1.0);\n}\n";
+			const char *farVsSrc =
+				"#version 450\nvoid main() {\n\tvec2 pos;\n\tpos.x = float((gl_VertexIndex & 1) << 2) - 1.0;\n"
+				"\tpos.y = float((gl_VertexIndex & 2) << 1) - 1.0;\n\tgl_Position = vec4(pos, 0.75, 1.0);\n}\n";
+			const char *redFsSrc =
+				"#version 450\nlayout(location = 0) out vec4 outColor;\nvoid main() { outColor = vec4(1, 0, 0, 1); }\n";
+			const char *greenFsSrc =
+				"#version 450\nlayout(location = 0) out vec4 outColor;\nvoid main() { outColor = vec4(0, 1, 0, 1); }\n";
+
+			auto nearVs = backend->CreateShader(
+				{GPU::Backend::ShaderType::Vertex, nearVsSrc, "main"});
+			auto farVs = backend->CreateShader(
+				{GPU::Backend::ShaderType::Vertex, farVsSrc, "main"});
+			auto redFs = backend->CreateShader(
+				{GPU::Backend::ShaderType::Fragment, redFsSrc, "main"});
+			auto greenFs = backend->CreateShader(
+				{GPU::Backend::ShaderType::Fragment, greenFsSrc, "main"});
+
+			GPU::Backend::GraphicsPipelineDesc nearDesc;
+			nearDesc.vertexShader		 = nearVs;
+			nearDesc.fragmentShader		 = redFs;
+			nearDesc.sampleCount		 = GPU::Backend::SampleCount::X4;
+			nearDesc.depthTestEnable	 = true;
+			nearDesc.depthWriteEnable	 = true;
+			nearDesc.depthCompareOp		 = GPU::Backend::CompareOp::Less;
+			auto nearPipeline = backend->CreateGraphicsPipeline(nearDesc);
+			auto farDesc = nearDesc;
+			farDesc.vertexShader = farVs;
+			farDesc.fragmentShader = greenFs;
+			auto farPipeline = backend->CreateGraphicsPipeline(farDesc);
+
+			GPU::Backend::TextureDesc colorDesc;
+			colorDesc.width = W;
+			colorDesc.height = H;
+			colorDesc.format = GPU::Backend::PixelFormat::RGBA8;
+			auto color = backend->CreateTexture(colorDesc);
+			auto depth = backend->CreateDepthBuffer(W, H);
+
+			GPU::Backend::RenderPassBeginDesc firstPass;
+			firstPass.colorAttachment = color;
+			firstPass.depthAttachment = depth;
+			firstPass.sampleCount = GPU::Backend::SampleCount::X4;
+			firstPass.clearColorFlag = true;
+			firstPass.clearDepthFlag = true;
+			backend->BeginRendering(firstPass);
+			backend->SetViewport(0, 0, W, H);
+			backend->SetScissor(0, 0, W, H);
+			backend->BindPipeline(nearPipeline);
+			backend->Draw(3, 1, 0, 0);
+			backend->EndRendering();
+
+			GPU::Backend::RenderPassBeginDesc secondPass = firstPass;
+			secondPass.clearColorFlag = false;
+			secondPass.colorLoadOp = GPU::Backend::AttachmentLoadOp::Load;
+			secondPass.clearDepthFlag = false;
+			backend->BeginRendering(secondPass);
+			backend->SetViewport(0, 0, W, H);
+			backend->SetScissor(0, 0, W, H);
+			backend->BindPipeline(farPipeline);
+			backend->Draw(3, 1, 0, 0);
+			backend->EndRendering();
+			backend->Finish();
+
+			std::vector<uint8_t> pixels(W * H * 4);
+			backend->DownloadTexture(color, 0, 0, W, H, pixels.data());
+			const size_t idx = (32 * W + 32) * 4;
+			const bool ok = pixels[idx] > 240 && pixels[idx + 1] < 16 && pixels[idx + 2] < 16;
+
+			backend->DestroyTexture(depth);
+			backend->DestroyTexture(color);
+			backend->DestroyPipeline(farPipeline);
+			backend->DestroyPipeline(nearPipeline);
+			backend->DestroyShader(greenFs);
+			backend->DestroyShader(redFs);
+			backend->DestroyShader(farVs);
+			backend->DestroyShader(nearVs);
+
+			if (!ok) {
+				std::cout << "[Test 4e] FAIL: expected near red geometry after depth load, got ("
+						  << (int)pixels[idx] << ", " << (int)pixels[idx + 1] << ", "
+						  << (int)pixels[idx + 2] << ")" << std::endl;
+				backend->MakeNoneCurrent();
+				return 1;
+			}
+			total++;
+			passed++;
+			std::cout << "[Test 4e MSAADepthLoad] PASS" << std::endl;
+		}
+
 		// Test 5: Double BeginRendering must throw
 		{
 			GPU::Backend::TextureDesc texDesc;

@@ -865,7 +865,7 @@ struct RenderPassBeginDesc {
 };
 ```
 
-`colorLoadOp` maps to Vulkan dynamic-rendering attachment load operations. `Default` preserves the older `clearColorFlag` behavior: clear when `clearColorFlag` is true, otherwise load. Use `Load` for later passes that must preserve pixels not covered by the current draw, `Clear` for frame/pass initialization, and `DontCare` only when previous color contents are irrelevant. MSAA draws keep one internal multisampled color attachment per resolved target texture, color slot, format, and sample count, so `Load` can continue a previous pass before resolving again.
+`colorLoadOp` maps to Vulkan dynamic-rendering attachment load operations. `Default` preserves the older `clearColorFlag` behavior: clear when `clearColorFlag` is true, otherwise load. Use `Load` for later passes that must preserve pixels not covered by the current draw, `Clear` for frame/pass initialization, and `DontCare` only when previous color contents are irrelevant. MSAA draws keep one internal multisampled color attachment per resolved target texture, color slot, format, and sample count, so `Load` can continue a previous pass before resolving again. Multisampled depth is retained per logical `depthAttachment`; set `clearDepthFlag` to `false` on later passes to load it instead of clearing it.
 
 **PrimitiveTopology**
 
