@@ -223,6 +223,12 @@ private:
 		uint32_t access	 = 0;
 	};
 
+	struct SamplerInfo {
+		SamplerDesc desc;
+		bool		hasMipmaps = false;
+		uint32_t	glHandle = 0;
+	};
+
 	/** @brief Initialize platform-specific window and context resources. */
 	void	 InitializePlatform();
 	/** @brief Clean up platform-specific resources. */
@@ -257,6 +263,7 @@ private:
 	 * @param readOnly Whether the texture is read-only.
 	 */
 	void	 BindImageTexture(uint32_t binding, uint32_t texture, uint32_t format, bool readOnly);
+	uint32_t GetOrCreateSampler(const SamplerDesc &desc, bool hasMipmaps);
 
 	/**
 	 * @brief Convert BufferMode to GL access mode constant.
@@ -303,6 +310,7 @@ private:
 	std::unordered_map<ShaderHandle, ShaderInfo>	   _shaders;
 	std::unordered_map<PipelineHandle, PipelineInfo>   _pipelines;
 	std::vector<QueryInfo>							   _queries;
+	std::vector<SamplerInfo>							   _samplers;
 
 	BufferHandle									   _nextBufferHandle   = 1;
 	TextureHandle									   _nextTextureHandle  = 1;
@@ -312,6 +320,7 @@ private:
 	uint32_t										   _currentProgram	   = 0;
 	std::array<uint32_t, MAX_BUFFER_BINDINGS>		   _boundBuffers{};
 	std::array<ImageBindingInfo, MAX_TEXTURE_BINDINGS> _boundImages{};
+	std::array<uint32_t, MAX_TEXTURE_BINDINGS>		   _boundSamplers{};
 };
 
 Backend *CreateOpenGLBackend();

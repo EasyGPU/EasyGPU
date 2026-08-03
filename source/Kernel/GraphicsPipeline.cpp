@@ -199,6 +199,11 @@ void GraphicsPipeline::DrawImpl(const std::vector<RenderTargetAttachment> &rende
 			rb.binding = binding;
 			rb.type	   = Backend::BindingType::Sampler;
 			rb.texture = texHandle;
+			if (const auto sampler = _context->GetRuntimeTextureSamplerBindings().find(binding);
+				sampler != _context->GetRuntimeTextureSamplerBindings().end()) {
+				rb.sampler = sampler->second;
+				rb.samplerOverridden = true;
+			}
 			bindings.push_back(rb);
 		}
 	}

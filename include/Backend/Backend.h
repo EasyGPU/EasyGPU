@@ -297,6 +297,7 @@ struct ResourceBinding {
 	PixelFormat format	 = PixelFormat::RGBA8;
 	bool		readOnly = false;
 	SamplerDesc sampler;
+	bool		samplerOverridden = false;
 };
 
 // ============================================================================

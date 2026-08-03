@@ -248,12 +248,23 @@ public:
 		}
 	}
 
+	/** @brief Override the sampler used by a sampled runtime texture binding. */
+	void BindRuntimeTextureSampler(uint32_t binding, const Backend::SamplerDesc &sampler) override {
+		_runtimeTextureSamplers[binding] = sampler;
+		InvalidateBindings();
+	}
+
 	/**
 	 * @brief Get the mapping of binding slots to backend texture handles.
 	 * @return Map of binding index to backend texture handle.
 	 */
 	const std::unordered_map<uint32_t, uint32_t> &GetRuntimeTextureBindings() const override {
 		return _runtimeTextures;
+	}
+
+	/** @brief Get sampler descriptor overrides keyed by texture binding slot. */
+	const std::unordered_map<uint32_t, Backend::SamplerDesc> &GetRuntimeTextureSamplerBindings() const override {
+		return _runtimeTextureSamplers;
 	}
 
 public:
@@ -491,6 +502,7 @@ protected:
 	std::vector<TextureInfo>								 _textures;
 	std::vector<uint32_t>									 _textureBindings;
 	std::unordered_map<uint32_t, uint32_t>					 _runtimeTextures; // binding -> backend texture handle
+	std::unordered_map<uint32_t, Backend::SamplerDesc>	 _runtimeTextureSamplers;
 
 	std::vector<UniformEntry>								 _uniforms;
 	int														 _nextUniformIndex	= 0;

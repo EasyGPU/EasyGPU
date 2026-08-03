@@ -32,6 +32,69 @@
 namespace GPU::Backend {
 
 namespace {
+bool SamplerDescsEqual(const SamplerDesc &a, const SamplerDesc &b) {
+	return a.minFilter == b.minFilter && a.magFilter == b.magFilter && a.mipmapMode == b.mipmapMode &&
+		   a.addressU == b.addressU && a.addressV == b.addressV && a.addressW == b.addressW &&
+		   a.mipLodBias == b.mipLodBias && a.minLod == b.minLod && a.maxLod == b.maxLod &&
+		   a.anisotropyEnable == b.anisotropyEnable && a.maxAnisotropy == b.maxAnisotropy &&
+		   a.compareEnable == b.compareEnable && a.compareOp == b.compareOp && a.borderColor == b.borderColor;
+}
+
+GLint ToGLFilter(SamplerFilter filter) {
+	return filter == SamplerFilter::Linear ? GL_LINEAR : GL_NEAREST;
+}
+
+GLint ToGLMinFilter(const SamplerDesc &desc, bool hasMipmaps) {
+	if (!hasMipmaps) {
+		return ToGLFilter(desc.minFilter);
+	}
+	if (desc.minFilter == SamplerFilter::Nearest) {
+		return desc.mipmapMode == SamplerMipmapMode::Linear ? GL_NEAREST_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
+	}
+	return desc.mipmapMode == SamplerMipmapMode::Linear ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_NEAREST;
+}
+
+GLint ToGLAddressMode(SamplerAddressMode mode) {
+	switch (mode) {
+	case SamplerAddressMode::Repeat:
+		return GL_REPEAT;
+	case SamplerAddressMode::MirroredRepeat:
+		return GL_MIRRORED_REPEAT;
+	case SamplerAddressMode::ClampToBorder:
+		return GL_CLAMP_TO_BORDER;
+	default:
+		return GL_CLAMP_TO_EDGE;
+	}
+}
+
+bool SupportsAnisotropy() {
+	GLint count = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &count);
+	for (GLint i = 0; i < count; ++i) {
+		const auto *extension = reinterpret_cast<const char *>(glGetStringi(GL_EXTENSIONS, static_cast<GLuint>(i)));
+		if (extension != nullptr && std::strcmp(extension, "GL_EXT_texture_filter_anisotropic") == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void SetBorderColor(uint32_t sampler, SamplerBorderColor borderColor) {
+	const bool opaqueWhite = borderColor == SamplerBorderColor::FloatOpaqueWhite ||
+							 borderColor == SamplerBorderColor::IntOpaqueWhite;
+	const bool integer = borderColor == SamplerBorderColor::IntTransparentBlack ||
+						 borderColor == SamplerBorderColor::IntOpaqueBlack ||
+						 borderColor == SamplerBorderColor::IntOpaqueWhite;
+	if (integer) {
+		const GLint color[] = {opaqueWhite ? 1 : 0, opaqueWhite ? 1 : 0, opaqueWhite ? 1 : 0, opaqueWhite ? 1 : 0};
+		glSamplerParameterIiv(sampler, GL_TEXTURE_BORDER_COLOR, color);
+	} else {
+		const GLfloat color[] = {opaqueWhite ? 1.0f : 0.0f, opaqueWhite ? 1.0f : 0.0f,
+								 opaqueWhite ? 1.0f : 0.0f, opaqueWhite ? 1.0f : 0.0f};
+		glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, color);
+	}
+}
+
 struct FramebufferGuard {
 	uint32_t handle = 0;
 
@@ -50,6 +113,7 @@ struct FramebufferGuard {
 OpenGLBackend::OpenGLBackend() {
 	std::fill(_boundBuffers.begin(), _boundBuffers.end(), 0);
 	std::fill(_boundImages.begin(), _boundImages.end(), ImageBindingInfo{});
+	std::fill(_boundSamplers.begin(), _boundSamplers.end(), 0);
 }
 
 OpenGLBackend::~OpenGLBackend() {
@@ -111,6 +175,13 @@ void OpenGLBackend::Shutdown() {
 		}
 	}
 	_queries.clear();
+
+	for (const auto &sampler : _samplers) {
+		if (sampler.glHandle != 0) {
+			glDeleteSamplers(1, &sampler.glHandle);
+		}
+	}
+	_samplers.clear();
 
 	CleanupPlatform();
 	_initialized = false;
@@ -701,9 +772,51 @@ void OpenGLBackend::BindResources(const ResourceBinding *bindings, uint32_t coun
 			if (it != _textures.end()) {
 				glActiveTexture(GL_TEXTURE0 + binding.binding);
 				glBindTexture(GL_TEXTURE_2D, it->second.glHandle);
+				const auto sampler = binding.samplerOverridden
+									 ? GetOrCreateSampler(binding.sampler, it->second.mipLevels > 1)
+									 : 0;
+				if (_boundSamplers[binding.binding] != sampler) {
+					glBindSampler(binding.binding, sampler);
+					_boundSamplers[binding.binding] = sampler;
+				}
 			}
 		}
 	}
+}
+
+uint32_t OpenGLBackend::GetOrCreateSampler(const SamplerDesc &desc, bool hasMipmaps) {
+	for (const auto &sampler : _samplers) {
+		if (sampler.hasMipmaps == hasMipmaps && SamplerDescsEqual(sampler.desc, desc)) {
+			return sampler.glHandle;
+		}
+	}
+
+	uint32_t sampler = 0;
+	glGenSamplers(1, &sampler);
+	if (sampler == 0) {
+		throw std::runtime_error("Failed to create OpenGL sampler");
+	}
+
+	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, ToGLMinFilter(desc, hasMipmaps));
+	glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, ToGLFilter(desc.magFilter));
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, ToGLAddressMode(desc.addressU));
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, ToGLAddressMode(desc.addressV));
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, ToGLAddressMode(desc.addressW));
+	glSamplerParameterf(sampler, GL_TEXTURE_LOD_BIAS, desc.mipLodBias);
+	glSamplerParameterf(sampler, GL_TEXTURE_MIN_LOD, desc.minLod);
+	glSamplerParameterf(sampler, GL_TEXTURE_MAX_LOD, hasMipmaps ? desc.maxLod : 0.0f);
+	SetBorderColor(sampler, desc.borderColor);
+	if (desc.anisotropyEnable && SupportsAnisotropy()) {
+		constexpr GLenum textureMaxAnisotropyExt = 0x84FE;
+		glSamplerParameterf(sampler, textureMaxAnisotropyExt, desc.maxAnisotropy);
+	}
+	if (desc.compareEnable) {
+		glSamplerParameteri(sampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glSamplerParameteri(sampler, GL_TEXTURE_COMPARE_FUNC, GL_ALWAYS + static_cast<GLint>(desc.compareOp));
+	}
+
+	_samplers.push_back({desc, hasMipmaps, sampler});
+	return sampler;
 }
 
 void OpenGLBackend::SetUniform(PipelineHandle pipeline, const std::string &name, const std::string &type,
@@ -810,6 +923,7 @@ void OpenGLBackend::InvalidateCache() {
 	_currentProgram = 0;
 	std::fill(_boundBuffers.begin(), _boundBuffers.end(), 0);
 	std::fill(_boundImages.begin(), _boundImages.end(), ImageBindingInfo{});
+	std::fill(_boundSamplers.begin(), _boundSamplers.end(), 0);
 }
 
 void OpenGLBackend::BindProgram(uint32_t program) {

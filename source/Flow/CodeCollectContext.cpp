@@ -119,11 +119,25 @@ void CodeCollectContext::BindRuntimeTexture(uint32_t binding, uint32_t textureHa
 	}
 }
 
+void CodeCollectContext::BindRuntimeTextureSampler(uint32_t binding, const Backend::SamplerDesc &sampler) {
+	if (_parentContext) {
+		_parentContext->BindRuntimeTextureSampler(binding, sampler);
+	}
+}
+
 const std::unordered_map<uint32_t, uint32_t> &CodeCollectContext::GetRuntimeTextureBindings() const {
 	if (_parentContext) {
 		return _parentContext->GetRuntimeTextureBindings();
 	}
 	static std::unordered_map<uint32_t, uint32_t> empty;
+	return empty;
+}
+
+const std::unordered_map<uint32_t, Backend::SamplerDesc> &CodeCollectContext::GetRuntimeTextureSamplerBindings() const {
+	if (_parentContext) {
+		return _parentContext->GetRuntimeTextureSamplerBindings();
+	}
+	static std::unordered_map<uint32_t, Backend::SamplerDesc> empty;
 	return empty;
 }
 

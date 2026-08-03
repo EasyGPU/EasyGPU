@@ -672,6 +672,10 @@ const std::vector<Backend::ResourceBinding> &KernelBuildContext::GetCachedBindin
 		rb.texture	= static_cast<Backend::TextureHandle>(handle);
 		rb.format	= Runtime::ToBackendPixelFormat(textureInfo->format);
 		rb.readOnly = textureInfo->sampled;
+		if (const auto sampler = _runtimeTextureSamplers.find(binding); sampler != _runtimeTextureSamplers.end()) {
+			rb.sampler = sampler->second;
+			rb.samplerOverridden = true;
+		}
 		_cachedBindings.push_back(rb);
 	}
 

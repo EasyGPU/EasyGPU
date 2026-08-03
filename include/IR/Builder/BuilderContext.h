@@ -165,11 +165,17 @@ public:
 	 */
 	virtual void						 BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) = 0;
 
+	/** Bind a sampler descriptor to a sampled runtime texture binding. */
+	virtual void BindRuntimeTextureSampler(uint32_t binding, const Backend::SamplerDesc &sampler) = 0;
+
 	/**
 	 * Get all runtime texture bindings for dispatch
 	 * @return Map of binding slot -> OpenGL texture handle
 	 */
 	virtual const std::unordered_map<uint32_t, uint32_t> &GetRuntimeTextureBindings() const			  = 0;
+
+	/** Get sampler descriptors keyed by runtime texture binding slot. */
+	virtual const std::unordered_map<uint32_t, Backend::SamplerDesc> &GetRuntimeTextureSamplerBindings() const = 0;
 
 public:
 	// ===================================================================

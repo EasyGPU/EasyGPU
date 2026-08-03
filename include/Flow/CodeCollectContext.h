@@ -138,12 +138,15 @@ public:
 	 * @param textureHandle The runtime texture handle.
 	 */
 	void										  BindRuntimeTexture(uint32_t binding, uint32_t textureHandle) override;
+	void										  BindRuntimeTextureSampler(uint32_t binding,
+																		 const Backend::SamplerDesc &sampler) override;
 
 	/**
 	 * @brief Get the runtime texture binding map.
 	 * @return Map of binding index to runtime texture handle.
 	 */
 	const std::unordered_map<uint32_t, uint32_t> &GetRuntimeTextureBindings() const override;
+	const std::unordered_map<uint32_t, Backend::SamplerDesc> &GetRuntimeTextureSamplerBindings() const override;
 
 	/**
 	 * @brief Register a uniform value with the parent context.

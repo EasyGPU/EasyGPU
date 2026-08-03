@@ -8,6 +8,7 @@
 #include <IR/Builder/Builder.h>
 #include <IR/Value/Expr.h>
 #include <IR/Value/Var.h>
+#include <Kernel/KernelBuildContext.h>
 #include <Runtime/Buffer.h>
 
 #include <cassert>
@@ -84,8 +85,15 @@ public:
 	void BindRuntimeTexture(uint32_t, uint32_t) override {
 	}
 
+	void BindRuntimeTextureSampler(uint32_t, const Backend::SamplerDesc &) override {
+	}
+
 	const std::unordered_map<uint32_t, uint32_t> &GetRuntimeTextureBindings() const override {
 		return emptyRuntimeBindings;
+	}
+
+	const std::unordered_map<uint32_t, Backend::SamplerDesc> &GetRuntimeTextureSamplerBindings() const override {
+		return emptyRuntimeTextureSamplers;
 	}
 
 	std::string RegisterUniform(const std::string &, void *, size_t, size_t,
@@ -127,6 +135,7 @@ private:
 	static inline const std::vector<std::string>			   emptyStrings;
 	static inline const std::vector<uint32_t>				   emptyBindings;
 	static inline const std::unordered_map<uint32_t, uint32_t> emptyRuntimeBindings;
+	static inline const std::unordered_map<uint32_t, Backend::SamplerDesc> emptyRuntimeTextureSamplers;
 };
 
 static void test_scoped_bind_restores_previous_context() {
@@ -144,6 +153,24 @@ static void test_scoped_bind_restores_previous_context() {
 		assert(builder.Context() == &outer);
 	}
 	assert(builder.Context() == nullptr);
+}
+
+static void test_runtime_texture_sampler_binding_is_cached() {
+	GPU::Kernel::KernelBuildContext context(1);
+	context.RegisterTexture(0, Runtime::PixelFormat::RGBA8, "texture", 2, 2, true);
+	context.BindRuntimeTexture(0, 1);
+
+	Backend::SamplerDesc sampler;
+	sampler.minFilter = Backend::SamplerFilter::Linear;
+	sampler.magFilter = Backend::SamplerFilter::Linear;
+	context.BindRuntimeTextureSampler(0, sampler);
+
+	const auto &bindings = context.GetCachedBindings();
+	assert(bindings.size() == 1);
+	assert(bindings[0].type == Backend::BindingType::Sampler);
+	assert(bindings[0].samplerOverridden);
+	assert(bindings[0].sampler.minFilter == Backend::SamplerFilter::Linear);
+	assert(bindings[0].sampler.magFilter == Backend::SamplerFilter::Linear);
 }
 
 static void test_scoped_gradient_tape_restores_previous_state() {
@@ -200,6 +227,7 @@ int main() {
 	std::cout << "========================================\n";
 
 	test_scoped_bind_restores_previous_context();
+	test_runtime_texture_sampler_binding_is_cached();
 	test_scoped_gradient_tape_restores_previous_state();
 	test_var_const_rvalue_semantics_removed();
 	test_expr_modulo_type_constraints();
