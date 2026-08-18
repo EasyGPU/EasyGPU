@@ -614,6 +614,7 @@ private:
 	std::unordered_map<SubmissionHandle, SubmissionInfo> _submissions;
 	std::vector<SubmissionInfo> _availableSubmissionResources;
 	SubmissionHandle _nextSubmissionHandle = 1;
+	SubmissionHandle _completedSubmissionWatermark = INVALID_SUBMISSION_HANDLE;
 
 	// Graphics pipeline state
 	bool											 _insideRenderPass		  = false;

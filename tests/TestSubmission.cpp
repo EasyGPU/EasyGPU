@@ -50,23 +50,28 @@ int main() {
 
 	backend->ReleaseSubmission(first);
 	backend->ReleaseSubmission(second);
-	bool rejectedReleasedHandle = false;
-	try {
-		(void)backend->IsSubmissionComplete(first);
-	} catch (const std::runtime_error &) {
-		rejectedReleasedHandle = true;
-	}
-	assert(rejectedReleasedHandle);
+	const auto expectInvalidSubmission = [](auto &&operation) {
+		bool rejected = false;
+		try {
+			operation();
+		} catch (const std::runtime_error &) {
+			rejected = true;
+		}
+		assert(rejected);
+	};
+	expectInvalidSubmission([&] { (void)backend->IsSubmissionComplete(first); });
+	expectInvalidSubmission([&] { (void)backend->IsSubmissionComplete(GPU::Backend::INVALID_SUBMISSION_HANDLE); });
+	expectInvalidSubmission([&] {
+		(void)backend->WaitForSubmission(GPU::Backend::INVALID_SUBMISSION_HANDLE, 0);
+	});
+	expectInvalidSubmission([&] { backend->ReleaseSubmission(GPU::Backend::INVALID_SUBMISSION_HANDLE); });
+	expectInvalidSubmission([&] {
+		(void)backend->IsSubmissionComplete(std::numeric_limits<GPU::Backend::SubmissionHandle>::max());
+	});
 
 	const auto releasedInFlight = backend->Submit();
 	backend->ReleaseSubmission(releasedInFlight);
-	bool rejectedInFlightReleasedHandle = false;
-	try {
-		(void)backend->WaitForSubmission(releasedInFlight, 0);
-	} catch (const std::runtime_error &) {
-		rejectedInFlightReleasedHandle = true;
-	}
-	assert(rejectedInFlightReleasedHandle);
+	expectInvalidSubmission([&] { (void)backend->WaitForSubmission(releasedInFlight, 0); });
 
 	std::vector<GPU::Backend::SubmissionHandle> burst;
 	burst.reserve(80);
@@ -93,6 +98,44 @@ int main() {
 			}
 			const auto elapsed = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start);
 			std::cout << "Submission benchmark: " << iterations << " iterations, "
+					  << elapsed.count() / static_cast<double>(iterations) << " us/submission\n";
+		}
+	}
+	if (const char *value = std::getenv("EASYGPU_BURST_SUBMISSION_BENCHMARK_ITERATIONS")) {
+		const auto iterations = std::strtoull(value, nullptr, 10);
+		if (iterations != 0) {
+			constexpr uint64_t submissionsPerBurst = 64;
+			std::vector<GPU::Backend::SubmissionHandle> submissions;
+			submissions.reserve(submissionsPerBurst);
+			const auto start = std::chrono::steady_clock::now();
+			for (uint64_t i = 0; i < iterations; ++i) {
+				submissions.clear();
+				for (uint64_t j = 0; j < submissionsPerBurst; ++j) {
+					submissions.push_back(backend->Submit());
+				}
+				assert(backend->WaitForSubmission(submissions.back(), std::numeric_limits<uint64_t>::max()));
+				for (const auto submission : submissions) {
+					assert(backend->IsSubmissionComplete(submission));
+					backend->ReleaseSubmission(submission);
+				}
+			}
+			const auto elapsed = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start);
+			std::cout << "Burst submission benchmark: " << iterations << " x " << submissionsPerBurst
+					  << " submissions, "
+					  << elapsed.count() / static_cast<double>(iterations * submissionsPerBurst)
+					  << " us/submission\n";
+		}
+	}
+	if (const char *value = std::getenv("EASYGPU_SYNC_SUBMISSION_BENCHMARK_ITERATIONS")) {
+		const auto iterations = std::strtoull(value, nullptr, 10);
+		if (iterations != 0) {
+			const auto start = std::chrono::steady_clock::now();
+			for (uint64_t i = 0; i < iterations; ++i) {
+				backend->CopyBuffer(source, 0, destination, 0, byteCount);
+				backend->Finish();
+			}
+			const auto elapsed = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start);
+			std::cout << "Synchronous submission benchmark: " << iterations << " iterations, "
 					  << elapsed.count() / static_cast<double>(iterations) << " us/submission\n";
 		}
 	}

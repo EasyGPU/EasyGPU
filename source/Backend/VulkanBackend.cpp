@@ -1586,6 +1586,9 @@ SubmissionHandle VulkanBackend::SubmitCommandBuffer(bool wait, bool externallyVi
 	if (_commandPool == nullptr || _commandBuffer == nullptr || _commandFence == nullptr) {
 		throw std::runtime_error("No Vulkan command buffer is available for submission");
 	}
+	if (_nextSubmissionHandle == INVALID_SUBMISSION_HANDLE) {
+		throw std::runtime_error("Vulkan submission handle space exhausted");
+	}
 
 	VkSubmitInfo submitInfo		  = {};
 	submitInfo.sType			  = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1638,6 +1641,11 @@ bool VulkanBackend::UpdateSubmissionStatus(SubmissionHandle submission, uint64_t
 	if (info.completed) {
 		return true;
 	}
+	if (submission <= _completedSubmissionWatermark) {
+		info.completed = true;
+		RecycleSubmissionResources(info);
+		return true;
+	}
 
 	const VkResult result = wait
 		? vkWaitForFences(_device, 1, &info.fence, VK_TRUE, timeoutNanoseconds)
@@ -1650,6 +1658,7 @@ bool VulkanBackend::UpdateSubmissionStatus(SubmissionHandle submission, uint64_t
 								 VkResultToString(result));
 	}
 
+	_completedSubmissionWatermark = std::max(_completedSubmissionWatermark, submission);
 	info.completed = true;
 	RecycleSubmissionResources(info);
 	return true;
@@ -1661,7 +1670,7 @@ void VulkanBackend::ReapReleasedSubmissions() {
 			++it;
 			continue;
 		}
-		if (!it->second.completed) {
+		if (!it->second.completed && it->first > _completedSubmissionWatermark) {
 			const VkResult result = vkGetFenceStatus(_device, it->second.fence);
 			if (result == VK_NOT_READY) {
 				++it;
@@ -1670,6 +1679,7 @@ void VulkanBackend::ReapReleasedSubmissions() {
 			if (result != VK_SUCCESS) {
 				throw std::runtime_error(std::string("vkGetFenceStatus failed: ") + VkResultToString(result));
 			}
+			_completedSubmissionWatermark = std::max(_completedSubmissionWatermark, it->first);
 		}
 		it->second.completed = true;
 		RecycleSubmissionResources(it->second);
