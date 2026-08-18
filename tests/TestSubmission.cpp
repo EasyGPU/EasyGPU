@@ -3,10 +3,13 @@
 
 #include <array>
 #include <cassert>
+#include <chrono>
+#include <cstdlib>
 #include <cstdint>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 
 int main() {
 	GPU::Runtime::AutoInitContext();
@@ -64,6 +67,35 @@ int main() {
 		rejectedInFlightReleasedHandle = true;
 	}
 	assert(rejectedInFlightReleasedHandle);
+
+	std::vector<GPU::Backend::SubmissionHandle> burst;
+	burst.reserve(80);
+	for (size_t i = 0; i < 80; ++i) {
+		burst.push_back(backend->Submit());
+	}
+	assert(backend->WaitForSubmission(burst.back(), std::numeric_limits<uint64_t>::max()));
+	for (const auto submission : burst) {
+		assert(backend->IsSubmissionComplete(submission));
+		backend->ReleaseSubmission(submission);
+	}
+	const auto reusedAfterBurst = backend->Submit();
+	assert(backend->WaitForSubmission(reusedAfterBurst, std::numeric_limits<uint64_t>::max()));
+	backend->ReleaseSubmission(reusedAfterBurst);
+
+	if (const char *value = std::getenv("EASYGPU_SUBMISSION_BENCHMARK_ITERATIONS")) {
+		const auto iterations = std::strtoull(value, nullptr, 10);
+		if (iterations != 0) {
+			const auto start = std::chrono::steady_clock::now();
+			for (uint64_t i = 0; i < iterations; ++i) {
+				const auto submission = backend->Submit();
+				assert(backend->WaitForSubmission(submission, std::numeric_limits<uint64_t>::max()));
+				backend->ReleaseSubmission(submission);
+			}
+			const auto elapsed = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start);
+			std::cout << "Submission benchmark: " << iterations << " iterations, "
+					  << elapsed.count() / static_cast<double>(iterations) << " us/submission\n";
+		}
+	}
 
 	backend->DestroyBuffer(destination);
 	backend->DestroyBuffer(intermediate);

@@ -450,8 +450,11 @@ private:
 	void EnsureCommandBuffer();
 	/** @brief Wait for all submitted GPU work to complete. */
 	void WaitForSubmittedWork();
+	struct SubmissionInfo;
 	bool UpdateSubmissionStatus(SubmissionHandle submission, uint64_t timeoutNanoseconds, bool wait);
 	void ReapReleasedSubmissions();
+	void RecycleSubmissionResources(SubmissionInfo &submission);
+	void DestroySubmissionResources(SubmissionInfo &submission);
 
 	/**
 	 * @brief Find a suitable memory type index for allocation.
@@ -590,6 +593,7 @@ private:
 		bool completed = false;
 		bool released = false;
 	};
+	static constexpr size_t MAX_CACHED_SUBMISSION_RESOURCES = 64;
 
 	// Vulkan handles
 	VkInstance										 _instance				  = nullptr;
@@ -605,6 +609,7 @@ private:
 	VkFence											 _commandFence			  = nullptr;
 	bool											 _commandBufferRecording  = false;
 	std::unordered_map<SubmissionHandle, SubmissionInfo> _submissions;
+	std::vector<SubmissionInfo> _availableSubmissionResources;
 	SubmissionHandle _nextSubmissionHandle = 1;
 
 	// Graphics pipeline state

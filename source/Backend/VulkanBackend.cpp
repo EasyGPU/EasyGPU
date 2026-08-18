@@ -941,12 +941,13 @@ void VulkanBackend::CleanupVulkan() {
 		// Destroy command resources
 		for (auto &[handle, submission] : _submissions) {
 			(void)handle;
-			if (submission.fence)
-				vkDestroyFence(_device, submission.fence, nullptr);
-			if (submission.pool)
-				vkDestroyCommandPool(_device, submission.pool, nullptr);
+			DestroySubmissionResources(submission);
 		}
 		_submissions.clear();
+		for (auto &submission : _availableSubmissionResources) {
+			DestroySubmissionResources(submission);
+		}
+		_availableSubmissionResources.clear();
 		if (_commandFence)
 			vkDestroyFence(_device, _commandFence, nullptr);
 		if (_commandPool)
@@ -1399,6 +1400,16 @@ void VulkanBackend::CreateCommandPool() {
 	if (_commandPool != nullptr) {
 		return;
 	}
+	if (!_availableSubmissionResources.empty()) {
+		auto resources = _availableSubmissionResources.back();
+		_availableSubmissionResources.pop_back();
+		_commandPool = resources.pool;
+		_commandBuffer = resources.commandBuffer;
+		_commandFence = resources.fence;
+		CheckVkResult(vkResetCommandPool(_device, _commandPool, 0), "vkResetCommandPool");
+		CheckVkResult(vkResetFences(_device, 1, &_commandFence), "vkResetFences");
+		return;
+	}
 
 	VkCommandPoolCreateInfo poolInfo = {};
 	poolInfo.sType					 = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -1634,15 +1645,7 @@ bool VulkanBackend::UpdateSubmissionStatus(SubmissionHandle submission, uint64_t
 	}
 
 	info.completed = true;
-	if (info.fence) {
-		vkDestroyFence(_device, info.fence, nullptr);
-		info.fence = nullptr;
-	}
-	if (info.pool) {
-		vkDestroyCommandPool(_device, info.pool, nullptr);
-		info.pool = nullptr;
-		info.commandBuffer = nullptr;
-	}
+	RecycleSubmissionResources(info);
 	return true;
 }
 
@@ -1662,14 +1665,44 @@ void VulkanBackend::ReapReleasedSubmissions() {
 				throw std::runtime_error(std::string("vkGetFenceStatus failed: ") + VkResultToString(result));
 			}
 		}
-		if (it->second.fence) {
-			vkDestroyFence(_device, it->second.fence, nullptr);
-		}
-		if (it->second.pool) {
-			vkDestroyCommandPool(_device, it->second.pool, nullptr);
-		}
+		it->second.completed = true;
+		RecycleSubmissionResources(it->second);
 		it = _submissions.erase(it);
 	}
+}
+
+void VulkanBackend::RecycleSubmissionResources(SubmissionInfo &submission) {
+	if (submission.pool == nullptr || submission.commandBuffer == nullptr || submission.fence == nullptr) {
+		DestroySubmissionResources(submission);
+		return;
+	}
+	if (_availableSubmissionResources.size() >= MAX_CACHED_SUBMISSION_RESOURCES) {
+		DestroySubmissionResources(submission);
+		return;
+	}
+
+	_availableSubmissionResources.push_back(SubmissionInfo{
+		submission.pool,
+		submission.commandBuffer,
+		submission.fence,
+		false,
+		false
+	});
+	submission.pool = nullptr;
+	submission.commandBuffer = nullptr;
+	submission.fence = nullptr;
+}
+
+void VulkanBackend::DestroySubmissionResources(SubmissionInfo &submission) {
+	if (submission.fence != nullptr) {
+		vkDestroyFence(_device, submission.fence, nullptr);
+	}
+	if (submission.pool != nullptr) {
+		vkDestroyCommandPool(_device, submission.pool, nullptr);
+	}
+	submission.pool = nullptr;
+	submission.commandBuffer = nullptr;
+	submission.fence = nullptr;
 }
 
 void VulkanBackend::EnsureNoPendingGpuWork() {
