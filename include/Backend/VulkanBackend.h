@@ -66,6 +66,9 @@ public:
 	void		   UploadBuffer(BufferHandle buffer, size_t offset, size_t size, const void *data) override;
 	/** @copydoc Backend::DownloadBuffer */
 	void		   DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData) override;
+	/** @copydoc Backend::CopyBuffer */
+	void		   CopyBuffer(BufferHandle source, size_t sourceOffset, BufferHandle destination,
+						  size_t destinationOffset, size_t size) override;
 	/** @copydoc Backend::MapBuffer */
 	void		  *MapBuffer(BufferHandle buffer, bool read, bool write) override;
 	/** @copydoc Backend::UnmapBuffer */
@@ -129,6 +132,14 @@ public:
 	void				 MemoryBarrier(BarrierType barrierType) override;
 	/** @copydoc Backend::Finish */
 	void				 Finish() override;
+	/** @copydoc Backend::Submit */
+	SubmissionHandle	 Submit() override;
+	/** @copydoc Backend::IsSubmissionComplete */
+	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
+	/** @copydoc Backend::WaitForSubmission */
+	bool				 WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) override;
+	/** @copydoc Backend::ReleaseSubmission */
+	void				 ReleaseSubmission(SubmissionHandle submission) override;
 
 	/** @copydoc Backend::BeginQuery */
 	uint32_t			 BeginQuery() override;
@@ -434,11 +445,13 @@ private:
 	 * @brief Submit the recorded command buffer to the queue.
 	 * @param wait If true, wait for the submission to complete.
 	 */
-	void SubmitCommandBuffer(bool wait = false);
+	SubmissionHandle SubmitCommandBuffer(bool wait = false, bool externallyVisible = false);
 	/** @brief Ensure a command buffer is available and recording. */
 	void EnsureCommandBuffer();
 	/** @brief Wait for all submitted GPU work to complete. */
 	void WaitForSubmittedWork();
+	bool UpdateSubmissionStatus(SubmissionHandle submission, uint64_t timeoutNanoseconds, bool wait);
+	void ReapReleasedSubmissions();
 
 	/**
 	 * @brief Find a suitable memory type index for allocation.
@@ -570,6 +583,14 @@ private:
 	SamplerKey				MakeSamplerKey(const SamplerDesc &desc, bool hasMipmaps) const;
 
 private:
+	struct SubmissionInfo {
+		VkCommandPool pool = nullptr;
+		VkCommandBuffer commandBuffer = nullptr;
+		VkFence fence = nullptr;
+		bool completed = false;
+		bool released = false;
+	};
+
 	// Vulkan handles
 	VkInstance										 _instance				  = nullptr;
 	VkDebugUtilsMessengerEXT						 _debugMessenger		  = nullptr;
@@ -583,7 +604,8 @@ private:
 	VkCommandBuffer									 _commandBuffer			  = nullptr;
 	VkFence											 _commandFence			  = nullptr;
 	bool											 _commandBufferRecording  = false;
-	bool											 _submissionPending		  = false;
+	std::unordered_map<SubmissionHandle, SubmissionInfo> _submissions;
+	SubmissionHandle _nextSubmissionHandle = 1;
 
 	// Graphics pipeline state
 	bool											 _insideRenderPass		  = false;

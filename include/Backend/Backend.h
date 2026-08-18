@@ -33,11 +33,13 @@ using BufferHandle								 = uint32_t;
 using TextureHandle								 = uint32_t;
 using ShaderHandle								 = uint32_t;
 using PipelineHandle							 = uint32_t;
+using SubmissionHandle						 = uint64_t;
 
 constexpr BufferHandle	 INVALID_BUFFER_HANDLE	 = 0;
 constexpr TextureHandle	 INVALID_TEXTURE_HANDLE	 = 0;
 constexpr ShaderHandle	 INVALID_SHADER_HANDLE	 = 0;
 constexpr PipelineHandle INVALID_PIPELINE_HANDLE = 0;
+constexpr SubmissionHandle INVALID_SUBMISSION_HANDLE = 0;
 
 // OpenGL buffer access mode constants (for internal use)
 constexpr int			 BUFFER_MODE_READ_ONLY	 = 0x88B8;
@@ -593,6 +595,9 @@ public:
 	 * @param outData Destination buffer pointer.
 	 */
 	virtual void		  DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData)  = 0;
+	/** @brief Record a device-local buffer copy on the current queue. */
+	virtual void		  CopyBuffer(BufferHandle source, size_t sourceOffset, BufferHandle destination,
+								 size_t destinationOffset, size_t size) = 0;
 	/**
 	 * @brief Map a buffer for CPU access.
 	 * @param buffer Buffer handle.
@@ -825,6 +830,15 @@ public:
 	virtual void		   MemoryBarrier(BarrierType barrierType)												  = 0;
 	/** @brief Flush and wait for all pending GPU work to complete. */
 	virtual void		   Finish()																				  = 0;
+
+	/** @brief Submit all work recorded so far and return a queue-ordered completion marker. */
+	virtual SubmissionHandle Submit() = 0;
+	/** @brief Query a submission without blocking. */
+	virtual bool IsSubmissionComplete(SubmissionHandle submission) = 0;
+	/** @brief Wait for a submission; UINT64_MAX waits indefinitely. */
+	virtual bool WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) = 0;
+	/** @brief Release a completion marker without waiting for its GPU work. */
+	virtual void ReleaseSubmission(SubmissionHandle submission) = 0;
 
 	/**
 	 * @brief Begin a GPU timestamp query.

@@ -141,6 +141,14 @@ void OpenGLBackend::Shutdown() {
 		return;
 	}
 
+	for (auto &[handle, sync] : _submissions) {
+		(void)handle;
+		if (sync != nullptr) {
+			glDeleteSync(reinterpret_cast<GLsync>(sync));
+		}
+	}
+	_submissions.clear();
+
 	for (auto &[handle, info] : _pipelines) {
 		if (info.glProgram != 0) {
 			glDeleteProgram(info.glProgram);
@@ -324,6 +332,33 @@ void OpenGLBackend::DownloadBuffer(BufferHandle buffer, size_t offset, size_t si
 	std::memcpy(outData, mapped, size);
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void OpenGLBackend::CopyBuffer(BufferHandle source, size_t sourceOffset, BufferHandle destination,
+							   size_t destinationOffset, size_t size) {
+	auto sourceIt = _buffers.find(source);
+	auto destinationIt = _buffers.find(destination);
+	if (sourceIt == _buffers.end() || destinationIt == _buffers.end()) {
+		throw std::runtime_error("Invalid buffer handle");
+	}
+	if (sourceOffset > sourceIt->second.size || size > sourceIt->second.size - sourceOffset ||
+		destinationOffset > destinationIt->second.size || size > destinationIt->second.size - destinationOffset) {
+		throw std::runtime_error("CopyBuffer range exceeds buffer size");
+	}
+	if (source == destination && sourceOffset < destinationOffset + size && destinationOffset < sourceOffset + size) {
+		throw std::runtime_error("CopyBuffer does not support overlapping ranges in the same buffer");
+	}
+	if (size == 0) {
+		return;
+	}
+
+	glBindBuffer(GL_COPY_READ_BUFFER, sourceIt->second.glHandle);
+	glBindBuffer(GL_COPY_WRITE_BUFFER, destinationIt->second.glHandle);
+	glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, static_cast<GLintptr>(sourceOffset),
+						static_cast<GLintptr>(destinationOffset), static_cast<GLsizeiptr>(size));
+	glBindBuffer(GL_COPY_READ_BUFFER, 0);
+	glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+	glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
 void *OpenGLBackend::MapBuffer(BufferHandle buffer, bool read, bool write) {
@@ -883,6 +918,63 @@ void OpenGLBackend::MemoryBarrier(BarrierType barrierType) {
 
 void OpenGLBackend::Finish() {
 	glFinish();
+}
+
+SubmissionHandle OpenGLBackend::Submit() {
+	GLsync sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	if (sync == nullptr) {
+		throw std::runtime_error("glFenceSync failed");
+	}
+	glFlush();
+	const SubmissionHandle handle = _nextSubmissionHandle++;
+	_submissions.emplace(handle, reinterpret_cast<void *>(sync));
+	return handle;
+}
+
+bool OpenGLBackend::IsSubmissionComplete(SubmissionHandle submission) {
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end()) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	const GLenum status = glClientWaitSync(reinterpret_cast<GLsync>(it->second), 0, 0);
+	if (status == GL_WAIT_FAILED) {
+		throw std::runtime_error("glClientWaitSync failed");
+	}
+	return status == GL_ALREADY_SIGNALED || status == GL_CONDITION_SATISFIED;
+}
+
+bool OpenGLBackend::WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) {
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end()) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	const auto sync = reinterpret_cast<GLsync>(it->second);
+	if (timeoutNanoseconds != UINT64_MAX) {
+		const GLenum status = glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, timeoutNanoseconds);
+		if (status == GL_WAIT_FAILED) {
+			throw std::runtime_error("glClientWaitSync failed");
+		}
+		return status == GL_ALREADY_SIGNALED || status == GL_CONDITION_SATISFIED;
+	}
+
+	for (;;) {
+		const GLenum status = glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+		if (status == GL_ALREADY_SIGNALED || status == GL_CONDITION_SATISFIED) {
+			return true;
+		}
+		if (status == GL_WAIT_FAILED) {
+			throw std::runtime_error("glClientWaitSync failed");
+		}
+	}
+}
+
+void OpenGLBackend::ReleaseSubmission(SubmissionHandle submission) {
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end()) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	glDeleteSync(reinterpret_cast<GLsync>(it->second));
+	_submissions.erase(it);
 }
 
 uint32_t OpenGLBackend::BeginQuery() {

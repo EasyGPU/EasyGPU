@@ -60,6 +60,9 @@ public:
 	void		   UploadBuffer(BufferHandle buffer, size_t offset, size_t size, const void *data) override;
 	/** @copydoc Backend::DownloadBuffer */
 	void		   DownloadBuffer(BufferHandle buffer, size_t offset, size_t size, void *outData) override;
+	/** @copydoc Backend::CopyBuffer */
+	void		   CopyBuffer(BufferHandle source, size_t sourceOffset, BufferHandle destination,
+						  size_t destinationOffset, size_t size) override;
 	/** @copydoc Backend::MapBuffer */
 	void		  *MapBuffer(BufferHandle buffer, bool read, bool write) override;
 	/** @copydoc Backend::UnmapBuffer */
@@ -118,6 +121,14 @@ public:
 	void				 MemoryBarrier(BarrierType barrierType) override;
 	/** @copydoc Backend::Finish */
 	void				 Finish() override;
+	/** @copydoc Backend::Submit */
+	SubmissionHandle	 Submit() override;
+	/** @copydoc Backend::IsSubmissionComplete */
+	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
+	/** @copydoc Backend::WaitForSubmission */
+	bool				 WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) override;
+	/** @copydoc Backend::ReleaseSubmission */
+	void				 ReleaseSubmission(SubmissionHandle submission) override;
 
 	/** @copydoc Backend::BeginQuery */
 	uint32_t			 BeginQuery() override;
@@ -311,11 +322,13 @@ private:
 	std::unordered_map<PipelineHandle, PipelineInfo>   _pipelines;
 	std::vector<QueryInfo>							   _queries;
 	std::vector<SamplerInfo>							   _samplers;
+	std::unordered_map<SubmissionHandle, void *>		   _submissions;
 
 	BufferHandle									   _nextBufferHandle   = 1;
 	TextureHandle									   _nextTextureHandle  = 1;
 	ShaderHandle									   _nextShaderHandle   = 1;
 	PipelineHandle									   _nextPipelineHandle = 1;
+	SubmissionHandle								   _nextSubmissionHandle = 1;
 
 	uint32_t										   _currentProgram	   = 0;
 	std::array<uint32_t, MAX_BUFFER_BINDINGS>		   _boundBuffers{};

@@ -939,10 +939,22 @@ void VulkanBackend::CleanupVulkan() {
 			vkDestroyQueryPool(_device, _queryPool, nullptr);
 
 		// Destroy command resources
+		for (auto &[handle, submission] : _submissions) {
+			(void)handle;
+			if (submission.fence)
+				vkDestroyFence(_device, submission.fence, nullptr);
+			if (submission.pool)
+				vkDestroyCommandPool(_device, submission.pool, nullptr);
+		}
+		_submissions.clear();
 		if (_commandFence)
 			vkDestroyFence(_device, _commandFence, nullptr);
 		if (_commandPool)
 			vkDestroyCommandPool(_device, _commandPool, nullptr);
+		_commandFence = nullptr;
+		_commandPool = nullptr;
+		_commandBuffer = nullptr;
+		_commandBufferRecording = false;
 
 		// Destroy device
 		vkDestroyDevice(_device, nullptr);
@@ -1384,6 +1396,10 @@ void VulkanBackend::CreateDevice() {
 	}
 }
 void VulkanBackend::CreateCommandPool() {
+	if (_commandPool != nullptr) {
+		return;
+	}
+
 	VkCommandPoolCreateInfo poolInfo = {};
 	poolInfo.sType					 = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	poolInfo.queueFamilyIndex		 = _computeQueueFamilyIndex;
@@ -1525,9 +1541,8 @@ void VulkanBackend::EnsureCommandBuffer() {
 }
 
 void VulkanBackend::BeginCommandBuffer() {
-	if (_submissionPending) {
-		WaitForSubmittedWork();
-	}
+	ReapReleasedSubmissions();
+	CreateCommandPool();
 
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType					   = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1550,54 +1565,119 @@ void VulkanBackend::EndCommandBuffer() {
 	_commandBufferRecording = false;
 }
 
-void VulkanBackend::SubmitCommandBuffer(bool wait) {
-	if (_submissionPending) {
-		WaitForSubmittedWork();
+SubmissionHandle VulkanBackend::SubmitCommandBuffer(bool wait, bool externallyVisible) {
+	if (_commandPool == nullptr || _commandBuffer == nullptr || _commandFence == nullptr) {
+		throw std::runtime_error("No Vulkan command buffer is available for submission");
 	}
-
-	VkResult result = vkResetFences(_device, 1, &_commandFence);
-	CheckVkResult(result, "vkResetFences");
 
 	VkSubmitInfo submitInfo		  = {};
 	submitInfo.sType			  = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers	  = &_commandBuffer;
 
-	result						  = vkQueueSubmit(_computeQueue, 1, &submitInfo, _commandFence);
+	VkResult result = vkQueueSubmit(_computeQueue, 1, &submitInfo, _commandFence);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error(std::string("vkQueueSubmit failed: ") + VkResultToString(result));
 	}
 
-	_submissionPending = true;
+	const SubmissionHandle submission = _nextSubmissionHandle++;
+	_submissions.emplace(submission, SubmissionInfo{
+		_commandPool,
+		_commandBuffer,
+		_commandFence,
+		false,
+		!externallyVisible
+	});
+	_commandPool = nullptr;
+	_commandBuffer = nullptr;
+	_commandFence = nullptr;
 
 	if (wait) {
-		WaitForSubmittedWork();
+		(void)UpdateSubmissionStatus(submission, UINT64_MAX, true);
+		ReapReleasedSubmissions();
 	}
+	return submission;
 }
 
 void VulkanBackend::WaitForSubmittedWork() {
-	if (!_submissionPending) {
-		return;
+	std::vector<SubmissionHandle> submissions;
+	submissions.reserve(_submissions.size());
+	for (const auto &[handle, info] : _submissions) {
+		(void)info;
+		submissions.push_back(handle);
+	}
+	for (const auto submission : submissions) {
+		(void)UpdateSubmissionStatus(submission, UINT64_MAX, true);
+	}
+	ReapReleasedSubmissions();
+}
+
+bool VulkanBackend::UpdateSubmissionStatus(SubmissionHandle submission, uint64_t timeoutNanoseconds, bool wait) {
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end()) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	auto &info = it->second;
+	if (info.completed) {
+		return true;
 	}
 
-	VkResult result = vkWaitForFences(_device, 1, &_commandFence, VK_TRUE, UINT64_MAX);
+	const VkResult result = wait
+		? vkWaitForFences(_device, 1, &info.fence, VK_TRUE, timeoutNanoseconds)
+		: vkGetFenceStatus(_device, info.fence);
+	if (result == VK_TIMEOUT || result == VK_NOT_READY) {
+		return false;
+	}
 	if (result != VK_SUCCESS) {
-		throw std::runtime_error(std::string("vkWaitForFences failed: ") + VkResultToString(result));
+		throw std::runtime_error(std::string(wait ? "vkWaitForFences failed: " : "vkGetFenceStatus failed: ") +
+								 VkResultToString(result));
 	}
-	result = vkResetCommandPool(_device, _commandPool, 0);
-	CheckVkResult(result, "vkResetCommandPool");
 
-	_submissionPending = false;
+	info.completed = true;
+	if (info.fence) {
+		vkDestroyFence(_device, info.fence, nullptr);
+		info.fence = nullptr;
+	}
+	if (info.pool) {
+		vkDestroyCommandPool(_device, info.pool, nullptr);
+		info.pool = nullptr;
+		info.commandBuffer = nullptr;
+	}
+	return true;
+}
+
+void VulkanBackend::ReapReleasedSubmissions() {
+	for (auto it = _submissions.begin(); it != _submissions.end();) {
+		if (!it->second.released) {
+			++it;
+			continue;
+		}
+		if (!it->second.completed) {
+			const VkResult result = vkGetFenceStatus(_device, it->second.fence);
+			if (result == VK_NOT_READY) {
+				++it;
+				continue;
+			}
+			if (result != VK_SUCCESS) {
+				throw std::runtime_error(std::string("vkGetFenceStatus failed: ") + VkResultToString(result));
+			}
+		}
+		if (it->second.fence) {
+			vkDestroyFence(_device, it->second.fence, nullptr);
+		}
+		if (it->second.pool) {
+			vkDestroyCommandPool(_device, it->second.pool, nullptr);
+		}
+		it = _submissions.erase(it);
+	}
 }
 
 void VulkanBackend::EnsureNoPendingGpuWork() {
 	if (_commandBufferRecording) {
 		EndCommandBuffer();
-		SubmitCommandBuffer(true);
-		return;
+		(void)SubmitCommandBuffer(false);
 	}
-
-	if (_submissionPending) {
+	if (!_submissions.empty()) {
 		WaitForSubmittedWork();
 	}
 }
@@ -1825,9 +1905,10 @@ void VulkanBackend::UploadBuffer(BufferHandle buffer, size_t offset, size_t size
 	if (data == nullptr && size != 0) {
 		throw std::runtime_error("UploadBuffer received null data");
 	}
-	if (offset + size > it->second.size) {
+	if (offset > it->second.size || size > it->second.size - offset) {
 		throw std::runtime_error("UploadBuffer range exceeds buffer size");
 	}
+	EnsureNoPendingGpuWork();
 
 	VkResult result = VK_SUCCESS;
 	void	*mapped = nullptr;
@@ -1873,7 +1954,7 @@ void VulkanBackend::DownloadBuffer(BufferHandle buffer, size_t offset, size_t si
 	if (outData == nullptr && size != 0) {
 		throw std::runtime_error("DownloadBuffer received null output pointer");
 	}
-	if (offset + size > it->second.size) {
+	if (offset > it->second.size || size > it->second.size - offset) {
 		throw std::runtime_error("DownloadBuffer range exceeds buffer size");
 	}
 
@@ -1898,6 +1979,48 @@ void VulkanBackend::DownloadBuffer(BufferHandle buffer, size_t offset, size_t si
 	vkUnmapMemory(_device, it->second.stagingMemory);
 }
 
+void VulkanBackend::CopyBuffer(BufferHandle source, size_t sourceOffset, BufferHandle destination,
+							   size_t destinationOffset, size_t size) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	auto sourceIt = _buffers.find(source);
+	auto destinationIt = _buffers.find(destination);
+	if (sourceIt == _buffers.end() || destinationIt == _buffers.end()) {
+		throw std::runtime_error("Invalid buffer handle");
+	}
+	if (sourceOffset > sourceIt->second.size || size > sourceIt->second.size - sourceOffset ||
+		destinationOffset > destinationIt->second.size || size > destinationIt->second.size - destinationOffset) {
+		throw std::runtime_error("CopyBuffer range exceeds buffer size");
+	}
+	if (source == destination && sourceOffset < destinationOffset + size && destinationOffset < sourceOffset + size) {
+		throw std::runtime_error("CopyBuffer does not support overlapping ranges in the same buffer");
+	}
+	if (size == 0) {
+		return;
+	}
+
+	EnsureCommandBuffer();
+	VkBufferCopy copyRegion = {};
+	copyRegion.srcOffset = sourceOffset;
+	copyRegion.dstOffset = destinationOffset;
+	copyRegion.size = size;
+	vkCmdCopyBuffer(_commandBuffer, sourceIt->second.buffer, destinationIt->second.buffer, 1, &copyRegion);
+
+	VkBufferMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
+		VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.buffer = destinationIt->second.buffer;
+	barrier.offset = destinationOffset;
+	barrier.size = size;
+	vkCmdPipelineBarrier(_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+		0, 0, nullptr, 1, &barrier, 0, nullptr);
+}
+
 void *VulkanBackend::MapBuffer(BufferHandle buffer, bool read, bool write) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
@@ -1916,9 +2039,9 @@ void *VulkanBackend::MapBuffer(BufferHandle buffer, bool read, bool write) {
 	if ((it->second.stagingMemoryFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) {
 		throw std::runtime_error("MapBuffer requires HOST_VISIBLE staging memory in Vulkan backend");
 	}
+	EnsureNoPendingGpuWork();
 
 	if (read) {
-		EnsureNoPendingGpuWork();
 		EnsureCommandBuffer();
 
 		VkBufferCopy copyRegion = {};
@@ -3745,12 +3868,53 @@ void VulkanBackend::Finish() {
 
 	if (_commandBufferRecording) {
 		EndCommandBuffer();
-		SubmitCommandBuffer(true);
-	} else if (_submissionPending) {
-		WaitForSubmittedWork();
-	} else {
-		vkDeviceWaitIdle(_device);
+		(void)SubmitCommandBuffer(false);
 	}
+	if (!_submissions.empty()) {
+		WaitForSubmittedWork();
+	}
+}
+
+SubmissionHandle VulkanBackend::Submit() {
+	std::lock_guard<std::mutex> lock(_mutex);
+	if (_insideRenderPass) {
+		throw std::runtime_error("Cannot submit while a render pass is active");
+	}
+	EnsureCommandBuffer();
+	EndCommandBuffer();
+	return SubmitCommandBuffer(false, true);
+}
+
+bool VulkanBackend::IsSubmissionComplete(SubmissionHandle submission) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end() || it->second.released) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	return UpdateSubmissionStatus(submission, 0, false);
+}
+
+bool VulkanBackend::WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end() || it->second.released) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	return UpdateSubmissionStatus(submission, timeoutNanoseconds, true);
+}
+
+void VulkanBackend::ReleaseSubmission(SubmissionHandle submission) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end() || it->second.released) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	if (it->second.completed) {
+		_submissions.erase(it);
+		return;
+	}
+	it->second.released = true;
+	ReapReleasedSubmissions();
 }
 
 // =============================================================================
