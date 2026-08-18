@@ -808,6 +808,9 @@ void VulkanBackend::Initialize() {
 	if (_initialized) {
 		return;
 	}
+	_spirvMemoryCache.clear();
+	_spirvMemoryCacheBytes = 0;
+	_spirvMemoryCacheAccess = 0;
 
 	try {
 		InitializeGlslang();
@@ -837,6 +840,9 @@ void VulkanBackend::Shutdown() {
 
 	CleanupVulkan();
 	ShutdownGlslang();
+	_spirvMemoryCache.clear();
+	_spirvMemoryCacheBytes = 0;
+	_spirvMemoryCacheAccess = 0;
 
 	_initialized = false;
 }
@@ -2967,9 +2973,73 @@ std::string VulkanBackend::DecompileSPIRVToGLSL(const std::vector<uint32_t> &spi
 #endif
 }
 
+std::optional<std::vector<uint32_t>> VulkanBackend::LoadMemoryCachedSpirv(const std::filesystem::path &path) {
+	const auto key = path.string();
+	auto it = _spirvMemoryCache.find(key);
+	if (it == _spirvMemoryCache.end()) {
+		return std::nullopt;
+	}
+
+	std::error_code error;
+	const auto fileSize = std::filesystem::file_size(path, error);
+	if (error) {
+		_spirvMemoryCacheBytes -= it->second.spirv.size() * sizeof(uint32_t);
+		_spirvMemoryCache.erase(it);
+		return std::nullopt;
+	}
+	const auto lastWriteTime = std::filesystem::last_write_time(path, error);
+	if (error || fileSize != it->second.fileSize || lastWriteTime != it->second.lastWriteTime) {
+		_spirvMemoryCacheBytes -= it->second.spirv.size() * sizeof(uint32_t);
+		_spirvMemoryCache.erase(it);
+		return std::nullopt;
+	}
+
+	it->second.lastAccess = ++_spirvMemoryCacheAccess;
+	return it->second.spirv;
+}
+
+void VulkanBackend::StoreMemoryCachedSpirv(const std::filesystem::path &path, const std::vector<uint32_t> &spirv) {
+	const size_t byteCount = spirv.size() * sizeof(uint32_t);
+	if (byteCount > MAX_CACHED_SPIRV_MEMORY_BYTES) {
+		return;
+	}
+
+	std::error_code error;
+	const auto fileSize = std::filesystem::file_size(path, error);
+	if (error) {
+		return;
+	}
+	const auto lastWriteTime = std::filesystem::last_write_time(path, error);
+	if (error) {
+		return;
+	}
+
+	const auto key = path.string();
+	auto existing = _spirvMemoryCache.find(key);
+	if (existing != _spirvMemoryCache.end()) {
+		_spirvMemoryCacheBytes -= existing->second.spirv.size() * sizeof(uint32_t);
+		_spirvMemoryCache.erase(existing);
+	}
+	while (!_spirvMemoryCache.empty() &&
+		   (_spirvMemoryCache.size() >= MAX_CACHED_SPIRV_MODULES ||
+			_spirvMemoryCacheBytes + byteCount > MAX_CACHED_SPIRV_MEMORY_BYTES)) {
+		const auto oldest = std::min_element(
+			_spirvMemoryCache.begin(), _spirvMemoryCache.end(),
+			[](const auto &left, const auto &right) { return left.second.lastAccess < right.second.lastAccess; });
+		if (oldest != _spirvMemoryCache.end()) {
+			_spirvMemoryCacheBytes -= oldest->second.spirv.size() * sizeof(uint32_t);
+			_spirvMemoryCache.erase(oldest);
+		}
+	}
+
+	_spirvMemoryCache[key] = {spirv, fileSize, lastWriteTime, ++_spirvMemoryCacheAccess};
+	_spirvMemoryCacheBytes += byteCount;
+}
+
 std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
 												ShaderOptimizationLevel optimizationLevel,
 												bool					preserveInterface) {
+	_shaderCompilationStats.lastMemoryCacheHit = false;
 	_shaderCompilationStats.lastDiskCacheHit = false;
 	_shaderCompilationStats.lastFrontendMilliseconds = 0.0;
 	_shaderCompilationStats.lastOptimizationMilliseconds = 0.0;
@@ -2979,7 +3049,13 @@ std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslS
 	try {
 		if (const auto cacheDirectory = GetSpirvCacheDirectory()) {
 			cachePath = *cacheDirectory / (BuildSpirvCacheKey(glslSource, type, optimizationLevel, preserveInterface) + ".spv");
+			if (auto cachedSpirv = LoadMemoryCachedSpirv(*cachePath)) {
+				++_shaderCompilationStats.memoryCacheHits;
+				_shaderCompilationStats.lastMemoryCacheHit = true;
+				return std::move(*cachedSpirv);
+			}
 			if (auto cachedSpirv = LoadCachedSpirv(*cachePath)) {
+				StoreMemoryCachedSpirv(*cachePath, *cachedSpirv);
 				++_shaderCompilationStats.diskCacheHits;
 				_shaderCompilationStats.lastDiskCacheHit = true;
 				return std::move(*cachedSpirv);
@@ -3061,7 +3137,9 @@ std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslS
 #ifdef EASYGPU_SHADER_CACHE_ENABLED
 	if (cachePath) {
 		try {
-			if (!StoreCachedSpirv(*cachePath, optimized)) {
+			if (StoreCachedSpirv(*cachePath, optimized)) {
+				StoreMemoryCachedSpirv(*cachePath, optimized);
+			} else {
 				++_shaderCompilationStats.diskCacheWriteFailures;
 			}
 		} catch (...) {

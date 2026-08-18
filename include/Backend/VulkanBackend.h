@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -517,6 +518,8 @@ private:
 	 */
 	std::vector<uint32_t>	  CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
 												 ShaderOptimizationLevel optimizationLevel, bool preserveInterface);
+	std::optional<std::vector<uint32_t>> LoadMemoryCachedSpirv(const std::filesystem::path &path);
+	void StoreMemoryCachedSpirv(const std::filesystem::path &path, const std::vector<uint32_t> &spirv);
 
 	/**
 	 * @brief Optimize SPIR-V bytecode with SPIRV-Tools.
@@ -665,6 +668,17 @@ private:
 	bool											 _fillModeNonSolidSupported = false;
 	ShaderCompilationStats						 _shaderCompilationStats;
 	PipelineCacheStats							 _pipelineCacheStats;
+	struct SpirvMemoryCacheEntry {
+		std::vector<uint32_t>			 spirv;
+		uintmax_t						 fileSize = 0;
+		std::filesystem::file_time_type lastWriteTime{};
+		uint64_t						 lastAccess = 0;
+	};
+	static constexpr size_t MAX_CACHED_SPIRV_MODULES = 256;
+	static constexpr size_t MAX_CACHED_SPIRV_MEMORY_BYTES = 64u * 1024u * 1024u;
+	std::unordered_map<std::string, SpirvMemoryCacheEntry> _spirvMemoryCache;
+	size_t _spirvMemoryCacheBytes = 0;
+	uint64_t _spirvMemoryCacheAccess = 0;
 
 	// Thread safety
 	mutable std::mutex							 _mutex;

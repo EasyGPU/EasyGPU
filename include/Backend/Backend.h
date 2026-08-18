@@ -154,12 +154,14 @@ struct ShaderDesc {
 
 /** @brief Runtime statistics for backend shader compilation and persistent cache use. */
 struct ShaderCompilationStats {
+	uint64_t memoryCacheHits			 = 0;
 	uint64_t diskCacheHits				 = 0;
 	uint64_t diskCacheMisses			 = 0;
 	uint64_t frontendCompilations		 = 0;
 	uint64_t diskCacheWriteFailures	 = 0;
 	double	 lastFrontendMilliseconds	 = 0.0;
 	double	 lastOptimizationMilliseconds = 0.0;
+	bool	 lastMemoryCacheHit			 = false;
 	bool	 lastDiskCacheHit			 = false;
 };
 

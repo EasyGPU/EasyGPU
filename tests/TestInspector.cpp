@@ -444,6 +444,7 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 
 	ASSERT(!kernel.GetOptimizedGLSL().empty());
 	auto stats = backend->GetShaderCompilationStats();
+	ASSERT(stats.memoryCacheHits == 0);
 	ASSERT(stats.diskCacheHits == 0);
 	ASSERT(stats.diskCacheMisses == 1);
 	ASSERT(stats.frontendCompilations == 1);
@@ -451,12 +452,33 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 
 	ASSERT(!kernel.GetOptimizedGLSL().empty());
 	stats = backend->GetShaderCompilationStats();
-	ASSERT(stats.diskCacheHits == 1);
+	ASSERT(stats.memoryCacheHits == 1);
+	ASSERT(stats.diskCacheHits == 0);
 	ASSERT(stats.diskCacheMisses == 1);
 	ASSERT(stats.frontendCompilations == 1);
-	ASSERT(stats.lastDiskCacheHit);
+	ASSERT(stats.lastMemoryCacheHit);
+	ASSERT(!stats.lastDiskCacheHit);
 	ASSERT(stats.lastFrontendMilliseconds == 0.0);
 	ASSERT(stats.lastOptimizationMilliseconds == 0.0);
+
+	#ifdef EASYGPU_BACKEND_VULKAN
+	Backend::ShaderDesc diskDescriptor;
+	diskDescriptor.type = Backend::ShaderType::Compute;
+	diskDescriptor.sourceCode = kernel.GetCode();
+	diskDescriptor.optimizationLevel = Backend::ShaderOptimizationLevel::Ultra;
+	Backend::VulkanBackend diskBackend;
+	diskBackend.Initialize();
+	diskBackend.ResetShaderCompilationStats();
+	ASSERT(!diskBackend.GetOptimizedGLSL(diskDescriptor).empty());
+	const auto diskStats = diskBackend.GetShaderCompilationStats();
+	ASSERT(diskStats.memoryCacheHits == 0);
+	ASSERT(diskStats.diskCacheHits == 1);
+	ASSERT(diskStats.diskCacheMisses == 0);
+	ASSERT(diskStats.frontendCompilations == 0);
+	ASSERT(!diskStats.lastMemoryCacheHit);
+	ASSERT(diskStats.lastDiskCacheHit);
+	diskBackend.Shutdown();
+	#endif
 
 	std::vector<std::filesystem::path> cacheFiles;
 	for (const auto &entry : std::filesystem::recursive_directory_iterator(cacheDirectory)) {
@@ -473,9 +495,11 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 
 	ASSERT(!kernel.GetOptimizedGLSL().empty());
 	stats = backend->GetShaderCompilationStats();
-	ASSERT(stats.diskCacheHits == 1);
+	ASSERT(stats.memoryCacheHits == 1);
+	ASSERT(stats.diskCacheHits == 0);
 	ASSERT(stats.diskCacheMisses == 2);
 	ASSERT(stats.frontendCompilations == 2);
+	ASSERT(!stats.lastMemoryCacheHit);
 	ASSERT(!stats.lastDiskCacheHit);
 	ASSERT(std::filesystem::file_size(cacheFiles.front()) >= 5 * sizeof(uint32_t));
 
