@@ -4444,6 +4444,23 @@ BackendOperationCounters VulkanBackend::GetOperationCounters() const {
 	return _operationCounters;
 }
 
+BackendResourceCounters VulkanBackend::GetResourceCounters() const {
+	std::lock_guard<std::mutex> lock(_mutex);
+	BackendResourceCounters counters{};
+	counters.trackingSupported			 = true;
+	counters.liveBufferHandles			 = _buffers.size();
+	counters.liveTextureHandles			 = _textures.size();
+	counters.livePipelineHandles		 = _pipelines.size();
+	counters.liveShaderHandles			 = _shaders.size();
+	counters.liveSubmissionHandles		 = _submissions.size();
+	counters.cachedDescriptorSets		 = _descriptorSets.size();
+	counters.descriptorPools			 = _descriptorPools.size();
+	counters.cachedSamplers				 = _samplerCache.size();
+	counters.cachedSubmissionResources = _availableSubmissionResources.size();
+	counters.liveMsaaAttachments		 = _msaaAttachments.size();
+	return counters;
+}
+
 // =============================================================================
 // Query / Timing
 // =============================================================================

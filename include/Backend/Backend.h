@@ -64,6 +64,26 @@ struct BackendOperationCounters {
 	uint64_t asyncTextureReadbackCalls	  = 0;
 };
 
+/**
+ * Point-in-time counts of native resources retained by a backend. These are
+ * intentionally handle/cache counts rather than estimated byte sizes: callers
+ * can use them to prove a steady-state plateau without pretending that a
+ * format-based estimate is the driver's physical allocation size.
+ */
+struct BackendResourceCounters {
+	bool	 trackingSupported			 = false;
+	uint64_t liveBufferHandles			 = 0;
+	uint64_t liveTextureHandles			 = 0;
+	uint64_t livePipelineHandles		 = 0;
+	uint64_t liveShaderHandles			 = 0;
+	uint64_t liveSubmissionHandles		 = 0;
+	uint64_t cachedDescriptorSets		 = 0;
+	uint64_t descriptorPools			 = 0;
+	uint64_t cachedSamplers				 = 0;
+	uint64_t cachedSubmissionResources = 0;
+	uint64_t liveMsaaAttachments		 = 0;
+};
+
 // OpenGL buffer access mode constants (for internal use)
 constexpr int			 BUFFER_MODE_READ_ONLY	 = 0x88B8;
 constexpr int			 BUFFER_MODE_WRITE_ONLY	 = 0x88B9;
@@ -897,6 +917,10 @@ public:
 	virtual void ReleaseSubmission(SubmissionHandle submission) = 0;
 	/** Snapshot backend synchronization/readback instrumentation counters. */
 	virtual BackendOperationCounters GetOperationCounters() const {
+		return {};
+	}
+	/** Snapshot native live-resource and bounded-cache instrumentation counters. */
+	virtual BackendResourceCounters GetResourceCounters() const {
 		return {};
 	}
 

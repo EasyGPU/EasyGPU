@@ -151,6 +151,8 @@ public:
 	void				 ReleaseSubmission(SubmissionHandle submission) override;
 	/** @copydoc Backend::GetOperationCounters */
 	BackendOperationCounters GetOperationCounters() const override;
+	/** @copydoc Backend::GetResourceCounters */
+	BackendResourceCounters GetResourceCounters() const override;
 
 	/** @copydoc Backend::BeginQuery */
 	uint32_t			 BeginQuery() override;
