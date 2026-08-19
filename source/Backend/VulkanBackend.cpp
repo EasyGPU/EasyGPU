@@ -1349,11 +1349,6 @@ void VulkanBackend::CreateDevice() {
 	_caps.supportsDepthClamp							= _depthClampSupported;
 	_caps.supportsNonFillPolygonMode					= _fillModeNonSolidSupported;
 
-	// Enable dynamic rendering feature (VK_KHR_dynamic_rendering)
-	VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures = {};
-	dynamicRenderingFeatures.sType			  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
-	dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
-
 	uint32_t extensionCount					  = 0;
 	vkEnumerateDeviceExtensionProperties(_physicalDevice, nullptr, &extensionCount, nullptr);
 	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
@@ -1368,13 +1363,19 @@ void VulkanBackend::CreateDevice() {
 
 	std::vector<const char *> deviceExtensions;
 	if (_caps.supportsGraphics) {
-		if (availableExtensionNames.count(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) == 0) {
+		const bool supportsRenderPass2 = availableExtensionNames.count(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME) != 0;
+		const bool supportsDepthStencilResolve =
+			availableExtensionNames.count(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME) != 0;
+		const bool supportsDynamicRendering =
+			availableExtensionNames.count(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) != 0;
+		if (!supportsRenderPass2 || !supportsDepthStencilResolve || !supportsDynamicRendering) {
 			_caps.supportsGraphics = false;
 		} else {
+			// The application requests Vulkan 1.1, so the extension dependency closure
+			// must be enabled explicitly in dependency order.
+			deviceExtensions.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
+			deviceExtensions.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
 			deviceExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-			if (availableExtensionNames.count(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME) != 0) {
-				deviceExtensions.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
-			}
 		}
 	}
 	if (HasInstanceExtensionProvider()) {
@@ -1382,11 +1383,24 @@ void VulkanBackend::CreateDevice() {
 			throw std::runtime_error("Vulkan device does not support VK_KHR_swapchain");
 		}
 		deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-#ifdef __APPLE__
-		if (availableExtensionNames.count("VK_KHR_portability_subset") != 0) {
-			deviceExtensions.push_back("VK_KHR_portability_subset");
+	}
+	if (availableExtensionNames.count("VK_KHR_portability_subset") != 0) {
+		deviceExtensions.push_back("VK_KHR_portability_subset");
+	}
+
+	VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures = {};
+	dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+	if (_caps.supportsGraphics) {
+		VkPhysicalDeviceFeatures2 supportedFeatures2 = {};
+		supportedFeatures2.sType					 = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		supportedFeatures2.pNext					 = &dynamicRenderingFeatures;
+		vkGetPhysicalDeviceFeatures2(_physicalDevice, &supportedFeatures2);
+		if (dynamicRenderingFeatures.dynamicRendering != VK_TRUE) {
+			_caps.supportsGraphics					  = false;
+			dynamicRenderingFeatures.dynamicRendering = VK_FALSE;
+		} else {
+			dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
 		}
-#endif
 	}
 
 	VkDeviceCreateInfo createInfo	   = {};

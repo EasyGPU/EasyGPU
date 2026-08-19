@@ -588,6 +588,9 @@ if(EASYGPU_BUILD_TESTS)
 
     file(GLOB EASYGPU_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/Test*.cpp")
     list(FILTER EASYGPU_TEST_SOURCES EXCLUDE REGEX "/TestFragmentKernel\\.cpp$")
+    if(NOT EASYGPU_BACKEND STREQUAL "Vulkan")
+        list(FILTER EASYGPU_TEST_SOURCES EXCLUDE REGEX "/TestVulkanValidationInit\\.cpp$")
+    endif()
     
     foreach(test_source ${EASYGPU_TEST_SOURCES})
         get_filename_component(test_name ${test_source} NAME_WE)
@@ -601,6 +604,15 @@ if(EASYGPU_BUILD_TESTS)
         add_test(NAME ${test_name} COMMAND ${test_name})
         set_tests_properties(${test_name} PROPERTIES TIMEOUT 120 LABELS "EasyGPU")
     endforeach()
+
+    if(EASYGPU_BACKEND STREQUAL "Vulkan")
+        set_tests_properties(TestVulkanValidationInit PROPERTIES
+            ENVIRONMENT "EASYGPU_ENABLE_VALIDATION=1"
+            FAIL_REGULAR_EXPRESSION "\\[easygpu vulkan validation\\]"
+            SKIP_RETURN_CODE 77
+            LABELS "EasyGPU;VulkanValidation"
+        )
+    endif()
 endif()
 
 # =============================================================================
