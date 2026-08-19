@@ -104,7 +104,9 @@ public:
 		std::array<IR::Value::Var<T>, HiddenFeatures> hidden;
 
 		for (size_t h = 0; h < HiddenFeatures; h++) {
-			IR::Value::Var<T> sum = b1Ref_[static_cast<int>(h)];
+			// TensorRef indexing returns a writable Var alias. Materialize the
+			// bias through Expr so accumulation cannot store back into B1.
+			IR::Value::Var<T> sum{IR::Value::Expr<T>(b1Ref_[static_cast<int>(h)])};
 			for (size_t i = 0; i < InFeatures; i++) {
 				sum = sum + w1Ref_(static_cast<int>(h), static_cast<int>(i)) *
 								input[threadId * static_cast<int>(InFeatures) + static_cast<int>(i)];
@@ -113,7 +115,7 @@ public:
 		}
 
 		for (size_t o = 0; o < OutFeatures; o++) {
-			IR::Value::Var<T> sum = b2Ref_[static_cast<int>(o)];
+			IR::Value::Var<T> sum{IR::Value::Expr<T>(b2Ref_[static_cast<int>(o)])};
 			for (size_t h = 0; h < HiddenFeatures; h++) {
 				sum = sum + w2Ref_(static_cast<int>(o), static_cast<int>(h)) * hidden[h];
 			}

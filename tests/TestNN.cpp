@@ -762,7 +762,14 @@ TEST(nn_fused_mlp2_forward_matches_cpu) {
 	std::vector<float> out;
 	outBuf.Download(out);
 	ASSERT(std::abs(out[0] - 2.75f) < 1e-4f);
-	ASSERT(std::isfinite(out[1]));
+	ASSERT(std::abs(out[1] - 4.25f) < 1e-4f);
+
+	mlp.B1().Download();
+	mlp.B2().Download();
+	ASSERT(std::abs(mlp.B1().Data()[0] - 0.5f) < 1e-4f);
+	ASSERT(std::abs(mlp.B1().Data()[1] + 0.5f) < 1e-4f);
+	ASSERT(std::abs(mlp.B1().Data()[2]) < 1e-4f);
+	ASSERT(std::abs(mlp.B2().Data()[0] - 0.25f) < 1e-4f);
 }
 END_TEST
 
