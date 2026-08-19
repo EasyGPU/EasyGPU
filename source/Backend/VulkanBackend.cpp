@@ -11,11 +11,12 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -64,6 +65,14 @@ namespace GPU::Backend {
 namespace {
 
 constexpr uintmax_t kMaximumCachedPipelineBytes = 256u * 1024u * 1024u;
+
+bool				TryMultiplySize(size_t left, size_t right, size_t &result) {
+	if (left != 0 && right > std::numeric_limits<size_t>::max() / left) {
+		return false;
+	}
+	result = left * right;
+	return true;
+}
 
 bool ValidatePipelineCacheData(const void *data, size_t byteCount, const VkPhysicalDeviceProperties &properties) {
 	if (data == nullptr || byteCount < sizeof(VkPipelineCacheHeaderVersionOne) ||
@@ -811,6 +820,7 @@ void VulkanBackend::Initialize() {
 	_spirvMemoryCache.clear();
 	_spirvMemoryCacheBytes = 0;
 	_spirvMemoryCacheAccess = 0;
+	_operationCounters		= {};
 
 	try {
 		InitializeGlslang();
@@ -853,6 +863,7 @@ bool VulkanBackend::IsInitialized() const {
 
 void VulkanBackend::CleanupVulkan() {
 	if (_device) {
+		++_operationCounters.deviceWaitIdleCalls;
 		vkDeviceWaitIdle(_device);
 		PersistPipelineCache();
 		_descriptorSets.clear();
@@ -908,7 +919,7 @@ void VulkanBackend::CleanupVulkan() {
 
 		// Destroy buffers
 		for (auto &[handle, info] : _buffers) {
-			if (info.isMapped && info.stagingMemory) {
+			if ((info.isMapped || info.mappedReadback != INVALID_SUBMISSION_HANDLE) && info.stagingMemory) {
 				vkUnmapMemory(_device, info.stagingMemory);
 			}
 			if (info.buffer)
@@ -962,6 +973,8 @@ void VulkanBackend::CleanupVulkan() {
 		_commandPool = nullptr;
 		_commandBuffer = nullptr;
 		_commandBufferRecording = false;
+		_recordingBufferUses.clear();
+		_recordingTextureUses.clear();
 
 		// Destroy device
 		vkDestroyDevice(_device, nullptr);
@@ -1601,13 +1614,16 @@ SubmissionHandle VulkanBackend::SubmitCommandBuffer(bool wait, bool externallyVi
 	}
 
 	const SubmissionHandle submission = _nextSubmissionHandle++;
-	_submissions.emplace(submission, SubmissionInfo{
-		_commandPool,
-		_commandBuffer,
-		_commandFence,
-		false,
-		!externallyVisible
-	});
+	SubmissionInfo		   submissionInfo;
+	submissionInfo.pool			 = _commandPool;
+	submissionInfo.commandBuffer = _commandBuffer;
+	submissionInfo.fence		 = _commandFence;
+	submissionInfo.released		 = !externallyVisible;
+	submissionInfo.bufferUses.assign(_recordingBufferUses.begin(), _recordingBufferUses.end());
+	submissionInfo.textureUses.assign(_recordingTextureUses.begin(), _recordingTextureUses.end());
+	_submissions.emplace(submission, std::move(submissionInfo));
+	_recordingBufferUses.clear();
+	_recordingTextureUses.clear();
 	_commandPool = nullptr;
 	_commandBuffer = nullptr;
 	_commandFence = nullptr;
@@ -1638,20 +1654,33 @@ bool VulkanBackend::UpdateSubmissionStatus(SubmissionHandle submission, uint64_t
 		throw std::runtime_error("Invalid submission handle");
 	}
 	auto &info = it->second;
+	if (info.failed) {
+		throw std::runtime_error("Vulkan submission failed because the device was lost");
+	}
 	if (info.completed) {
 		return true;
 	}
 	if (submission <= _completedSubmissionWatermark) {
 		info.completed = true;
+		ReleaseSubmissionResourceLeases(info);
 		RecycleSubmissionResources(info);
 		return true;
 	}
 
+	if (wait) {
+		++_operationCounters.blockingSubmissionWaitCalls;
+	}
 	const VkResult result = wait
 		? vkWaitForFences(_device, 1, &info.fence, VK_TRUE, timeoutNanoseconds)
 		: vkGetFenceStatus(_device, info.fence);
 	if (result == VK_TIMEOUT || result == VK_NOT_READY) {
 		return false;
+	}
+	if (result == VK_ERROR_DEVICE_LOST) {
+		info.failed	   = true;
+		info.completed = true;
+		ReleaseSubmissionResourceLeases(info);
+		throw std::runtime_error("Vulkan submission failed because the device was lost");
 	}
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error(std::string(wait ? "vkWaitForFences failed: " : "vkGetFenceStatus failed: ") +
@@ -1660,6 +1689,7 @@ bool VulkanBackend::UpdateSubmissionStatus(SubmissionHandle submission, uint64_t
 
 	_completedSubmissionWatermark = std::max(_completedSubmissionWatermark, submission);
 	info.completed = true;
+	ReleaseSubmissionResourceLeases(info);
 	RecycleSubmissionResources(info);
 	return true;
 }
@@ -1676,13 +1706,23 @@ void VulkanBackend::ReapReleasedSubmissions() {
 				++it;
 				continue;
 			}
-			if (result != VK_SUCCESS) {
+			if (result == VK_ERROR_DEVICE_LOST) {
+				it->second.failed	 = true;
+				it->second.completed = true;
+			} else if (result != VK_SUCCESS) {
 				throw std::runtime_error(std::string("vkGetFenceStatus failed: ") + VkResultToString(result));
+			} else {
+				_completedSubmissionWatermark = std::max(_completedSubmissionWatermark, it->first);
 			}
-			_completedSubmissionWatermark = std::max(_completedSubmissionWatermark, it->first);
 		}
 		it->second.completed = true;
-		RecycleSubmissionResources(it->second);
+		ReleaseSubmissionResourceLeases(it->second);
+		if (it->second.failed) {
+			DestroySubmissionResources(it->second);
+		} else {
+			RecycleSubmissionResources(it->second);
+		}
+		ReleaseReadbackLease(it->second);
 		it = _submissions.erase(it);
 	}
 }
@@ -1697,13 +1737,11 @@ void VulkanBackend::RecycleSubmissionResources(SubmissionInfo &submission) {
 		return;
 	}
 
-	_availableSubmissionResources.push_back(SubmissionInfo{
-		submission.pool,
-		submission.commandBuffer,
-		submission.fence,
-		false,
-		false
-	});
+	SubmissionInfo reusable;
+	reusable.pool		   = submission.pool;
+	reusable.commandBuffer = submission.commandBuffer;
+	reusable.fence		   = submission.fence;
+	_availableSubmissionResources.push_back(std::move(reusable));
 	submission.pool = nullptr;
 	submission.commandBuffer = nullptr;
 	submission.fence = nullptr;
@@ -1721,7 +1759,104 @@ void VulkanBackend::DestroySubmissionResources(SubmissionInfo &submission) {
 	submission.fence = nullptr;
 }
 
+void VulkanBackend::TrackBufferUsage(BufferHandle buffer) {
+	if (!_commandBufferRecording) {
+		throw std::runtime_error("Cannot track a buffer without an active Vulkan command buffer");
+	}
+	auto it = _buffers.find(buffer);
+	if (it == _buffers.end() || it->second.destroyRequested) {
+		throw std::runtime_error("Invalid buffer handle");
+	}
+	if (_recordingBufferUses.insert(buffer).second) {
+		if (it->second.gpuUseLeases == std::numeric_limits<uint32_t>::max()) {
+			_recordingBufferUses.erase(buffer);
+			throw std::runtime_error("Buffer GPU-use lease count exhausted");
+		}
+		++it->second.gpuUseLeases;
+	}
+}
+
+void VulkanBackend::TrackTextureUsage(TextureHandle texture) {
+	if (!_commandBufferRecording) {
+		throw std::runtime_error("Cannot track a texture without an active Vulkan command buffer");
+	}
+	auto it = _textures.find(texture);
+	if (it == _textures.end() || it->second.destroyRequested) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	if (_recordingTextureUses.insert(texture).second) {
+		if (it->second.gpuUseLeases == std::numeric_limits<uint32_t>::max()) {
+			_recordingTextureUses.erase(texture);
+			throw std::runtime_error("Texture GPU-use lease count exhausted");
+		}
+		++it->second.gpuUseLeases;
+	}
+}
+
+void VulkanBackend::ReleaseSubmissionResourceLeases(SubmissionInfo &submission) {
+	if (submission.resourceLeasesReleased) {
+		return;
+	}
+	submission.resourceLeasesReleased = true;
+
+	for (const BufferHandle buffer : submission.bufferUses) {
+		auto it = _buffers.find(buffer);
+		if (it == _buffers.end()) {
+			continue;
+		}
+		if (it->second.gpuUseLeases == 0) {
+			throw std::runtime_error("Buffer GPU-use lease accounting underflow");
+		}
+		--it->second.gpuUseLeases;
+		TryDestroyDeferredBuffer(buffer);
+	}
+	for (const TextureHandle texture : submission.textureUses) {
+		auto it = _textures.find(texture);
+		if (it == _textures.end()) {
+			continue;
+		}
+		if (it->second.gpuUseLeases == 0) {
+			throw std::runtime_error("Texture GPU-use lease accounting underflow");
+		}
+		--it->second.gpuUseLeases;
+		TryDestroyDeferredTexture(texture);
+	}
+	submission.bufferUses.clear();
+	submission.textureUses.clear();
+}
+
+void VulkanBackend::ReleaseReadbackLease(SubmissionInfo &submission) {
+	if (!submission.readback.has_value()) {
+		return;
+	}
+	const auto readback = *submission.readback;
+	if (readback.mappingState == SubmissionInfo::ReadbackMappingState::Mapped) {
+		throw std::runtime_error("Cannot release a mapped texture readback");
+	}
+
+	auto textureIt = _textures.find(readback.texture);
+	if (textureIt != _textures.end()) {
+		if (textureIt->second.readbackLeases == 0) {
+			throw std::runtime_error("Texture readback lease accounting underflow");
+		}
+		--textureIt->second.readbackLeases;
+	}
+
+	auto bufferIt = _buffers.find(readback.stagingBuffer);
+	if (bufferIt != _buffers.end()) {
+		if (bufferIt->second.readbackLeases == 0) {
+			throw std::runtime_error("Texture readback staging lease accounting underflow");
+		}
+		--bufferIt->second.readbackLeases;
+	}
+
+	submission.readback.reset();
+	TryDestroyDeferredTexture(readback.texture);
+	TryDestroyDeferredBuffer(readback.stagingBuffer);
+}
+
 void VulkanBackend::EnsureNoPendingGpuWork() {
+	++_operationCounters.globalDrainCalls;
 	if (_commandBufferRecording) {
 		EndCommandBuffer();
 		(void)SubmitCommandBuffer(false);
@@ -1921,11 +2056,30 @@ void VulkanBackend::DestroyBuffer(BufferHandle buffer) {
 	if (it == _buffers.end()) {
 		return;
 	}
+	if (it->second.destroyRequested) {
+		return;
+	}
+	it->second.destroyRequested = true;
+	TryDestroyDeferredBuffer(buffer);
+}
 
-	EnsureNoPendingGpuWork();
+void VulkanBackend::TryDestroyDeferredBuffer(BufferHandle buffer) {
+	auto it = _buffers.find(buffer);
+	if (it == _buffers.end() || !it->second.destroyRequested || it->second.gpuUseLeases != 0 ||
+		it->second.readbackLeases != 0) {
+		return;
+	}
+	DestroyBufferNow(buffer);
+}
+
+void VulkanBackend::DestroyBufferNow(BufferHandle buffer) {
+	auto it = _buffers.find(buffer);
+	if (it == _buffers.end()) {
+		return;
+	}
 	InvalidateDescriptorCachesForBuffer(buffer);
 
-	if (it->second.isMapped && it->second.memory) {
+	if ((it->second.isMapped || it->second.mappedReadback != INVALID_SUBMISSION_HANDLE) && it->second.stagingMemory) {
 		vkUnmapMemory(_device, it->second.stagingMemory);
 	}
 	if (it->second.buffer) {
@@ -1948,8 +2102,12 @@ void VulkanBackend::UploadBuffer(BufferHandle buffer, size_t offset, size_t size
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _buffers.find(buffer);
-	if (it == _buffers.end()) {
+	if (it == _buffers.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid buffer handle");
+	}
+	if (it->second.isMapped || it->second.mappedReadback != INVALID_SUBMISSION_HANDLE ||
+		it->second.readbackLeases != 0) {
+		throw std::runtime_error("UploadBuffer cannot access staging storage owned by a mapping or texture readback");
 	}
 	if (data == nullptr && size != 0) {
 		throw std::runtime_error("UploadBuffer received null data");
@@ -1967,6 +2125,7 @@ void VulkanBackend::UploadBuffer(BufferHandle buffer, size_t offset, size_t size
 	vkUnmapMemory(_device, it->second.stagingMemory);
 
 	EnsureCommandBuffer();
+	TrackBufferUsage(buffer);
 
 	VkBufferCopy copyRegion = {};
 	copyRegion.srcOffset	= offset;
@@ -1997,8 +2156,12 @@ void VulkanBackend::DownloadBuffer(BufferHandle buffer, size_t offset, size_t si
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _buffers.find(buffer);
-	if (it == _buffers.end()) {
+	if (it == _buffers.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid buffer handle");
+	}
+	if (it->second.isMapped || it->second.mappedReadback != INVALID_SUBMISSION_HANDLE ||
+		it->second.readbackLeases != 0) {
+		throw std::runtime_error("DownloadBuffer cannot access staging storage owned by a mapping or texture readback");
 	}
 	if (outData == nullptr && size != 0) {
 		throw std::runtime_error("DownloadBuffer received null output pointer");
@@ -2009,6 +2172,7 @@ void VulkanBackend::DownloadBuffer(BufferHandle buffer, size_t offset, size_t si
 
 	EnsureNoPendingGpuWork();
 	EnsureCommandBuffer();
+	TrackBufferUsage(buffer);
 
 	VkBufferCopy copyRegion = {};
 	copyRegion.srcOffset	= offset;
@@ -2033,7 +2197,8 @@ void VulkanBackend::CopyBuffer(BufferHandle source, size_t sourceOffset, BufferH
 	std::lock_guard<std::mutex> lock(_mutex);
 	auto sourceIt = _buffers.find(source);
 	auto destinationIt = _buffers.find(destination);
-	if (sourceIt == _buffers.end() || destinationIt == _buffers.end()) {
+	if (sourceIt == _buffers.end() || destinationIt == _buffers.end() || sourceIt->second.destroyRequested ||
+		destinationIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid buffer handle");
 	}
 	if (sourceOffset > sourceIt->second.size || size > sourceIt->second.size - sourceOffset ||
@@ -2048,6 +2213,8 @@ void VulkanBackend::CopyBuffer(BufferHandle source, size_t sourceOffset, BufferH
 	}
 
 	EnsureCommandBuffer();
+	TrackBufferUsage(source);
+	TrackBufferUsage(destination);
 	VkBufferCopy copyRegion = {};
 	copyRegion.srcOffset = sourceOffset;
 	copyRegion.dstOffset = destinationOffset;
@@ -2074,11 +2241,14 @@ void *VulkanBackend::MapBuffer(BufferHandle buffer, bool read, bool write) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _buffers.find(buffer);
-	if (it == _buffers.end()) {
+	if (it == _buffers.end() || it->second.destroyRequested) {
 		return nullptr;
 	}
 	if (!read && !write) {
 		throw std::runtime_error("MapBuffer requires read and/or write access");
+	}
+	if (it->second.readbackLeases != 0 || it->second.mappedReadback != INVALID_SUBMISSION_HANDLE) {
+		throw std::runtime_error("MapBuffer cannot access staging storage owned by a texture readback");
 	}
 
 	if (it->second.isMapped) {
@@ -2092,6 +2262,7 @@ void *VulkanBackend::MapBuffer(BufferHandle buffer, bool read, bool write) {
 
 	if (read) {
 		EnsureCommandBuffer();
+		TrackBufferUsage(buffer);
 
 		VkBufferCopy copyRegion = {};
 		copyRegion.srcOffset	= 0;
@@ -2121,12 +2292,16 @@ void VulkanBackend::UnmapBuffer(BufferHandle buffer) {
 	if (it == _buffers.end()) {
 		return;
 	}
+	if (it->second.mappedReadback != INVALID_SUBMISSION_HANDLE) {
+		throw std::runtime_error("UnmapBuffer cannot unmap a texture readback mapping");
+	}
 
 	if (it->second.isMapped) {
 		vkUnmapMemory(_device, it->second.stagingMemory);
 
 		if (it->second.mappedForWrite) {
 			EnsureCommandBuffer();
+			TrackBufferUsage(buffer);
 
 			VkBufferCopy copyRegion = {};
 			copyRegion.srcOffset	= 0;
@@ -2157,6 +2332,67 @@ void VulkanBackend::UnmapBuffer(BufferHandle buffer) {
 		it->second.mappedForRead  = false;
 		it->second.mappedForWrite = false;
 	}
+}
+
+TextureReadbackMapping VulkanBackend::MapTextureReadback(SubmissionHandle submission) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	auto						submissionIt = _submissions.find(submission);
+	if (submissionIt == _submissions.end() || submissionIt->second.released ||
+		!submissionIt->second.readback.has_value()) {
+		throw std::runtime_error("Invalid texture readback submission");
+	}
+	auto &submissionInfo = submissionIt->second;
+	if (submissionInfo.failed) {
+		throw std::runtime_error("Texture readback submission failed");
+	}
+	if (!UpdateSubmissionStatus(submission, 0, false)) {
+		throw std::runtime_error("Texture readback is not complete");
+	}
+	auto &readback = *submissionInfo.readback;
+	if (readback.mappingState != SubmissionInfo::ReadbackMappingState::Available) {
+		throw std::runtime_error("Texture readback mapping has already been consumed");
+	}
+	auto bufferIt = _buffers.find(readback.stagingBuffer);
+	if (bufferIt == _buffers.end()) {
+		throw std::runtime_error("Texture readback staging buffer is unavailable");
+	}
+	auto &buffer = bufferIt->second;
+	if (buffer.isMapped || buffer.mappedReadback != INVALID_SUBMISSION_HANDLE) {
+		throw std::runtime_error("Texture readback staging buffer is already mapped");
+	}
+	if ((buffer.stagingMemoryFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) {
+		throw std::runtime_error("Texture readback staging memory is not host visible");
+	}
+
+	void		  *mappedBase = nullptr;
+	const VkResult result	  = vkMapMemory(_device, buffer.stagingMemory, 0, VK_WHOLE_SIZE, 0, &mappedBase);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error(std::string("vkMapMemory failed: ") + VkResultToString(result));
+	}
+	readback.mappingState = SubmissionInfo::ReadbackMappingState::Mapped;
+	buffer.mappedReadback = submission;
+	auto *mapped		  = static_cast<uint8_t *>(mappedBase) + readback.stagingOffset;
+	return TextureReadbackMapping{mapped, readback.byteSize, readback.rowPitch};
+}
+
+void VulkanBackend::UnmapTextureReadback(SubmissionHandle submission) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	auto						submissionIt = _submissions.find(submission);
+	if (submissionIt == _submissions.end() || submissionIt->second.released ||
+		!submissionIt->second.readback.has_value()) {
+		throw std::runtime_error("Invalid texture readback submission");
+	}
+	auto &readback = *submissionIt->second.readback;
+	if (readback.mappingState != SubmissionInfo::ReadbackMappingState::Mapped) {
+		throw std::runtime_error("Texture readback is not mapped");
+	}
+	auto bufferIt = _buffers.find(readback.stagingBuffer);
+	if (bufferIt == _buffers.end() || bufferIt->second.mappedReadback != submission) {
+		throw std::runtime_error("Texture readback mapping ownership is invalid");
+	}
+	vkUnmapMemory(_device, bufferIt->second.stagingMemory);
+	bufferIt->second.mappedReadback = INVALID_SUBMISSION_HANDLE;
+	readback.mappingState			= SubmissionInfo::ReadbackMappingState::Consumed;
 }
 
 // =============================================================================
@@ -2327,6 +2563,7 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	info.mipLevels	   = mipLevels;
 	info.format		   = desc.format;
 	info.vkFormat	   = format;
+	info.usage		   = usage;
 	info.samples	   = VK_SAMPLE_COUNT_1_BIT;
 	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -2344,7 +2581,7 @@ VulkanBackend::NativeTextureInfo VulkanBackend::GetNativeTextureInfo(TextureHand
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _textures.find(texture);
-	if (it == _textures.end()) {
+	if (it == _textures.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 
@@ -2362,7 +2599,7 @@ void VulkanBackend::SetNativeTextureLayout(TextureHandle texture, VkImageLayout 
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _textures.find(texture);
-	if (it == _textures.end()) {
+	if (it == _textures.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 	it->second.currentLayout = layout;
@@ -2377,8 +2614,27 @@ void VulkanBackend::DestroyTexture(TextureHandle texture) {
 	if (it == _textures.end()) {
 		return;
 	}
+	if (it->second.destroyRequested) {
+		return;
+	}
+	it->second.destroyRequested = true;
+	TryDestroyDeferredTexture(texture);
+}
 
-	EnsureNoPendingGpuWork();
+void VulkanBackend::TryDestroyDeferredTexture(TextureHandle texture) {
+	auto it = _textures.find(texture);
+	if (it == _textures.end() || !it->second.destroyRequested || it->second.gpuUseLeases != 0 ||
+		it->second.readbackLeases != 0) {
+		return;
+	}
+	DestroyTextureNow(texture);
+}
+
+void VulkanBackend::DestroyTextureNow(TextureHandle texture) {
+	auto it = _textures.find(texture);
+	if (it == _textures.end()) {
+		return;
+	}
 	InvalidateDescriptorCachesForTexture(texture);
 
 	for (auto attachmentIt = _msaaAttachments.begin(); attachmentIt != _msaaAttachments.end();) {
@@ -2412,11 +2668,11 @@ void VulkanBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y,
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _textures.find(texture);
-	if (it == _textures.end()) {
+	if (it == _textures.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 
-	UploadTextureInternal(it->second, x, y, 0, width, height, 1, data);
+	UploadTextureInternal(it->second, x, y, 0, width, height, 1, data, texture);
 }
 
 void VulkanBackend::UploadTextureFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
@@ -2424,11 +2680,11 @@ void VulkanBackend::UploadTextureFromBuffer(TextureHandle texture, uint32_t x, u
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						texIt = _textures.find(texture);
-	if (texIt == _textures.end()) {
+	if (texIt == _textures.end() || texIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 	auto bufIt = _buffers.find(source);
-	if (bufIt == _buffers.end()) {
+	if (bufIt == _buffers.end() || bufIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid source buffer handle");
 	}
 	size_t dataSize = static_cast<size_t>(width) * height * PixelFormatByteSize(texIt->second.format);
@@ -2436,14 +2692,14 @@ void VulkanBackend::UploadTextureFromBuffer(TextureHandle texture, uint32_t x, u
 		throw std::runtime_error("UploadTextureFromBuffer range exceeds source buffer size");
 	}
 
-	CopyBufferToTexture(texIt->second, bufIt->second.buffer, sourceOffset, x, y, 0, width, height, 1);
+	CopyBufferToTexture(texIt->second, bufIt->second.buffer, sourceOffset, x, y, 0, width, height, 1, texture, source);
 }
 
 void VulkanBackend::GenerateMipmaps(TextureHandle texture) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _textures.find(texture);
-	if (it == _textures.end())
+	if (it == _textures.end() || it->second.destroyRequested)
 		throw std::runtime_error("Invalid texture handle");
 	TextureInfo &info = it->second;
 	if (info.mipLevels <= 1)
@@ -2457,6 +2713,7 @@ void VulkanBackend::GenerateMipmaps(TextureHandle texture) {
 		throw std::runtime_error("Texture format does not support linear blit mipmap generation");
 
 	EnsureCommandBuffer();
+	TrackTextureUsage(texture);
 	TransitionTexture(info, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					  VK_ACCESS_TRANSFER_WRITE_BIT);
 
@@ -2514,11 +2771,11 @@ void VulkanBackend::UploadTexture3D(TextureHandle texture, uint32_t x, uint32_t 
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _textures.find(texture);
-	if (it == _textures.end()) {
+	if (it == _textures.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 
-	UploadTextureInternal(it->second, x, y, z, width, height, depth, data);
+	UploadTextureInternal(it->second, x, y, z, width, height, depth, data, texture);
 }
 
 void VulkanBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
@@ -2527,11 +2784,11 @@ void VulkanBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x,
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						texIt = _textures.find(texture);
-	if (texIt == _textures.end()) {
+	if (texIt == _textures.end() || texIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 	auto bufIt = _buffers.find(source);
-	if (bufIt == _buffers.end()) {
+	if (bufIt == _buffers.end() || bufIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid source buffer handle");
 	}
 	size_t dataSize = static_cast<size_t>(width) * height * depth * PixelFormatByteSize(texIt->second.format);
@@ -2539,11 +2796,13 @@ void VulkanBackend::UploadTexture3DFromBuffer(TextureHandle texture, uint32_t x,
 		throw std::runtime_error("UploadTexture3DFromBuffer range exceeds source buffer size");
 	}
 
-	CopyBufferToTexture(texIt->second, bufIt->second.buffer, sourceOffset, x, y, z, width, height, depth);
+	CopyBufferToTexture(texIt->second, bufIt->second.buffer, sourceOffset, x, y, z, width, height, depth, texture,
+						source);
 }
 
 void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-										  uint32_t height, uint32_t depth, const void *data) {
+										  uint32_t height, uint32_t depth, const void *data,
+										  TextureHandle trackedTexture) {
 	if (data == nullptr && (width != 0 || height != 0 || depth != 0)) {
 		throw std::runtime_error("UploadTexture received null data");
 	}
@@ -2580,11 +2839,12 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 	std::memcpy(mapped, data, dataSize);
 	vkUnmapMemory(_device, staging.memory);
 
-	CopyBufferToTexture(info, staging.buffer, 0, x, y, z, width, height, depth);
+	CopyBufferToTexture(info, staging.buffer, 0, x, y, z, width, height, depth, trackedTexture);
 }
 
 void VulkanBackend::CopyBufferToTexture(TextureInfo &info, VkBuffer sourceBuffer, size_t sourceOffset, uint32_t x,
-										uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth) {
+										uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth,
+										TextureHandle trackedTexture, BufferHandle trackedSource) {
 	if (x + width > info.width || y + height > info.height || z + depth > info.depth) {
 		throw std::runtime_error("UploadTexture region exceeds texture bounds");
 	}
@@ -2592,6 +2852,12 @@ void VulkanBackend::CopyBufferToTexture(TextureInfo &info, VkBuffer sourceBuffer
 		return;
 	}
 	EnsureCommandBuffer();
+	if (trackedTexture != INVALID_TEXTURE_HANDLE) {
+		TrackTextureUsage(trackedTexture);
+	}
+	if (trackedSource != INVALID_BUFFER_HANDLE) {
+		TrackBufferUsage(trackedSource);
+	}
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					  VK_ACCESS_TRANSFER_WRITE_BIT);
@@ -2620,13 +2886,14 @@ void VulkanBackend::CopyBufferToTexture(TextureInfo &info, VkBuffer sourceBuffer
 void VulkanBackend::DownloadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 									void *outData) {
 	std::lock_guard<std::mutex> lock(_mutex);
+	++_operationCounters.blockingTextureDownloadCalls;
 
 	auto						it = _textures.find(texture);
-	if (it == _textures.end()) {
+	if (it == _textures.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 
-	DownloadTextureInternal(it->second, x, y, 0, width, height, 1, outData);
+	DownloadTextureInternal(it->second, x, y, 0, width, height, 1, outData, texture);
 }
 
 void VulkanBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
@@ -2634,11 +2901,11 @@ void VulkanBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, u
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						texIt = _textures.find(texture);
-	if (texIt == _textures.end()) {
+	if (texIt == _textures.end() || texIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 	auto bufIt = _buffers.find(destination);
-	if (bufIt == _buffers.end()) {
+	if (bufIt == _buffers.end() || bufIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid destination buffer handle");
 	}
 	size_t dataSize = static_cast<size_t>(width) * height * PixelFormatByteSize(texIt->second.format);
@@ -2646,7 +2913,93 @@ void VulkanBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, u
 		throw std::runtime_error("DownloadTextureToBuffer range exceeds destination buffer size");
 	}
 
-	CopyTextureToBuffer(texIt->second, bufIt->second.buffer, destinationOffset, x, y, 0, width, height, 1);
+	++_operationCounters.blockingTextureDownloadCalls;
+	CopyTextureToBufferBlocking(texIt->second, bufIt->second.buffer, destinationOffset, x, y, 0, width, height, 1,
+								texture, destination);
+}
+
+SubmissionHandle VulkanBackend::BeginTextureReadback(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+													 uint32_t height, BufferHandle stagingBuffer,
+													 size_t stagingOffset) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	if (_insideRenderPass) {
+		throw std::runtime_error("Cannot begin a texture readback inside an active render pass");
+	}
+	auto textureIt = _textures.find(texture);
+	if (textureIt == _textures.end() || textureIt->second.destroyRequested) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	auto bufferIt = _buffers.find(stagingBuffer);
+	if (bufferIt == _buffers.end() || bufferIt->second.destroyRequested) {
+		throw std::runtime_error("Invalid staging buffer handle");
+	}
+	auto &textureInfo = textureIt->second;
+	auto &bufferInfo  = bufferIt->second;
+	if ((textureInfo.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
+		throw std::runtime_error("Texture readback requires transfer-source usage");
+	}
+	if (textureInfo.depth != 1 || textureInfo.format == PixelFormat::D32F || textureInfo.format == PixelFormat::D24S8) {
+		throw std::runtime_error("Asynchronous texture readback currently supports 2D color textures only");
+	}
+	if (width == 0 || height == 0) {
+		throw std::runtime_error("Texture readback region must be non-empty");
+	}
+	if (x > textureInfo.width || width > textureInfo.width - x || y > textureInfo.height ||
+		height > textureInfo.height - y) {
+		throw std::runtime_error("Texture readback region exceeds texture bounds");
+	}
+	if (bufferInfo.isMapped || bufferInfo.mappedReadback != INVALID_SUBMISSION_HANDLE ||
+		bufferInfo.readbackLeases != 0) {
+		throw std::runtime_error("Texture readback staging buffer is already in use");
+	}
+	if ((bufferInfo.stagingMemoryFlags &
+		 (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) !=
+		(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+		throw std::runtime_error("Texture readback staging memory must be host-visible and coherent");
+	}
+
+	const size_t pixelSize = PixelFormatByteSize(textureInfo.format);
+	size_t		 rowPitch  = 0;
+	size_t		 byteSize  = 0;
+	if (pixelSize == 0 || !TryMultiplySize(static_cast<size_t>(width), pixelSize, rowPitch) ||
+		!TryMultiplySize(rowPitch, static_cast<size_t>(height), byteSize)) {
+		throw std::runtime_error("Texture readback byte size overflows address space");
+	}
+	if ((stagingOffset % 4) != 0 || (stagingOffset % pixelSize) != 0) {
+		throw std::runtime_error("Texture readback staging offset does not satisfy Vulkan copy alignment");
+	}
+	if (stagingOffset > bufferInfo.size || byteSize > bufferInfo.size - stagingOffset) {
+		throw std::runtime_error("Texture readback range exceeds staging buffer size");
+	}
+
+	if (textureInfo.readbackLeases == std::numeric_limits<uint32_t>::max() ||
+		bufferInfo.readbackLeases == std::numeric_limits<uint32_t>::max()) {
+		throw std::runtime_error("Texture readback lease count exhausted");
+	}
+	++textureInfo.readbackLeases;
+	++bufferInfo.readbackLeases;
+	try {
+		EnsureCommandBuffer();
+		TrackTextureUsage(texture);
+		TrackBufferUsage(stagingBuffer);
+		CopyTextureToBuffer(textureInfo, bufferInfo.stagingBuffer, stagingOffset, x, y, 0, width, height, 1);
+		EndCommandBuffer();
+		const SubmissionHandle		 submission		= SubmitCommandBuffer(false, true);
+		auto						&submissionInfo = _submissions.at(submission);
+		SubmissionInfo::ReadbackInfo readbackInfo;
+		readbackInfo.texture	   = texture;
+		readbackInfo.stagingBuffer = stagingBuffer;
+		readbackInfo.stagingOffset = stagingOffset;
+		readbackInfo.byteSize	   = byteSize;
+		readbackInfo.rowPitch	   = rowPitch;
+		submissionInfo.readback	   = readbackInfo;
+		++_operationCounters.asyncTextureReadbackCalls;
+		return submission;
+	} catch (...) {
+		--textureInfo.readbackLeases;
+		--bufferInfo.readbackLeases;
+		throw;
+	}
 }
 
 void VulkanBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
@@ -2654,11 +3007,11 @@ void VulkanBackend::DownloadTexture3D(TextureHandle texture, uint32_t x, uint32_
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _textures.find(texture);
-	if (it == _textures.end()) {
+	if (it == _textures.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 
-	DownloadTextureInternal(it->second, x, y, z, width, height, depth, outData);
+	DownloadTextureInternal(it->second, x, y, z, width, height, depth, outData, texture);
 }
 
 void VulkanBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
@@ -2667,11 +3020,11 @@ void VulkanBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x,
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						texIt = _textures.find(texture);
-	if (texIt == _textures.end()) {
+	if (texIt == _textures.end() || texIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid texture handle");
 	}
 	auto bufIt = _buffers.find(destination);
-	if (bufIt == _buffers.end()) {
+	if (bufIt == _buffers.end() || bufIt->second.destroyRequested) {
 		throw std::runtime_error("Invalid destination buffer handle");
 	}
 	size_t dataSize = static_cast<size_t>(width) * height * depth * PixelFormatByteSize(texIt->second.format);
@@ -2679,11 +3032,14 @@ void VulkanBackend::DownloadTexture3DToBuffer(TextureHandle texture, uint32_t x,
 		throw std::runtime_error("DownloadTexture3DToBuffer range exceeds destination buffer size");
 	}
 
-	CopyTextureToBuffer(texIt->second, bufIt->second.buffer, destinationOffset, x, y, z, width, height, depth);
+	++_operationCounters.blockingTextureDownloadCalls;
+	CopyTextureToBufferBlocking(texIt->second, bufIt->second.buffer, destinationOffset, x, y, z, width, height, depth,
+								texture, destination);
 }
 
 void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width,
-											uint32_t height, uint32_t depth, void *outData) {
+											uint32_t height, uint32_t depth, void *outData,
+											TextureHandle trackedTexture) {
 	if (outData == nullptr && (width != 0 || height != 0 || depth != 0)) {
 		throw std::runtime_error("DownloadTexture received null output pointer");
 	}
@@ -2713,7 +3069,7 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 	result = vkBindBufferMemory(_device, staging.buffer, staging.memory, 0);
 	CheckVkResult(result, "vkBindBufferMemory (staging)");
 
-	CopyTextureToBuffer(info, staging.buffer, 0, x, y, z, width, height, depth);
+	CopyTextureToBufferBlocking(info, staging.buffer, 0, x, y, z, width, height, depth, trackedTexture);
 
 	// Map and copy data
 	void *mapped = nullptr;
@@ -2725,15 +3081,22 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 
 void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset,
 										uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
-										uint32_t depth) {
-	if (x + width > info.width || y + height > info.height || z + depth > info.depth) {
-		throw std::runtime_error("DownloadTexture region exceeds texture bounds");
-	}
+										uint32_t depth, TextureHandle trackedTexture, BufferHandle trackedDestination) {
 	if (width == 0 || height == 0 || depth == 0) {
 		return;
 	}
+	if (x > info.width || width > info.width - x || y > info.height || height > info.height - y || z > info.depth ||
+		depth > info.depth - z) {
+		throw std::runtime_error("DownloadTexture region exceeds texture bounds");
+	}
 
 	EnsureCommandBuffer();
+	if (trackedTexture != INVALID_TEXTURE_HANDLE) {
+		TrackTextureUsage(trackedTexture);
+	}
+	if (trackedDestination != INVALID_BUFFER_HANDLE) {
+		TrackBufferUsage(trackedDestination);
+	}
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					  VK_ACCESS_TRANSFER_READ_BIT);
@@ -2755,7 +3118,14 @@ void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationB
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 					  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+}
 
+void VulkanBackend::CopyTextureToBufferBlocking(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset,
+												uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+												uint32_t depth, TextureHandle trackedTexture,
+												BufferHandle trackedDestination) {
+	CopyTextureToBuffer(info, destinationBuffer, destinationOffset, x, y, z, width, height, depth, trackedTexture,
+						trackedDestination);
 	EndCommandBuffer();
 	SubmitCommandBuffer(true);
 }
@@ -3649,7 +4019,7 @@ void VulkanBackend::UpdateDescriptorSet(const DescriptorSetCache &cache) {
 		if (resource.type == BindingType::Buffer) {
 			const BufferHandle handle	= cache.boundBuffers[resource.binding];
 			auto			   bufferIt = _buffers.find(handle);
-			if (bufferIt == _buffers.end()) {
+			if (bufferIt == _buffers.end() || bufferIt->second.destroyRequested) {
 				throw std::runtime_error("Descriptor cache references an invalid buffer handle");
 			}
 
@@ -3674,7 +4044,7 @@ void VulkanBackend::UpdateDescriptorSet(const DescriptorSetCache &cache) {
 		} else if (resource.type == BindingType::Texture) {
 			const TextureHandle handle	  = cache.boundTextures[resource.binding];
 			auto				textureIt = _textures.find(handle);
-			if (textureIt == _textures.end()) {
+			if (textureIt == _textures.end() || textureIt->second.destroyRequested) {
 				throw std::runtime_error("Descriptor cache references an invalid texture handle");
 			}
 
@@ -3700,7 +4070,7 @@ void VulkanBackend::UpdateDescriptorSet(const DescriptorSetCache &cache) {
 		} else if (resource.type == BindingType::Sampler) {
 			const TextureHandle handle	  = cache.boundTextures[resource.binding];
 			auto				textureIt = _textures.find(handle);
-			if (textureIt == _textures.end()) {
+			if (textureIt == _textures.end() || textureIt->second.destroyRequested) {
 				throw std::runtime_error("Descriptor cache references an invalid sampled texture handle");
 			}
 
@@ -3759,7 +4129,7 @@ VulkanBackend::DescriptorSetCache *VulkanBackend::FindOrCreateDescriptorSet(cons
 			requested.boundReadOnly[binding.binding]	  = binding.readOnly;
 			if (binding.type == BindingType::Sampler) {
 				auto textureIt = _textures.find(binding.texture);
-				if (textureIt == _textures.end()) {
+				if (textureIt == _textures.end() || textureIt->second.destroyRequested) {
 					throw std::runtime_error("Invalid sampled texture handle in BindResources");
 				}
 				requested.boundSamplers[binding.binding] = MakeSamplerKey(binding.sampler, textureIt->second.mipLevels > 1);
@@ -3869,17 +4239,19 @@ void VulkanBackend::BindResources(const ResourceBinding *bindings, uint32_t coun
 				throw std::runtime_error("BindResources buffer binding exceeds Vulkan backend cache limits");
 			}
 			auto it = _buffers.find(binding.buffer);
-			if (it == _buffers.end()) {
+			if (it == _buffers.end() || it->second.destroyRequested) {
 				throw std::runtime_error("Invalid buffer handle in BindResources");
 			}
+			TrackBufferUsage(binding.buffer);
 		} else if (binding.type == BindingType::Texture || binding.type == BindingType::Sampler) {
 			if (binding.binding >= MAX_TEXTURE_BINDINGS) {
 				throw std::runtime_error("BindResources texture binding exceeds Vulkan backend cache limits");
 			}
 			auto it = _textures.find(binding.texture);
-			if (it == _textures.end()) {
+			if (it == _textures.end() || it->second.destroyRequested) {
 				throw std::runtime_error("Invalid texture handle in BindResources");
 			}
+			TrackTextureUsage(binding.texture);
 			if (binding.format != layoutIt->format) {
 				throw std::runtime_error("BindResources texture format does not match pipeline layout");
 			}
@@ -3986,6 +4358,7 @@ void VulkanBackend::MemoryBarrier(BarrierType barrierType) {
 
 void VulkanBackend::Finish() {
 	std::lock_guard<std::mutex> lock(_mutex);
+	++_operationCounters.finishCalls;
 
 	if (_commandBufferRecording) {
 		EndCommandBuffer();
@@ -4030,12 +4403,25 @@ void VulkanBackend::ReleaseSubmission(SubmissionHandle submission) {
 	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
 	}
+	if (it->second.readback.has_value() &&
+		it->second.readback->mappingState == SubmissionInfo::ReadbackMappingState::Mapped) {
+		throw std::runtime_error("Cannot release a mapped texture readback");
+	}
 	if (it->second.completed) {
+		if (it->second.failed) {
+			DestroySubmissionResources(it->second);
+		}
+		ReleaseReadbackLease(it->second);
 		_submissions.erase(it);
 		return;
 	}
 	it->second.released = true;
 	ReapReleasedSubmissions();
+}
+
+BackendOperationCounters VulkanBackend::GetOperationCounters() const {
+	std::lock_guard<std::mutex> lock(_mutex);
+	return _operationCounters;
 }
 
 // =============================================================================
@@ -4723,7 +5109,7 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 	colorTextureIters.reserve(colorHandles.size());
 	for (TextureHandle handle : colorHandles) {
 		auto colorIt = _textures.find(handle);
-		if (colorIt == _textures.end()) {
+		if (colorIt == _textures.end() || colorIt->second.destroyRequested) {
 			throw std::runtime_error("Invalid color attachment texture handle");
 		}
 		colorTextureIters.push_back(colorIt);
@@ -4735,6 +5121,9 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 		if (colorIt->second.width != renderWidth || colorIt->second.height != renderHeight) {
 			throw std::runtime_error("BeginRendering MRT color attachments must have identical dimensions");
 		}
+	}
+	for (TextureHandle handle : colorHandles) {
+		TrackTextureUsage(handle);
 	}
 
 	std::vector<VkRenderingAttachmentInfoKHR> colorAttachments;
@@ -4805,43 +5194,42 @@ void VulkanBackend::BeginRendering(const RenderPassBeginDesc &desc) {
 
 	if (desc.depthAttachment != INVALID_TEXTURE_HANDLE) {
 		auto depthIt = _textures.find(desc.depthAttachment);
-		if (depthIt != _textures.end()) {
-			hasStencil = depthIt->second.vkFormat == VK_FORMAT_D24_UNORM_S8_UINT;
-			depthAttachment.sType		= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-			depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			depthAttachment.loadOp	= desc.clearDepthFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
-			depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			depthAttachment.clearValue.depthStencil.depth	= desc.clearDepth;
-			depthAttachment.clearValue.depthStencil.stencil = 0;
-
-			if (sampleCount == VK_SAMPLE_COUNT_1_BIT) {
-				depthAttachment.imageView = depthIt->second.view;
-				const VkAccessFlags depthAccess = desc.clearDepthFlag
-											 ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-											 : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-												VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-				TransitionTexture(depthIt->second, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-								  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-									  VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-								  depthAccess);
-			} else {
-				auto &msaaDepth = GetOrCreateMsaaAttachment(
-					renderWidth, renderHeight, MAX_COLOR_ATTACHMENTS, depthIt->second.vkFormat, sampleCount,
-					desc.depthAttachment,
-					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-					hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) : VK_IMAGE_ASPECT_DEPTH_BIT);
-				const VkAccessFlags depthAccess = desc.clearDepthFlag
-											 ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-											 : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-												VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-				TransitionMsaaAttachment(msaaDepth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-										 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-											 VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-										 depthAccess);
-				depthAttachment.imageView = msaaDepth.view;
-			}
-			hasDepth = true;
+		if (depthIt == _textures.end() || depthIt->second.destroyRequested) {
+			throw std::runtime_error("Invalid depth attachment texture handle");
 		}
+		TrackTextureUsage(desc.depthAttachment);
+		hasStencil					= depthIt->second.vkFormat == VK_FORMAT_D24_UNORM_S8_UINT;
+		depthAttachment.sType		= VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+		depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		depthAttachment.loadOp		= desc.clearDepthFlag ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+		depthAttachment.storeOp		= VK_ATTACHMENT_STORE_OP_STORE;
+		depthAttachment.clearValue.depthStencil.depth	= desc.clearDepth;
+		depthAttachment.clearValue.depthStencil.stencil = 0;
+
+		if (sampleCount == VK_SAMPLE_COUNT_1_BIT) {
+			depthAttachment.imageView = depthIt->second.view;
+			const VkAccessFlags depthAccess =
+				desc.clearDepthFlag
+					? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+					: (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+			TransitionTexture(depthIt->second, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+							  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+							  depthAccess);
+		} else {
+			auto &msaaDepth = GetOrCreateMsaaAttachment(
+				renderWidth, renderHeight, MAX_COLOR_ATTACHMENTS, depthIt->second.vkFormat, sampleCount,
+				desc.depthAttachment, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+				hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) : VK_IMAGE_ASPECT_DEPTH_BIT);
+			const VkAccessFlags depthAccess =
+				desc.clearDepthFlag
+					? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+					: (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+			TransitionMsaaAttachment(
+				msaaDepth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, depthAccess);
+			depthAttachment.imageView = msaaDepth.view;
+		}
+		hasDepth = true;
 	}
 
 	VkRenderingInfoKHR renderingInfo	   = {};
@@ -4911,11 +5299,12 @@ void VulkanBackend::BindVertexBuffer(BufferHandle buffer, uint32_t stride) {
 	}
 
 	auto						it = _buffers.find(buffer);
-	if (it == _buffers.end()) {
+	if (it == _buffers.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid vertex buffer handle");
 	}
 
 	EnsureCommandBuffer();
+	TrackBufferUsage(buffer);
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(_commandBuffer, 0, 1, &it->second.buffer, &offset);
 	_currentVertexBuffer = buffer;
@@ -4925,11 +5314,12 @@ void VulkanBackend::BindIndexBuffer(BufferHandle buffer) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _buffers.find(buffer);
-	if (it == _buffers.end()) {
+	if (it == _buffers.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid index buffer handle");
 	}
 
 	EnsureCommandBuffer();
+	TrackBufferUsage(buffer);
 	vkCmdBindIndexBuffer(_commandBuffer, it->second.buffer, 0, VK_INDEX_TYPE_UINT32);
 	_currentIndexBuffer = buffer;
 }
@@ -5021,6 +5411,7 @@ TextureHandle VulkanBackend::CreateDepthBuffer(uint32_t width, uint32_t height) 
 	info.mipLevels	   = 1;
 	info.format		   = PixelFormat::R32F;
 	info.vkFormat	   = depthFormat;
+	info.usage		   = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	info.samples	   = VK_SAMPLE_COUNT_1_BIT;
 	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -5086,8 +5477,14 @@ void VulkanBackend::UploadUniformBuffer(BufferHandle handle, const void *data, s
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _buffers.find(handle);
-	if (it == _buffers.end()) {
+	if (it == _buffers.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid uniform buffer handle");
+	}
+	if (data == nullptr && size != 0) {
+		throw std::runtime_error("UploadUniformBuffer received null data");
+	}
+	if (size > it->second.size) {
+		throw std::runtime_error("UploadUniformBuffer exceeds buffer size");
 	}
 
 	UploadBufferInternal(it->second.buffer, size, data);

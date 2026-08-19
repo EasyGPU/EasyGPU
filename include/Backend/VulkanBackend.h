@@ -16,6 +16,7 @@
 #include <mutex>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // Include Vulkan header
@@ -74,6 +75,13 @@ public:
 	void		  *MapBuffer(BufferHandle buffer, bool read, bool write) override;
 	/** @copydoc Backend::UnmapBuffer */
 	void		   UnmapBuffer(BufferHandle buffer) override;
+	/** @copydoc Backend::BeginTextureReadback */
+	SubmissionHandle BeginTextureReadback(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+										  uint32_t height, BufferHandle stagingBuffer, size_t stagingOffset) override;
+	/** @copydoc Backend::MapTextureReadback */
+	TextureReadbackMapping MapTextureReadback(SubmissionHandle submission) override;
+	/** @copydoc Backend::UnmapTextureReadback */
+	void				   UnmapTextureReadback(SubmissionHandle submission) override;
 
 	/** @copydoc Backend::CreateTexture */
 	TextureHandle  CreateTexture(const TextureDesc &desc) override;
@@ -141,6 +149,8 @@ public:
 	bool				 WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) override;
 	/** @copydoc Backend::ReleaseSubmission */
 	void				 ReleaseSubmission(SubmissionHandle submission) override;
+	/** @copydoc Backend::GetOperationCounters */
+	BackendOperationCounters GetOperationCounters() const override;
 
 	/** @copydoc Backend::BeginQuery */
 	uint32_t			 BeginQuery() override;
@@ -234,6 +244,10 @@ private:
 		bool				  isMapped			 = false;
 		bool				  mappedForRead		 = false;
 		bool				  mappedForWrite	 = false;
+		SubmissionHandle	  mappedReadback	 = INVALID_SUBMISSION_HANDLE;
+		uint32_t			  gpuUseLeases		 = 0;
+		uint32_t			  readbackLeases	 = 0;
+		bool				  destroyRequested	 = false;
 		VkMemoryPropertyFlags memoryFlags		 = 0;
 		VkMemoryPropertyFlags stagingMemoryFlags = 0;
 	};
@@ -250,10 +264,14 @@ private:
 		uint32_t			 mipLevels	   = 1;
 		PixelFormat			 format		   = PixelFormat::RGBA8;
 		VkFormat			 vkFormat	   = VK_FORMAT_UNDEFINED;
+		VkImageUsageFlags	  usage			   = 0;
 		VkSampleCountFlagBits samples	   = VK_SAMPLE_COUNT_1_BIT;
 		VkImageLayout		 currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		VkPipelineStageFlags lastStage	   = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		VkAccessFlags		 lastAccess	   = 0;
+		uint32_t			  gpuUseLeases	   = 0;
+		uint32_t			  readbackLeases   = 0;
+		bool				  destroyRequested = false;
 	};
 
 	struct MsaaAttachment {
@@ -368,9 +386,11 @@ private:
 	 * @param data Source voxel data.
 	 */
 	void UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
-							   uint32_t depth, const void *data);
+							   uint32_t depth, const void *data, TextureHandle trackedTexture = INVALID_TEXTURE_HANDLE);
 	void CopyBufferToTexture(TextureInfo &info, VkBuffer sourceBuffer, size_t sourceOffset, uint32_t x, uint32_t y,
-							 uint32_t z, uint32_t width, uint32_t height, uint32_t depth);
+							 uint32_t z, uint32_t width, uint32_t height, uint32_t depth,
+							 TextureHandle trackedTexture = INVALID_TEXTURE_HANDLE,
+							 BufferHandle  trackedSource  = INVALID_BUFFER_HANDLE);
 	/**
 	 * @brief Download voxel data from a texture using a staging buffer.
 	 * @param info Texture info structure.
@@ -383,9 +403,19 @@ private:
 	 * @param outData Destination voxel buffer.
 	 */
 	void DownloadTextureInternal(TextureInfo &info, uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
-								 uint32_t depth, void *outData);
+								 uint32_t depth, void *outData, TextureHandle trackedTexture = INVALID_TEXTURE_HANDLE);
 	void CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset, uint32_t x,
-							 uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth);
+							 uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth,
+							 TextureHandle trackedTexture	  = INVALID_TEXTURE_HANDLE,
+							 BufferHandle  trackedDestination = INVALID_BUFFER_HANDLE);
+	void CopyTextureToBufferBlocking(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset,
+									 uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
+									 uint32_t depth, TextureHandle trackedTexture = INVALID_TEXTURE_HANDLE,
+									 BufferHandle trackedDestination = INVALID_BUFFER_HANDLE);
+	void DestroyBufferNow(BufferHandle buffer);
+	void DestroyTextureNow(TextureHandle texture);
+	void TryDestroyDeferredBuffer(BufferHandle buffer);
+	void TryDestroyDeferredTexture(TextureHandle texture);
 	/** @brief Wait for all pending GPU work to finish. */
 	void EnsureNoPendingGpuWork();
 	/**
@@ -456,6 +486,10 @@ private:
 	void ReapReleasedSubmissions();
 	void RecycleSubmissionResources(SubmissionInfo &submission);
 	void DestroySubmissionResources(SubmissionInfo &submission);
+	void	 TrackBufferUsage(BufferHandle buffer);
+	void	 TrackTextureUsage(TextureHandle texture);
+	void	 ReleaseSubmissionResourceLeases(SubmissionInfo &submission);
+	void	 ReleaseReadbackLease(SubmissionInfo &submission);
 
 	/**
 	 * @brief Find a suitable memory type index for allocation.
@@ -590,11 +624,29 @@ private:
 
 private:
 	struct SubmissionInfo {
+		enum class ReadbackMappingState : uint8_t {
+			Available,
+			Mapped,
+			Consumed,
+		};
+		struct ReadbackInfo {
+			TextureHandle		 texture	   = INVALID_TEXTURE_HANDLE;
+			BufferHandle		 stagingBuffer = INVALID_BUFFER_HANDLE;
+			size_t				 stagingOffset = 0;
+			size_t				 byteSize	   = 0;
+			size_t				 rowPitch	   = 0;
+			ReadbackMappingState mappingState  = ReadbackMappingState::Available;
+		};
 		VkCommandPool pool = nullptr;
 		VkCommandBuffer commandBuffer = nullptr;
 		VkFence fence = nullptr;
 		bool completed = false;
 		bool released = false;
+		bool						failed				   = false;
+		bool						resourceLeasesReleased = false;
+		std::vector<BufferHandle>	bufferUses;
+		std::vector<TextureHandle>	textureUses;
+		std::optional<ReadbackInfo> readback;
 	};
 	static constexpr size_t MAX_CACHED_SUBMISSION_RESOURCES = 64;
 
@@ -611,10 +663,13 @@ private:
 	VkCommandBuffer									 _commandBuffer			  = nullptr;
 	VkFence											 _commandFence			  = nullptr;
 	bool											 _commandBufferRecording  = false;
+	std::unordered_set<BufferHandle>					 _recordingBufferUses;
+	std::unordered_set<TextureHandle>					 _recordingTextureUses;
 	std::unordered_map<SubmissionHandle, SubmissionInfo> _submissions;
 	std::vector<SubmissionInfo> _availableSubmissionResources;
 	SubmissionHandle _nextSubmissionHandle = 1;
 	SubmissionHandle _completedSubmissionWatermark = INVALID_SUBMISSION_HANDLE;
+	BackendOperationCounters							 _operationCounters;
 
 	// Graphics pipeline state
 	bool											 _insideRenderPass		  = false;

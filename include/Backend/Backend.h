@@ -41,6 +41,29 @@ constexpr ShaderHandle	 INVALID_SHADER_HANDLE	 = 0;
 constexpr PipelineHandle INVALID_PIPELINE_HANDLE = 0;
 constexpr SubmissionHandle INVALID_SUBMISSION_HANDLE = 0;
 
+/**
+ * A completed texture readback mapping. The pointer is valid only until the
+ * matching UnmapTextureReadback call. Pixels are tightly packed by row.
+ */
+struct TextureReadbackMapping {
+	void  *data		= nullptr;
+	size_t byteSize = 0;
+	size_t rowPitch = 0;
+};
+
+/**
+ * Low-overhead backend counters used to prove that asynchronous paths do not
+ * accidentally enter a global drain, fence wait, or blocking download.
+ */
+struct BackendOperationCounters {
+	uint64_t finishCalls				  = 0;
+	uint64_t deviceWaitIdleCalls		  = 0;
+	uint64_t globalDrainCalls			  = 0;
+	uint64_t blockingSubmissionWaitCalls  = 0;
+	uint64_t blockingTextureDownloadCalls = 0;
+	uint64_t asyncTextureReadbackCalls	  = 0;
+};
+
 // OpenGL buffer access mode constants (for internal use)
 constexpr int			 BUFFER_MODE_READ_ONLY	 = 0x88B8;
 constexpr int			 BUFFER_MODE_WRITE_ONLY	 = 0x88B9;
@@ -715,6 +738,34 @@ public:
 		throw std::runtime_error("Backend does not support texture download to buffer");
 	}
 	/**
+	 * @brief Submit a tightly-packed 2D texture readback into caller-owned staging storage.
+	 *
+	 * The call records and submits only; it never waits for the queue. The returned
+	 * submission owns leases on both resources until ReleaseSubmission. Mapping is
+	 * performed through MapTextureReadback and is legal only after completion.
+	 */
+	virtual SubmissionHandle BeginTextureReadback(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
+												  uint32_t height, BufferHandle stagingBuffer, size_t stagingOffset) {
+		(void)texture;
+		(void)x;
+		(void)y;
+		(void)width;
+		(void)height;
+		(void)stagingBuffer;
+		(void)stagingOffset;
+		throw std::runtime_error("Backend does not support asynchronous texture readback");
+	}
+	/** Map a completed readback exactly once. */
+	virtual TextureReadbackMapping MapTextureReadback(SubmissionHandle submission) {
+		(void)submission;
+		throw std::runtime_error("Backend does not support asynchronous texture readback mapping");
+	}
+	/** Unmap the mapping associated with a readback submission exactly once. */
+	virtual void UnmapTextureReadback(SubmissionHandle submission) {
+		(void)submission;
+		throw std::runtime_error("Backend does not support asynchronous texture readback mapping");
+	}
+	/**
 	 * @brief Download voxel data from a 3D texture region.
 	 * @param texture Texture handle.
 	 * @param x Source x offset.
@@ -841,6 +892,10 @@ public:
 	virtual bool WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) = 0;
 	/** @brief Release a completion marker without waiting for its GPU work. */
 	virtual void ReleaseSubmission(SubmissionHandle submission) = 0;
+	/** Snapshot backend synchronization/readback instrumentation counters. */
+	virtual BackendOperationCounters GetOperationCounters() const {
+		return {};
+	}
 
 	/**
 	 * @brief Begin a GPU timestamp query.
