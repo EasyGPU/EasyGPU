@@ -237,6 +237,11 @@ BackendCaps OpenGLBackend::GetCaps() const {
 
 	const GLubyte *version = glGetString(GL_VERSION);
 	caps.versionString	   = version ? reinterpret_cast<const char *>(version) : "Unknown";
+	const GLubyte *renderer = glGetString(GL_RENDERER);
+	const GLubyte *vendor   = glGetString(GL_VENDOR);
+	caps.adapterName = renderer ? reinterpret_cast<const char *>(renderer) : "Unknown OpenGL adapter";
+	caps.driverVersion = vendor ? reinterpret_cast<const char *>(vendor) + std::string(" ") + caps.versionString
+							  : caps.versionString;
 
 	GLint major = 0, minor = 0;
 	glGetIntegerv(GL_MAJOR_VERSION, &major);
@@ -258,6 +263,10 @@ BackendCaps OpenGLBackend::GetCaps() const {
 
 	glGetIntegerv(GL_MAX_IMAGE_UNITS, &maxBindings);
 	caps.maxTextureBindings		  = static_cast<uint32_t>(maxBindings);
+
+	GLint maxTextureDimension = 0;
+	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureDimension);
+	caps.maxTextureDimension2D = static_cast<uint32_t>(std::max(maxTextureDimension, 0));
 
 	caps.supportsAsyncTransfer	  = caps.supportsComputeShaders;
 	caps.supportsMultiQueue		  = false;

@@ -94,7 +94,15 @@ int main() {
 		}
 		backend->MakeCurrent();
 
-		if (!backend->GetCaps().supportsGraphics) {
+		const auto caps = backend->GetCaps();
+		if (caps.adapterName.empty() || caps.driverVersion.empty() || caps.versionString.empty() ||
+			caps.maxTextureDimension2D == 0) {
+			std::cout << "Backend device identity or texture limit is unavailable" << std::endl;
+			backend->MakeNoneCurrent();
+			return 1;
+		}
+
+		if (!caps.supportsGraphics) {
 			std::cout << "Graphics not supported, skipping all tests" << std::endl;
 			backend->MakeNoneCurrent();
 			return 0;

@@ -359,11 +359,14 @@ inline bool HasFlag(BarrierType flags, BarrierType flag) {
 /** @brief Backend capability information queried after initialization. */
 struct BackendCaps {
 	std::string versionString;
+	std::string adapterName;
+	std::string driverVersion;
 	uint32_t	maxWorkGroupSizeX		 = 0;
 	uint32_t	maxWorkGroupSizeY		 = 0;
 	uint32_t	maxWorkGroupSizeZ		 = 0;
 	uint32_t	maxBufferBindings		 = 0;
 	uint32_t	maxTextureBindings		 = 0;
+	uint32_t	maxTextureDimension2D	 = 0;
 	bool		supportsComputeShaders	 = false;
 	bool		supportsGraphics		 = false;
 	bool		supportsAsyncTransfer	 = false;

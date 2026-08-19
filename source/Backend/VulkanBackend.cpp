@@ -1253,6 +1253,8 @@ void VulkanBackend::SelectPhysicalDevice() {
 				// Store capabilities
 				_caps.versionString			   = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
 												 std::to_string(VK_VERSION_MINOR(props.apiVersion));
+				_caps.adapterName			   = props.deviceName;
+				_caps.driverVersion			   = std::to_string(props.driverVersion);
 
 				VkPhysicalDeviceLimits limits  = props.limits;
 				_caps.maxWorkGroupSizeX		   = limits.maxComputeWorkGroupSize[0];
@@ -1260,6 +1262,7 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.maxWorkGroupSizeZ		   = limits.maxComputeWorkGroupSize[2];
 				_caps.maxBufferBindings		   = limits.maxPerStageDescriptorStorageBuffers;
 				_caps.maxTextureBindings	   = limits.maxPerStageDescriptorStorageImages;
+				_caps.maxTextureDimension2D  = limits.maxImageDimension2D;
 				_caps.supportsComputeShaders   = true;
 				_caps.supportsGraphics		   = true;
 				_caps.supportsAsyncTransfer	   = false;
@@ -1292,6 +1295,8 @@ void VulkanBackend::SelectPhysicalDevice() {
 
 				_caps.versionString			   = std::to_string(VK_VERSION_MAJOR(props.apiVersion)) + "." +
 												 std::to_string(VK_VERSION_MINOR(props.apiVersion));
+				_caps.adapterName			   = props.deviceName;
+				_caps.driverVersion			   = std::to_string(props.driverVersion);
 
 				VkPhysicalDeviceLimits limits  = props.limits;
 				_caps.maxWorkGroupSizeX		   = limits.maxComputeWorkGroupSize[0];
@@ -1299,6 +1304,7 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.maxWorkGroupSizeZ		   = limits.maxComputeWorkGroupSize[2];
 				_caps.maxBufferBindings		   = limits.maxPerStageDescriptorStorageBuffers;
 				_caps.maxTextureBindings	   = limits.maxPerStageDescriptorStorageImages;
+				_caps.maxTextureDimension2D  = limits.maxImageDimension2D;
 				_caps.supportsComputeShaders   = true;
 				_caps.supportsGraphics		   = false;
 				_caps.supportsAsyncTransfer	   = false;
