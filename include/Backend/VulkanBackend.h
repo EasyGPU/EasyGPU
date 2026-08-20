@@ -346,6 +346,8 @@ private:
 		VkSampleCountFlagBits			 samples		= VK_SAMPLE_COUNT_1_BIT;
 		bool							 depthEnable	= false;
 		std::vector<VertexLayoutEntry>	 vertexLayout;
+		uint32_t						 gpuUseLeases	 = 0;
+		bool							 destroyRequested = false;
 	};
 
 	/** @brief Internal Vulkan query resource information. */
@@ -416,8 +418,10 @@ private:
 									 BufferHandle trackedDestination = INVALID_BUFFER_HANDLE);
 	void DestroyBufferNow(BufferHandle buffer);
 	void DestroyTextureNow(TextureHandle texture);
+	void DestroyPipelineNow(PipelineHandle pipeline);
 	void TryDestroyDeferredBuffer(BufferHandle buffer);
 	void TryDestroyDeferredTexture(TextureHandle texture);
+	void TryDestroyDeferredPipeline(PipelineHandle pipeline);
 	/** @brief Wait for all pending GPU work to finish. */
 	void EnsureNoPendingGpuWork();
 	/**
@@ -490,6 +494,7 @@ private:
 	void DestroySubmissionResources(SubmissionInfo &submission);
 	void	 TrackBufferUsage(BufferHandle buffer);
 	void	 TrackTextureUsage(TextureHandle texture);
+	void	 TrackPipelineUsage(PipelineHandle pipeline);
 	void	 ReleaseSubmissionResourceLeases(SubmissionInfo &submission);
 	void	 ReleaseReadbackLease(SubmissionInfo &submission);
 
@@ -648,6 +653,7 @@ private:
 		bool						resourceLeasesReleased = false;
 		std::vector<BufferHandle>	bufferUses;
 		std::vector<TextureHandle>	textureUses;
+		std::vector<PipelineHandle> pipelineUses;
 		std::optional<ReadbackInfo> readback;
 	};
 	static constexpr size_t MAX_CACHED_SUBMISSION_RESOURCES = 64;
@@ -667,6 +673,7 @@ private:
 	bool											 _commandBufferRecording  = false;
 	std::unordered_set<BufferHandle>					 _recordingBufferUses;
 	std::unordered_set<TextureHandle>					 _recordingTextureUses;
+	std::unordered_set<PipelineHandle>				 _recordingPipelineUses;
 	std::unordered_map<SubmissionHandle, SubmissionInfo> _submissions;
 	std::vector<SubmissionInfo> _availableSubmissionResources;
 	SubmissionHandle _nextSubmissionHandle = 1;

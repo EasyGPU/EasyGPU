@@ -975,6 +975,7 @@ void VulkanBackend::CleanupVulkan() {
 		_commandBufferRecording = false;
 		_recordingBufferUses.clear();
 		_recordingTextureUses.clear();
+		_recordingPipelineUses.clear();
 
 		// Destroy device
 		vkDestroyDevice(_device, nullptr);
@@ -1641,9 +1642,11 @@ SubmissionHandle VulkanBackend::SubmitCommandBuffer(bool wait, bool externallyVi
 	submissionInfo.released		 = !externallyVisible;
 	submissionInfo.bufferUses.assign(_recordingBufferUses.begin(), _recordingBufferUses.end());
 	submissionInfo.textureUses.assign(_recordingTextureUses.begin(), _recordingTextureUses.end());
+	submissionInfo.pipelineUses.assign(_recordingPipelineUses.begin(), _recordingPipelineUses.end());
 	_submissions.emplace(submission, std::move(submissionInfo));
 	_recordingBufferUses.clear();
 	_recordingTextureUses.clear();
+	_recordingPipelineUses.clear();
 	_commandPool = nullptr;
 	_commandBuffer = nullptr;
 	_commandFence = nullptr;
@@ -1813,6 +1816,23 @@ void VulkanBackend::TrackTextureUsage(TextureHandle texture) {
 	}
 }
 
+void VulkanBackend::TrackPipelineUsage(PipelineHandle pipeline) {
+	if (!_commandBufferRecording) {
+		throw std::runtime_error("Cannot track a pipeline without an active Vulkan command buffer");
+	}
+	auto it = _pipelines.find(pipeline);
+	if (it == _pipelines.end() || it->second.destroyRequested) {
+		throw std::runtime_error("Invalid pipeline handle");
+	}
+	if (_recordingPipelineUses.insert(pipeline).second) {
+		if (it->second.gpuUseLeases == std::numeric_limits<uint32_t>::max()) {
+			_recordingPipelineUses.erase(pipeline);
+			throw std::runtime_error("Pipeline GPU-use lease count exhausted");
+		}
+		++it->second.gpuUseLeases;
+	}
+}
+
 void VulkanBackend::ReleaseSubmissionResourceLeases(SubmissionInfo &submission) {
 	if (submission.resourceLeasesReleased) {
 		return;
@@ -1841,8 +1861,20 @@ void VulkanBackend::ReleaseSubmissionResourceLeases(SubmissionInfo &submission) 
 		--it->second.gpuUseLeases;
 		TryDestroyDeferredTexture(texture);
 	}
+	for (const PipelineHandle pipeline : submission.pipelineUses) {
+		auto it = _pipelines.find(pipeline);
+		if (it == _pipelines.end()) {
+			continue;
+		}
+		if (it->second.gpuUseLeases == 0) {
+			throw std::runtime_error("Pipeline GPU-use lease accounting underflow");
+		}
+		--it->second.gpuUseLeases;
+		TryDestroyDeferredPipeline(pipeline);
+	}
 	submission.bufferUses.clear();
 	submission.textureUses.clear();
+	submission.pipelineUses.clear();
 }
 
 void VulkanBackend::ReleaseReadbackLease(SubmissionInfo &submission) {
@@ -3621,8 +3653,6 @@ void VulkanBackend::DestroyShader(ShaderHandle shader) {
 		return;
 	}
 
-	EnsureNoPendingGpuWork();
-
 	if (it->second.module) {
 		vkDestroyShaderModule(_device, it->second.module, nullptr);
 	}
@@ -3754,7 +3784,29 @@ void VulkanBackend::DestroyPipeline(PipelineHandle pipeline) {
 		return;
 	}
 
-	EnsureNoPendingGpuWork();
+	if (it->second.destroyRequested) {
+		return;
+	}
+	it->second.destroyRequested = true;
+	if (_currentPipeline == pipeline) {
+		_currentPipeline = INVALID_PIPELINE_HANDLE;
+	}
+	TryDestroyDeferredPipeline(pipeline);
+}
+
+void VulkanBackend::TryDestroyDeferredPipeline(PipelineHandle pipeline) {
+	auto it = _pipelines.find(pipeline);
+	if (it == _pipelines.end() || !it->second.destroyRequested || it->second.gpuUseLeases != 0) {
+		return;
+	}
+	DestroyPipelineNow(pipeline);
+}
+
+void VulkanBackend::DestroyPipelineNow(PipelineHandle pipeline) {
+	auto it = _pipelines.find(pipeline);
+	if (it == _pipelines.end()) {
+		return;
+	}
 	InvalidateDescriptorCachesForPipeline(pipeline);
 
 	if (it->second.pipeline)
@@ -3763,10 +3815,6 @@ void VulkanBackend::DestroyPipeline(PipelineHandle pipeline) {
 		vkDestroyPipelineLayout(_device, it->second.layout, nullptr);
 	if (it->second.descriptorSetLayout)
 		vkDestroyDescriptorSetLayout(_device, it->second.descriptorSetLayout, nullptr);
-	if (_currentPipeline == pipeline) {
-		_currentPipeline = INVALID_PIPELINE_HANDLE;
-	}
-
 	_pipelines.erase(it);
 }
 
@@ -3970,11 +4018,12 @@ void VulkanBackend::BindPipeline(PipelineHandle pipeline) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _pipelines.find(pipeline);
-	if (it == _pipelines.end()) {
+	if (it == _pipelines.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid pipeline handle");
 	}
 
 	EnsureCommandBuffer();
+	TrackPipelineUsage(pipeline);
 
 	if (it->second.isGraphics) {
 		vkCmdBindPipeline(_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, it->second.pipeline);
@@ -3999,7 +4048,7 @@ void VulkanBackend::SetUniformData(PipelineHandle pipeline, const void *data, si
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _pipelines.find(pipeline);
-	if (it == _pipelines.end()) {
+	if (it == _pipelines.end() || it->second.destroyRequested) {
 		throw std::runtime_error("Invalid pipeline handle for SetUniformData");
 	}
 	if (size == 0) {
@@ -4013,6 +4062,7 @@ void VulkanBackend::SetUniformData(PipelineHandle pipeline, const void *data, si
 	}
 
 	EnsureCommandBuffer();
+	TrackPipelineUsage(pipeline);
 	VkShaderStageFlags pushStages = it->second.isGraphics ? (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
 														  : VK_SHADER_STAGE_COMPUTE_BIT;
 	vkCmdPushConstants(_commandBuffer, it->second.layout, pushStages, 0, static_cast<uint32_t>(size), data);
@@ -4688,7 +4738,7 @@ std::vector<uint8_t> VulkanBackend::GetPipelineBinary(PipelineHandle pipeline, u
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	auto						it = _pipelines.find(pipeline);
-	if (it == _pipelines.end()) {
+	if (it == _pipelines.end() || it->second.destroyRequested) {
 		return {};
 	}
 

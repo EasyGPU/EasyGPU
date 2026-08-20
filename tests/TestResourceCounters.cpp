@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 
 int main() {
 	GPU::Runtime::AutoInitContext();
@@ -62,12 +63,46 @@ int main() {
 		pipelineDesc.fragmentShader = fragmentShader;
 		pipelineDesc.colorAttachmentFormat = GPU::Backend::PixelFormat::RGBA8;
 		const auto pipeline = backend->CreateGraphicsPipeline(pipelineDesc);
+
+		GPU::Backend::TextureDesc targetDesc{};
+		targetDesc.width = 4;
+		targetDesc.height = 4;
+		targetDesc.format = GPU::Backend::PixelFormat::RGBA8;
+		const auto target = backend->CreateTexture(targetDesc);
+		GPU::Backend::RenderPassBeginDesc renderPass{};
+		renderPass.colorAttachment = target;
+		renderPass.clearColorFlag = true;
+		backend->BeginRendering(renderPass);
+		backend->SetViewport(0, 0, targetDesc.width, targetDesc.height);
+		backend->SetScissor(0, 0, targetDesc.width, targetDesc.height);
+		backend->BindPipeline(pipeline);
+		backend->Draw(3, 1, 0, 0);
+		backend->EndRendering();
+		const auto graphicsSubmission = backend->Submit();
+
 		const auto beforeDestroy = backend->GetOperationCounters();
 		backend->DestroyPipeline(pipeline);
 		backend->DestroyShader(vertexShader);
 		backend->DestroyShader(fragmentShader);
 		const auto afterDestroy = backend->GetOperationCounters();
 		assert(afterDestroy.globalDrainCalls == beforeDestroy.globalDrainCalls);
+		assert(afterDestroy.blockingSubmissionWaitCalls == beforeDestroy.blockingSubmissionWaitCalls);
+		const auto deferred = backend->GetResourceCounters();
+		assert(deferred.livePipelineHandles == baseline.livePipelineHandles + 1);
+		assert(deferred.liveShaderHandles == baseline.liveShaderHandles);
+		bool rejectedDestroyedPipeline = false;
+		try {
+			backend->BindPipeline(pipeline);
+		} catch (const std::runtime_error &) {
+			rejectedDestroyedPipeline = true;
+		}
+		assert(rejectedDestroyedPipeline);
+
+		assert(backend->WaitForSubmission(graphicsSubmission, std::numeric_limits<uint64_t>::max()));
+		const auto completed = backend->GetResourceCounters();
+		assert(completed.livePipelineHandles == baseline.livePipelineHandles);
+		backend->ReleaseSubmission(graphicsSubmission);
+		backend->DestroyTexture(target);
 	}
 
 	std::cout << "Native resource counters track allocation and release\n";
