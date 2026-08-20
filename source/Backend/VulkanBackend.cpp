@@ -1876,6 +1876,9 @@ void VulkanBackend::ReleaseReadbackLease(SubmissionInfo &submission) {
 }
 
 void VulkanBackend::EnsureNoPendingGpuWork() {
+	if (!_commandBufferRecording && _submissions.empty()) {
+		return;
+	}
 	++_operationCounters.globalDrainCalls;
 	if (_commandBufferRecording) {
 		EndCommandBuffer();
