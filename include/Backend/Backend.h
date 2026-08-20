@@ -138,6 +138,16 @@ enum TextureUsageFlags : uint32_t {
 	TextureUsageDepthStencilAttachment = 1u << 5
 };
 
+/** @brief Explicit steady-state access expected after an auxiliary texture operation. */
+enum class TextureAccessState : uint32_t {
+	StorageRead            = 1,
+	StorageWrite           = 2,
+	StorageReadWrite       = 3,
+	Sampled                = 4,
+	ColorAttachment        = 5,
+	DepthStencilAttachment = 6
+};
+
 // ============================================================================
 // Buffer Description
 // ============================================================================
@@ -671,6 +681,13 @@ public:
 	 * @param texture Texture handle.
 	 */
 	virtual void		  DestroyTexture(TextureHandle texture)											  = 0;
+	/**
+	 * @brief Record a resource-scoped transition to the caller's next declared texture access.
+	 *
+	 * This does not submit or wait. It is intended for auxiliary work such as inspection or
+	 * Preview conversion that must leave a resource ready for the owning graph's next use.
+	 */
+	virtual void		  PrepareTextureAccess(TextureHandle texture, TextureAccessState access)			  = 0;
 	/**
 	 * @brief Upload pixel data to a 2D texture region.
 	 * @param texture Texture handle.

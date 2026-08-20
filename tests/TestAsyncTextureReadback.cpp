@@ -64,6 +64,14 @@ int main() {
 	const auto texture = backend->CreateTexture(textureDesc);
 	backend->UploadTexture(texture, 0, 0, width, height, source.data());
 	const auto staging = CreateStaging(backend, stagingOffset + imageBytes);
+	ExpectRuntimeError([&] {
+		backend->PrepareTextureAccess(GPU::Backend::INVALID_TEXTURE_HANDLE,
+									  GPU::Backend::TextureAccessState::StorageReadWrite);
+	});
+	backend->PrepareTextureAccess(texture, GPU::Backend::TextureAccessState::StorageReadWrite);
+	const auto prepared = backend->Submit();
+	assert(backend->WaitForSubmission(prepared, std::numeric_limits<uint64_t>::max()));
+	backend->ReleaseSubmission(prepared);
 
 	// An ordinary buffer mapping owns the same persistent staging allocation.
 	assert(backend->MapBuffer(staging, false, true) != nullptr);
@@ -139,6 +147,18 @@ int main() {
 	backend->DestroyTexture(depthTexture);
 
 	if (backend->GetCaps().supportsGraphics) {
+		backend->PrepareTextureAccess(texture, GPU::Backend::TextureAccessState::ColorAttachment);
+		const auto preparedRenderTarget = backend->Submit();
+		assert(backend->WaitForSubmission(preparedRenderTarget, std::numeric_limits<uint64_t>::max()));
+		backend->ReleaseSubmission(preparedRenderTarget);
+		const auto statePreservingReadback =
+			backend->BeginTextureReadback(texture, 0, 0, width, height, staging, stagingOffset);
+		assert(backend->WaitForSubmission(statePreservingReadback, std::numeric_limits<uint64_t>::max()));
+		const auto statePreservingMap = backend->MapTextureReadback(statePreservingReadback);
+		assert(std::memcmp(statePreservingMap.data, source.data(), imageBytes) == 0);
+		backend->UnmapTextureReadback(statePreservingReadback);
+		backend->ReleaseSubmission(statePreservingReadback);
+
 		GPU::Backend::RenderPassBeginDesc renderPass{};
 		renderPass.colorAttachment = texture;
 		renderPass.colorLoadOp	   = GPU::Backend::AttachmentLoadOp::Load;

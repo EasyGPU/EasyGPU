@@ -2688,6 +2688,48 @@ void VulkanBackend::DestroyTexture(TextureHandle texture) {
 	TryDestroyDeferredTexture(texture);
 }
 
+void VulkanBackend::PrepareTextureAccess(TextureHandle texture, TextureAccessState access) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	auto						it = _textures.find(texture);
+	if (it == _textures.end() || it->second.destroyRequested) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	EnsureCommandBuffer();
+	TrackTextureUsage(texture);
+	switch (access) {
+	case TextureAccessState::StorageRead:
+		TransitionTexture(it->second, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+						  VK_ACCESS_SHADER_READ_BIT);
+		break;
+	case TextureAccessState::StorageWrite:
+		TransitionTexture(it->second, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+						  VK_ACCESS_SHADER_WRITE_BIT);
+		break;
+	case TextureAccessState::StorageReadWrite:
+		TransitionTexture(it->second, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		break;
+	case TextureAccessState::Sampled:
+		TransitionTexture(it->second, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+						  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+						  VK_ACCESS_SHADER_READ_BIT);
+		break;
+	case TextureAccessState::ColorAttachment:
+		TransitionTexture(it->second, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+						  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+						  VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+		break;
+	case TextureAccessState::DepthStencilAttachment:
+		TransitionTexture(it->second, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+						  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+						  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+		break;
+	default:
+		throw std::runtime_error("Invalid texture access state");
+	}
+}
+
 void VulkanBackend::TryDestroyDeferredTexture(TextureHandle texture) {
 	auto it = _textures.find(texture);
 	if (it == _textures.end() || !it->second.destroyRequested || it->second.gpuUseLeases != 0 ||
@@ -3164,6 +3206,14 @@ void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationB
 	if (trackedDestination != INVALID_BUFFER_HANDLE) {
 		TrackBufferUsage(trackedDestination);
 	}
+	// Readback is an observation, not a permanent usage-state mutation. Preserve the
+	// caller's exact prior layout/stage/access so a later render/compute submission does
+	// not inherit a transfer-induced barrier inside its own timing interval. A genuinely
+	// uninitialized texture has no restorable layout, so retain the historical GENERAL
+	// read/write postcondition for that edge case.
+	const VkImageLayout		   priorLayout = info.currentLayout;
+	const VkPipelineStageFlags priorStage  = info.lastStage;
+	const VkAccessFlags		   priorAccess = info.lastAccess;
 
 	TransitionTexture(info, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
 					  VK_ACCESS_TRANSFER_READ_BIT);
@@ -3183,8 +3233,12 @@ void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationB
 	vkCmdCopyImageToBuffer(_commandBuffer, info.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destinationBuffer, 1,
 						   &region);
 
-	TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	if (priorLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
+		TransitionTexture(info, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	} else {
+		TransitionTexture(info, priorLayout, priorStage, priorAccess);
+	}
 }
 
 void VulkanBackend::CopyTextureToBufferBlocking(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset,

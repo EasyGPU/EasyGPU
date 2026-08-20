@@ -469,6 +469,16 @@ void OpenGLBackend::DestroyTexture(TextureHandle texture) {
 	_textures.erase(it);
 }
 
+void OpenGLBackend::PrepareTextureAccess(TextureHandle texture, TextureAccessState access) {
+	if (_textures.find(texture) == _textures.end()) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	(void)access;
+	// OpenGL has no explicit image layout. Make auxiliary shader/image/framebuffer writes
+	// visible to the next declared use without forcing a queue finish.
+	glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
+}
+
 void OpenGLBackend::UploadTexture(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
 								  const void *data) {
 	auto it = _textures.find(texture);
