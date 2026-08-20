@@ -186,7 +186,7 @@ EasyGPU keeps the kernel DSL backend-independent. Actual feature availability de
 |:---------|:---------------|:------------------|:--------|
 | **Windows** | OpenGL / Vulkan | Vulkan | OpenGL is continuously built |
 | **Linux** | OpenGL / Vulkan | Vulkan | OpenGL is continuously built |
-| **macOS** | Vulkan via MoltenVK | Vulkan via MoltenVK | Locally validated; GPU timestamp profiling uses a synchronized fallback |
+| **macOS** | Vulkan via MoltenVK | Vulkan via MoltenVK | Locally validated; native timestamps are enabled when the selected queue reports support |
 
 ```cpp
 // The kernel DSL source is shared across supported backends and platforms
@@ -905,7 +905,7 @@ No kernel rewrite is required.
 - Release tests keep assertions enabled and use deterministic test compilation settings.
 - Buffer and texture slots detect access after the attached resource has been destroyed.
 - Shader and pipeline creation use explicit lifetime management and exception-safe cleanup.
-- Vulkan profiling uses native timestamp queries where reliable. MoltenVK uses a synchronized CPU timing fallback to avoid device-loss failures.
+- Vulkan profiling, including MoltenVK, uses native timestamp queries only when the selected queue reports valid timestamp bits and a finite positive timestamp period. Submission-owned aggregate queries resolve from their exact completion fence without a global wait.
 - Vulkan pipeline-cache data accelerates pipeline creation but never replaces the required live shader module.
 
 Run the complete configured test suite with:

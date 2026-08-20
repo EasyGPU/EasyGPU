@@ -87,6 +87,25 @@ int main() {
 	assert(backend->WaitForSubmission(reusedAfterBurst, std::numeric_limits<uint64_t>::max()));
 	backend->ReleaseSubmission(reusedAfterBurst);
 
+	if (backend->GetCaps().supportsTimestampQueries) {
+		// More than MAX_QUERIES sequential intervals proves completed submission ownership
+		// returns query slots instead of wrapping over an in-flight pair.
+		for (uint32_t iteration = 0; iteration < 300; ++iteration) {
+			const uint32_t query = backend->BeginSubmissionTimestamp();
+			assert(query != 0);
+			backend->CopyBuffer(source, 0, destination, 0, byteCount);
+			const auto submission = backend->SubmitTimestamped(query);
+			uint64_t elapsedNanoseconds = 0;
+			(void)backend->TryGetSubmissionTimestamp(submission, elapsedNanoseconds);
+			assert(backend->WaitForSubmission(submission, std::numeric_limits<uint64_t>::max()));
+			assert(backend->TryGetSubmissionTimestamp(submission, elapsedNanoseconds));
+			assert(elapsedNanoseconds > 0);
+			backend->ReleaseSubmission(submission);
+		}
+	} else {
+		assert(backend->BeginSubmissionTimestamp() == 0);
+	}
+
 	if (const char *value = std::getenv("EASYGPU_SUBMISSION_BENCHMARK_ITERATIONS")) {
 		const auto iterations = std::strtoull(value, nullptr, 10);
 		if (iterations != 0) {

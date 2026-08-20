@@ -143,6 +143,12 @@ public:
 	void				 Finish() override;
 	/** @copydoc Backend::Submit */
 	SubmissionHandle	 Submit() override;
+	/** @copydoc Backend::BeginSubmissionTimestamp */
+	uint32_t			 BeginSubmissionTimestamp() override;
+	/** @copydoc Backend::SubmitTimestamped */
+	SubmissionHandle	 SubmitTimestamped(uint32_t query) override;
+	/** @copydoc Backend::TryGetSubmissionTimestamp */
+	bool				 TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) override;
 	/** @copydoc Backend::IsSubmissionComplete */
 	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
 	/** @copydoc Backend::WaitForSubmission */
@@ -497,6 +503,8 @@ private:
 	void	 TrackPipelineUsage(PipelineHandle pipeline);
 	void	 ReleaseSubmissionResourceLeases(SubmissionInfo &submission);
 	void	 ReleaseReadbackLease(SubmissionInfo &submission);
+	void	 ReleaseSubmissionTimestamp(SubmissionInfo &submission);
+	bool	 ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanoseconds);
 
 	/**
 	 * @brief Find a suitable memory type index for allocation.
@@ -655,6 +663,9 @@ private:
 		std::vector<TextureHandle>	textureUses;
 		std::vector<PipelineHandle> pipelineUses;
 		std::optional<ReadbackInfo> readback;
+		std::optional<uint32_t> timestampQuerySlot;
+		std::optional<uint64_t> timestampNanoseconds;
+		bool timestampInvalid = false;
 	};
 	static constexpr size_t MAX_CACHED_SUBMISSION_RESOURCES = 64;
 
@@ -702,7 +713,6 @@ private:
 
 	// Query pool for timing
 	VkQueryPool										 _queryPool		 = nullptr;
-	uint32_t										 _nextQueryIndex = 0;
 
 	// Resource maps
 	std::unordered_map<BufferHandle, BufferInfo>	 _buffers;
@@ -726,6 +736,7 @@ private:
 	// Capabilities
 	BackendCaps										 _caps;
 	float											 _timestampPeriod	  = 1.0f;
+	uint32_t										 _timestampValidBits = 0;
 	uint32_t										 _maxPushConstantSize = 0;
 	bool											 _samplerAnisotropySupported = false;
 	float											 _maxSamplerAnisotropy = 1.0f;

@@ -909,6 +909,34 @@ public:
 
 	/** @brief Submit all work recorded so far and return a queue-ordered completion marker. */
 	virtual SubmissionHandle Submit() = 0;
+	/**
+	 * @brief Begin one aggregate GPU timestamp interval in the command stream for the next submission.
+	 * @return An opaque non-zero token, or zero when submission timestamps are unsupported or exhausted.
+	 *
+	 * The token must be consumed by SubmitTimestamped. Implementations keep the timestamp storage owned by
+	 * the returned submission until ReleaseSubmission, so callers can resolve it after the submission fence
+	 * completes without a global wait or a query-pool lifetime race.
+	 */
+	virtual uint32_t BeginSubmissionTimestamp() { return 0; }
+	/**
+	 * @brief End a timestamp interval and submit the command stream that owns it.
+	 * @param query Non-zero token returned by BeginSubmissionTimestamp.
+	 */
+	virtual SubmissionHandle SubmitTimestamped(uint32_t query) {
+		(void)query;
+		throw std::runtime_error("Submission timestamp queries are unsupported by this backend");
+	}
+	/**
+	 * @brief Resolve a submission-owned timestamp without waiting.
+	 * @param submission Live submission returned by SubmitTimestamped.
+	 * @param elapsedNanoseconds Receives the GPU interval when a valid result is available.
+	 * @return true only for a complete, valid GPU timestamp result; false for pending or invalid results.
+	 */
+	virtual bool TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) {
+		(void)submission;
+		elapsedNanoseconds = 0;
+		return false;
+	}
 	/** @brief Query a submission without blocking. */
 	virtual bool IsSubmissionComplete(SubmissionHandle submission) = 0;
 	/** @brief Wait for a submission; UINT64_MAX waits indefinitely. */

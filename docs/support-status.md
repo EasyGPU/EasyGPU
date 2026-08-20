@@ -44,6 +44,6 @@ EasyGPU keeps its C++ kernel DSL backend-independent, but backend and platform c
 - Persistent Vulkan SPIR-V entries are version-keyed and validated before use; invalid entries fall back to source compilation.
 - Persistent Vulkan pipeline data is accepted only when the standard cache header matches the selected device's vendor ID, device ID, and complete pipeline-cache UUID.
 - Vulkan pipeline-cache entries are used only as pipeline creation acceleration data; a valid shader module remains live throughout pipeline creation.
-- Native GPU timestamp queries are used only when the backend reports reliable support. MoltenVK uses synchronized CPU timing as a stability fallback.
+- Native GPU timestamp queries are used only when the selected queue reports valid timestamp bits and a finite positive timestamp period, including through MoltenVK. Submission-owned aggregate timing remains unavailable instead of substituting CPU or fence latency when that capability is absent.
 
 These guarantees reduce common lifetime and backend failure modes, but do not replace application-level validation on the target driver and workload.

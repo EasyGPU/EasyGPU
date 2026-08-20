@@ -302,7 +302,7 @@ kernel.Dispatch(100, true);
 KernelProfiler::PrintReport(kernel);
 ```
 
-The profiler uses native backend timestamp queries when they are reported as reliable. On macOS through MoltenVK, it uses a synchronized CPU timing fallback because native timestamp-query usage can cause device-loss failures on affected configurations.
+The profiler uses native backend timestamp queries when the selected queue reports valid timestamp bits and a finite positive timestamp period, including on macOS through MoltenVK. The submission-owned aggregate timing API reports an unavailable result, rather than CPU or fence latency, when that capability is absent or a query cannot be allocated. The legacy synchronous profiler may still use its documented CPU fallback when no native query token is available.
 
 ---
 

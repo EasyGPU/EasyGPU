@@ -141,10 +141,10 @@ void OpenGLBackend::Shutdown() {
 		return;
 	}
 
-	for (auto &[handle, sync] : _submissions) {
+	for (auto &[handle, submission] : _submissions) {
 		(void)handle;
-		if (sync != nullptr) {
-			glDeleteSync(reinterpret_cast<GLsync>(sync));
+		if (submission.sync != nullptr) {
+			glDeleteSync(reinterpret_cast<GLsync>(submission.sync));
 		}
 	}
 	_submissions.clear();
@@ -936,8 +936,61 @@ SubmissionHandle OpenGLBackend::Submit() {
 	}
 	glFlush();
 	const SubmissionHandle handle = _nextSubmissionHandle++;
-	_submissions.emplace(handle, reinterpret_cast<void *>(sync));
+	SubmissionInfo info;
+	info.sync = reinterpret_cast<void *>(sync);
+	_submissions.emplace(handle, std::move(info));
 	return handle;
+}
+
+uint32_t OpenGLBackend::BeginSubmissionTimestamp() {
+	return BeginQuery() + 1;
+}
+
+SubmissionHandle OpenGLBackend::SubmitTimestamped(uint32_t query) {
+	if (query == 0) {
+		throw std::runtime_error("Invalid submission timestamp query");
+	}
+	const uint32_t querySlot = query - 1;
+	if (querySlot >= _queries.size() || !_queries[querySlot].active) {
+		throw std::runtime_error("Invalid submission timestamp query");
+	}
+	glEndQuery(GL_TIME_ELAPSED);
+	const SubmissionHandle submission = Submit();
+	_submissions.at(submission).timestampQuerySlot = querySlot;
+	return submission;
+}
+
+bool OpenGLBackend::TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) {
+	elapsedNanoseconds = 0;
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end()) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	auto &info = it->second;
+	if (!info.timestampQuerySlot.has_value()) {
+		return false;
+	}
+	if (info.timestampNanoseconds.has_value()) {
+		elapsedNanoseconds = *info.timestampNanoseconds;
+		return true;
+	}
+	if (!IsSubmissionComplete(submission)) {
+		return false;
+	}
+	const uint32_t querySlot = *info.timestampQuerySlot;
+	if (querySlot >= _queries.size() || !_queries[querySlot].active) {
+		return false;
+	}
+	GLint available = GL_FALSE;
+	glGetQueryObjectiv(_queries[querySlot].glQuery, GL_QUERY_RESULT_AVAILABLE, &available);
+	if (available != GL_TRUE) {
+		return false;
+	}
+	GLuint64 elapsed = 0;
+	glGetQueryObjectui64v(_queries[querySlot].glQuery, GL_QUERY_RESULT, &elapsed);
+	info.timestampNanoseconds = elapsed;
+	elapsedNanoseconds = elapsed;
+	return true;
 }
 
 bool OpenGLBackend::IsSubmissionComplete(SubmissionHandle submission) {
@@ -945,7 +998,7 @@ bool OpenGLBackend::IsSubmissionComplete(SubmissionHandle submission) {
 	if (it == _submissions.end()) {
 		throw std::runtime_error("Invalid submission handle");
 	}
-	const GLenum status = glClientWaitSync(reinterpret_cast<GLsync>(it->second), 0, 0);
+	const GLenum status = glClientWaitSync(reinterpret_cast<GLsync>(it->second.sync), 0, 0);
 	if (status == GL_WAIT_FAILED) {
 		throw std::runtime_error("glClientWaitSync failed");
 	}
@@ -957,7 +1010,7 @@ bool OpenGLBackend::WaitForSubmission(SubmissionHandle submission, uint64_t time
 	if (it == _submissions.end()) {
 		throw std::runtime_error("Invalid submission handle");
 	}
-	const auto sync = reinterpret_cast<GLsync>(it->second);
+	const auto sync = reinterpret_cast<GLsync>(it->second.sync);
 	if (timeoutNanoseconds != UINT64_MAX) {
 		const GLenum status = glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, timeoutNanoseconds);
 		if (status == GL_WAIT_FAILED) {
@@ -982,7 +1035,13 @@ void OpenGLBackend::ReleaseSubmission(SubmissionHandle submission) {
 	if (it == _submissions.end()) {
 		throw std::runtime_error("Invalid submission handle");
 	}
-	glDeleteSync(reinterpret_cast<GLsync>(it->second));
+	glDeleteSync(reinterpret_cast<GLsync>(it->second.sync));
+	if (it->second.timestampQuerySlot.has_value()) {
+		const uint32_t querySlot = *it->second.timestampQuerySlot;
+		if (querySlot < _queries.size()) {
+			_queries[querySlot].active = false;
+		}
+	}
 	_submissions.erase(it);
 }
 

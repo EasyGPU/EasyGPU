@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -1268,13 +1269,10 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.supportsGraphics		   = true;
 				_caps.supportsAsyncTransfer	   = false;
 				_caps.supportsMultiQueue	   = false;
-				_caps.supportsTimestampQueries = queueFamilies[i].timestampValidBits != 0;
-#ifdef __APPLE__
-				// MoltenVK timestamp queries are not reliable across all supported
-				// macOS/GPU combinations. Use the profiler's synchronized CPU fallback.
-				_caps.supportsTimestampQueries = false;
-#endif
+				_timestampValidBits = queueFamilies[i].timestampValidBits;
 				_timestampPeriod	 = limits.timestampPeriod;
+				_caps.supportsTimestampQueries = _timestampValidBits != 0 &&
+					std::isfinite(_timestampPeriod) && _timestampPeriod > 0.0f;
 				_maxPushConstantSize = limits.maxPushConstantsSize;
 				VkPhysicalDeviceFeatures features{};
 				vkGetPhysicalDeviceFeatures(device, &features);
@@ -1310,11 +1308,10 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.supportsGraphics		   = false;
 				_caps.supportsAsyncTransfer	   = false;
 				_caps.supportsMultiQueue	   = false;
-				_caps.supportsTimestampQueries = queueFamilies[i].timestampValidBits != 0;
-#ifdef __APPLE__
-				_caps.supportsTimestampQueries = false;
-#endif
+				_timestampValidBits = queueFamilies[i].timestampValidBits;
 				_timestampPeriod	 = limits.timestampPeriod;
+				_caps.supportsTimestampQueries = _timestampValidBits != 0 &&
+					std::isfinite(_timestampPeriod) && _timestampPeriod > 0.0f;
 				_maxPushConstantSize = limits.maxPushConstantsSize;
 				VkPhysicalDeviceFeatures features{};
 				vkGetPhysicalDeviceFeatures(device, &features);
@@ -1746,6 +1743,7 @@ void VulkanBackend::ReapReleasedSubmissions() {
 			RecycleSubmissionResources(it->second);
 		}
 		ReleaseReadbackLease(it->second);
+		ReleaseSubmissionTimestamp(it->second);
 		it = _submissions.erase(it);
 	}
 }
@@ -1905,6 +1903,20 @@ void VulkanBackend::ReleaseReadbackLease(SubmissionInfo &submission) {
 	submission.readback.reset();
 	TryDestroyDeferredTexture(readback.texture);
 	TryDestroyDeferredBuffer(readback.stagingBuffer);
+}
+
+void VulkanBackend::ReleaseSubmissionTimestamp(SubmissionInfo &submission) {
+	if (!submission.timestampQuerySlot.has_value()) {
+		return;
+	}
+	const uint32_t querySlot = *submission.timestampQuerySlot;
+	if (querySlot < _queries.size()) {
+		_queries[querySlot].active = false;
+		_queries[querySlot].result = 0;
+	}
+	submission.timestampQuerySlot.reset();
+	submission.timestampNanoseconds.reset();
+	submission.timestampInvalid = false;
 }
 
 void VulkanBackend::EnsureNoPendingGpuWork() {
@@ -4485,6 +4497,7 @@ void VulkanBackend::ReleaseSubmission(SubmissionHandle submission) {
 			DestroySubmissionResources(it->second);
 		}
 		ReleaseReadbackLease(it->second);
+		ReleaseSubmissionTimestamp(it->second);
 		_submissions.erase(it);
 		return;
 	}
@@ -4526,39 +4539,84 @@ uint32_t VulkanBackend::BeginQuery() {
 	}
 
 	EnsureCommandBuffer();
-
-	uint32_t queryIndex = _nextQueryIndex;
-	if (queryIndex >= MAX_QUERIES * 2 - 1) {
-		// Query pool exhausted, reset and start over
-		// In a real implementation, you'd want to flush and get results first
-		_nextQueryIndex = 0;
-		queryIndex		= 0;
-	}
-
-	vkCmdResetQueryPool(_commandBuffer, _queryPool, queryIndex, 2);
-	// TOP/BOTTOM_OF_PIPE are supported for timestamp queries even on devices
-	// that do not expose timestamps at every graphics/compute pipeline stage.
-	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, _queryPool, queryIndex);
-
-	_nextQueryIndex += 2;
-
-	// Find or create query info
 	for (uint32_t i = 0; i < _queries.size(); ++i) {
 		if (!_queries[i].active) {
-			_queries[i].queryIndex = queryIndex;
+			const uint32_t queryIndex = _queries[i].queryIndex;
+			vkCmdResetQueryPool(_commandBuffer, _queryPool, queryIndex, 2);
+			vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, _queryPool, queryIndex);
 			_queries[i].active	   = true;
 			_queries[i].result	   = 0;
 			return i + 1;
 		}
 	}
+	if (_queries.size() >= MAX_QUERIES) {
+		return 0;
+	}
 
 	QueryInfo info;
-	info.queryIndex = queryIndex;
+	info.queryIndex = static_cast<uint32_t>(_queries.size()) * 2;
 	info.active		= true;
 	info.result		= 0;
+	vkCmdResetQueryPool(_commandBuffer, _queryPool, info.queryIndex, 2);
+	// TOP/BOTTOM_OF_PIPE are valid even when timestamps are not supported at every stage.
+	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, _queryPool, info.queryIndex);
 	_queries.push_back(info);
 
 	return static_cast<uint32_t>(_queries.size());
+}
+
+uint32_t VulkanBackend::BeginSubmissionTimestamp() {
+	return BeginQuery();
+}
+
+SubmissionHandle VulkanBackend::SubmitTimestamped(uint32_t query) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	if (query == 0 || !_queryPool) {
+		throw std::runtime_error("Invalid submission timestamp query");
+	}
+	const uint32_t querySlot = query - 1;
+	if (querySlot >= _queries.size() || !_queries[querySlot].active) {
+		throw std::runtime_error("Invalid submission timestamp query");
+	}
+	if (_insideRenderPass) {
+		throw std::runtime_error("Cannot submit while a render pass is active");
+	}
+
+	EnsureCommandBuffer();
+	const uint32_t queryIndex = _queries[querySlot].queryIndex;
+	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, _queryPool, queryIndex + 1);
+	EndCommandBuffer();
+	const SubmissionHandle submission = SubmitCommandBuffer(false, true);
+	_submissions.at(submission).timestampQuerySlot = querySlot;
+	return submission;
+}
+
+bool VulkanBackend::TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	elapsedNanoseconds = 0;
+	auto it = _submissions.find(submission);
+	if (it == _submissions.end() || it->second.released) {
+		throw std::runtime_error("Invalid submission handle");
+	}
+	auto &info = it->second;
+	if (!info.timestampQuerySlot.has_value() || info.timestampInvalid) {
+		return false;
+	}
+	if (info.timestampNanoseconds.has_value()) {
+		elapsedNanoseconds = *info.timestampNanoseconds;
+		return true;
+	}
+	if (!UpdateSubmissionStatus(submission, 0, false)) {
+		return false;
+	}
+	uint64_t resolved = 0;
+	if (!ResolveQuery(*info.timestampQuerySlot, resolved)) {
+		info.timestampInvalid = true;
+		return false;
+	}
+	info.timestampNanoseconds = resolved;
+	elapsedNanoseconds = resolved;
+	return true;
 }
 
 uint64_t VulkanBackend::EndQuery(uint32_t query) {
@@ -4577,24 +4635,58 @@ uint64_t VulkanBackend::EndQuery(uint32_t query) {
 	uint32_t queryIndex = _queries[querySlot].queryIndex;
 	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, _queryPool, queryIndex + 1);
 
-	// Flush commands and get results
 	EndCommandBuffer();
 	SubmitCommandBuffer(true);
-
-	// Get query results
-	uint64_t timestamps[2] = {0, 0};
-	VkResult result		   = vkGetQueryPoolResults(_device, _queryPool, queryIndex, 2, sizeof(timestamps), timestamps,
-												   sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
-
+	uint64_t elapsedNanoseconds = 0;
+	const bool resolved = ResolveQuery(querySlot, elapsedNanoseconds);
 	_queries[querySlot].active = false;
+	return resolved ? elapsedNanoseconds : 0;
+}
 
-	if (result != VK_SUCCESS) {
-		return 0;
+bool VulkanBackend::ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanoseconds) {
+	elapsedNanoseconds = 0;
+	if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queryPool) {
+		return false;
 	}
 
-	double elapsedNanoseconds =
-		static_cast<double>(timestamps[1] - timestamps[0]) * static_cast<double>(_timestampPeriod);
-	return static_cast<uint64_t>(elapsedNanoseconds);
+	// Result and availability are interleaved for each of the two timestamps. No WAIT flag is
+	// used: submission fences establish readiness and this call never creates a GPU drain.
+	uint64_t values[4] = {0, 0, 0, 0};
+	const VkResult result = vkGetQueryPoolResults(
+		_device,
+		_queryPool,
+		_queries[querySlot].queryIndex,
+		2,
+		sizeof(values),
+		values,
+		2 * sizeof(uint64_t),
+		VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+	if (result == VK_NOT_READY) {
+		return false;
+	}
+	if (result == VK_ERROR_DEVICE_LOST) {
+		throw std::runtime_error("Vulkan submission timestamp failed because the device was lost");
+	}
+	CheckVkResult(result, "vkGetQueryPoolResults (submission timestamp)");
+	if (values[1] == 0 || values[3] == 0) {
+		return false;
+	}
+
+	uint64_t ticks = values[2] - values[0];
+	if (_timestampValidBits < 64) {
+		const uint64_t mask = (uint64_t{1} << _timestampValidBits) - 1;
+		ticks &= mask;
+	}
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
+	const double timestampPeriod = static_cast<double>(properties.limits.timestampPeriod);
+	const double scaled = static_cast<double>(ticks) * timestampPeriod;
+	if (!std::isfinite(scaled) || scaled < 0.0 || scaled > static_cast<double>(UINT64_MAX)) {
+		return false;
+	}
+	elapsedNanoseconds = static_cast<uint64_t>(scaled);
+	_queries[querySlot].result = elapsedNanoseconds;
+	return true;
 }
 
 // =============================================================================

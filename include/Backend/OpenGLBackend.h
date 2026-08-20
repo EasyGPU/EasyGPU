@@ -11,6 +11,7 @@
 #include <Backend/Backend.h>
 
 #include <array>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -123,6 +124,12 @@ public:
 	void				 Finish() override;
 	/** @copydoc Backend::Submit */
 	SubmissionHandle	 Submit() override;
+	/** @copydoc Backend::BeginSubmissionTimestamp */
+	uint32_t			 BeginSubmissionTimestamp() override;
+	/** @copydoc Backend::SubmitTimestamped */
+	SubmissionHandle	 SubmitTimestamped(uint32_t query) override;
+	/** @copydoc Backend::TryGetSubmissionTimestamp */
+	bool				 TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) override;
 	/** @copydoc Backend::IsSubmissionComplete */
 	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
 	/** @copydoc Backend::WaitForSubmission */
@@ -228,6 +235,12 @@ private:
 		bool	 active	 = false;
 	};
 
+	struct SubmissionInfo {
+		void		*sync = nullptr;
+		std::optional<uint32_t> timestampQuerySlot;
+		std::optional<uint64_t> timestampNanoseconds;
+	};
+
 	struct ImageBindingInfo {
 		uint32_t texture = 0;
 		uint32_t format	 = 0;
@@ -322,7 +335,7 @@ private:
 	std::unordered_map<PipelineHandle, PipelineInfo>   _pipelines;
 	std::vector<QueryInfo>							   _queries;
 	std::vector<SamplerInfo>							   _samplers;
-	std::unordered_map<SubmissionHandle, void *>		   _submissions;
+	std::unordered_map<SubmissionHandle, SubmissionInfo> _submissions;
 
 	BufferHandle									   _nextBufferHandle   = 1;
 	TextureHandle									   _nextTextureHandle  = 1;
