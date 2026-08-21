@@ -3667,6 +3667,29 @@ std::string VulkanBackend::GetOptimizedGLSL(const ShaderDesc &desc) {
 		CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel, desc.preserveInterface), desc.type);
 }
 
+std::string VulkanBackend::GetOptimizedIR(const ShaderDesc &desc) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_initialized) {
+		throw std::runtime_error("Vulkan backend not initialized");
+	}
+
+#if defined(EASYGPU_SPIRV_OPT_ENABLED) || defined(EASYGPU_SHADER_CACHE_ENABLED)
+	const auto spirv =
+		CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel, desc.preserveInterface);
+	spvtools::SpirvTools tools(SPV_ENV_VULKAN_1_1);
+	std::string assembly;
+	const uint32_t options = SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_INDENT;
+	if (!tools.Disassemble(spirv, &assembly, options)) {
+		throw std::runtime_error("SPIR-V disassembly failed after optimization");
+	}
+	return assembly;
+#else
+	(void)desc;
+	return {};
+#endif
+}
+
 ShaderCompilationStats VulkanBackend::GetShaderCompilationStats() const {
 	std::lock_guard<std::mutex> lock(_mutex);
 	return _shaderCompilationStats;

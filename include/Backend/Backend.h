@@ -858,6 +858,18 @@ public:
 		(void)desc;
 		return {};
 	}
+	/**
+	 * @brief Compile shader source, run backend optimization, and return readable target IR.
+	 *
+	 * Vulkan returns SPIR-V assembly after the selected optimization recipe. Backends that do
+	 * not expose a stable optimized IR representation should return an empty string.
+	 * @param desc Shader creation descriptor.
+	 * @return Backend-specific optimized intermediate representation.
+	 */
+	virtual std::string GetOptimizedIR(const ShaderDesc &desc) {
+		(void)desc;
+		return {};
+	}
 	/** @brief Return shader compilation and persistent-cache statistics for this backend instance. */
 	virtual ShaderCompilationStats GetShaderCompilationStats() const {
 		return {};

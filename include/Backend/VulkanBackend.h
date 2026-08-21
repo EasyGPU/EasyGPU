@@ -118,6 +118,8 @@ public:
 	void				 DestroyShader(ShaderHandle shader) override;
 	/** @copydoc Backend::GetOptimizedGLSL */
 	std::string			 GetOptimizedGLSL(const ShaderDesc &desc) override;
+	/** @copydoc Backend::GetOptimizedIR */
+	std::string			 GetOptimizedIR(const ShaderDesc &desc) override;
 	/** @copydoc Backend::GetShaderCompilationStats */
 	ShaderCompilationStats GetShaderCompilationStats() const override;
 	/** @copydoc Backend::ResetShaderCompilationStats */

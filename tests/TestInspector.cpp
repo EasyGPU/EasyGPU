@@ -254,13 +254,25 @@ GPU::Kernel::InspectorKernel1D kernel([](Var<int> &id) {
 std::string					   before = kernel.GetCode();
 std::string					   after  = kernel.GetOptimizedGLSL();
 
+Backend::ShaderDesc		   descriptor;
+descriptor.type = Backend::ShaderType::Compute;
+descriptor.sourceCode = before;
+descriptor.optimizationLevel = Backend::ShaderOptimizationLevel::Aggressive;
+auto* backend = Runtime::Context::GetBackend();
+ASSERT(backend != nullptr);
+std::string					   optimizedIr = backend->GetOptimizedIR(descriptor);
+
 ASSERT(!before.empty());
 if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
 	ASSERT(!after.empty());
 	ASSERT(after.find("#version") != std::string::npos);
 	ASSERT(after.find("main") != std::string::npos);
+	ASSERT(!optimizedIr.empty());
+	ASSERT(optimizedIr.find("OpEntryPoint") != std::string::npos);
+	ASSERT(optimizedIr.find("OpFunction") != std::string::npos);
 } else {
 	ASSERT(after.empty());
+	ASSERT(optimizedIr.empty());
 }
 std::cout << "  ✓ Optimized GLSL generated via SPIR-V toolchain!\n";
 END_TEST
