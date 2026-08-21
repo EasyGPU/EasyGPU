@@ -953,8 +953,12 @@ void VulkanBackend::CleanupVulkan() {
 		}
 
 		// Destroy query pool
-		if (_queryPool)
+		if (_queryPool) {
 			vkDestroyQueryPool(_device, _queryPool, nullptr);
+			_queryPool = nullptr;
+		}
+		_queries.clear();
+		_pendingTimestampIntervals.clear();
 
 		// Destroy command resources
 		for (auto &[handle, submission] : _submissions) {
@@ -1567,7 +1571,9 @@ void VulkanBackend::MakeCurrent() {
 
 void VulkanBackend::MakeNoneCurrent() {
 	std::lock_guard<std::mutex> lock(_mutex);
-	if (_commandBufferRecording) {
+	// A timestamp interval is a command-stream scope and may span short ContextGuard lifetimes.
+	// Keep that command buffer open until SubmitProfiled consumes the interval ownership.
+	if (_commandBufferRecording && _pendingTimestampIntervals.empty()) {
 		EndCommandBuffer();
 		SubmitCommandBuffer(false);
 	}
@@ -1906,20 +1912,22 @@ void VulkanBackend::ReleaseReadbackLease(SubmissionInfo &submission) {
 }
 
 void VulkanBackend::ReleaseSubmissionTimestamp(SubmissionInfo &submission) {
-	if (!submission.timestampQuerySlot.has_value()) {
-		return;
+	for (const uint32_t querySlot : submission.timestampQuerySlots) {
+		if (querySlot < _queries.size()) {
+			_queries[querySlot].active = false;
+			_queries[querySlot].ended = false;
+			_queries[querySlot].result = 0;
+		}
 	}
-	const uint32_t querySlot = *submission.timestampQuerySlot;
-	if (querySlot < _queries.size()) {
-		_queries[querySlot].active = false;
-		_queries[querySlot].result = 0;
-	}
-	submission.timestampQuerySlot.reset();
-	submission.timestampNanoseconds.reset();
+	submission.timestampQuerySlots.clear();
+	submission.timestampNanoseconds.clear();
 	submission.timestampInvalid = false;
 }
 
 void VulkanBackend::EnsureNoPendingGpuWork() {
+	if (!_pendingTimestampIntervals.empty()) {
+		throw std::runtime_error("Cannot drain GPU work with pending timestamp intervals");
+	}
 	if (!_commandBufferRecording && _submissions.empty()) {
 		return;
 	}
@@ -4567,6 +4575,9 @@ void VulkanBackend::MemoryBarrier(BarrierType barrierType) {
 void VulkanBackend::Finish() {
 	std::lock_guard<std::mutex> lock(_mutex);
 	++_operationCounters.finishCalls;
+	if (!_pendingTimestampIntervals.empty()) {
+		throw std::runtime_error("Cannot finish GPU work with pending timestamp intervals");
+	}
 
 	if (_commandBufferRecording) {
 		EndCommandBuffer();
@@ -4581,6 +4592,9 @@ SubmissionHandle VulkanBackend::Submit() {
 	std::lock_guard<std::mutex> lock(_mutex);
 	if (_insideRenderPass) {
 		throw std::runtime_error("Cannot submit while a render pass is active");
+	}
+	if (!_pendingTimestampIntervals.empty()) {
+		throw std::runtime_error("Pending timestamp intervals require SubmitProfiled");
 	}
 	EnsureCommandBuffer();
 	EndCommandBuffer();
@@ -4656,11 +4670,24 @@ BackendResourceCounters VulkanBackend::GetResourceCounters() const {
 
 uint32_t VulkanBackend::BeginQuery() {
 	std::lock_guard<std::mutex> lock(_mutex);
+	return BeginTimestampIntervalLocked();
+}
 
+
+uint32_t VulkanBackend::BeginTimestampInterval() {
+	std::lock_guard<std::mutex> lock(_mutex);
+	return BeginTimestampIntervalLocked();
+}
+
+uint32_t VulkanBackend::BeginTimestampIntervalLocked() {
 	if (!_queryPool) {
 		return 0;
 	}
+	if (_insideRenderPass) {
+		throw std::runtime_error("Cannot begin a timestamp interval inside a render pass");
+	}
 
+	ReapReleasedSubmissions();
 	EnsureCommandBuffer();
 	for (uint32_t i = 0; i < _queries.size(); ++i) {
 		if (!_queries[i].active) {
@@ -4668,8 +4695,11 @@ uint32_t VulkanBackend::BeginQuery() {
 			vkCmdResetQueryPool(_commandBuffer, _queryPool, queryIndex, 2);
 			vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, _queryPool, queryIndex);
 			_queries[i].active	   = true;
+			_queries[i].ended	   = false;
 			_queries[i].result	   = 0;
-			return i + 1;
+			const uint32_t token = i + 1;
+			_pendingTimestampIntervals.push_back(token);
+			return token;
 		}
 	}
 	if (_queries.size() >= MAX_QUERIES) {
@@ -4679,96 +4709,157 @@ uint32_t VulkanBackend::BeginQuery() {
 	QueryInfo info;
 	info.queryIndex = static_cast<uint32_t>(_queries.size()) * 2;
 	info.active		= true;
+	info.ended		= false;
 	info.result		= 0;
 	vkCmdResetQueryPool(_commandBuffer, _queryPool, info.queryIndex, 2);
 	// TOP/BOTTOM_OF_PIPE are valid even when timestamps are not supported at every stage.
 	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, _queryPool, info.queryIndex);
 	_queries.push_back(info);
 
-	return static_cast<uint32_t>(_queries.size());
+	const uint32_t token = static_cast<uint32_t>(_queries.size());
+	_pendingTimestampIntervals.push_back(token);
+	return token;
 }
 
 uint32_t VulkanBackend::BeginSubmissionTimestamp() {
-	return BeginQuery();
+	return BeginTimestampInterval();
 }
 
-SubmissionHandle VulkanBackend::SubmitTimestamped(uint32_t query) {
+void VulkanBackend::EndTimestampInterval(uint32_t interval) {
 	std::lock_guard<std::mutex> lock(_mutex);
-	if (query == 0 || !_queryPool) {
-		throw std::runtime_error("Invalid submission timestamp query");
+	EndTimestampIntervalLocked(interval);
+}
+
+void VulkanBackend::EndTimestampIntervalLocked(uint32_t interval) {
+	if (interval == 0 || !_queryPool) {
+		throw std::runtime_error("Invalid timestamp interval");
 	}
-	const uint32_t querySlot = query - 1;
-	if (querySlot >= _queries.size() || !_queries[querySlot].active) {
-		throw std::runtime_error("Invalid submission timestamp query");
+	const uint32_t querySlot = interval - 1;
+	if (querySlot >= _queries.size() || !_queries[querySlot].active || _queries[querySlot].ended) {
+		throw std::runtime_error("Invalid or already-ended timestamp interval");
 	}
 	if (_insideRenderPass) {
-		throw std::runtime_error("Cannot submit while a render pass is active");
+		throw std::runtime_error("Cannot end a timestamp interval inside a render pass");
+	}
+	const auto openInterval = std::find_if(
+		_pendingTimestampIntervals.rbegin(), _pendingTimestampIntervals.rend(), [this](uint32_t token) {
+			const uint32_t slot = token - 1;
+			return slot < _queries.size() && _queries[slot].active && !_queries[slot].ended;
+		});
+	if (openInterval == _pendingTimestampIntervals.rend() || *openInterval != interval) {
+		throw std::runtime_error("Timestamp intervals must end in last-in-first-out order");
 	}
 
 	EnsureCommandBuffer();
 	const uint32_t queryIndex = _queries[querySlot].queryIndex;
 	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, _queryPool, queryIndex + 1);
+	_queries[querySlot].ended = true;
+}
+
+SubmissionHandle VulkanBackend::SubmitTimestamped(uint32_t query) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	EndTimestampIntervalLocked(query);
+	return SubmitProfiledLocked({query});
+}
+
+SubmissionHandle VulkanBackend::SubmitProfiled(const std::vector<uint32_t> &intervals) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	return SubmitProfiledLocked(intervals);
+}
+
+SubmissionHandle VulkanBackend::SubmitProfiledLocked(const std::vector<uint32_t> &intervals) {
+	if (_insideRenderPass) {
+		throw std::runtime_error("Cannot submit while a render pass is active");
+	}
+	if (intervals.empty() || intervals != _pendingTimestampIntervals) {
+		throw std::runtime_error("Profiled submission must own every pending timestamp interval in begin order");
+	}
+	std::vector<uint32_t> querySlots;
+	querySlots.reserve(intervals.size());
+	for (const uint32_t interval : intervals) {
+		if (interval == 0) {
+			throw std::runtime_error("Profiled submission contains an invalid timestamp interval");
+		}
+		const uint32_t querySlot = interval - 1;
+		if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queries[querySlot].ended) {
+			throw std::runtime_error("Profiled submission contains an unfinished timestamp interval");
+		}
+		querySlots.push_back(querySlot);
+	}
+
+	EnsureCommandBuffer();
 	EndCommandBuffer();
 	const SubmissionHandle submission = SubmitCommandBuffer(false, true);
-	_submissions.at(submission).timestampQuerySlot = querySlot;
+	auto &info = _submissions.at(submission);
+	info.timestampQuerySlots = std::move(querySlots);
+	_pendingTimestampIntervals.clear();
 	return submission;
 }
 
 bool VulkanBackend::TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) {
+	std::vector<uint64_t> intervals;
+	if (!TryGetSubmissionTimestamps(submission, intervals) || intervals.size() != 1) {
+		elapsedNanoseconds = 0;
+		return false;
+	}
+	elapsedNanoseconds = intervals[0];
+	return true;
+}
+
+bool VulkanBackend::TryGetSubmissionTimestamps(SubmissionHandle submission,
+											std::vector<uint64_t> &elapsedNanoseconds) {
 	std::lock_guard<std::mutex> lock(_mutex);
-	elapsedNanoseconds = 0;
+	elapsedNanoseconds.clear();
 	auto it = _submissions.find(submission);
 	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
 	}
 	auto &info = it->second;
-	if (!info.timestampQuerySlot.has_value() || info.timestampInvalid) {
+	if (info.timestampQuerySlots.empty() || info.timestampInvalid) {
 		return false;
 	}
-	if (info.timestampNanoseconds.has_value()) {
-		elapsedNanoseconds = *info.timestampNanoseconds;
+	if (info.timestampNanoseconds.size() == info.timestampQuerySlots.size()) {
+		elapsedNanoseconds = info.timestampNanoseconds;
 		return true;
 	}
 	if (!UpdateSubmissionStatus(submission, 0, false)) {
 		return false;
 	}
-	uint64_t resolved = 0;
-	if (!ResolveQuery(*info.timestampQuerySlot, resolved)) {
-		info.timestampInvalid = true;
-		return false;
+	std::vector<uint64_t> resolved;
+	resolved.reserve(info.timestampQuerySlots.size());
+	for (const uint32_t querySlot : info.timestampQuerySlots) {
+		uint64_t duration = 0;
+		if (!ResolveQuery(querySlot, duration)) {
+			info.timestampInvalid = true;
+			return false;
+		}
+		resolved.push_back(duration);
 	}
 	info.timestampNanoseconds = resolved;
-	elapsedNanoseconds = resolved;
+	elapsedNanoseconds = std::move(resolved);
 	return true;
 }
 
 uint64_t VulkanBackend::EndQuery(uint32_t query) {
 	std::lock_guard<std::mutex> lock(_mutex);
-
-	if (query == 0 || !_queryPool) {
-		return 0;
-	}
+	if (query == 0) return 0;
+	EndTimestampIntervalLocked(query);
+	const SubmissionHandle submission = SubmitProfiledLocked({query});
+	(void)UpdateSubmissionStatus(submission, UINT64_MAX, true);
 	const uint32_t querySlot = query - 1;
-	if (querySlot >= _queries.size() || !_queries[querySlot].active) {
-		return 0;
-	}
-
-	EnsureCommandBuffer();
-
-	uint32_t queryIndex = _queries[querySlot].queryIndex;
-	vkCmdWriteTimestamp(_commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, _queryPool, queryIndex + 1);
-
-	EndCommandBuffer();
-	SubmitCommandBuffer(true);
 	uint64_t elapsedNanoseconds = 0;
 	const bool resolved = ResolveQuery(querySlot, elapsedNanoseconds);
-	_queries[querySlot].active = false;
+	auto it = _submissions.find(submission);
+	if (it != _submissions.end()) {
+		ReleaseSubmissionTimestamp(it->second);
+		_submissions.erase(it);
+	}
 	return resolved ? elapsedNanoseconds : 0;
 }
 
 bool VulkanBackend::ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanoseconds) {
 	elapsedNanoseconds = 0;
-	if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queryPool) {
+	if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queries[querySlot].ended || !_queryPool) {
 		return false;
 	}
 
@@ -4800,9 +4891,7 @@ bool VulkanBackend::ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanosecond
 		const uint64_t mask = (uint64_t{1} << _timestampValidBits) - 1;
 		ticks &= mask;
 	}
-	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
-	const double timestampPeriod = static_cast<double>(properties.limits.timestampPeriod);
+	const double timestampPeriod = static_cast<double>(_timestampPeriod);
 	const double scaled = static_cast<double>(ticks) * timestampPeriod;
 	if (!std::isfinite(scaled) || scaled < 0.0 || scaled > static_cast<double>(UINT64_MAX)) {
 		return false;

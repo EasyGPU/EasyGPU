@@ -178,11 +178,11 @@ void OpenGLBackend::Shutdown() {
 	_buffers.clear();
 
 	for (auto &query : _queries) {
-		if (query.glQuery != 0) {
-			glDeleteQueries(1, &query.glQuery);
-		}
+		if (query.startQuery != 0) glDeleteQueries(1, &query.startQuery);
+		if (query.endQuery != 0) glDeleteQueries(1, &query.endQuery);
 	}
 	_queries.clear();
+	_pendingTimestampIntervals.clear();
 
 	for (const auto &sampler : _samplers) {
 		if (sampler.glHandle != 0) {
@@ -936,10 +936,18 @@ void OpenGLBackend::MemoryBarrier(BarrierType barrierType) {
 }
 
 void OpenGLBackend::Finish() {
+	if (!_pendingTimestampIntervals.empty()) {
+		throw std::runtime_error("Cannot finish GPU work with pending timestamp intervals");
+	}
 	glFinish();
+	ReapReleasedSubmissions();
 }
 
 SubmissionHandle OpenGLBackend::Submit() {
+	if (!_pendingTimestampIntervals.empty()) {
+		throw std::runtime_error("Pending timestamp intervals require SubmitProfiled");
+	}
+	ReapReleasedSubmissions();
 	GLsync sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 	if (sync == nullptr) {
 		throw std::runtime_error("glFenceSync failed");
@@ -953,59 +961,142 @@ SubmissionHandle OpenGLBackend::Submit() {
 }
 
 uint32_t OpenGLBackend::BeginSubmissionTimestamp() {
-	return BeginQuery() + 1;
+	return BeginTimestampInterval();
 }
 
 SubmissionHandle OpenGLBackend::SubmitTimestamped(uint32_t query) {
-	if (query == 0) {
-		throw std::runtime_error("Invalid submission timestamp query");
-	}
-	const uint32_t querySlot = query - 1;
-	if (querySlot >= _queries.size() || !_queries[querySlot].active) {
-		throw std::runtime_error("Invalid submission timestamp query");
-	}
-	glEndQuery(GL_TIME_ELAPSED);
-	const SubmissionHandle submission = Submit();
-	_submissions.at(submission).timestampQuerySlot = querySlot;
-	return submission;
+	EndTimestampInterval(query);
+	return SubmitProfiled({query});
 }
 
 bool OpenGLBackend::TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) {
-	elapsedNanoseconds = 0;
+	std::vector<uint64_t> intervals;
+	if (!TryGetSubmissionTimestamps(submission, intervals) || intervals.size() != 1) {
+		elapsedNanoseconds = 0;
+		return false;
+	}
+	elapsedNanoseconds = intervals[0];
+	return true;
+}
+
+uint32_t OpenGLBackend::BeginTimestampInterval() {
+	if (!_initialized) return 0;
+	ReapReleasedSubmissions();
+	uint32_t querySlot = 0;
+	for (; querySlot < _queries.size(); ++querySlot) {
+		if (!_queries[querySlot].active) break;
+	}
+	if (querySlot == _queries.size()) {
+		if (_queries.size() >= MAX_TIMESTAMP_INTERVALS) return 0;
+		QueryInfo query;
+		glGenQueries(1, &query.startQuery);
+		glGenQueries(1, &query.endQuery);
+		_queries.push_back(query);
+	}
+	auto &query = _queries[querySlot];
+	if (query.startQuery == 0) glGenQueries(1, &query.startQuery);
+	if (query.endQuery == 0) glGenQueries(1, &query.endQuery);
+	if (query.startQuery == 0 || query.endQuery == 0) return 0;
+	glQueryCounter(query.startQuery, GL_TIMESTAMP);
+	query.active = true;
+	query.ended = false;
+	const uint32_t token = querySlot + 1;
+	_pendingTimestampIntervals.push_back(token);
+	return token;
+}
+
+void OpenGLBackend::EndTimestampInterval(uint32_t interval) {
+	if (interval == 0) throw std::runtime_error("Invalid timestamp interval");
+	const uint32_t querySlot = interval - 1;
+	if (querySlot >= _queries.size() || !_queries[querySlot].active || _queries[querySlot].ended) {
+		throw std::runtime_error("Invalid or already-ended timestamp interval");
+	}
+	const auto openInterval = std::find_if(
+		_pendingTimestampIntervals.rbegin(), _pendingTimestampIntervals.rend(), [this](uint32_t token) {
+			const uint32_t slot = token - 1;
+			return slot < _queries.size() && _queries[slot].active && !_queries[slot].ended;
+		});
+	if (openInterval == _pendingTimestampIntervals.rend() || *openInterval != interval) {
+		throw std::runtime_error("Timestamp intervals must end in last-in-first-out order");
+	}
+	glQueryCounter(_queries[querySlot].endQuery, GL_TIMESTAMP);
+	_queries[querySlot].ended = true;
+}
+
+SubmissionHandle OpenGLBackend::SubmitProfiled(const std::vector<uint32_t> &intervals) {
+	if (intervals.empty() || intervals != _pendingTimestampIntervals) {
+		throw std::runtime_error("Profiled submission must own every pending timestamp interval in begin order");
+	}
+	std::vector<uint32_t> querySlots;
+	querySlots.reserve(intervals.size());
+	for (const uint32_t interval : intervals) {
+		if (interval == 0) throw std::runtime_error("Profiled submission contains an invalid timestamp interval");
+		const uint32_t querySlot = interval - 1;
+		if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queries[querySlot].ended) {
+			throw std::runtime_error("Profiled submission contains an unfinished timestamp interval");
+		}
+		querySlots.push_back(querySlot);
+	}
+	GLsync sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	if (sync == nullptr) throw std::runtime_error("glFenceSync failed");
+	glFlush();
+	const SubmissionHandle handle = _nextSubmissionHandle++;
+	SubmissionInfo info;
+	info.sync = reinterpret_cast<void *>(sync);
+	info.timestampQuerySlots = std::move(querySlots);
+	_submissions.emplace(handle, std::move(info));
+	_pendingTimestampIntervals.clear();
+	return handle;
+}
+
+bool OpenGLBackend::TryGetSubmissionTimestamps(SubmissionHandle submission,
+											std::vector<uint64_t> &elapsedNanoseconds) {
+	elapsedNanoseconds.clear();
 	auto it = _submissions.find(submission);
-	if (it == _submissions.end()) {
+	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
 	}
 	auto &info = it->second;
-	if (!info.timestampQuerySlot.has_value()) {
+	if (info.timestampQuerySlots.empty() || info.timestampInvalid) {
 		return false;
 	}
-	if (info.timestampNanoseconds.has_value()) {
-		elapsedNanoseconds = *info.timestampNanoseconds;
+	if (info.timestampNanoseconds.size() == info.timestampQuerySlots.size()) {
+		elapsedNanoseconds = info.timestampNanoseconds;
 		return true;
 	}
 	if (!IsSubmissionComplete(submission)) {
 		return false;
 	}
-	const uint32_t querySlot = *info.timestampQuerySlot;
-	if (querySlot >= _queries.size() || !_queries[querySlot].active) {
-		return false;
+	std::vector<uint64_t> resolved;
+	resolved.reserve(info.timestampQuerySlots.size());
+	for (const uint32_t querySlot : info.timestampQuerySlots) {
+		if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queries[querySlot].ended) {
+			info.timestampInvalid = true;
+			return false;
+		}
+		GLint startAvailable = GL_FALSE;
+		GLint endAvailable = GL_FALSE;
+		glGetQueryObjectiv(_queries[querySlot].startQuery, GL_QUERY_RESULT_AVAILABLE, &startAvailable);
+		glGetQueryObjectiv(_queries[querySlot].endQuery, GL_QUERY_RESULT_AVAILABLE, &endAvailable);
+		if (startAvailable != GL_TRUE || endAvailable != GL_TRUE) return false;
+		GLuint64 start = 0;
+		GLuint64 end = 0;
+		glGetQueryObjectui64v(_queries[querySlot].startQuery, GL_QUERY_RESULT, &start);
+		glGetQueryObjectui64v(_queries[querySlot].endQuery, GL_QUERY_RESULT, &end);
+		if (end < start) {
+			info.timestampInvalid = true;
+			return false;
+		}
+		resolved.push_back(end - start);
 	}
-	GLint available = GL_FALSE;
-	glGetQueryObjectiv(_queries[querySlot].glQuery, GL_QUERY_RESULT_AVAILABLE, &available);
-	if (available != GL_TRUE) {
-		return false;
-	}
-	GLuint64 elapsed = 0;
-	glGetQueryObjectui64v(_queries[querySlot].glQuery, GL_QUERY_RESULT, &elapsed);
-	info.timestampNanoseconds = elapsed;
-	elapsedNanoseconds = elapsed;
+	info.timestampNanoseconds = resolved;
+	elapsedNanoseconds = std::move(resolved);
 	return true;
 }
 
 bool OpenGLBackend::IsSubmissionComplete(SubmissionHandle submission) {
 	auto it = _submissions.find(submission);
-	if (it == _submissions.end()) {
+	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
 	}
 	const GLenum status = glClientWaitSync(reinterpret_cast<GLsync>(it->second.sync), 0, 0);
@@ -1017,7 +1108,7 @@ bool OpenGLBackend::IsSubmissionComplete(SubmissionHandle submission) {
 
 bool OpenGLBackend::WaitForSubmission(SubmissionHandle submission, uint64_t timeoutNanoseconds) {
 	auto it = _submissions.find(submission);
-	if (it == _submissions.end()) {
+	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
 	}
 	const auto sync = reinterpret_cast<GLsync>(it->second.sync);
@@ -1042,51 +1133,76 @@ bool OpenGLBackend::WaitForSubmission(SubmissionHandle submission, uint64_t time
 
 void OpenGLBackend::ReleaseSubmission(SubmissionHandle submission) {
 	auto it = _submissions.find(submission);
-	if (it == _submissions.end()) {
+	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
 	}
-	glDeleteSync(reinterpret_cast<GLsync>(it->second.sync));
-	if (it->second.timestampQuerySlot.has_value()) {
-		const uint32_t querySlot = *it->second.timestampQuerySlot;
-		if (querySlot < _queries.size()) {
-			_queries[querySlot].active = false;
+	if (!it->second.timestampQuerySlots.empty()) {
+		const GLenum status = glClientWaitSync(reinterpret_cast<GLsync>(it->second.sync), 0, 0);
+		if (status == GL_WAIT_FAILED) {
+			throw std::runtime_error("glClientWaitSync failed");
+		}
+		if (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED) {
+			it->second.released = true;
+			return;
 		}
 	}
+	glDeleteSync(reinterpret_cast<GLsync>(it->second.sync));
+	ReleaseSubmissionTimestamp(it->second);
 	_submissions.erase(it);
 }
 
-uint32_t OpenGLBackend::BeginQuery() {
-	for (uint32_t i = 0; i < _queries.size(); ++i) {
-		if (!_queries[i].active) {
-			if (_queries[i].glQuery == 0) {
-				glGenQueries(1, &_queries[i].glQuery);
-			}
-			glBeginQuery(GL_TIME_ELAPSED, _queries[i].glQuery);
-			_queries[i].active = true;
-			return i;
+void OpenGLBackend::ReleaseSubmissionTimestamp(SubmissionInfo &submission) {
+	for (const uint32_t querySlot : submission.timestampQuerySlots) {
+		if (querySlot < _queries.size()) {
+			_queries[querySlot].active = false;
+			_queries[querySlot].ended = false;
 		}
 	}
+	submission.timestampQuerySlots.clear();
+	submission.timestampNanoseconds.clear();
+	submission.timestampInvalid = false;
+}
 
-	QueryInfo query;
-	glGenQueries(1, &query.glQuery);
-	glBeginQuery(GL_TIME_ELAPSED, query.glQuery);
-	query.active   = true;
-	uint32_t index = static_cast<uint32_t>(_queries.size());
-	_queries.push_back(query);
-	return index;
+void OpenGLBackend::ReapReleasedSubmissions() {
+	for (auto it = _submissions.begin(); it != _submissions.end();) {
+		if (!it->second.released) {
+			++it;
+			continue;
+		}
+		const GLenum status = glClientWaitSync(reinterpret_cast<GLsync>(it->second.sync), 0, 0);
+		if (status == GL_TIMEOUT_EXPIRED) {
+			++it;
+			continue;
+		}
+		if (status == GL_WAIT_FAILED) {
+			throw std::runtime_error("glClientWaitSync failed while reaping a released submission");
+		}
+		glDeleteSync(reinterpret_cast<GLsync>(it->second.sync));
+		ReleaseSubmissionTimestamp(it->second);
+		it = _submissions.erase(it);
+	}
+}
+
+uint32_t OpenGLBackend::BeginQuery() {
+	return BeginTimestampInterval();
 }
 
 uint64_t OpenGLBackend::EndQuery(uint32_t query) {
-	if (query >= _queries.size() || !_queries[query].active) {
-		return 0;
+	if (query == 0) return 0;
+	EndTimestampInterval(query);
+	if (_pendingTimestampIntervals.size() != 1 || _pendingTimestampIntervals[0] != query) {
+		throw std::runtime_error("Blocking timestamp query cannot overlap profiled intervals");
 	}
-
-	glEndQuery(GL_TIME_ELAPSED);
-	_queries[query].active = false;
-
-	GLuint64 elapsed	   = 0;
-	glGetQueryObjectui64v(_queries[query].glQuery, GL_QUERY_RESULT, &elapsed);
-	return elapsed;
+	const uint32_t querySlot = query - 1;
+	glFlush();
+	GLuint64 start = 0;
+	GLuint64 end = 0;
+	glGetQueryObjectui64v(_queries[querySlot].startQuery, GL_QUERY_RESULT, &start);
+	glGetQueryObjectui64v(_queries[querySlot].endQuery, GL_QUERY_RESULT, &end);
+	_queries[querySlot].active = false;
+	_queries[querySlot].ended = false;
+	_pendingTimestampIntervals.clear();
+	return end >= start ? end - start : 0;
 }
 
 void OpenGLBackend::InvalidateCache() {

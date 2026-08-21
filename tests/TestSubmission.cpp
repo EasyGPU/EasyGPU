@@ -88,6 +88,52 @@ int main() {
 	backend->ReleaseSubmission(reusedAfterBurst);
 
 	if (backend->GetCaps().supportsTimestampQueries) {
+		const uint32_t graphInterval = backend->BeginTimestampInterval();
+		const uint32_t passInterval = backend->BeginTimestampInterval();
+		assert(graphInterval != 0);
+		assert(passInterval != 0);
+		expectInvalidSubmission([&] { backend->EndTimestampInterval(graphInterval); });
+
+		const uint32_t commandInterval = backend->BeginTimestampInterval();
+		assert(commandInterval != 0);
+		for (uint32_t copy = 0; copy < 64; ++copy) {
+			backend->CopyBuffer(source, 0, destination, 0, byteCount);
+		}
+		backend->EndTimestampInterval(commandInterval);
+		backend->EndTimestampInterval(passInterval);
+		backend->EndTimestampInterval(graphInterval);
+
+		const std::vector<uint32_t> nestedIntervals = {graphInterval, passInterval, commandInterval};
+		expectInvalidSubmission([&] {
+			(void)backend->SubmitProfiled({graphInterval, passInterval});
+		});
+		const auto nestedSubmission = backend->SubmitProfiled(nestedIntervals);
+		std::vector<uint64_t> nestedNanoseconds;
+		(void)backend->TryGetSubmissionTimestamps(nestedSubmission, nestedNanoseconds);
+		assert(backend->WaitForSubmission(nestedSubmission, std::numeric_limits<uint64_t>::max()));
+		assert(backend->TryGetSubmissionTimestamps(nestedSubmission, nestedNanoseconds));
+		assert(nestedNanoseconds.size() == nestedIntervals.size());
+		assert(nestedNanoseconds[0] > 0);
+		assert(nestedNanoseconds[1] > 0);
+		assert(nestedNanoseconds[2] > 0);
+		assert(nestedNanoseconds[0] >= nestedNanoseconds[1]);
+		assert(nestedNanoseconds[1] >= nestedNanoseconds[2]);
+		backend->ReleaseSubmission(nestedSubmission);
+
+		// Releasing an in-flight timestamp submission invalidates its public handle immediately,
+		// but its query slot stays leased until the GPU fence completes.
+		const uint32_t releasedQuery = backend->BeginSubmissionTimestamp();
+		assert(releasedQuery != 0);
+		for (uint32_t copy = 0; copy < 64; ++copy) {
+			backend->CopyBuffer(source, 0, destination, 0, byteCount);
+		}
+		const auto releasedTimestampSubmission = backend->SubmitTimestamped(releasedQuery);
+		backend->ReleaseSubmission(releasedTimestampSubmission);
+		expectInvalidSubmission([&] {
+			(void)backend->WaitForSubmission(releasedTimestampSubmission, 0);
+		});
+		backend->Finish();
+
 		// More than MAX_QUERIES sequential intervals proves completed submission ownership
 		// returns query slots instead of wrapping over an in-flight pair.
 		for (uint32_t iteration = 0; iteration < 300; ++iteration) {

@@ -153,6 +153,15 @@ public:
 	SubmissionHandle	 SubmitTimestamped(uint32_t query) override;
 	/** @copydoc Backend::TryGetSubmissionTimestamp */
 	bool				 TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) override;
+	/** @copydoc Backend::BeginTimestampInterval */
+	uint32_t			 BeginTimestampInterval() override;
+	/** @copydoc Backend::EndTimestampInterval */
+	void				 EndTimestampInterval(uint32_t interval) override;
+	/** @copydoc Backend::SubmitProfiled */
+	SubmissionHandle	 SubmitProfiled(const std::vector<uint32_t> &intervals) override;
+	/** @copydoc Backend::TryGetSubmissionTimestamps */
+	bool				 TryGetSubmissionTimestamps(SubmissionHandle submission,
+										std::vector<uint64_t> &elapsedNanoseconds) override;
 	/** @copydoc Backend::IsSubmissionComplete */
 	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
 	/** @copydoc Backend::WaitForSubmission */
@@ -364,6 +373,7 @@ private:
 	struct QueryInfo {
 		uint32_t queryIndex = 0;
 		bool	 active		= false;
+		bool	 ended		= false;
 		uint64_t result		= 0;
 	};
 
@@ -508,6 +518,9 @@ private:
 	void	 ReleaseSubmissionResourceLeases(SubmissionInfo &submission);
 	void	 ReleaseReadbackLease(SubmissionInfo &submission);
 	void	 ReleaseSubmissionTimestamp(SubmissionInfo &submission);
+	uint32_t BeginTimestampIntervalLocked();
+	void	 EndTimestampIntervalLocked(uint32_t interval);
+	SubmissionHandle SubmitProfiledLocked(const std::vector<uint32_t> &intervals);
 	bool	 ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanoseconds);
 
 	/**
@@ -670,8 +683,8 @@ private:
 		std::vector<TextureHandle>	textureUses;
 		std::vector<PipelineHandle> pipelineUses;
 		std::optional<ReadbackInfo> readback;
-		std::optional<uint32_t> timestampQuerySlot;
-		std::optional<uint64_t> timestampNanoseconds;
+		std::vector<uint32_t> timestampQuerySlots;
+		std::vector<uint64_t> timestampNanoseconds;
 		bool timestampInvalid = false;
 	};
 	static constexpr size_t MAX_CACHED_SUBMISSION_RESOURCES = 64;
@@ -728,6 +741,7 @@ private:
 	std::unordered_map<ShaderHandle, ShaderInfo>	 _shaders;
 	std::unordered_map<PipelineHandle, PipelineInfo> _pipelines;
 	std::vector<QueryInfo>							 _queries;
+	std::vector<uint32_t>						 _pendingTimestampIntervals;
 	std::vector<DescriptorSetCache>					 _descriptorSets;
 
 	// Handle counters

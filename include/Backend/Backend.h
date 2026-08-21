@@ -970,6 +970,43 @@ public:
 		elapsedNanoseconds = 0;
 		return false;
 	}
+	/**
+	 * @brief Begin one timestamp interval in the current command stream.
+	 * @return An opaque non-zero token, or zero when timestamp queries are unsupported or exhausted.
+	 *
+	 * Intervals may be nested and must be ended in last-in-first-out order. Every non-zero token
+	 * must be ended exactly once and passed to the
+	 * next SubmitProfiled call. The returned submission owns all referenced query slots until it is
+	 * released, so asynchronous resolution cannot race query-pool reuse.
+	 */
+	virtual uint32_t BeginTimestampInterval() { return 0; }
+	/** @brief End the innermost timestamp interval without submitting or waiting. */
+	virtual void EndTimestampInterval(uint32_t interval) {
+		(void)interval;
+		throw std::runtime_error("Timestamp intervals are unsupported by this backend");
+	}
+	/**
+	 * @brief Submit the current command stream with the exact ended timestamp intervals it owns.
+	 * @param intervals Unique non-zero tokens in begin order.
+	 */
+	virtual SubmissionHandle SubmitProfiled(const std::vector<uint32_t> &intervals) {
+		if (!intervals.empty()) {
+			throw std::runtime_error("Timestamp intervals are unsupported by this backend");
+		}
+		return Submit();
+	}
+	/**
+	 * @brief Resolve all timestamp intervals owned by a submission without waiting.
+	 * @param submission Live submission returned by SubmitProfiled.
+	 * @param elapsedNanoseconds Receives one duration for each submitted interval, in the same order.
+	 * @return true only when every interval has a complete, valid hardware timestamp result.
+	 */
+	virtual bool TryGetSubmissionTimestamps(SubmissionHandle submission,
+										 std::vector<uint64_t> &elapsedNanoseconds) {
+		(void)submission;
+		elapsedNanoseconds.clear();
+		return false;
+	}
 	/** @brief Query a submission without blocking. */
 	virtual bool IsSubmissionComplete(SubmissionHandle submission) = 0;
 	/** @brief Wait for a submission; UINT64_MAX waits indefinitely. */

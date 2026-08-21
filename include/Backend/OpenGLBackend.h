@@ -132,6 +132,15 @@ public:
 	SubmissionHandle	 SubmitTimestamped(uint32_t query) override;
 	/** @copydoc Backend::TryGetSubmissionTimestamp */
 	bool				 TryGetSubmissionTimestamp(SubmissionHandle submission, uint64_t &elapsedNanoseconds) override;
+	/** @copydoc Backend::BeginTimestampInterval */
+	uint32_t			 BeginTimestampInterval() override;
+	/** @copydoc Backend::EndTimestampInterval */
+	void				 EndTimestampInterval(uint32_t interval) override;
+	/** @copydoc Backend::SubmitProfiled */
+	SubmissionHandle	 SubmitProfiled(const std::vector<uint32_t> &intervals) override;
+	/** @copydoc Backend::TryGetSubmissionTimestamps */
+	bool				 TryGetSubmissionTimestamps(SubmissionHandle submission,
+										std::vector<uint64_t> &elapsedNanoseconds) override;
 	/** @copydoc Backend::IsSubmissionComplete */
 	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
 	/** @copydoc Backend::WaitForSubmission */
@@ -197,6 +206,8 @@ public:
 	}
 
 private:
+	static constexpr size_t MAX_TIMESTAMP_INTERVALS = 256;
+
 	/** @brief Internal GL buffer resource information. */
 	struct BufferInfo {
 		uint32_t glHandle = 0;
@@ -233,14 +244,18 @@ private:
 
 	/** @brief Internal GL query resource information. */
 	struct QueryInfo {
-		uint32_t glQuery = 0;
-		bool	 active	 = false;
+		uint32_t startQuery = 0;
+		uint32_t endQuery   = 0;
+		bool	 active	  = false;
+		bool	 ended	  = false;
 	};
 
 	struct SubmissionInfo {
 		void		*sync = nullptr;
-		std::optional<uint32_t> timestampQuerySlot;
-		std::optional<uint64_t> timestampNanoseconds;
+		std::vector<uint32_t> timestampQuerySlots;
+		std::vector<uint64_t> timestampNanoseconds;
+		bool timestampInvalid = false;
+		bool released = false;
 	};
 
 	struct ImageBindingInfo {
@@ -290,6 +305,8 @@ private:
 	 */
 	void	 BindImageTexture(uint32_t binding, uint32_t texture, uint32_t format, bool readOnly);
 	uint32_t GetOrCreateSampler(const SamplerDesc &desc, bool hasMipmaps);
+	void ReleaseSubmissionTimestamp(SubmissionInfo &submission);
+	void ReapReleasedSubmissions();
 
 	/**
 	 * @brief Convert BufferMode to GL access mode constant.
@@ -336,6 +353,7 @@ private:
 	std::unordered_map<ShaderHandle, ShaderInfo>	   _shaders;
 	std::unordered_map<PipelineHandle, PipelineInfo>   _pipelines;
 	std::vector<QueryInfo>							   _queries;
+	std::vector<uint32_t>							   _pendingTimestampIntervals;
 	std::vector<SamplerInfo>							   _samplers;
 	std::unordered_map<SubmissionHandle, SubmissionInfo> _submissions;
 
