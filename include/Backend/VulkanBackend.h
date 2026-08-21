@@ -117,9 +117,9 @@ public:
 	/** @copydoc Backend::DestroyShader */
 	void				 DestroyShader(ShaderHandle shader) override;
 	/** @copydoc Backend::GetOptimizedGLSL */
-	std::string			 GetOptimizedGLSL(const ShaderDesc &desc) override;
+	std::string			 GetOptimizedGLSL(const ShaderDesc &desc, bool updateCompilationStats = true) override;
 	/** @copydoc Backend::GetOptimizedIR */
-	std::string			 GetOptimizedIR(const ShaderDesc &desc) override;
+	std::string			 GetOptimizedIR(const ShaderDesc &desc, bool updateCompilationStats = true) override;
 	/** @copydoc Backend::GetShaderCompilationStats */
 	ShaderCompilationStats GetShaderCompilationStats() const override;
 	/** @copydoc Backend::ResetShaderCompilationStats */
@@ -567,10 +567,13 @@ private:
 	 * @param type Shader type.
 	 * @param optimizationLevel SPIR-V optimization preset.
 	 * @param preserveInterface Preserve non-IO entry-point interface variables.
+	 * @param updateCompilationStats Whether this compilation contributes to public runtime statistics.
 	 * @return SPIR-V binary as uint32_t vector.
 	 */
 	std::vector<uint32_t>	  CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
-												 ShaderOptimizationLevel optimizationLevel, bool preserveInterface);
+												 ShaderOptimizationLevel optimizationLevel, bool preserveInterface,
+												 bool updateCompilationStats = true);
+	std::optional<std::vector<uint32_t>> PeekMemoryCachedSpirv(const std::filesystem::path &path) const;
 	std::optional<std::vector<uint32_t>> LoadMemoryCachedSpirv(const std::filesystem::path &path);
 	void StoreMemoryCachedSpirv(const std::filesystem::path &path, const std::vector<uint32_t> &spirv);
 

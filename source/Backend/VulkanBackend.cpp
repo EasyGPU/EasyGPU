@@ -3474,6 +3474,25 @@ std::string VulkanBackend::DecompileSPIRVToGLSL(const std::vector<uint32_t> &spi
 #endif
 }
 
+std::optional<std::vector<uint32_t>> VulkanBackend::PeekMemoryCachedSpirv(const std::filesystem::path &path) const {
+	const auto it = _spirvMemoryCache.find(path.string());
+	if (it == _spirvMemoryCache.end()) {
+		return std::nullopt;
+	}
+
+	std::error_code error;
+	const auto fileSize = std::filesystem::file_size(path, error);
+	if (error) {
+		return std::nullopt;
+	}
+	const auto lastWriteTime = std::filesystem::last_write_time(path, error);
+	if (error || fileSize != it->second.fileSize || lastWriteTime != it->second.lastWriteTime) {
+		return std::nullopt;
+	}
+
+	return it->second.spirv;
+}
+
 std::optional<std::vector<uint32_t>> VulkanBackend::LoadMemoryCachedSpirv(const std::filesystem::path &path) {
 	const auto key = path.string();
 	auto it = _spirvMemoryCache.find(key);
@@ -3539,36 +3558,47 @@ void VulkanBackend::StoreMemoryCachedSpirv(const std::filesystem::path &path, co
 
 std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
 												ShaderOptimizationLevel optimizationLevel,
-												bool					preserveInterface) {
-	_shaderCompilationStats.lastMemoryCacheHit = false;
-	_shaderCompilationStats.lastDiskCacheHit = false;
-	_shaderCompilationStats.lastFrontendMilliseconds = 0.0;
-	_shaderCompilationStats.lastOptimizationMilliseconds = 0.0;
+												bool					preserveInterface,
+												bool					updateCompilationStats) {
+	if (updateCompilationStats) {
+		_shaderCompilationStats.lastMemoryCacheHit = false;
+		_shaderCompilationStats.lastDiskCacheHit = false;
+		_shaderCompilationStats.lastFrontendMilliseconds = 0.0;
+		_shaderCompilationStats.lastOptimizationMilliseconds = 0.0;
+	}
 
 #ifdef EASYGPU_SHADER_CACHE_ENABLED
 	std::optional<std::filesystem::path> cachePath;
 	try {
 		if (const auto cacheDirectory = GetSpirvCacheDirectory()) {
 			cachePath = *cacheDirectory / (BuildSpirvCacheKey(glslSource, type, optimizationLevel, preserveInterface) + ".spv");
-			if (auto cachedSpirv = LoadMemoryCachedSpirv(*cachePath)) {
-				++_shaderCompilationStats.memoryCacheHits;
-				_shaderCompilationStats.lastMemoryCacheHit = true;
+			auto cachedSpirv = updateCompilationStats ? LoadMemoryCachedSpirv(*cachePath)
+												 : PeekMemoryCachedSpirv(*cachePath);
+			if (cachedSpirv) {
+				if (updateCompilationStats) {
+					++_shaderCompilationStats.memoryCacheHits;
+					_shaderCompilationStats.lastMemoryCacheHit = true;
+				}
 				return std::move(*cachedSpirv);
 			}
-			if (auto cachedSpirv = LoadCachedSpirv(*cachePath)) {
-				StoreMemoryCachedSpirv(*cachePath, *cachedSpirv);
-				++_shaderCompilationStats.diskCacheHits;
-				_shaderCompilationStats.lastDiskCacheHit = true;
-				return std::move(*cachedSpirv);
+			if (updateCompilationStats) {
+				if (auto diskCachedSpirv = LoadCachedSpirv(*cachePath)) {
+					StoreMemoryCachedSpirv(*cachePath, *diskCachedSpirv);
+					++_shaderCompilationStats.diskCacheHits;
+					_shaderCompilationStats.lastDiskCacheHit = true;
+					return std::move(*diskCachedSpirv);
+				}
+				++_shaderCompilationStats.diskCacheMisses;
 			}
-			++_shaderCompilationStats.diskCacheMisses;
 		}
 	} catch (...) {
 		cachePath.reset();
 	}
 #endif
 
-	++_shaderCompilationStats.frontendCompilations;
+	if (updateCompilationStats) {
+		++_shaderCompilationStats.frontendCompilations;
+	}
 	const auto frontendStart = std::chrono::steady_clock::now();
 	EShLanguage stage;
 	switch (type) {
@@ -3626,25 +3656,31 @@ std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslS
 	}
 
 	const auto frontendEnd = std::chrono::steady_clock::now();
-	_shaderCompilationStats.lastFrontendMilliseconds =
-		std::chrono::duration<double, std::milli>(frontendEnd - frontendStart).count();
+	if (updateCompilationStats) {
+		_shaderCompilationStats.lastFrontendMilliseconds =
+			std::chrono::duration<double, std::milli>(frontendEnd - frontendStart).count();
+	}
 
 	const auto optimizationStart = std::chrono::steady_clock::now();
 	auto optimized = OptimizeSPIRV(spirv, optimizationLevel, preserveInterface);
 	const auto optimizationEnd = std::chrono::steady_clock::now();
-	_shaderCompilationStats.lastOptimizationMilliseconds =
-		std::chrono::duration<double, std::milli>(optimizationEnd - optimizationStart).count();
+	if (updateCompilationStats) {
+		_shaderCompilationStats.lastOptimizationMilliseconds =
+			std::chrono::duration<double, std::milli>(optimizationEnd - optimizationStart).count();
+	}
 
 #ifdef EASYGPU_SHADER_CACHE_ENABLED
-	if (cachePath) {
+	if (cachePath && updateCompilationStats) {
 		try {
 			if (StoreCachedSpirv(*cachePath, optimized)) {
 				StoreMemoryCachedSpirv(*cachePath, optimized);
-			} else {
+			} else if (updateCompilationStats) {
 				++_shaderCompilationStats.diskCacheWriteFailures;
 			}
 		} catch (...) {
-			++_shaderCompilationStats.diskCacheWriteFailures;
+			if (updateCompilationStats) {
+				++_shaderCompilationStats.diskCacheWriteFailures;
+			}
 		}
 	}
 #endif
@@ -3656,7 +3692,7 @@ std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslS
 // Shader Management
 // =============================================================================
 
-std::string VulkanBackend::GetOptimizedGLSL(const ShaderDesc &desc) {
+std::string VulkanBackend::GetOptimizedGLSL(const ShaderDesc &desc, bool updateCompilationStats) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	if (!_initialized) {
@@ -3665,14 +3701,17 @@ std::string VulkanBackend::GetOptimizedGLSL(const ShaderDesc &desc) {
 
 #ifdef EASYGPU_SPIRV_CROSS_GLSL_ENABLED
 	return DecompileSPIRVToGLSL(
-		CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel, desc.preserveInterface), desc.type);
+		CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel, desc.preserveInterface,
+						  updateCompilationStats),
+		desc.type);
 #else
 	(void)desc;
+	(void)updateCompilationStats;
 	return {};
 #endif
 }
 
-std::string VulkanBackend::GetOptimizedIR(const ShaderDesc &desc) {
+std::string VulkanBackend::GetOptimizedIR(const ShaderDesc &desc, bool updateCompilationStats) {
 	std::lock_guard<std::mutex> lock(_mutex);
 
 	if (!_initialized) {
@@ -3681,7 +3720,8 @@ std::string VulkanBackend::GetOptimizedIR(const ShaderDesc &desc) {
 
 #if defined(EASYGPU_SPIRV_OPT_ENABLED) || defined(EASYGPU_SHADER_CACHE_ENABLED)
 	const auto spirv =
-		CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel, desc.preserveInterface);
+		CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel, desc.preserveInterface,
+						  updateCompilationStats);
 	spvtools::SpirvTools tools(SPV_ENV_VULKAN_1_1);
 	std::string assembly;
 	const uint32_t options = SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_INDENT;
@@ -3691,6 +3731,7 @@ std::string VulkanBackend::GetOptimizedIR(const ShaderDesc &desc) {
 	return assembly;
 #else
 	(void)desc;
+	(void)updateCompilationStats;
 	return {};
 #endif
 }

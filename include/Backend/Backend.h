@@ -852,10 +852,12 @@ public:
 	 *
 	 * Backends that do not support optimized GLSL inspection should return an empty string.
 	 * @param desc Shader creation descriptor.
+	 * @param updateCompilationStats Whether this inspection contributes to shader compilation/cache statistics.
 	 * @return Backend-specific optimized GLSL representation.
 	 */
-	virtual std::string GetOptimizedGLSL(const ShaderDesc &desc) {
+	virtual std::string GetOptimizedGLSL(const ShaderDesc &desc, bool updateCompilationStats = true) {
 		(void)desc;
+		(void)updateCompilationStats;
 		return {};
 	}
 	/**
@@ -864,10 +866,12 @@ public:
 	 * Vulkan returns SPIR-V assembly after the selected optimization recipe. Backends that do
 	 * not expose a stable optimized IR representation should return an empty string.
 	 * @param desc Shader creation descriptor.
+	 * @param updateCompilationStats Whether this inspection contributes to shader compilation/cache statistics.
 	 * @return Backend-specific optimized intermediate representation.
 	 */
-	virtual std::string GetOptimizedIR(const ShaderDesc &desc) {
+	virtual std::string GetOptimizedIR(const ShaderDesc &desc, bool updateCompilationStats = true) {
 		(void)desc;
+		(void)updateCompilationStats;
 		return {};
 	}
 	/** @brief Return shader compilation and persistent-cache statistics for this backend instance. */

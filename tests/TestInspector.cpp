@@ -473,6 +473,27 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 	ASSERT(stats.lastFrontendMilliseconds == 0.0);
 	ASSERT(stats.lastOptimizationMilliseconds == 0.0);
 
+	Backend::ShaderDesc inspectionDescriptor;
+	inspectionDescriptor.type = Backend::ShaderType::Compute;
+	inspectionDescriptor.sourceCode = kernel.GetCode();
+	inspectionDescriptor.optimizationLevel = Backend::ShaderOptimizationLevel::Ultra;
+	const auto beforeUntrackedInspection = stats;
+	ASSERT(!backend->GetOptimizedIR(inspectionDescriptor, false).empty());
+#ifdef EASYGPU_SPIRV_CROSS_GLSL_ENABLED
+	ASSERT(!backend->GetOptimizedGLSL(inspectionDescriptor, false).empty());
+#endif
+	const auto afterUntrackedInspection = backend->GetShaderCompilationStats();
+	ASSERT(afterUntrackedInspection.memoryCacheHits == beforeUntrackedInspection.memoryCacheHits);
+	ASSERT(afterUntrackedInspection.diskCacheHits == beforeUntrackedInspection.diskCacheHits);
+	ASSERT(afterUntrackedInspection.diskCacheMisses == beforeUntrackedInspection.diskCacheMisses);
+	ASSERT(afterUntrackedInspection.frontendCompilations == beforeUntrackedInspection.frontendCompilations);
+	ASSERT(afterUntrackedInspection.diskCacheWriteFailures == beforeUntrackedInspection.diskCacheWriteFailures);
+	ASSERT(afterUntrackedInspection.lastFrontendMilliseconds == beforeUntrackedInspection.lastFrontendMilliseconds);
+	ASSERT(afterUntrackedInspection.lastOptimizationMilliseconds ==
+		   beforeUntrackedInspection.lastOptimizationMilliseconds);
+	ASSERT(afterUntrackedInspection.lastMemoryCacheHit == beforeUntrackedInspection.lastMemoryCacheHit);
+	ASSERT(afterUntrackedInspection.lastDiskCacheHit == beforeUntrackedInspection.lastDiskCacheHit);
+
 	#ifdef EASYGPU_BACKEND_VULKAN
 	Backend::ShaderDesc diskDescriptor;
 	diskDescriptor.type = Backend::ShaderType::Compute;
@@ -530,6 +551,21 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 	stats = backend->GetShaderCompilationStats();
 	ASSERT(stats.diskCacheMisses == 4);
 	ASSERT(stats.frontendCompilations == 4);
+
+	Backend::ShaderDesc coldInspectionDescriptor = inspectionDescriptor;
+	coldInspectionDescriptor.sourceCode += "\n// untracked-inspection-cache-isolation\n";
+	const auto beforeColdInspection = stats;
+	ASSERT(!backend->GetOptimizedIR(coldInspectionDescriptor, false).empty());
+	ASSERT(backend->GetShaderCompilationStats().memoryCacheHits == beforeColdInspection.memoryCacheHits);
+	ASSERT(backend->GetShaderCompilationStats().diskCacheHits == beforeColdInspection.diskCacheHits);
+	ASSERT(backend->GetShaderCompilationStats().diskCacheMisses == beforeColdInspection.diskCacheMisses);
+	ASSERT(backend->GetShaderCompilationStats().frontendCompilations == beforeColdInspection.frontendCompilations);
+	ASSERT(!backend->GetOptimizedIR(coldInspectionDescriptor).empty());
+	stats = backend->GetShaderCompilationStats();
+	ASSERT(stats.memoryCacheHits == beforeColdInspection.memoryCacheHits);
+	ASSERT(stats.diskCacheHits == beforeColdInspection.diskCacheHits);
+	ASSERT(stats.diskCacheMisses == beforeColdInspection.diskCacheMisses + 1);
+	ASSERT(stats.frontendCompilations == beforeColdInspection.frontendCompilations + 1);
 
 #ifdef _WIN32
 	_putenv_s("EASYGPU_SHADER_CACHE_DIR", "");
