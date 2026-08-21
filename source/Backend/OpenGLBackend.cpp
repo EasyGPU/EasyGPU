@@ -1052,6 +1052,21 @@ SubmissionHandle OpenGLBackend::SubmitProfiled(const std::vector<uint32_t> &inte
 bool OpenGLBackend::TryGetSubmissionTimestamps(SubmissionHandle submission,
 											std::vector<uint64_t> &elapsedNanoseconds) {
 	elapsedNanoseconds.clear();
+	std::vector<SubmissionTimestampInterval> intervals;
+	if (!TryGetSubmissionTimestampIntervals(submission, intervals)) {
+		return false;
+	}
+	elapsedNanoseconds.reserve(intervals.size());
+	for (const auto &interval : intervals) {
+		elapsedNanoseconds.push_back(interval.durationNanoseconds);
+	}
+	return true;
+}
+
+bool OpenGLBackend::TryGetSubmissionTimestampIntervals(
+	SubmissionHandle submission,
+	std::vector<SubmissionTimestampInterval> &intervals) {
+	intervals.clear();
 	auto it = _submissions.find(submission);
 	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
@@ -1060,15 +1075,17 @@ bool OpenGLBackend::TryGetSubmissionTimestamps(SubmissionHandle submission,
 	if (info.timestampQuerySlots.empty() || info.timestampInvalid) {
 		return false;
 	}
-	if (info.timestampNanoseconds.size() == info.timestampQuerySlots.size()) {
-		elapsedNanoseconds = info.timestampNanoseconds;
+	if (info.timestampIntervals.size() == info.timestampQuerySlots.size()) {
+		intervals = info.timestampIntervals;
 		return true;
 	}
 	if (!IsSubmissionComplete(submission)) {
 		return false;
 	}
-	std::vector<uint64_t> resolved;
-	resolved.reserve(info.timestampQuerySlots.size());
+	std::vector<uint64_t> starts;
+	std::vector<uint64_t> ends;
+	starts.reserve(info.timestampQuerySlots.size());
+	ends.reserve(info.timestampQuerySlots.size());
 	for (const uint32_t querySlot : info.timestampQuerySlots) {
 		if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queries[querySlot].ended) {
 			info.timestampInvalid = true;
@@ -1087,10 +1104,21 @@ bool OpenGLBackend::TryGetSubmissionTimestamps(SubmissionHandle submission,
 			info.timestampInvalid = true;
 			return false;
 		}
-		resolved.push_back(end - start);
+		starts.push_back(start);
+		ends.push_back(end);
 	}
-	info.timestampNanoseconds = resolved;
-	elapsedNanoseconds = std::move(resolved);
+	const uint64_t baseline = starts.front();
+	std::vector<SubmissionTimestampInterval> resolved;
+	resolved.reserve(starts.size());
+	for (size_t index = 0; index < starts.size(); ++index) {
+		if (starts[index] < baseline) {
+			info.timestampInvalid = true;
+			return false;
+		}
+		resolved.push_back({starts[index] - baseline, ends[index] - starts[index]});
+	}
+	info.timestampIntervals = resolved;
+	intervals = std::move(resolved);
 	return true;
 }
 
@@ -1159,7 +1187,7 @@ void OpenGLBackend::ReleaseSubmissionTimestamp(SubmissionInfo &submission) {
 		}
 	}
 	submission.timestampQuerySlots.clear();
-	submission.timestampNanoseconds.clear();
+	submission.timestampIntervals.clear();
 	submission.timestampInvalid = false;
 }
 

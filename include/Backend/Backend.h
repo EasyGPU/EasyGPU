@@ -52,6 +52,17 @@ struct TextureReadbackMapping {
 };
 
 /**
+ * One hardware timestamp interval placed on a submission-relative GPU timeline.
+ * startOffsetNanoseconds is measured from the first submitted interval's begin timestamp;
+ * durationNanoseconds is the interval's own end-minus-begin duration. Both values come from
+ * the same device timestamp domain and never contain CPU or fence wall time.
+ */
+struct SubmissionTimestampInterval {
+	uint64_t startOffsetNanoseconds = 0;
+	uint64_t durationNanoseconds	 = 0;
+};
+
+/**
  * Low-overhead backend counters used to prove that asynchronous paths do not
  * accidentally enter a global drain, fence wait, or blocking download.
  */
@@ -1005,6 +1016,19 @@ public:
 										 std::vector<uint64_t> &elapsedNanoseconds) {
 		(void)submission;
 		elapsedNanoseconds.clear();
+		return false;
+	}
+	/**
+	 * @brief Resolve submission-owned timestamp intervals on one relative GPU timeline.
+	 * @param submission Live submission returned by SubmitProfiled.
+	 * @param intervals Receives one start offset and duration per submitted interval, in begin order.
+	 * @return true only when every interval has a complete, valid hardware timestamp result.
+	 */
+	virtual bool TryGetSubmissionTimestampIntervals(
+		SubmissionHandle submission,
+		std::vector<SubmissionTimestampInterval> &intervals) {
+		(void)submission;
+		intervals.clear();
 		return false;
 	}
 	/** @brief Query a submission without blocking. */

@@ -141,6 +141,10 @@ public:
 	/** @copydoc Backend::TryGetSubmissionTimestamps */
 	bool				 TryGetSubmissionTimestamps(SubmissionHandle submission,
 										std::vector<uint64_t> &elapsedNanoseconds) override;
+	/** @copydoc Backend::TryGetSubmissionTimestampIntervals */
+	bool				 TryGetSubmissionTimestampIntervals(
+		SubmissionHandle submission,
+		std::vector<SubmissionTimestampInterval> &intervals) override;
 	/** @copydoc Backend::IsSubmissionComplete */
 	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
 	/** @copydoc Backend::WaitForSubmission */
@@ -253,7 +257,7 @@ private:
 	struct SubmissionInfo {
 		void		*sync = nullptr;
 		std::vector<uint32_t> timestampQuerySlots;
-		std::vector<uint64_t> timestampNanoseconds;
+		std::vector<SubmissionTimestampInterval> timestampIntervals;
 		bool timestampInvalid = false;
 		bool released = false;
 	};

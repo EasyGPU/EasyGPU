@@ -162,6 +162,10 @@ public:
 	/** @copydoc Backend::TryGetSubmissionTimestamps */
 	bool				 TryGetSubmissionTimestamps(SubmissionHandle submission,
 										std::vector<uint64_t> &elapsedNanoseconds) override;
+	/** @copydoc Backend::TryGetSubmissionTimestampIntervals */
+	bool				 TryGetSubmissionTimestampIntervals(
+		SubmissionHandle submission,
+		std::vector<SubmissionTimestampInterval> &intervals) override;
 	/** @copydoc Backend::IsSubmissionComplete */
 	bool				 IsSubmissionComplete(SubmissionHandle submission) override;
 	/** @copydoc Backend::WaitForSubmission */
@@ -524,6 +528,8 @@ private:
 	void	 EndTimestampIntervalLocked(uint32_t interval);
 	SubmissionHandle SubmitProfiledLocked(const std::vector<uint32_t> &intervals);
 	bool	 ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanoseconds);
+	bool	 ResolveQueryRange(uint32_t querySlot, uint64_t &startTicks, uint64_t &endTicks);
+	bool	 ScaleTimestampDelta(uint64_t startTicks, uint64_t endTicks, uint64_t &nanoseconds) const;
 
 	/**
 	 * @brief Find a suitable memory type index for allocation.
@@ -686,7 +692,7 @@ private:
 		std::vector<PipelineHandle> pipelineUses;
 		std::optional<ReadbackInfo> readback;
 		std::vector<uint32_t> timestampQuerySlots;
-		std::vector<uint64_t> timestampNanoseconds;
+		std::vector<SubmissionTimestampInterval> timestampIntervals;
 		bool timestampInvalid = false;
 	};
 	static constexpr size_t MAX_CACHED_SUBMISSION_RESOURCES = 64;

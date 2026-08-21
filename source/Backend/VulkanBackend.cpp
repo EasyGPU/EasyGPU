@@ -1920,7 +1920,7 @@ void VulkanBackend::ReleaseSubmissionTimestamp(SubmissionInfo &submission) {
 		}
 	}
 	submission.timestampQuerySlots.clear();
-	submission.timestampNanoseconds.clear();
+	submission.timestampIntervals.clear();
 	submission.timestampInvalid = false;
 }
 
@@ -4826,8 +4826,23 @@ bool VulkanBackend::TryGetSubmissionTimestamp(SubmissionHandle submission, uint6
 
 bool VulkanBackend::TryGetSubmissionTimestamps(SubmissionHandle submission,
 											std::vector<uint64_t> &elapsedNanoseconds) {
-	std::lock_guard<std::mutex> lock(_mutex);
 	elapsedNanoseconds.clear();
+	std::vector<SubmissionTimestampInterval> intervals;
+	if (!TryGetSubmissionTimestampIntervals(submission, intervals)) {
+		return false;
+	}
+	elapsedNanoseconds.reserve(intervals.size());
+	for (const auto &interval : intervals) {
+		elapsedNanoseconds.push_back(interval.durationNanoseconds);
+	}
+	return true;
+}
+
+bool VulkanBackend::TryGetSubmissionTimestampIntervals(
+	SubmissionHandle submission,
+	std::vector<SubmissionTimestampInterval> &intervals) {
+	std::lock_guard<std::mutex> lock(_mutex);
+	intervals.clear();
 	auto it = _submissions.find(submission);
 	if (it == _submissions.end() || it->second.released) {
 		throw std::runtime_error("Invalid submission handle");
@@ -4836,25 +4851,42 @@ bool VulkanBackend::TryGetSubmissionTimestamps(SubmissionHandle submission,
 	if (info.timestampQuerySlots.empty() || info.timestampInvalid) {
 		return false;
 	}
-	if (info.timestampNanoseconds.size() == info.timestampQuerySlots.size()) {
-		elapsedNanoseconds = info.timestampNanoseconds;
+	if (info.timestampIntervals.size() == info.timestampQuerySlots.size()) {
+		intervals = info.timestampIntervals;
 		return true;
 	}
 	if (!UpdateSubmissionStatus(submission, 0, false)) {
 		return false;
 	}
-	std::vector<uint64_t> resolved;
-	resolved.reserve(info.timestampQuerySlots.size());
+	std::vector<uint64_t> starts;
+	std::vector<uint64_t> ends;
+	starts.reserve(info.timestampQuerySlots.size());
+	ends.reserve(info.timestampQuerySlots.size());
 	for (const uint32_t querySlot : info.timestampQuerySlots) {
-		uint64_t duration = 0;
-		if (!ResolveQuery(querySlot, duration)) {
+		uint64_t start = 0;
+		uint64_t end = 0;
+		if (!ResolveQueryRange(querySlot, start, end)) {
 			info.timestampInvalid = true;
 			return false;
 		}
-		resolved.push_back(duration);
+		starts.push_back(start);
+		ends.push_back(end);
 	}
-	info.timestampNanoseconds = resolved;
-	elapsedNanoseconds = std::move(resolved);
+	const uint64_t baseline = starts.front();
+	std::vector<SubmissionTimestampInterval> resolved;
+	resolved.reserve(starts.size());
+	for (size_t index = 0; index < starts.size(); ++index) {
+		uint64_t startOffset = 0;
+		uint64_t duration = 0;
+		if (!ScaleTimestampDelta(baseline, starts[index], startOffset) ||
+			!ScaleTimestampDelta(starts[index], ends[index], duration)) {
+			info.timestampInvalid = true;
+			return false;
+		}
+		resolved.push_back({startOffset, duration});
+	}
+	info.timestampIntervals = resolved;
+	intervals = std::move(resolved);
 	return true;
 }
 
@@ -4877,6 +4909,22 @@ uint64_t VulkanBackend::EndQuery(uint32_t query) {
 
 bool VulkanBackend::ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanoseconds) {
 	elapsedNanoseconds = 0;
+	uint64_t startTicks = 0;
+	uint64_t endTicks = 0;
+	if (!ResolveQueryRange(querySlot, startTicks, endTicks) ||
+		!ScaleTimestampDelta(startTicks, endTicks, elapsedNanoseconds)) {
+		return false;
+	}
+	_queries[querySlot].result = elapsedNanoseconds;
+	return true;
+}
+
+bool VulkanBackend::ResolveQueryRange(
+	uint32_t querySlot,
+	uint64_t &startTicks,
+	uint64_t &endTicks) {
+	startTicks = 0;
+	endTicks = 0;
 	if (querySlot >= _queries.size() || !_queries[querySlot].active || !_queries[querySlot].ended || !_queryPool) {
 		return false;
 	}
@@ -4903,8 +4951,17 @@ bool VulkanBackend::ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanosecond
 	if (values[1] == 0 || values[3] == 0) {
 		return false;
 	}
+	startTicks = values[0];
+	endTicks = values[2];
+	return true;
+}
 
-	uint64_t ticks = values[2] - values[0];
+bool VulkanBackend::ScaleTimestampDelta(
+	uint64_t startTicks,
+	uint64_t endTicks,
+	uint64_t &nanoseconds) const {
+	nanoseconds = 0;
+	uint64_t ticks = endTicks - startTicks;
 	if (_timestampValidBits < 64) {
 		const uint64_t mask = (uint64_t{1} << _timestampValidBits) - 1;
 		ticks &= mask;
@@ -4914,8 +4971,7 @@ bool VulkanBackend::ResolveQuery(uint32_t querySlot, uint64_t &elapsedNanosecond
 	if (!std::isfinite(scaled) || scaled < 0.0 || scaled > static_cast<double>(UINT64_MAX)) {
 		return false;
 	}
-	elapsedNanoseconds = static_cast<uint64_t>(scaled);
-	_queries[querySlot].result = elapsedNanoseconds;
+	nanoseconds = static_cast<uint64_t>(scaled);
 	return true;
 }
 

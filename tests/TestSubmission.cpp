@@ -147,6 +147,19 @@ int main() {
 		assert(nestedNanoseconds[2] > 0);
 		assert(nestedNanoseconds[0] >= nestedNanoseconds[1]);
 		assert(nestedNanoseconds[1] >= nestedNanoseconds[2]);
+		std::vector<GPU::Backend::SubmissionTimestampInterval> nestedTimeline;
+		assert(backend->TryGetSubmissionTimestampIntervals(nestedSubmission, nestedTimeline));
+		assert(nestedTimeline.size() == nestedIntervals.size());
+		assert(nestedTimeline[0].startOffsetNanoseconds == 0);
+		assert(nestedTimeline[0].durationNanoseconds == nestedNanoseconds[0]);
+		assert(nestedTimeline[1].durationNanoseconds == nestedNanoseconds[1]);
+		assert(nestedTimeline[2].durationNanoseconds == nestedNanoseconds[2]);
+		assert(nestedTimeline[1].startOffsetNanoseconds >= nestedTimeline[0].startOffsetNanoseconds);
+		assert(nestedTimeline[2].startOffsetNanoseconds >= nestedTimeline[1].startOffsetNanoseconds);
+		assert(nestedTimeline[1].startOffsetNanoseconds + nestedTimeline[1].durationNanoseconds <=
+			   nestedTimeline[0].durationNanoseconds);
+		assert(nestedTimeline[2].startOffsetNanoseconds + nestedTimeline[2].durationNanoseconds <=
+			   nestedTimeline[1].startOffsetNanoseconds + nestedTimeline[1].durationNanoseconds);
 		backend->ReleaseSubmission(nestedSubmission);
 
 		// Releasing an in-flight timestamp submission invalidates its public handle immediately,
