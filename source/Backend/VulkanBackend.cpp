@@ -1924,10 +1924,14 @@ void VulkanBackend::ReleaseSubmissionTimestamp(SubmissionInfo &submission) {
 	submission.timestampInvalid = false;
 }
 
-void VulkanBackend::EnsureNoPendingGpuWork() {
+void VulkanBackend::EnsureNoPendingTimestampIntervals(const char *operation) const {
 	if (!_pendingTimestampIntervals.empty()) {
-		throw std::runtime_error("Cannot drain GPU work with pending timestamp intervals");
+		throw std::runtime_error(std::string(operation) + " cannot split pending timestamp intervals");
 	}
+}
+
+void VulkanBackend::EnsureNoPendingGpuWork() {
+	EnsureNoPendingTimestampIntervals("GPU drain");
 	if (!_commandBufferRecording && _submissions.empty()) {
 		return;
 	}
@@ -1991,6 +1995,9 @@ BufferHandle VulkanBackend::CreateBuffer(const BufferDesc &desc) {
 
 	if (!_initialized) {
 		throw std::runtime_error("Vulkan backend not initialized");
+	}
+	if (desc.initialData != nullptr) {
+		EnsureNoPendingTimestampIntervals("Initial buffer upload");
 	}
 
 	VkBufferCreateInfo bufferInfo = {};
@@ -2062,6 +2069,8 @@ BufferHandle VulkanBackend::CreateBuffer(const BufferDesc &desc) {
 }
 
 void VulkanBackend::UploadBufferInternal(VkBuffer buffer, size_t size, const void *data) {
+	EnsureNoPendingTimestampIntervals("Initial buffer upload");
+
 	// Create staging buffer
 	VkBufferCreateInfo stagingInfo = {};
 	stagingInfo.sType			   = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -2372,6 +2381,9 @@ void VulkanBackend::UnmapBuffer(BufferHandle buffer) {
 	}
 
 	if (it->second.isMapped) {
+		if (it->second.mappedForWrite) {
+			EnsureNoPendingTimestampIntervals("Mapped buffer upload");
+		}
 		vkUnmapMemory(_device, it->second.stagingMemory);
 
 		if (it->second.mappedForWrite) {
@@ -2523,6 +2535,9 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 
 	if (!_initialized) {
 		throw std::runtime_error("Vulkan backend not initialized");
+	}
+	if (desc.initialData != nullptr) {
+		EnsureNoPendingTimestampIntervals("Initial texture upload");
 	}
 
 	VkFormat format		  = GetVkFormat(desc.format);
@@ -2823,6 +2838,7 @@ void VulkanBackend::GenerateMipmaps(TextureHandle texture) {
 		return;
 	if (info.depth > 1)
 		throw std::runtime_error("VulkanBackend mipmap generation currently supports 2D textures only");
+	EnsureNoPendingTimestampIntervals("Mipmap generation");
 
 	VkFormatProperties properties{};
 	vkGetPhysicalDeviceFormatProperties(_physicalDevice, info.vkFormat, &properties);
@@ -2962,6 +2978,7 @@ void VulkanBackend::UploadTextureInternal(TextureInfo &info, uint32_t x, uint32_
 void VulkanBackend::CopyBufferToTexture(TextureInfo &info, VkBuffer sourceBuffer, size_t sourceOffset, uint32_t x,
 										uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth,
 										TextureHandle trackedTexture, BufferHandle trackedSource) {
+	EnsureNoPendingTimestampIntervals("Blocking texture upload");
 	if (x + width > info.width || y + height > info.height || z + depth > info.depth) {
 		throw std::runtime_error("UploadTexture region exceeds texture bounds");
 	}
@@ -3253,6 +3270,7 @@ void VulkanBackend::CopyTextureToBufferBlocking(TextureInfo &info, VkBuffer dest
 												uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 												uint32_t depth, TextureHandle trackedTexture,
 												BufferHandle trackedDestination) {
+	EnsureNoPendingTimestampIntervals("Blocking texture download");
 	CopyTextureToBuffer(info, destinationBuffer, destinationOffset, x, y, z, width, height, depth, trackedTexture,
 						trackedDestination);
 	EndCommandBuffer();

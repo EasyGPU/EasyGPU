@@ -88,6 +88,35 @@ int main() {
 	backend->ReleaseSubmission(reusedAfterBurst);
 
 	if (backend->GetCaps().supportsTimestampQueries) {
+		if (backend->GetType() == GPU::Backend::BackendType::Vulkan) {
+			// A synchronous cold upload must fail before recording or submitting anything;
+			// otherwise one timestamp pair could be split across two Vulkan submissions.
+			const uint32_t guardedInterval = backend->BeginTimestampInterval();
+			assert(guardedInterval != 0);
+			const auto operationsBeforeGuard = backend->GetOperationCounters();
+			const auto resourcesBeforeGuard = backend->GetResourceCounters();
+			GPU::Backend::BufferDesc coldDesc{};
+			coldDesc.sizeInBytes = byteCount;
+			coldDesc.mode = GPU::Backend::BufferMode::Read;
+			coldDesc.initialData = sourceData.data();
+			expectInvalidSubmission([&] { (void)backend->CreateBuffer(coldDesc); });
+			const auto operationsAfterGuard = backend->GetOperationCounters();
+			const auto resourcesAfterGuard = backend->GetResourceCounters();
+			assert(operationsAfterGuard.blockingSubmissionWaitCalls ==
+				   operationsBeforeGuard.blockingSubmissionWaitCalls);
+			assert(resourcesAfterGuard.liveBufferHandles == resourcesBeforeGuard.liveBufferHandles);
+
+			backend->CopyBuffer(source, 0, destination, 0, byteCount);
+			backend->EndTimestampInterval(guardedInterval);
+			const auto guardedSubmission = backend->SubmitProfiled({guardedInterval});
+			assert(backend->WaitForSubmission(guardedSubmission, std::numeric_limits<uint64_t>::max()));
+			std::vector<uint64_t> guardedNanoseconds;
+			assert(backend->TryGetSubmissionTimestamps(guardedSubmission, guardedNanoseconds));
+			assert(guardedNanoseconds.size() == 1);
+			assert(guardedNanoseconds[0] > 0);
+			backend->ReleaseSubmission(guardedSubmission);
+		}
+
 		const uint32_t graphInterval = backend->BeginTimestampInterval();
 		const uint32_t passInterval = backend->BeginTimestampInterval();
 		assert(graphInterval != 0);

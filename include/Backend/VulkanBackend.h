@@ -442,6 +442,8 @@ private:
 	void TryDestroyDeferredBuffer(BufferHandle buffer);
 	void TryDestroyDeferredTexture(TextureHandle texture);
 	void TryDestroyDeferredPipeline(PipelineHandle pipeline);
+	/** @brief Reject an operation that would submit part of an open timestamp scope. */
+	void EnsureNoPendingTimestampIntervals(const char *operation) const;
 	/** @brief Wait for all pending GPU work to finish. */
 	void EnsureNoPendingGpuWork();
 	/**
