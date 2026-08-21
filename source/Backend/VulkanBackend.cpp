@@ -3663,8 +3663,13 @@ std::string VulkanBackend::GetOptimizedGLSL(const ShaderDesc &desc) {
 		throw std::runtime_error("Vulkan backend not initialized");
 	}
 
+#ifdef EASYGPU_SPIRV_CROSS_GLSL_ENABLED
 	return DecompileSPIRVToGLSL(
 		CompileGLSLToSPIRV(desc.sourceCode, desc.type, desc.optimizationLevel, desc.preserveInterface), desc.type);
+#else
+	(void)desc;
+	return {};
+#endif
 }
 
 std::string VulkanBackend::GetOptimizedIR(const ShaderDesc &desc) {
