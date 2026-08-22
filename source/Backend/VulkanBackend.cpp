@@ -3065,7 +3065,7 @@ void VulkanBackend::DownloadTextureToBuffer(TextureHandle texture, uint32_t x, u
 
 SubmissionHandle VulkanBackend::BeginTextureReadback(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
 													 uint32_t height, BufferHandle stagingBuffer,
-													 size_t stagingOffset) {
+													 size_t stagingOffset, uint32_t mipLevel) {
 	std::lock_guard<std::mutex> lock(_mutex);
 	if (_insideRenderPass) {
 		throw std::runtime_error("Cannot begin a texture readback inside an active render pass");
@@ -3086,11 +3086,15 @@ SubmissionHandle VulkanBackend::BeginTextureReadback(TextureHandle texture, uint
 	if (textureInfo.depth != 1 || textureInfo.format == PixelFormat::D32F || textureInfo.format == PixelFormat::D24S8) {
 		throw std::runtime_error("Asynchronous texture readback currently supports 2D color textures only");
 	}
+	if (mipLevel >= textureInfo.mipLevels) {
+		throw std::runtime_error("Texture readback mip level exceeds the allocated mip chain");
+	}
 	if (width == 0 || height == 0) {
 		throw std::runtime_error("Texture readback region must be non-empty");
 	}
-	if (x > textureInfo.width || width > textureInfo.width - x || y > textureInfo.height ||
-		height > textureInfo.height - y) {
+	const uint32_t mipWidth  = std::max(1u, textureInfo.width >> mipLevel);
+	const uint32_t mipHeight = std::max(1u, textureInfo.height >> mipLevel);
+	if (x > mipWidth || width > mipWidth - x || y > mipHeight || height > mipHeight - y) {
 		throw std::runtime_error("Texture readback region exceeds texture bounds");
 	}
 	if (bufferInfo.isMapped || bufferInfo.mappedReadback != INVALID_SUBMISSION_HANDLE ||
@@ -3127,7 +3131,8 @@ SubmissionHandle VulkanBackend::BeginTextureReadback(TextureHandle texture, uint
 		EnsureCommandBuffer();
 		TrackTextureUsage(texture);
 		TrackBufferUsage(stagingBuffer);
-		CopyTextureToBuffer(textureInfo, bufferInfo.stagingBuffer, stagingOffset, x, y, 0, width, height, 1);
+		CopyTextureToBuffer(textureInfo, bufferInfo.stagingBuffer, stagingOffset, x, y, 0, width, height, 1, texture,
+							stagingBuffer, mipLevel);
 		EndCommandBuffer();
 		const SubmissionHandle		 submission		= SubmitCommandBuffer(false, true);
 		auto						&submissionInfo = _submissions.at(submission);
@@ -3226,11 +3231,17 @@ void VulkanBackend::DownloadTextureInternal(TextureInfo &info, uint32_t x, uint3
 
 void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset,
 										uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
-										uint32_t depth, TextureHandle trackedTexture, BufferHandle trackedDestination) {
+										uint32_t depth, TextureHandle trackedTexture, BufferHandle trackedDestination,
+										uint32_t mipLevel) {
 	if (width == 0 || height == 0 || depth == 0) {
 		return;
 	}
-	if (x > info.width || width > info.width - x || y > info.height || height > info.height - y || z > info.depth ||
+	if (mipLevel >= info.mipLevels) {
+		throw std::runtime_error("DownloadTexture mip level exceeds the allocated mip chain");
+	}
+	const uint32_t mipWidth  = std::max(1u, info.width >> mipLevel);
+	const uint32_t mipHeight = std::max(1u, info.height >> mipLevel);
+	if (x > mipWidth || width > mipWidth - x || y > mipHeight || height > mipHeight - y || z > info.depth ||
 		depth > info.depth - z) {
 		throw std::runtime_error("DownloadTexture region exceeds texture bounds");
 	}
@@ -3260,7 +3271,7 @@ void VulkanBackend::CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationB
 	region.bufferRowLength				   = 0;
 	region.bufferImageHeight			   = 0;
 	region.imageSubresource.aspectMask	   = VK_IMAGE_ASPECT_COLOR_BIT;
-	region.imageSubresource.mipLevel	   = 0;
+	region.imageSubresource.mipLevel	   = mipLevel;
 	region.imageSubresource.baseArrayLayer = 0;
 	region.imageSubresource.layerCount	   = 1;
 	region.imageOffset = {static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};

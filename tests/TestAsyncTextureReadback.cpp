@@ -126,6 +126,45 @@ int main() {
 											std::numeric_limits<size_t>::max() - 3);
 	});
 
+	constexpr uint32_t mipWidth	   = 4;
+	constexpr uint32_t mipHeight   = 4;
+	constexpr uint32_t mipLevels   = 3;
+	constexpr size_t   mipOneBytes = 2 * 2 * pixelBytes;
+	std::array<uint8_t, mipWidth * mipHeight * pixelBytes> mipSource{};
+	for (size_t pixel = 0; pixel < mipSource.size(); pixel += pixelBytes) {
+		mipSource[pixel + 0] = 0x19;
+		mipSource[pixel + 1] = 0x37;
+		mipSource[pixel + 2] = 0x5b;
+		mipSource[pixel + 3] = 0xff;
+	}
+	GPU::Backend::TextureDesc mipTextureDesc{};
+	mipTextureDesc.width	 = mipWidth;
+	mipTextureDesc.height	 = mipHeight;
+	mipTextureDesc.mipLevels = mipLevels;
+	mipTextureDesc.format	 = GPU::Backend::PixelFormat::RGBA8;
+	const auto mipTexture	 = backend->CreateTexture(mipTextureDesc);
+	backend->UploadTexture(mipTexture, 0, 0, mipWidth, mipHeight, mipSource.data());
+	backend->GenerateMipmaps(mipTexture);
+	const auto mipStaging = CreateStaging(backend, mipOneBytes);
+	ExpectRuntimeError([&] { (void)backend->BeginTextureReadback(mipTexture, 0, 0, 1, 1, mipStaging, 0, mipLevels); });
+	ExpectRuntimeError([&] { (void)backend->BeginTextureReadback(mipTexture, 1, 0, 2, 1, mipStaging, 0, 1); });
+	const auto mipReadback = backend->BeginTextureReadback(mipTexture, 0, 0, 2, 2, mipStaging, 0, 1);
+	assert(backend->WaitForSubmission(mipReadback, std::numeric_limits<uint64_t>::max()));
+	const auto mipMapping = backend->MapTextureReadback(mipReadback);
+	assert(mipMapping.byteSize == mipOneBytes);
+	assert(mipMapping.rowPitch == 2 * pixelBytes);
+	const auto *mipBytes = static_cast<const uint8_t *>(mipMapping.data);
+	for (size_t pixel = 0; pixel < mipMapping.byteSize; pixel += pixelBytes) {
+		assert(mipBytes[pixel + 0] == 0x19);
+		assert(mipBytes[pixel + 1] == 0x37);
+		assert(mipBytes[pixel + 2] == 0x5b);
+		assert(mipBytes[pixel + 3] == 0xff);
+	}
+	backend->UnmapTextureReadback(mipReadback);
+	backend->ReleaseSubmission(mipReadback);
+	backend->DestroyBuffer(mipStaging);
+	backend->DestroyTexture(mipTexture);
+
 	GPU::Backend::TextureDesc noTransferDesc{};
 	noTransferDesc.width		 = width;
 	noTransferDesc.height		 = height;

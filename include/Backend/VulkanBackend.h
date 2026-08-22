@@ -81,7 +81,8 @@ public:
 	void		   UnmapBuffer(BufferHandle buffer) override;
 	/** @copydoc Backend::BeginTextureReadback */
 	SubmissionHandle BeginTextureReadback(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
-										  uint32_t height, BufferHandle stagingBuffer, size_t stagingOffset) override;
+										  uint32_t height, BufferHandle stagingBuffer, size_t stagingOffset,
+										  uint32_t mipLevel = 0) override;
 	/** @copydoc Backend::MapTextureReadback */
 	TextureReadbackMapping MapTextureReadback(SubmissionHandle submission) override;
 	/** @copydoc Backend::UnmapTextureReadback */
@@ -451,7 +452,7 @@ private:
 	void CopyTextureToBuffer(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset, uint32_t x,
 							 uint32_t y, uint32_t z, uint32_t width, uint32_t height, uint32_t depth,
 							 TextureHandle trackedTexture	  = INVALID_TEXTURE_HANDLE,
-							 BufferHandle  trackedDestination = INVALID_BUFFER_HANDLE);
+							 BufferHandle  trackedDestination = INVALID_BUFFER_HANDLE, uint32_t mipLevel = 0);
 	void CopyTextureToBufferBlocking(TextureInfo &info, VkBuffer destinationBuffer, size_t destinationOffset,
 									 uint32_t x, uint32_t y, uint32_t z, uint32_t width, uint32_t height,
 									 uint32_t depth, TextureHandle trackedTexture = INVALID_TEXTURE_HANDLE,

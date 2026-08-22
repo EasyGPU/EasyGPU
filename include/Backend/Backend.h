@@ -814,7 +814,8 @@ public:
 	 * performed through MapTextureReadback and is legal only after completion.
 	 */
 	virtual SubmissionHandle BeginTextureReadback(TextureHandle texture, uint32_t x, uint32_t y, uint32_t width,
-												  uint32_t height, BufferHandle stagingBuffer, size_t stagingOffset) {
+												  uint32_t height, BufferHandle stagingBuffer, size_t stagingOffset,
+												  uint32_t mipLevel = 0) {
 		(void)texture;
 		(void)x;
 		(void)y;
@@ -822,6 +823,7 @@ public:
 		(void)height;
 		(void)stagingBuffer;
 		(void)stagingOffset;
+		(void)mipLevel;
 		throw std::runtime_error("Backend does not support asynchronous texture readback");
 	}
 	/** Map a completed readback exactly once. */
