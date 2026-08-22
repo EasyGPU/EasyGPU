@@ -24,6 +24,10 @@
 
 namespace GPU::Backend {
 
+namespace Detail {
+struct OptimizationPlan;
+}
+
 constexpr uint32_t MAX_DESCRIPTOR_SETS = 1024;
 constexpr uint32_t MAX_QUERIES		   = 256;
 
@@ -120,6 +124,8 @@ public:
 	std::string			 GetOptimizedGLSL(const ShaderDesc &desc, bool updateCompilationStats = true) override;
 	/** @copydoc Backend::GetOptimizedIR */
 	std::string			 GetOptimizedIR(const ShaderDesc &desc, bool updateCompilationStats = true) override;
+	/** @copydoc Backend::GetOptimizationReport */
+	std::string			 GetOptimizationReport(const ShaderDesc &desc, bool updateCompilationStats = true) override;
 	/** @copydoc Backend::GetShaderCompilationStats */
 	ShaderCompilationStats GetShaderCompilationStats() const override;
 	/** @copydoc Backend::ResetShaderCompilationStats */
@@ -592,8 +598,9 @@ private:
 	 * @return SPIR-V binary as uint32_t vector.
 	 */
 	std::vector<uint32_t>	  CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
-												 ShaderOptimizationLevel optimizationLevel, bool preserveInterface,
-												 bool updateCompilationStats = true);
+										 ShaderOptimizationLevel optimizationLevel, bool preserveInterface,
+										 bool updateCompilationStats = true,
+										 Detail::OptimizationPlan *optimizationReport = nullptr);
 	std::optional<std::vector<uint32_t>> PeekMemoryCachedSpirv(const std::filesystem::path &path) const;
 	std::optional<std::vector<uint32_t>> LoadMemoryCachedSpirv(const std::filesystem::path &path);
 	void StoreMemoryCachedSpirv(const std::filesystem::path &path, const std::vector<uint32_t> &spirv);
@@ -605,8 +612,9 @@ private:
 	 * @param preserveInterface Preserve non-IO entry-point interface variables.
 	 * @return Optimized SPIR-V binary.
 	 */
-	std::vector<uint32_t>	  OptimizeSPIRV(const std::vector<uint32_t> &spirv,
-											ShaderOptimizationLevel optimizationLevel, bool preserveInterface);
+	std::vector<uint32_t>	  OptimizeSPIRV(const std::vector<uint32_t> &spirv, const std::string &source,
+											ShaderOptimizationLevel optimizationLevel, bool preserveInterface,
+											Detail::OptimizationPlan *optimizationReport = nullptr);
 
 	/**
 	 * @brief Convert SPIR-V bytecode back to readable GLSL for inspection.

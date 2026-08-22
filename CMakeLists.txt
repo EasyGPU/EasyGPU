@@ -314,6 +314,8 @@ if(EASYGPU_BACKEND STREQUAL "OpenGL")
 elseif(EASYGPU_BACKEND STREQUAL "Vulkan")
     set(EASYGPU_BACKEND_SOURCES
         include/Backend/VulkanBackend.h
+        source/Backend/ShaderOptimizationReport.h
+        source/Backend/ShaderOptimizationReport.cpp
         source/Backend/VulkanBackend.cpp
     )
 endif()

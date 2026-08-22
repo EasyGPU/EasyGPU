@@ -885,6 +885,20 @@ public:
 		(void)updateCompilationStats;
 		return {};
 	}
+	/**
+	 * @brief Compile the shader through the active target optimizer and return its structured decision report.
+	 *
+	 * The JSON report is backend-owned evidence. Unsupported backends return an empty string rather than
+	 * manufacturing target facts or decisions.
+	 * @param desc Shader creation descriptor.
+	 * @param updateCompilationStats Whether report generation contributes to public compilation statistics.
+	 * @return A versioned JSON optimization report, or an empty string when unavailable.
+	 */
+	virtual std::string GetOptimizationReport(const ShaderDesc &desc, bool updateCompilationStats = true) {
+		(void)desc;
+		(void)updateCompilationStats;
+		return {};
+	}
 	/** @brief Return shader compilation and persistent-cache statistics for this backend instance. */
 	virtual ShaderCompilationStats GetShaderCompilationStats() const {
 		return {};

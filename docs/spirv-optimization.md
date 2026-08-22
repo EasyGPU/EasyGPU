@@ -22,7 +22,11 @@ enum class ShaderOptimizationLevel {
 };
 ```
 
-`Aggressive` is the default. SPIRV-Tools exposes two built-in general optimization recipes: `-O` and `-Os`. EasyGPU maps `Aggressive` to the strongest general performance recipe available from SPIRV-Tools, `RegisterPerformancePasses()` / `spirv-opt -O`. `Performance` is kept as a compatibility alias for `Aggressive`.
+`Aggressive` is the default. SPIRV-Tools exposes two built-in general optimization recipes: `-O` and `-Os`. EasyGPU starts `Aggressive` from the installed `RegisterPerformancePasses()` / `spirv-opt -O` recipe. `Performance` is kept as a compatibility alias for `Aggressive`.
+
+SPIRV-Tools documents its exhaustive entry-point inliner as having no size or runtime cost analysis. EasyGPU therefore evaluates every callable module before registering that pass. When any callee exceeds the selected profile's instruction, code-growth, barrier-legality, or static value-pressure guard, EasyGPU reconstructs the installed recipe in order and omits only exhaustive inline for that module. Opaque-type legality inline remains available. This is deliberately conservative: a mixed module is kept callable instead of allowing one expensive callee to bypass the gate.
+
+Static `for` loops receive an `Unroll` control mask only when their trip count and estimated expansion fit the selected profile. Unknown/dynamic loops and rejected loops receive `DontUnroll`, so source hints cannot silently bypass the target gate. The profile limits become stricter for compute workgroups of 256 invocations or more. In particular, a fixed 4096-iteration loop remains rolled under every production profile and reports `UNROLL_TRIP_COUNT_LIMIT`; it is never expanded by an unconditional fixed-trip rule.
 
 `Ultra` starts with SPIRV-Tools' maintained `RegisterPerformancePasses()` recipe instead of copying its current pass list. It then runs a conservative, target-independent tail: loop invariant code motion (LICM), strength reduction, local and global redundancy elimination, code sinking, simplification, preserve-aware dead-code elimination, CFG cleanup, and ID compaction. These passes preserve shader precision and keep risky loop restructuring out of the production-oriented preset.
 
@@ -52,6 +56,20 @@ All optimizing presets honor `ShaderDesc::preserveInterface`. EasyGPU also valid
 | **CompactIds** | Renumber result IDs to a compact range after all semantic transformations |
 
 These are SPIR-V-level, target-independent transformations. A smaller module or fewer SPIR-V instructions does not by itself prove lower GPU execution time; the Vulkan driver still performs target-specific lowering and scheduling.
+
+## Structured decision report
+
+`Backend::GetOptimizationReport(const ShaderDesc&, bool)` returns a versioned JSON document on Vulkan and an empty string on unsupported backends. Report generation can be excluded from public cache/compile counters by passing `false`.
+
+The `EasyGPU.ShaderOptimizationReport` version-1 document includes:
+
+- exact optimizer/frontend/cost-model versions and selected profile;
+- Vulkan device IDs and relevant workgroup/resource limits;
+- before/after SPIR-V instruction, function, call, loop, branch, memory, texture, barrier, and byte counts;
+- stable `INLINE`, `UNROLL`, `VECTORIZE`, `SPECIALIZE`, and `BARRIER` rule results using `APPLIED`, `REJECTED_COST`, `REJECTED_LEGALITY`, or `NOT_APPLICABLE`;
+- cost inputs, thresholds, estimated code-growth/static-value-pressure effects, whole-shader actual deltas, and backend-input GLSL/pre-optimization SPIR-V locations when available.
+
+The static value-pressure unit is explicitly `SPIRV_FUNCTION_INSTRUCTIONS`; it is a conservative IR upper bound, not a physical register count. Vulkan does not expose final driver register allocation or occupancy through this path, so those fields remain `available: false` with stable reason codes. Consumers must not relabel either value as measured registers or occupancy.
 
 ### Extreme-Only Passes
 

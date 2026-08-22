@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -275,6 +276,96 @@ if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vu
 	ASSERT(optimizedIr.empty());
 }
 std::cout << "  ✓ Optimized GLSL generated via SPIR-V toolchain!\n";
+END_TEST
+
+TEST(inspector_structured_optimization_report_cost_gates)
+std::cout << "\n  Testing target-aware structured optimization decisions...\n";
+
+auto *backend = Runtime::Context::GetBackend();
+ASSERT(backend != nullptr);
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	const auto makeLoop = [](int tripCount) {
+		Backend::ShaderDesc descriptor;
+		descriptor.type = Backend::ShaderType::Compute;
+		descriptor.optimizationLevel = Backend::ShaderOptimizationLevel::Aggressive;
+		descriptor.sourceCode = "#version 450\n"
+			"layout(local_size_x=64) in;\n"
+			"layout(set=0,binding=0,std430) buffer Output { uint value; } outputBuffer;\n"
+			"void main() {\n"
+			"  uint sum = gl_GlobalInvocationID.x;\n"
+			"  for (int i = 0; i < " + std::to_string(tripCount) + "; i++) { sum = sum * 33u + uint(i); }\n"
+			"  outputBuffer.value = sum;\n"
+			"}\n";
+		return descriptor;
+	};
+
+	const Backend::ShaderDesc smallLoop = makeLoop(4);
+	const std::string smallReport = backend->GetOptimizationReport(smallLoop, false);
+	ASSERT(smallReport.find("\"kind\":\"EasyGPU.ShaderOptimizationReport\"") != std::string::npos);
+	ASSERT(smallReport.find("\"costModelVersion\":\"easygpu-vulkan-cost-v1\"") != std::string::npos);
+	ASSERT(smallReport.find("\"registerAllocation\":{\"available\":false") != std::string::npos);
+	ASSERT(smallReport.find("\"occupancy\":{\"available\":false") != std::string::npos);
+	const std::string smallIr = backend->GetOptimizedIR(smallLoop, false);
+	const bool optimizerCompiled = smallReport.find("SPIRV_OPTIMIZER_NOT_COMPILED") == std::string::npos;
+	if (optimizerCompiled) {
+		ASSERT(smallReport.find("\"kind\":\"UNROLL\",\"status\":\"APPLIED\"") != std::string::npos);
+		ASSERT(smallReport.find("\"reasonCode\":\"UNROLL_WITHIN_TARGET_COST_LIMITS\"") != std::string::npos);
+		ASSERT(smallIr.find("OpLoopMerge") == std::string::npos);
+	} else {
+		ASSERT(smallReport.find("\"reasonCode\":\"SPIRV_OPTIMIZER_NOT_COMPILED\"") != std::string::npos);
+		ASSERT(smallIr.find("OpLoopMerge") != std::string::npos);
+	}
+
+	const Backend::ShaderDesc largeLoop = makeLoop(4096);
+	const std::string largeReport = backend->GetOptimizationReport(largeLoop, false);
+	ASSERT(largeReport.find("\"value\":\"4096\"") != std::string::npos);
+	ASSERT(largeReport.find("\"kind\":\"UNROLL\",\"status\":\"REJECTED_COST\"") != std::string::npos);
+	ASSERT(largeReport.find("\"reasonCode\":\"UNROLL_TRIP_COUNT_LIMIT\"") != std::string::npos);
+	ASSERT(backend->GetOptimizedIR(largeLoop, false).find("OpLoopMerge") != std::string::npos);
+
+	Backend::ShaderDesc inlineCandidate;
+	inlineCandidate.type = Backend::ShaderType::Compute;
+	inlineCandidate.optimizationLevel = Backend::ShaderOptimizationLevel::Aggressive;
+	inlineCandidate.sourceCode = R"(#version 450
+layout(local_size_x=64) in;
+layout(set=0,binding=0,std430) buffer Output { uint value; } outputBuffer;
+uint helper(uint value) { return value * 33u + 7u; }
+void main() { outputBuffer.value = helper(gl_GlobalInvocationID.x); }
+)";
+	const std::string inlineReport = backend->GetOptimizationReport(inlineCandidate, false);
+	if (optimizerCompiled) {
+		ASSERT(inlineReport.find("\"kind\":\"INLINE\",\"status\":\"APPLIED\"") != std::string::npos);
+		ASSERT(inlineReport.find("\"reasonCode\":\"INLINE_WITHIN_TARGET_COST_LIMITS\"") != std::string::npos);
+		ASSERT(backend->GetOptimizedIR(inlineCandidate, false).find("OpFunctionCall") == std::string::npos);
+	} else {
+		ASSERT(inlineReport.find("\"reasonCode\":\"SPIRV_OPTIMIZER_NOT_COMPILED\"") != std::string::npos);
+		ASSERT(backend->GetOptimizedIR(inlineCandidate, false).find("OpFunctionCall") != std::string::npos);
+	}
+
+	Backend::ShaderDesc rejectedInline = inlineCandidate;
+	std::ostringstream largeHelper;
+	largeHelper << "#version 450\nlayout(local_size_x=64) in;\n"
+				<< "layout(set=0,binding=0,std430) buffer Output { uint value; } outputBuffer;\n"
+				<< "uint helper(uint inputValue) { uint result = inputValue;\n";
+	for (int index = 0; index < 48; ++index) {
+		largeHelper << "result = result * " << (33 + index * 2) << "u + " << (7 + index) << "u;\n";
+	}
+	largeHelper << "return result; }\n"
+				<< "void main() { outputBuffer.value = helper(gl_GlobalInvocationID.x); }\n";
+	rejectedInline.sourceCode = largeHelper.str();
+	const std::string rejectedInlineReport = backend->GetOptimizationReport(rejectedInline, false);
+	ASSERT(rejectedInlineReport.find("\"kind\":\"INLINE\",\"status\":\"REJECTED_COST\"") !=
+		   std::string::npos);
+	ASSERT(rejectedInlineReport.find("\"reasonCode\":\"INLINE_INSTRUCTION_LIMIT\"") != std::string::npos);
+	ASSERT(backend->GetOptimizedIR(rejectedInline, false).find("OpFunctionCall") != std::string::npos);
+} else {
+	Backend::ShaderDesc descriptor;
+	descriptor.type = Backend::ShaderType::Compute;
+	descriptor.sourceCode = "#version 430\nlayout(local_size_x=1) in;\nvoid main() {}\n";
+	ASSERT(backend->GetOptimizationReport(descriptor, false).empty());
+}
+
+std::cout << "  Structured optimizer decisions and the 4096-trip guard verified!\n";
 END_TEST
 
 TEST(inspector_optimization_levels)
@@ -722,6 +813,7 @@ int main() {
 		test_inspector_compile_3d();
 		test_inspector_compile_simple_version();
 		test_inspector_optimized_glsl();
+		test_inspector_structured_optimization_report_cost_gates();
 		test_inspector_optimization_levels();
 		test_inspector_ultra_optimization();
 		test_inspector_extreme_optimization();

@@ -6,6 +6,8 @@
 #include <Backend/VulkanBackend.h>
 #include <Utility/SHA256.h>
 
+#include "ShaderOptimizationReport.h"
+
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
@@ -114,7 +116,7 @@ std::optional<std::vector<uint8_t>> GetPipelineCacheBytes(VkDevice device, VkPip
 
 constexpr uint32_t kSpirvMagicNumber = 0x07230203u;
 constexpr uintmax_t kMaximumCachedSpirvBytes = 64u * 1024u * 1024u;
-constexpr std::string_view kSpirvCacheSchema = "easygpu-spirv-cache-v2";
+constexpr std::string_view kSpirvCacheSchema = "easygpu-spirv-cache-v3";
 constexpr std::string_view kPipelineCacheSchema = "easygpu-vulkan-pipeline-cache-v1";
 
 static std::atomic<uint64_t> g_cacheTemporaryFileCounter{0};
@@ -3405,28 +3407,68 @@ VkShaderStageFlags VulkanBackend::GetVkResourceStages(uint32_t stageFlags, bool 
 // SPIR-V Compilation using glslang
 // =============================================================================
 
-std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &spirv,
-												   ShaderOptimizationLevel optimizationLevel,
-												   bool					 preserveInterface) {
+std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &spirv, const std::string &source,
+											   ShaderOptimizationLevel optimizationLevel,
+											   bool preserveInterface, Detail::OptimizationPlan *optimizationReport) {
+	VkPhysicalDeviceProperties properties{};
+	if (_physicalDevice != VK_NULL_HANDLE) {
+		vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
+	}
+	Detail::OptimizationTargetFacts target{
+		properties.deviceName,
+		properties.vendorID,
+		properties.deviceID,
+		properties.driverVersion,
+		properties.apiVersion,
+		properties.limits.maxComputeWorkGroupInvocations,
+		properties.limits.maxComputeSharedMemorySize,
+		properties.limits.maxPerStageResources,
+	};
+	Detail::OptimizationPlan plan = Detail::BuildOptimizationPlan(source, spirv, optimizationLevel, target);
+	std::vector<uint32_t> planned = spirv;
+	Detail::ApplyOptimizationPlan(planned, plan);
 	if (optimizationLevel == ShaderOptimizationLevel::None) {
-		return spirv;
+		Detail::FinalizeOptimizationPlan(plan, planned);
+		if (optimizationReport != nullptr) *optimizationReport = std::move(plan);
+		return planned;
 	}
 
 #ifdef EASYGPU_SPIRV_OPT_ENABLED
 	spvtools::Optimizer optimizer(SPV_ENV_VULKAN_1_1);
+	auto registerPreset = [&](bool sizePreset) {
+		if (plan.allowExhaustiveInline) {
+			if (sizePreset) optimizer.RegisterSizePasses(preserveInterface);
+			else optimizer.RegisterPerformancePasses(preserveInterface);
+			return;
+		}
+
+		// SPIRV-Tools' maintained presets contain an exhaustive inliner that explicitly
+		// performs no size/runtime cost analysis. Rebuild the installed recipe in order while
+		// removing only that pass when EasyGPU's module-level target gate rejects a callee.
+		spvtools::Optimizer recipe(SPV_ENV_VULKAN_1_1);
+		if (sizePreset) recipe.RegisterSizePasses(preserveInterface);
+		else recipe.RegisterPerformancePasses(preserveInterface);
+		for (const char *rawName : recipe.GetPassNames()) {
+			const std::string name = rawName == nullptr ? std::string{} : std::string(rawName);
+			if (name == "inline-entry-points-exhaustive") continue;
+			if (name.empty() || !optimizer.RegisterPassFromFlag("--" + name, preserveInterface)) {
+				throw std::runtime_error("Unable to rebuild SPIRV-Tools preset without exhaustive inline: " + name);
+			}
+		}
+	};
 	switch (optimizationLevel) {
 	case ShaderOptimizationLevel::Aggressive:
-		optimizer.RegisterPerformancePasses(preserveInterface);
+		registerPreset(false);
 		break;
 	case ShaderOptimizationLevel::Size:
-		optimizer.RegisterSizePasses(preserveInterface);
+		registerPreset(true);
 		break;
 	case ShaderOptimizationLevel::Ultra:
 	case ShaderOptimizationLevel::Extreme: {
 		// Track SPIRV-Tools' maintained -O recipe first, then add a small
 		// target-independent tail. This avoids copying a recipe that changes
 		// between SPIRV-Tools releases.
-		optimizer.RegisterPerformancePasses(preserveInterface);
+		registerPreset(false);
 		optimizer.RegisterPass(spvtools::CreateLoopInvariantCodeMotionPass());
 		optimizer.RegisterPass(spvtools::CreateStrengthReductionPass());
 		optimizer.RegisterPass(spvtools::CreateLocalRedundancyEliminationPass());
@@ -3463,11 +3505,11 @@ std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &
 		std::cerr << "SPIRV-Tools optimizer: " << position.line << ":" << position.column << ": " << message << '\n';
 	});
 
-	if (!optimizer.Run(spirv.data(), spirv.size(), &optimized)) {
+	if (!optimizer.Run(planned.data(), planned.size(), &optimized)) {
 		throw std::runtime_error("SPIR-V optimization failed");
 	}
 
-	const auto &result = optimized.empty() ? spirv : optimized;
+	const auto &result = optimized.empty() ? planned : optimized;
 	spvtools::SpirvTools validator(SPV_ENV_VULKAN_1_1);
 	validator.SetMessageConsumer([](spv_message_level_t, const char *, const spv_position_t &position,
 									const char *message) {
@@ -3477,9 +3519,20 @@ std::vector<uint32_t> VulkanBackend::OptimizeSPIRV(const std::vector<uint32_t> &
 		throw std::runtime_error("SPIR-V validation failed after optimization");
 	}
 
+	Detail::FinalizeOptimizationPlan(plan, result);
+	if (optimizationReport != nullptr) *optimizationReport = std::move(plan);
 	return result;
 #else
 	(void)preserveInterface;
+	for (Detail::OptimizationDecision &decision : plan.decisions) {
+		if (!decision.requested) continue;
+		decision.status = "REJECTED_LEGALITY";
+		decision.reasonCode = "SPIRV_OPTIMIZER_NOT_COMPILED";
+		decision.chosenAction = decision.kind == "UNROLL" ? "KEEP_ROLLED" : "KEEP_CALL";
+		decision.requested = false;
+	}
+	Detail::FinalizeOptimizationPlan(plan, spirv);
+	if (optimizationReport != nullptr) *optimizationReport = std::move(plan);
 	return spirv;
 #endif
 }
@@ -3584,8 +3637,8 @@ void VulkanBackend::StoreMemoryCachedSpirv(const std::filesystem::path &path, co
 
 std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslSource, ShaderType type,
 												ShaderOptimizationLevel optimizationLevel,
-												bool					preserveInterface,
-												bool					updateCompilationStats) {
+												bool preserveInterface, bool updateCompilationStats,
+												Detail::OptimizationPlan *optimizationReport) {
 	if (updateCompilationStats) {
 		_shaderCompilationStats.lastMemoryCacheHit = false;
 		_shaderCompilationStats.lastDiskCacheHit = false;
@@ -3596,25 +3649,28 @@ std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslS
 #ifdef EASYGPU_SHADER_CACHE_ENABLED
 	std::optional<std::filesystem::path> cachePath;
 	try {
-		if (const auto cacheDirectory = GetSpirvCacheDirectory()) {
-			cachePath = *cacheDirectory / (BuildSpirvCacheKey(glslSource, type, optimizationLevel, preserveInterface) + ".spv");
-			auto cachedSpirv = updateCompilationStats ? LoadMemoryCachedSpirv(*cachePath)
+		if (optimizationReport == nullptr) {
+			if (const auto cacheDirectory = GetSpirvCacheDirectory()) {
+				cachePath = *cacheDirectory /
+					(BuildSpirvCacheKey(glslSource, type, optimizationLevel, preserveInterface) + ".spv");
+				auto cachedSpirv = updateCompilationStats ? LoadMemoryCachedSpirv(*cachePath)
 												 : PeekMemoryCachedSpirv(*cachePath);
-			if (cachedSpirv) {
+				if (cachedSpirv) {
+					if (updateCompilationStats) {
+						++_shaderCompilationStats.memoryCacheHits;
+						_shaderCompilationStats.lastMemoryCacheHit = true;
+					}
+					return std::move(*cachedSpirv);
+				}
 				if (updateCompilationStats) {
-					++_shaderCompilationStats.memoryCacheHits;
-					_shaderCompilationStats.lastMemoryCacheHit = true;
+					if (auto diskCachedSpirv = LoadCachedSpirv(*cachePath)) {
+						StoreMemoryCachedSpirv(*cachePath, *diskCachedSpirv);
+						++_shaderCompilationStats.diskCacheHits;
+						_shaderCompilationStats.lastDiskCacheHit = true;
+						return std::move(*diskCachedSpirv);
+					}
+					++_shaderCompilationStats.diskCacheMisses;
 				}
-				return std::move(*cachedSpirv);
-			}
-			if (updateCompilationStats) {
-				if (auto diskCachedSpirv = LoadCachedSpirv(*cachePath)) {
-					StoreMemoryCachedSpirv(*cachePath, *diskCachedSpirv);
-					++_shaderCompilationStats.diskCacheHits;
-					_shaderCompilationStats.lastDiskCacheHit = true;
-					return std::move(*diskCachedSpirv);
-				}
-				++_shaderCompilationStats.diskCacheMisses;
 			}
 		}
 	} catch (...) {
@@ -3688,7 +3744,7 @@ std::vector<uint32_t> VulkanBackend::CompileGLSLToSPIRV(const std::string &glslS
 	}
 
 	const auto optimizationStart = std::chrono::steady_clock::now();
-	auto optimized = OptimizeSPIRV(spirv, optimizationLevel, preserveInterface);
+	auto optimized = OptimizeSPIRV(spirv, glslSource, optimizationLevel, preserveInterface, optimizationReport);
 	const auto optimizationEnd = std::chrono::steady_clock::now();
 	if (updateCompilationStats) {
 		_shaderCompilationStats.lastOptimizationMilliseconds =
@@ -3760,6 +3816,34 @@ std::string VulkanBackend::GetOptimizedIR(const ShaderDesc &desc, bool updateCom
 	(void)updateCompilationStats;
 	return {};
 #endif
+}
+
+std::string VulkanBackend::GetOptimizationReport(const ShaderDesc &desc, bool updateCompilationStats) {
+	std::lock_guard<std::mutex> lock(_mutex);
+
+	if (!_initialized) {
+		throw std::runtime_error("Vulkan backend not initialized");
+	}
+
+	Detail::OptimizationPlan report;
+	const std::vector<uint32_t> optimized = CompileGLSLToSPIRV(
+		desc.sourceCode,
+		desc.type,
+		desc.optimizationLevel,
+		desc.preserveInterface,
+		updateCompilationStats,
+		&report);
+	const Detail::OptimizationMetrics after = Detail::AnalyzeOptimizationMetrics(optimized);
+#ifdef EASYGPU_SPIRV_OPT_ENABLED
+	const std::string optimizerVersion = spvSoftwareVersionDetailsString();
+#else
+	const std::string optimizerVersion = "SPIRV_TOOLS_OPT_NOT_COMPILED";
+#endif
+	const auto frontend = glslang::GetVersion();
+	std::ostringstream frontendVersion;
+	frontendVersion << frontend.major << '.' << frontend.minor << '.' << frontend.patch << '-'
+					<< (frontend.flavor == nullptr ? "" : frontend.flavor);
+	return Detail::SerializeOptimizationReport(report, after, optimizerVersion, frontendVersion.str());
 }
 
 ShaderCompilationStats VulkanBackend::GetShaderCompilationStats() const {
