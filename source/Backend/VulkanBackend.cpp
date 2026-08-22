@@ -3914,6 +3914,21 @@ void VulkanBackend::DestroyShader(ShaderHandle shader) {
 	_shaders.erase(it);
 }
 
+std::vector<uint8_t> VulkanBackend::GetShaderBinary(ShaderHandle shader, ShaderBinaryFormat &format) const {
+	format = ShaderBinaryFormat::Unavailable;
+
+	std::lock_guard<std::mutex> lock(_mutex);
+	const auto					it = _shaders.find(shader);
+	if (it == _shaders.end() || it->second.spirvCode.empty()) {
+		return {};
+	}
+
+	std::vector<uint8_t> binary(it->second.spirvCode.size() * sizeof(uint32_t));
+	std::memcpy(binary.data(), it->second.spirvCode.data(), binary.size());
+	format = ShaderBinaryFormat::SpirV;
+	return binary;
+}
+
 // =============================================================================
 // Pipeline Management
 // =============================================================================

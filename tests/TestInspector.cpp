@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -671,6 +672,61 @@ std::cout << "  Persistent SPIR-V cache is disabled in this build.\n";
 #endif
 END_TEST
 
+TEST(loaded_shader_binary_identity)
+std::cout << "\n  Testing exact loaded shader binary inspection...\n";
+
+auto *backend = Runtime::Context::GetBackend();
+ASSERT(backend != nullptr);
+
+Backend::ShaderDesc shaderDesc;
+shaderDesc.type				 = Backend::ShaderType::Compute;
+shaderDesc.optimizationLevel = Backend::ShaderOptimizationLevel::Ultra;
+shaderDesc.sourceCode		 = R"glsl(#version 450
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+void main() {}
+)glsl";
+
+const auto shader			 = backend->CreateShader(shaderDesc);
+ASSERT(shader != Backend::INVALID_SHADER_HANDLE);
+const auto					statsBeforeInspection = backend->GetShaderCompilationStats();
+
+Backend::ShaderBinaryFormat firstFormat			  = Backend::ShaderBinaryFormat::Unavailable;
+const auto					firstBinary			  = backend->GetShaderBinary(shader, firstFormat);
+if (Runtime::Context::GetInstance().GetBackendType() == Backend::BackendType::Vulkan) {
+	ASSERT(firstFormat == Backend::ShaderBinaryFormat::SpirV);
+	ASSERT(!firstBinary.empty());
+	ASSERT(firstBinary.size() % sizeof(uint32_t) == 0);
+	uint32_t magic = 0;
+	std::memcpy(&magic, firstBinary.data(), sizeof(magic));
+	ASSERT(magic == 0x07230203u);
+
+	Backend::ShaderBinaryFormat secondFormat = Backend::ShaderBinaryFormat::Unavailable;
+	const auto					secondBinary = backend->GetShaderBinary(shader, secondFormat);
+	ASSERT(secondFormat == firstFormat);
+	ASSERT(secondBinary == firstBinary);
+} else {
+	ASSERT(firstFormat == Backend::ShaderBinaryFormat::Unavailable);
+	ASSERT(firstBinary.empty());
+}
+
+const auto statsAfterInspection = backend->GetShaderCompilationStats();
+ASSERT(statsAfterInspection.memoryCacheHits == statsBeforeInspection.memoryCacheHits);
+ASSERT(statsAfterInspection.diskCacheHits == statsBeforeInspection.diskCacheHits);
+ASSERT(statsAfterInspection.diskCacheMisses == statsBeforeInspection.diskCacheMisses);
+ASSERT(statsAfterInspection.frontendCompilations == statsBeforeInspection.frontendCompilations);
+ASSERT(statsAfterInspection.diskCacheWriteFailures == statsBeforeInspection.diskCacheWriteFailures);
+ASSERT(statsAfterInspection.lastFrontendMilliseconds == statsBeforeInspection.lastFrontendMilliseconds);
+ASSERT(statsAfterInspection.lastOptimizationMilliseconds == statsBeforeInspection.lastOptimizationMilliseconds);
+ASSERT(statsAfterInspection.lastMemoryCacheHit == statsBeforeInspection.lastMemoryCacheHit);
+ASSERT(statsAfterInspection.lastDiskCacheHit == statsBeforeInspection.lastDiskCacheHit);
+
+backend->DestroyShader(shader);
+Backend::ShaderBinaryFormat destroyedFormat = Backend::ShaderBinaryFormat::SpirV;
+ASSERT(backend->GetShaderBinary(shader, destroyedFormat).empty());
+ASSERT(destroyedFormat == Backend::ShaderBinaryFormat::Unavailable);
+std::cout << "  Loaded shader binary is stable, passive, and lifetime-scoped!\n";
+END_TEST
+
 TEST(vulkan_pipeline_disk_cache)
 std::cout << "\n  Testing persistent Vulkan pipeline cache...\n";
 
@@ -819,6 +875,7 @@ int main() {
 		test_inspector_extreme_optimization();
 		test_shader_optimization_execution_equivalence();
 		test_shader_disk_cache();
+		test_loaded_shader_binary_identity();
 		test_vulkan_pipeline_disk_cache();
 
 		std::cout << "\n========================================\n";

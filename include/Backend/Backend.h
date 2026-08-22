@@ -208,6 +208,12 @@ enum class ShaderType {
 	Fragment
 };
 
+/** @brief Stable format identifier for an exact binary used to create a loaded shader module. */
+enum class ShaderBinaryFormat : uint32_t {
+	Unavailable = 0,
+	SpirV		= 1
+};
+
 /** @brief SPIR-V optimization preset used by backends that support shader binary optimization. */
 enum class ShaderOptimizationLevel {
 	None,				  ///< Skip backend optimization passes.
@@ -870,6 +876,21 @@ public:
 	 * @param shader Shader handle.
 	 */
 	virtual void		 DestroyShader(ShaderHandle shader)												  = 0;
+	/**
+	 * @brief Copy the exact target binary used to create a currently loaded shader module.
+	 *
+	 * This is a passive inspection query: it must not compile source, mutate shader-cache
+	 * statistics, or extend the shader lifetime. Unsupported backends and stale handles
+	 * return an empty vector with format set to Unavailable.
+	 * @param shader Live shader handle.
+	 * @param[out] format Stable target-binary format identifier.
+	 * @return Immutable byte snapshot of the loaded module input.
+	 */
+	virtual std::vector<uint8_t> GetShaderBinary(ShaderHandle shader, ShaderBinaryFormat &format) const {
+		(void)shader;
+		format = ShaderBinaryFormat::Unavailable;
+		return {};
+	}
 	/**
 	 * @brief Compile shader source, run backend optimization, and return a readable GLSL dump if supported.
 	 *

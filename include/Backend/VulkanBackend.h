@@ -120,6 +120,8 @@ public:
 	ShaderHandle		 CreateShader(const ShaderDesc &desc) override;
 	/** @copydoc Backend::DestroyShader */
 	void				 DestroyShader(ShaderHandle shader) override;
+	/** @copydoc Backend::GetShaderBinary */
+	std::vector<uint8_t>   GetShaderBinary(ShaderHandle shader, ShaderBinaryFormat &format) const override;
 	/** @copydoc Backend::GetOptimizedGLSL */
 	std::string			 GetOptimizedGLSL(const ShaderDesc &desc, bool updateCompilationStats = true) override;
 	/** @copydoc Backend::GetOptimizedIR */
