@@ -34,6 +34,15 @@ int main() {
 	const auto allocated = backend->GetResourceCounters();
 	assert(allocated.liveBufferHandles == baseline.liveBufferHandles + 1);
 	assert(allocated.liveTextureHandles == baseline.liveTextureHandles + 1);
+	const auto bufferAllocation = backend->GetBufferAllocationInfo(buffer);
+	const auto textureAllocation = backend->GetTextureAllocationInfo(texture);
+	assert(bufferAllocation.available);
+	assert(bufferAllocation.physicalBytes >= bufferDesc.sizeInBytes);
+	assert(bufferAllocation.allocationGroup != 0);
+	assert(textureAllocation.available);
+	assert(textureAllocation.physicalBytes >= 4u * 4u * 4u);
+	assert(textureAllocation.allocationGroup != 0);
+	assert(textureAllocation.allocationGroup != bufferAllocation.allocationGroup);
 
 	const auto submission = backend->Submit();
 	const auto submitted  = backend->GetResourceCounters();
@@ -47,6 +56,20 @@ int main() {
 	assert(released.liveBufferHandles == baseline.liveBufferHandles);
 	assert(released.liveTextureHandles == baseline.liveTextureHandles);
 	assert(released.liveSubmissionHandles == baseline.liveSubmissionHandles);
+	bool rejectedDestroyedBuffer = false;
+	try {
+		(void)backend->GetBufferAllocationInfo(buffer);
+	} catch (const std::runtime_error &) {
+		rejectedDestroyedBuffer = true;
+	}
+	assert(rejectedDestroyedBuffer);
+	bool rejectedDestroyedTexture = false;
+	try {
+		(void)backend->GetTextureAllocationInfo(texture);
+	} catch (const std::runtime_error &) {
+		rejectedDestroyedTexture = true;
+	}
+	assert(rejectedDestroyedTexture);
 
 	if (backend->GetCaps().supportsGraphics) {
 		const char *vertexSource =

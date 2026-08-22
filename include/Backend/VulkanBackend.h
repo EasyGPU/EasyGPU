@@ -182,6 +182,10 @@ public:
 	BackendOperationCounters GetOperationCounters() const override;
 	/** @copydoc Backend::GetResourceCounters */
 	BackendResourceCounters GetResourceCounters() const override;
+	/** @copydoc Backend::GetBufferAllocationInfo */
+	BackendResourceAllocationInfo GetBufferAllocationInfo(BufferHandle buffer) const override;
+	/** @copydoc Backend::GetTextureAllocationInfo */
+	BackendResourceAllocationInfo GetTextureAllocationInfo(TextureHandle texture) const override;
 
 	/** @copydoc Backend::BeginQuery */
 	uint32_t			 BeginQuery() override;
@@ -281,6 +285,8 @@ private:
 		bool				  destroyRequested	 = false;
 		VkMemoryPropertyFlags memoryFlags		 = 0;
 		VkMemoryPropertyFlags stagingMemoryFlags = 0;
+		uint64_t			  allocationBytes	 = 0;
+		uint64_t			  allocationGroup	 = 0;
 	};
 
 	/** @brief Internal Vulkan texture resource information. */
@@ -303,6 +309,8 @@ private:
 		uint32_t			  gpuUseLeases	   = 0;
 		uint32_t			  readbackLeases   = 0;
 		bool				  destroyRequested = false;
+		uint64_t			  allocationBytes  = 0;
+		uint64_t			  allocationGroup  = 0;
 	};
 
 	struct MsaaAttachment {
@@ -551,14 +559,15 @@ private:
 	 * @param properties Required memory property flags.
 	 * @param size Allocation size in bytes.
 	 */
-	void AllocateBufferMemory(VkBuffer buffer, VkDeviceMemory &memory, VkMemoryPropertyFlags properties, size_t size);
+	uint64_t AllocateBufferMemory(VkBuffer buffer, VkDeviceMemory &memory, VkMemoryPropertyFlags properties,
+							  size_t size);
 	/**
 	 * @brief Allocate and bind memory for an image.
 	 * @param image Vulkan image handle.
 	 * @param[out] memory Allocated device memory.
 	 * @param properties Required memory property flags.
 	 */
-	void AllocateImageMemory(VkImage image, VkDeviceMemory &memory, VkMemoryPropertyFlags properties);
+	uint64_t AllocateImageMemory(VkImage image, VkDeviceMemory &memory, VkMemoryPropertyFlags properties);
 
 	/**
 	 * @brief Convert PixelFormat to Vulkan format.
@@ -765,6 +774,7 @@ private:
 	TextureHandle									 _nextTextureHandle	 = 1;
 	ShaderHandle									 _nextShaderHandle	 = 1;
 	PipelineHandle									 _nextPipelineHandle = 1;
+	uint64_t										 _nextAllocationGroup = 1;
 
 	// State
 	bool											 _initialized		 = false;

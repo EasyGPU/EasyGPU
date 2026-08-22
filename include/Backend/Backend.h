@@ -95,6 +95,18 @@ struct BackendResourceCounters {
 	uint64_t liveMsaaAttachments		 = 0;
 };
 
+/**
+ * Exact physical allocation evidence for one backend resource. The allocation
+ * group is an opaque backend-owned identifier, never a pointer or native
+ * handle. Equal non-zero groups identify resources backed by the same physical
+ * allocation.
+ */
+struct BackendResourceAllocationInfo {
+	bool	 available		 = false;
+	uint64_t physicalBytes	 = 0;
+	uint64_t allocationGroup = 0;
+};
+
 // OpenGL buffer access mode constants (for internal use)
 constexpr int			 BUFFER_MODE_READ_ONLY	 = 0x88B8;
 constexpr int			 BUFFER_MODE_WRITE_ONLY	 = 0x88B9;
@@ -1057,6 +1069,16 @@ public:
 	}
 	/** Snapshot native live-resource and bounded-cache instrumentation counters. */
 	virtual BackendResourceCounters GetResourceCounters() const {
+		return {};
+	}
+	/** Query exact physical allocation evidence for a buffer when supported. */
+	virtual BackendResourceAllocationInfo GetBufferAllocationInfo(BufferHandle buffer) const {
+		(void)buffer;
+		return {};
+	}
+	/** Query exact physical allocation evidence for a texture when supported. */
+	virtual BackendResourceAllocationInfo GetTextureAllocationInfo(TextureHandle texture) const {
+		(void)texture;
 		return {};
 	}
 

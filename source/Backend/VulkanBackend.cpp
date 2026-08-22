@@ -2017,11 +2017,12 @@ BufferHandle VulkanBackend::CreateBuffer(const BufferDesc &desc) {
 	VkMemoryPropertyFlags memProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
 	VkDeviceMemory		  memory		= nullptr;
+	uint64_t			  allocationBytes = 0;
 	try {
-		AllocateBufferMemory(buffer, memory, memProperties, desc.sizeInBytes);
+		allocationBytes = AllocateBufferMemory(buffer, memory, memProperties, desc.sizeInBytes);
 	} catch (const std::exception &) {
 		memProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		AllocateBufferMemory(buffer, memory, memProperties, desc.sizeInBytes);
+		allocationBytes = AllocateBufferMemory(buffer, memory, memProperties, desc.sizeInBytes);
 	}
 
 	result = vkBindBufferMemory(_device, buffer, memory, 0);
@@ -2064,6 +2065,8 @@ BufferHandle VulkanBackend::CreateBuffer(const BufferDesc &desc) {
 	info.mappedForWrite		= false;
 	info.memoryFlags		= memProperties;
 	info.stagingMemoryFlags = stagingProperties;
+	info.allocationBytes	= allocationBytes;
+	info.allocationGroup	= _nextAllocationGroup++;
 
 	_buffers[handle]		= info;
 
@@ -2501,8 +2504,9 @@ uint32_t VulkanBackend::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlag
 	throw std::runtime_error("Failed to find suitable memory type");
 }
 
-void VulkanBackend::AllocateBufferMemory(VkBuffer buffer, VkDeviceMemory &memory, VkMemoryPropertyFlags properties,
-										 size_t size) {
+uint64_t VulkanBackend::AllocateBufferMemory(VkBuffer buffer, VkDeviceMemory &memory,
+										 VkMemoryPropertyFlags properties, size_t size) {
+	(void)size;
 	VkMemoryRequirements memRequirements;
 	vkGetBufferMemoryRequirements(_device, buffer, &memRequirements);
 
@@ -2513,9 +2517,11 @@ void VulkanBackend::AllocateBufferMemory(VkBuffer buffer, VkDeviceMemory &memory
 
 	VkResult result				   = vkAllocateMemory(_device, &allocInfo, nullptr, &memory);
 	CheckVkResult(result, "vkAllocateMemory");
+	return memRequirements.size;
 }
 
-void VulkanBackend::AllocateImageMemory(VkImage image, VkDeviceMemory &memory, VkMemoryPropertyFlags properties) {
+uint64_t VulkanBackend::AllocateImageMemory(VkImage image, VkDeviceMemory &memory,
+										VkMemoryPropertyFlags properties) {
 	VkMemoryRequirements memRequirements;
 	vkGetImageMemoryRequirements(_device, image, &memRequirements);
 
@@ -2526,6 +2532,7 @@ void VulkanBackend::AllocateImageMemory(VkImage image, VkDeviceMemory &memory, V
 
 	VkResult result				   = vkAllocateMemory(_device, &allocInfo, nullptr, &memory);
 	CheckVkResult(result, "vkAllocateMemory (image)");
+	return memRequirements.size;
 }
 
 // =============================================================================
@@ -2612,7 +2619,7 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	CheckVkResult(result, "vkCreateImage");
 
 	VkDeviceMemory memory = nullptr;
-	AllocateImageMemory(image, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	const auto	 physicalBytes = AllocateImageMemory(image, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	result = vkBindImageMemory(_device, image, memory, 0);
 	CheckVkResult(result, "vkBindImageMemory");
@@ -2658,6 +2665,8 @@ TextureHandle VulkanBackend::CreateTexture(const TextureDesc &desc) {
 	info.usage		   = usage;
 	info.samples	   = VK_SAMPLE_COUNT_1_BIT;
 	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.allocationBytes = physicalBytes;
+	info.allocationGroup = _nextAllocationGroup++;
 
 	_textures[handle]  = info;
 
@@ -4766,6 +4775,24 @@ BackendResourceCounters VulkanBackend::GetResourceCounters() const {
 	return counters;
 }
 
+BackendResourceAllocationInfo VulkanBackend::GetBufferAllocationInfo(BufferHandle buffer) const {
+	std::lock_guard<std::mutex> lock(_mutex);
+	const auto				it = _buffers.find(buffer);
+	if (it == _buffers.end() || it->second.destroyRequested) {
+		throw std::runtime_error("Invalid buffer handle");
+	}
+	return {true, it->second.allocationBytes, it->second.allocationGroup};
+}
+
+BackendResourceAllocationInfo VulkanBackend::GetTextureAllocationInfo(TextureHandle texture) const {
+	std::lock_guard<std::mutex> lock(_mutex);
+	const auto				it = _textures.find(texture);
+	if (it == _textures.end() || it->second.destroyRequested) {
+		throw std::runtime_error("Invalid texture handle");
+	}
+	return {true, it->second.allocationBytes, it->second.allocationGroup};
+}
+
 // =============================================================================
 // Query / Timing
 // =============================================================================
@@ -5932,7 +5959,7 @@ TextureHandle VulkanBackend::CreateDepthBuffer(uint32_t width, uint32_t height) 
 	CheckVkResult(result, "vkCreateImage (depth)");
 
 	VkDeviceMemory memory = nullptr;
-	AllocateImageMemory(image, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	const auto	 physicalBytes = AllocateImageMemory(image, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	result = vkBindImageMemory(_device, image, memory, 0);
 	CheckVkResult(result, "vkBindImageMemory (depth)");
@@ -5966,6 +5993,8 @@ TextureHandle VulkanBackend::CreateDepthBuffer(uint32_t width, uint32_t height) 
 	info.usage		   = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	info.samples	   = VK_SAMPLE_COUNT_1_BIT;
 	info.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	info.allocationBytes = physicalBytes;
+	info.allocationGroup = _nextAllocationGroup++;
 
 	_textures[handle]  = std::move(info);
 	return handle;
@@ -6003,7 +6032,8 @@ BufferHandle VulkanBackend::CreateUniformBuffer(size_t size, const void *data) {
 	CheckVkResult(result, "vkCreateBuffer (UBO)");
 
 	VkDeviceMemory memory = nullptr;
-	AllocateBufferMemory(buffer, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, size);
+	const auto	 physicalBytes =
+		AllocateBufferMemory(buffer, memory, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, size);
 
 	result = vkBindBufferMemory(_device, buffer, memory, 0);
 	CheckVkResult(result, "vkBindBufferMemory (UBO)");
@@ -6020,6 +6050,8 @@ BufferHandle VulkanBackend::CreateUniformBuffer(size_t size, const void *data) {
 	info.size		 = size;
 	info.mode		 = BufferMode::Read;
 	info.memoryFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	info.allocationBytes = physicalBytes;
+	info.allocationGroup = _nextAllocationGroup++;
 
 	_buffers[handle] = std::move(info);
 	return handle;
