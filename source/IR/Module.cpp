@@ -34,6 +34,7 @@
 #include <IR/Node/While.h>
 #include <Kernel/KernelBuildContext.h>
 
+#include <array>
 #include <cstring>
 #include <format>
 #include <memory>
@@ -216,6 +217,8 @@ public:
 		context->WorkSizeX	  = function.workSizeX;
 		context->WorkSizeY	  = function.workSizeY;
 		context->WorkSizeZ	  = function.workSizeZ;
+		context->RequireSubgroupCapabilities(_module.subgroupRequirements.basic, _module.subgroupRequirements.vote,
+											 _module.subgroupRequirements.ballot);
 		if (!RegisterResources(*context)) {
 			return nullptr;
 		}
@@ -1244,6 +1247,14 @@ private:
 			return std::make_unique<Node::LoadLocalVariableNode>("int(gl_WorkGroupSize.y)");
 		case ValueRecord::Kind::GroupSizeZ:
 			return std::make_unique<Node::LoadLocalVariableNode>("int(gl_WorkGroupSize.z)");
+		case ValueRecord::Kind::SubgroupInvocationId:
+			return std::make_unique<Node::LoadLocalVariableNode>("gl_SubgroupInvocationID");
+		case ValueRecord::Kind::SubgroupId:
+			return std::make_unique<Node::LoadLocalVariableNode>("gl_SubgroupID");
+		case ValueRecord::Kind::SubgroupSize:
+			return std::make_unique<Node::LoadLocalVariableNode>("gl_SubgroupSize");
+		case ValueRecord::Kind::NumSubgroups:
+			return std::make_unique<Node::LoadLocalVariableNode>("gl_NumSubgroups");
 		case ValueRecord::Kind::ResourceElement:
 			return BuildResourceElement(value);
 		case ValueRecord::Kind::TextureElement:
@@ -1677,6 +1688,83 @@ ValueId ModuleBuilder::GroupSizeY() {
 
 ValueId ModuleBuilder::GroupSizeZ() {
 	return AddBuiltinValue(ValueRecord::Kind::GroupSizeZ);
+}
+
+ValueId ModuleBuilder::SubgroupInvocationId() {
+	_module.subgroupRequirements.basic = true;
+	ValueRecord value;
+	value.kind = ValueRecord::Kind::SubgroupInvocationId;
+	value.type = Type::UInt();
+	return AddValue(std::move(value));
+}
+
+ValueId ModuleBuilder::SubgroupId() {
+	_module.subgroupRequirements.basic = true;
+	ValueRecord value;
+	value.kind = ValueRecord::Kind::SubgroupId;
+	value.type = Type::UInt();
+	return AddValue(std::move(value));
+}
+
+ValueId ModuleBuilder::SubgroupSize() {
+	_module.subgroupRequirements.basic = true;
+	ValueRecord value;
+	value.kind = ValueRecord::Kind::SubgroupSize;
+	value.type = Type::UInt();
+	return AddValue(std::move(value));
+}
+
+ValueId ModuleBuilder::NumSubgroups() {
+	_module.subgroupRequirements.basic = true;
+	ValueRecord value;
+	value.kind = ValueRecord::Kind::NumSubgroups;
+	value.type = Type::UInt();
+	return AddValue(std::move(value));
+}
+
+ValueId ModuleBuilder::SubgroupElect() {
+	_module.subgroupRequirements.basic = true;
+	return Intrinsic("subgroupElect", Type::Bool(), {});
+}
+
+ValueId ModuleBuilder::SubgroupAny(ValueId predicate) {
+	if (predicate >= _module.values.size() || _module.values[predicate].type.kind != Type::Kind::Bool) {
+		return InvalidValueId;
+	}
+	_module.subgroupRequirements.basic = true;
+	_module.subgroupRequirements.vote  = true;
+	const std::array arguments{predicate};
+	return Intrinsic("subgroupAny", Type::Bool(), arguments);
+}
+
+ValueId ModuleBuilder::SubgroupAll(ValueId predicate) {
+	if (predicate >= _module.values.size() || _module.values[predicate].type.kind != Type::Kind::Bool) {
+		return InvalidValueId;
+	}
+	_module.subgroupRequirements.basic = true;
+	_module.subgroupRequirements.vote  = true;
+	const std::array arguments{predicate};
+	return Intrinsic("subgroupAll", Type::Bool(), arguments);
+}
+
+ValueId ModuleBuilder::SubgroupBallot(ValueId predicate) {
+	if (predicate >= _module.values.size() || _module.values[predicate].type.kind != Type::Kind::Bool) {
+		return InvalidValueId;
+	}
+	_module.subgroupRequirements.basic	= true;
+	_module.subgroupRequirements.ballot = true;
+	const std::array arguments{predicate};
+	return Intrinsic("subgroupBallot", Type::UInt4(), arguments);
+}
+
+ValueId ModuleBuilder::SubgroupBallotBitCount(ValueId ballot) {
+	if (ballot >= _module.values.size() || _module.values[ballot].type.kind != Type::Kind::UInt4) {
+		return InvalidValueId;
+	}
+	_module.subgroupRequirements.basic	= true;
+	_module.subgroupRequirements.ballot = true;
+	const std::array arguments{ballot};
+	return Intrinsic("subgroupBallotBitCount", Type::UInt(), arguments);
 }
 
 ValueId ModuleBuilder::ResourceElement(ResourceId resource, ValueId index) {

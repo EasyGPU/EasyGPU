@@ -522,6 +522,9 @@ protected:
 
 	// Float atomic buffer tracking (buffer names needing int alias for CAS-loop fallback)
 	std::unordered_set<std::string>							 _floatAtomicBuffers;
+	bool											 _requiresSubgroupBasic = false;
+	bool											 _requiresSubgroupVote = false;
+	bool											 _requiresSubgroupBallot = false;
 
 public:
 	// ===================================================================
@@ -551,6 +554,17 @@ public:
 	bool		HasFloatAtomics() const {
 		return !_floatAtomicBuffers.empty();
 	}
+
+	/** Retain explicit subgroup requirements for deterministic GLSL extension emission. */
+	void RequireSubgroupCapabilities(bool basic, bool vote, bool ballot) {
+		_requiresSubgroupBasic = _requiresSubgroupBasic || basic;
+		_requiresSubgroupVote = _requiresSubgroupVote || vote;
+		_requiresSubgroupBallot = _requiresSubgroupBallot || ballot;
+	}
+
+	bool RequiresSubgroupBasic() const { return _requiresSubgroupBasic; }
+	bool RequiresSubgroupVote() const { return _requiresSubgroupVote; }
+	bool RequiresSubgroupBallot() const { return _requiresSubgroupBallot; }
 
 public:
 	// ===================================================================

@@ -46,6 +46,13 @@ enum class ShaderStage {
 	Fragment,
 };
 
+/** Explicit subgroup feature requirements retained by a language-neutral module. */
+struct SubgroupRequirements {
+	bool basic	= false;
+	bool vote	= false;
+	bool ballot = false;
+};
+
 /**
  * Resource category owned by a module.
  */
@@ -280,6 +287,10 @@ struct ValueRecord {
 		GroupSizeX,
 		GroupSizeY,
 		GroupSizeZ,
+		SubgroupInvocationId,
+		SubgroupId,
+		SubgroupSize,
+		NumSubgroups,
 		Compare,
 		ResourceElement,
 		TextureElement,
@@ -421,6 +432,7 @@ struct Function {
  */
 struct Module {
 	uint32_t					  version = 1;
+	SubgroupRequirements		  subgroupRequirements;
 	std::vector<ResourceBinding>  resources;
 	std::vector<ValueRecord>	  values;
 	std::vector<Function>		  functions;
@@ -462,6 +474,15 @@ public:
 	ValueId	   GroupSizeX();
 	ValueId	   GroupSizeY();
 	ValueId	   GroupSizeZ();
+	ValueId	   SubgroupInvocationId();
+	ValueId	   SubgroupId();
+	ValueId	   SubgroupSize();
+	ValueId	   NumSubgroups();
+	ValueId	   SubgroupElect();
+	ValueId	   SubgroupAny(ValueId predicate);
+	ValueId	   SubgroupAll(ValueId predicate);
+	ValueId	   SubgroupBallot(ValueId predicate);
+	ValueId	   SubgroupBallotBitCount(ValueId ballot);
 	ValueId	   ResourceElement(ResourceId resource, ValueId index);
 	ValueId	   TextureElement(ResourceId resource, ValueId x, ValueId y);
 	ValueId	   TextureElement3D(ResourceId resource, ValueId x, ValueId y, ValueId z);

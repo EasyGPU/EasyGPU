@@ -1240,6 +1240,25 @@ void VulkanBackend::SelectPhysicalDevice() {
 	std::vector<VkPhysicalDevice> devices(deviceCount);
 	vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
 
+	auto retainSubgroupCapabilities = [this](VkPhysicalDevice device) {
+		VkPhysicalDeviceSubgroupProperties subgroup{};
+		subgroup.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+		VkPhysicalDeviceProperties2 properties{};
+		properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		properties.pNext = &subgroup;
+		vkGetPhysicalDeviceProperties2(device, &properties);
+
+		_caps.subgroupSize = subgroup.subgroupSize;
+		_caps.supportsComputeSubgroups =
+			(subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) != 0;
+		_caps.supportsSubgroupBasic =
+			(subgroup.supportedOperations & VK_SUBGROUP_FEATURE_BASIC_BIT) != 0;
+		_caps.supportsSubgroupVote =
+			(subgroup.supportedOperations & VK_SUBGROUP_FEATURE_VOTE_BIT) != 0;
+		_caps.supportsSubgroupBallot =
+			(subgroup.supportedOperations & VK_SUBGROUP_FEATURE_BALLOT_BIT) != 0;
+	};
+
 	// Select the first device that supports both graphics and compute (preferred)
 	for (auto device : devices) {
 		VkPhysicalDeviceProperties props;
@@ -1288,6 +1307,7 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.supportsDepthClamp = _depthClampSupported;
 				_caps.supportsNonFillPolygonMode = _fillModeNonSolidSupported;
 				_maxSamplerAnisotropy = std::max(1.0f, limits.maxSamplerAnisotropy);
+				retainSubgroupCapabilities(device);
 				return;
 			}
 		}
@@ -1327,6 +1347,7 @@ void VulkanBackend::SelectPhysicalDevice() {
 				_caps.supportsDepthClamp = _depthClampSupported;
 				_caps.supportsNonFillPolygonMode = _fillModeNonSolidSupported;
 				_maxSamplerAnisotropy = std::max(1.0f, limits.maxSamplerAnisotropy);
+				retainSubgroupCapabilities(device);
 				return;
 			}
 		}

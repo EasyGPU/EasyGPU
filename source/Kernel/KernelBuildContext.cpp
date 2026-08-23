@@ -77,6 +77,19 @@ std::string KernelBuildContext::GetCompleteCode() {
 	oss << "#version 430 core\n\n";
 #endif
 
+	if (_requiresSubgroupBasic) {
+		oss << "#extension GL_KHR_shader_subgroup_basic : require\n";
+	}
+	if (_requiresSubgroupVote) {
+		oss << "#extension GL_KHR_shader_subgroup_vote : require\n";
+	}
+	if (_requiresSubgroupBallot) {
+		oss << "#extension GL_KHR_shader_subgroup_ballot : require\n";
+	}
+	if (_requiresSubgroupBasic || _requiresSubgroupVote || _requiresSubgroupBallot) {
+		oss << "\n";
+	}
+
 	// Float atomic extensions for maximum GPU compatibility
 	if (!_floatAtomicBuffers.empty()) {
 		oss << "#extension GL_NV_shader_atomic_float : enable\n"

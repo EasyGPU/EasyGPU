@@ -431,6 +431,11 @@ struct BackendCaps {
 	bool		supportsAsyncTransfer	 = false;
 	bool		supportsMultiQueue		 = false;
 	bool		supportsTimestampQueries = false;
+	uint32_t	subgroupSize			 = 0;
+	bool		supportsComputeSubgroups = false;
+	bool		supportsSubgroupBasic	 = false;
+	bool		supportsSubgroupVote	 = false;
+	bool		supportsSubgroupBallot	 = false;
 	bool		supportsDepthClamp		 = false;
 	bool		supportsNonFillPolygonMode = false;
 };
